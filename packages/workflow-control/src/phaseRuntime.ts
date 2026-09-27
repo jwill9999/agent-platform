@@ -534,24 +534,39 @@ export class StandalonePhaseRuntime {
       this.#journal.releaseClaim(claim, Date.now());
       throw error;
     }
-    if (PHASE_JOB_DISPATCH[action.phase].endsWith('_coordinator')) {
-      if (!this.#coordinators) {
-        this.#journal.block(claim, 'phase_coordinator_configuration_missing', Date.now());
-        return false;
-      }
-      try {
-        await this.#verifySource(action, []);
-        const job = this.#journal.start(claim, Date.now());
-        return await this.#runCoordinator(job, action, fences);
-      } catch {
-        this.#journal.block(
-          this.#journal.get(claim.id)!,
-          'phase_coordinator_reconciliation_required',
-          Date.now(),
-        );
-        return false;
-      }
+    if (PHASE_JOB_DISPATCH[action.phase].endsWith('_coordinator'))
+      return this.#startCoordinator(claim, action, fences);
+    return this.#runSpecialist(claim, action, fences);
+  }
+
+  async #startCoordinator(
+    claim: PhaseJob,
+    action: ExecutePhaseAction,
+    fences: ResourceFences,
+  ): Promise<boolean> {
+    if (!this.#coordinators) {
+      this.#journal.block(claim, 'phase_coordinator_configuration_missing', Date.now());
+      return false;
     }
+    try {
+      await this.#verifySource(action, []);
+      const job = this.#journal.start(claim, Date.now());
+      return await this.#runCoordinator(job, action, fences);
+    } catch {
+      this.#journal.block(
+        this.#journal.get(claim.id)!,
+        'phase_coordinator_reconciliation_required',
+        Date.now(),
+      );
+      return false;
+    }
+  }
+
+  async #runSpecialist(
+    claim: PhaseJob,
+    action: ExecutePhaseAction,
+    fences: ResourceFences,
+  ): Promise<boolean> {
     let packet: TaskPacket;
     try {
       packet = this.#packet(action);
@@ -741,18 +756,18 @@ export class StandalonePhaseRuntime {
         resultHead = imported.resultHead;
         await this.#verifySource({ ...action, headSha: resultHead }, packet.allowedPaths);
       }
-      await this.#completeSpecialist(
-        job,
-        action,
-        packet,
-        fences,
-        reservation.id,
-        terminal,
-        resultHead,
-        inputEvidence.reference.digest,
-        evidenceCapability,
-        this.#owner,
-      );
+      await this.#completeSpecialist({
+        job: job,
+        action: action,
+        packet: packet,
+        fences: fences,
+        executionId: reservation.id,
+        terminal: terminal,
+        resultHead: resultHead,
+        inputDigest: inputEvidence.reference.digest,
+        evidenceCapability: evidenceCapability,
+        inputProducer: this.#owner,
+      });
       return true;
     } catch (error) {
       await this.#failExecution(job, reservation, fences, error);
@@ -834,18 +849,30 @@ export class StandalonePhaseRuntime {
     }
   }
 
-  async #completeSpecialist(
-    job: PhaseJob,
-    action: ExecutePhaseAction,
-    packet: TaskPacket,
-    fences: ResourceFences,
-    executionId: string,
-    terminal: AgentResult,
-    resultHead: string,
-    inputDigest: string,
-    evidenceCapability: EvidenceCapability,
-    inputProducer: string,
-  ): Promise<boolean> {
+  async #completeSpecialist(input: {
+    job: PhaseJob;
+    action: ExecutePhaseAction;
+    packet: TaskPacket;
+    fences: ResourceFences;
+    executionId: string;
+    terminal: AgentResult;
+    resultHead: string;
+    inputDigest: string;
+    evidenceCapability: EvidenceCapability;
+    inputProducer: string;
+  }): Promise<boolean> {
+    const {
+      job,
+      action,
+      packet,
+      fences,
+      executionId,
+      terminal,
+      resultHead,
+      inputDigest,
+      evidenceCapability,
+      inputProducer,
+    } = input;
     // Keep the structured answer only, with trusted execution identity to avoid cross-role digest aliasing.
     const result = { executionDigest: digestGovernedValue(executionId), terminal };
     const resultEvidence = await this.#vault.recordSpecialistResult({
@@ -1077,11 +1104,12 @@ export class StandalonePhaseRuntime {
     this.#assertAdmission();
     if (this.#closing) throw new Error('phase_runtime_closing');
     // A recovery may observe a prepared or applied head; pin Git before any import mutation.
-    new TrustedSourceGit(
+    const recoveryGit = new TrustedSourceGit(
       this.#config.sourceRoot,
       this.#config.gitBinary,
       this.#config.gitBinaryDigest,
     );
+    recoveryGit.assertSafeIndex();
     const action = this.#journal.action(job);
     const fences = this.#fences(action);
     const authority = {
@@ -1137,18 +1165,18 @@ export class StandalonePhaseRuntime {
       const inputDigest = digestGovernedValue(packet);
       const input = this.#store.getSecureEvidence(inputDigest, action.runId, action.taskId);
       if (!input) throw new Error('implementation recovery input evidence missing');
-      await this.#completeSpecialist(
-        job,
-        action,
-        packet.task,
-        fences,
-        execution.id,
-        output.terminal,
-        imported.resultHead,
-        inputDigest,
-        evidenceCapability,
-        input.producer,
-      );
+      await this.#completeSpecialist({
+        job: job,
+        action: action,
+        packet: packet.task,
+        fences: fences,
+        executionId: execution.id,
+        terminal: output.terminal,
+        resultHead: imported.resultHead,
+        inputDigest: inputDigest,
+        evidenceCapability: evidenceCapability,
+        inputProducer: input.producer,
+      });
     } finally {
       this.#capabilities.revoke(capability.token);
     }

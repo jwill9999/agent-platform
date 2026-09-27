@@ -67,8 +67,7 @@ function transition(
     ? (JSON.parse(row.external_arguments_json) as Record<string, unknown>)
     : undefined;
   if (
-    !row ||
-    row.run_id !== action.runId ||
+    row?.run_id !== action.runId ||
     row.from_state !== from ||
     row.to_state !== to ||
     row.operation !== operation ||
@@ -99,8 +98,7 @@ function operation(
       }
     | undefined;
   if (
-    !row ||
-    row.workspace_id !== action.workspaceId ||
+    row?.workspace_id !== action.workspaceId ||
     row.run_id !== action.runId ||
     row.task_id !== action.taskId ||
     row.kind !== kind ||
@@ -128,137 +126,21 @@ export function verifyCoordinatorProof(
   const proof = coordinatorProofSchema.parse(raw);
   let outcome: CoordinatorOutcome;
   switch (proof.kind) {
-    case 'task_acceptance': {
-      if (action.phase !== 'task_accepted') throw new Error('coordinator phase mismatch');
-      transition(
-        db,
-        action,
-        proof.closeTransitionId,
-        'task_accepted',
-        'integration',
-        'beads.task_close',
-        action.runVersion,
-      );
-      const integrated = transition(
-        db,
-        action,
-        proof.integrationTransitionId,
-        'integration',
-        'feature_evaluation',
-        'internal.integration_verified',
-        action.runVersion + 2,
-      );
-      const result = JSON.parse(integrated.result_json ?? 'null') as {
-        headSha?: string;
-        evidenceDigests?: string[];
-      } | null;
-      if (result?.headSha !== action.headSha || !result.evidenceDigests?.length)
-        throw new Error('coordinator integration head or evidence missing');
-      for (const item of result.evidenceDigests) {
-        if (
-          !db
-            .prepare(
-              `SELECT 1 FROM evidence_bindings WHERE digest=? AND run_id=? AND task_id=? AND head_sha=?
-          AND workspace_id=? AND contract_version=? AND policy_digest=?
-          AND producer='local-exact-head-integration-gate' AND kind='test'`,
-            )
-            .get(
-              item,
-              action.runId,
-              action.taskId,
-              action.headSha,
-              action.workspaceId,
-              action.contractVersion,
-              action.policyDigest,
-            )
-        )
-          throw new Error('coordinator integration evidence missing');
-      }
-      outcome = {
-        state: 'feature_evaluation',
-        version: action.runVersion + 4,
-        headSha: action.headSha,
-      };
+    case 'task_acceptance':
+      outcome = verifyTaskAcceptance(db, action, proof);
       break;
-    }
-    case 'repair': {
-      if (action.phase !== 'repair') throw new Error('coordinator phase mismatch');
-      const dispatch = db
-        .prepare(
-          `SELECT * FROM repair_dispatches WHERE id=? AND run_id=? AND task_id=?
-        AND status='dispatched' AND failure_head_sha=?`,
-        )
-        .get(proof.dispatchId, action.runId, action.taskId, action.headSha);
-      if (!dispatch) throw new Error('coordinator repair budget reservation missing');
-      const moved = transition(
-        db,
-        action,
-        proof.transitionId,
-        'repair',
-        'implementing',
-        'internal.repair_dispatched',
-        action.runVersion,
-      );
-      if (
-        (JSON.parse(moved.external_arguments_json) as { dispatchId?: string }).dispatchId !==
-        proof.dispatchId
-      )
-        throw new Error('coordinator repair dispatch binding rejected');
-      outcome = { state: 'implementing', version: action.runVersion + 2, headSha: action.headSha };
+    case 'repair':
+      outcome = verifyRepair(db, action, proof);
       break;
-    }
-    case 'pipeline': {
-      if (action.phase !== 'pipeline') throw new Error('coordinator phase mismatch');
-      const observed = operation(db, action, proof.checksOperationId, 'github.checks');
-      const checks = observed.result.checks as Record<string, unknown> | undefined;
-      const required = observed.request.requiredChecks as string[];
-      if (
-        !checks ||
-        !Array.isArray(required) ||
-        required.length === 0 ||
-        required.some((check) => checks[check] !== 'success')
-      )
-        throw new Error('coordinator pipeline checks not passed');
-      const moved = transition(
-        db,
-        action,
-        proof.transitionId,
-        'pipeline',
-        'delivery',
-        'internal.pipeline_verified',
-        action.runVersion,
-      );
-      if (
-        (JSON.parse(moved.external_arguments_json) as { checksOperationId?: string })
-          .checksOperationId !== proof.checksOperationId
-      )
-        throw new Error('coordinator checks binding rejected');
-      outcome = { state: 'delivery', version: action.runVersion + 2, headSha: action.headSha };
+    case 'pipeline':
+      outcome = verifyPipeline(db, action, proof);
       break;
-    }
-    case 'delivery': {
-      if (action.phase !== 'delivery') throw new Error('coordinator phase mismatch');
-      operation(db, action, proof.mergeOperationId, 'github.merge');
-      outcome = { state: 'finalizing', version: action.runVersion + 1, headSha: action.headSha };
+    case 'delivery':
+      outcome = verifyDelivery(db, action, proof);
       break;
-    }
-    case 'finalization': {
-      if (action.phase !== 'finalizing') throw new Error('coordinator phase mismatch');
-      const closed = db
-        .prepare(
-          `SELECT report_json FROM feature_finalizations WHERE run_id=? AND status='closed'
-        AND report_digest=? AND closed_at_ms IS NOT NULL`,
-        )
-        .get(action.runId, proof.reportDigest) as { report_json: string } | undefined;
-      if (!closed || digestGovernedValue(JSON.parse(closed.report_json)) !== proof.reportDigest)
-        throw new Error('coordinator verified finalization missing');
-      const run = db.prepare('SELECT state,version FROM runs WHERE id=?').get(action.runId) as {
-        state: string;
-        version: number;
-      };
-      outcome = { state: 'closed', version: run.version, headSha: action.headSha };
+    case 'finalization':
+      outcome = verifyFinalization(db, action, proof);
       break;
-    }
   }
   const run = db.prepare('SELECT state,version FROM runs WHERE id=?').get(action.runId) as {
     state: string;
@@ -267,4 +149,155 @@ export function verifyCoordinatorProof(
   if (run.state !== outcome.state || run.version !== outcome.version)
     throw new Error('coordinator outcome no longer current');
   return outcome;
+}
+
+function verifyTaskAcceptance(
+  db: Database.Database,
+  action: CoordinatorProofContext,
+  proof: Extract<CoordinatorProof, { kind: 'task_acceptance' }>,
+): CoordinatorOutcome {
+  if (action.phase !== 'task_accepted') throw new Error('coordinator phase mismatch');
+  transition(
+    db,
+    action,
+    proof.closeTransitionId,
+    'task_accepted',
+    'integration',
+    'beads.task_close',
+    action.runVersion,
+  );
+  const integrated = transition(
+    db,
+    action,
+    proof.integrationTransitionId,
+    'integration',
+    'feature_evaluation',
+    'internal.integration_verified',
+    action.runVersion + 2,
+  );
+  const result = JSON.parse(integrated.result_json ?? 'null') as {
+    headSha?: string;
+    evidenceDigests?: string[];
+  } | null;
+  if (result?.headSha !== action.headSha || !result.evidenceDigests?.length)
+    throw new Error('coordinator integration head or evidence missing');
+  for (const item of result.evidenceDigests) {
+    if (
+      !db
+        .prepare(
+          `SELECT 1 FROM evidence_bindings WHERE digest=? AND run_id=? AND task_id=? AND head_sha=?
+          AND workspace_id=? AND contract_version=? AND policy_digest=?
+          AND producer='local-exact-head-integration-gate' AND kind='test'`,
+        )
+        .get(
+          item,
+          action.runId,
+          action.taskId,
+          action.headSha,
+          action.workspaceId,
+          action.contractVersion,
+          action.policyDigest,
+        )
+    )
+      throw new Error('coordinator integration evidence missing');
+  }
+  return {
+    state: 'feature_evaluation',
+    version: action.runVersion + 4,
+    headSha: action.headSha,
+  };
+}
+
+function verifyRepair(
+  db: Database.Database,
+  action: CoordinatorProofContext,
+  proof: Extract<CoordinatorProof, { kind: 'repair' }>,
+): CoordinatorOutcome {
+  if (action.phase !== 'repair') throw new Error('coordinator phase mismatch');
+  const dispatch = db
+    .prepare(
+      `SELECT * FROM repair_dispatches WHERE id=? AND run_id=? AND task_id=?
+        AND status='dispatched' AND failure_head_sha=?`,
+    )
+    .get(proof.dispatchId, action.runId, action.taskId, action.headSha);
+  if (!dispatch) throw new Error('coordinator repair budget reservation missing');
+  const moved = transition(
+    db,
+    action,
+    proof.transitionId,
+    'repair',
+    'implementing',
+    'internal.repair_dispatched',
+    action.runVersion,
+  );
+  if (
+    (JSON.parse(moved.external_arguments_json) as { dispatchId?: string }).dispatchId !==
+    proof.dispatchId
+  )
+    throw new Error('coordinator repair dispatch binding rejected');
+  return { state: 'implementing', version: action.runVersion + 2, headSha: action.headSha };
+}
+
+function verifyPipeline(
+  db: Database.Database,
+  action: CoordinatorProofContext,
+  proof: Extract<CoordinatorProof, { kind: 'pipeline' }>,
+): CoordinatorOutcome {
+  if (action.phase !== 'pipeline') throw new Error('coordinator phase mismatch');
+  const observed = operation(db, action, proof.checksOperationId, 'github.checks');
+  const checks = observed.result.checks as Record<string, unknown> | undefined;
+  const required = observed.request.requiredChecks as string[];
+  if (
+    !checks ||
+    !Array.isArray(required) ||
+    required.length === 0 ||
+    required.some((check) => checks[check] !== 'success')
+  )
+    throw new Error('coordinator pipeline checks not passed');
+  const moved = transition(
+    db,
+    action,
+    proof.transitionId,
+    'pipeline',
+    'delivery',
+    'internal.pipeline_verified',
+    action.runVersion,
+  );
+  if (
+    (JSON.parse(moved.external_arguments_json) as { checksOperationId?: string })
+      .checksOperationId !== proof.checksOperationId
+  )
+    throw new Error('coordinator checks binding rejected');
+  return { state: 'delivery', version: action.runVersion + 2, headSha: action.headSha };
+}
+
+function verifyDelivery(
+  db: Database.Database,
+  action: CoordinatorProofContext,
+  proof: Extract<CoordinatorProof, { kind: 'delivery' }>,
+): CoordinatorOutcome {
+  if (action.phase !== 'delivery') throw new Error('coordinator phase mismatch');
+  operation(db, action, proof.mergeOperationId, 'github.merge');
+  return { state: 'finalizing', version: action.runVersion + 1, headSha: action.headSha };
+}
+
+function verifyFinalization(
+  db: Database.Database,
+  action: CoordinatorProofContext,
+  proof: Extract<CoordinatorProof, { kind: 'finalization' }>,
+): CoordinatorOutcome {
+  if (action.phase !== 'finalizing') throw new Error('coordinator phase mismatch');
+  const closed = db
+    .prepare(
+      `SELECT report_json FROM feature_finalizations WHERE run_id=? AND status='closed'
+        AND report_digest=? AND closed_at_ms IS NOT NULL`,
+    )
+    .get(action.runId, proof.reportDigest) as { report_json: string } | undefined;
+  if (!closed || digestGovernedValue(JSON.parse(closed.report_json)) !== proof.reportDigest)
+    throw new Error('coordinator verified finalization missing');
+  const run = db.prepare('SELECT state,version FROM runs WHERE id=?').get(action.runId) as {
+    state: string;
+    version: number;
+  };
+  return { state: 'closed', version: run.version, headSha: action.headSha };
 }

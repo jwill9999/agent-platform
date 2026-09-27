@@ -36,73 +36,13 @@ export const implementationOutputSchema = z
       fail('implementation role required');
     let total = 0;
     const aliases = new Set<string>();
-    const forbidden = new Set([
-      '.git',
-      '.beads',
-      '.codex',
-      '.agents',
-      '.ssh',
-      '.aws',
-      '.azure',
-      '.gnupg',
-      '.gitconfig',
-      '.gitattributes',
-      '.gitmodules',
-      '.git-credentials',
-      '.npmrc',
-      '.netrc',
-      'auth.json',
-    ]);
     for (const file of value.files) {
-      if (
-        /[\\:]/u.test(file.path) ||
-        [...file.path].some(
-          (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
-        ) ||
-        file.path
-          .split('/')
-          .some(
-            (part) => part === '' || part === '.' || part.endsWith('.') || part.endsWith(' '),
-          ) ||
-        file.path.normalize('NFC') !== file.path
-      )
-        fail('noncanonical returned path');
-      const alias = file.path.normalize('NFC').toLowerCase();
-      if (aliases.has(alias)) fail('duplicate or aliased returned path');
-      aliases.add(alias);
-      if (
-        file.path
-          .split('/')
-          .some(
-            (part) => forbidden.has(part.toLowerCase()) || part.toLowerCase().startsWith('.env'),
-          )
-      )
-        fail('prohibited returned path');
-      if (
-        !value.input.task.allowedPaths.some(
-          (path) => file.path === path || file.path.startsWith(`${path}/`),
-        )
-      )
-        fail('returned path outside task');
-      if (file.content === null) {
-        if (file.afterDigest !== null || file.beforeDigest === null) fail('invalid deletion');
-      } else {
-        const bytes = Buffer.from(file.content, 'utf8');
-        total += bytes.length;
-        if (
-          bytes.length > 1024 * 1024 ||
-          bytes.toString('utf8') !== file.content ||
-          file.content.includes('\0')
-        )
-          fail('returned content is not bounded UTF-8 text');
-        if (`sha256:${createHash('sha256').update(bytes).digest('hex')}` !== file.afterDigest)
-          fail('returned content digest mismatch');
-        if (file.beforeDigest === file.afterDigest) fail('unchanged returned file');
-      }
+      validateReturnedPath(file, value.input.task.allowedPaths, aliases, fail);
+      total += validateReturnedContent(file, fail);
     }
     if (total > 16 * 1024 * 1024) fail('returned byte limit exceeded');
-    const reported = [...value.terminal.changedFiles].sort();
-    const observed = value.files.map((file) => file.path).sort();
+    const reported = [...value.terminal.changedFiles].sort((a, b) => a.localeCompare(b));
+    const observed = value.files.map((file) => file.path).sort((a, b) => a.localeCompare(b));
     if (JSON.stringify(reported) !== JSON.stringify(observed))
       fail('reported changes differ from returned bytes');
     const deleted = new Set(
@@ -112,3 +52,72 @@ export const implementationOutputSchema = z
       fail('rename-shaped output rejected');
   });
 export type ImplementationOutput = z.infer<typeof implementationOutputSchema>;
+
+const forbidden = new Set([
+  '.git',
+  '.beads',
+  '.codex',
+  '.agents',
+  '.ssh',
+  '.aws',
+  '.azure',
+  '.gnupg',
+  '.gitconfig',
+  '.gitattributes',
+  '.gitmodules',
+  '.git-credentials',
+  '.npmrc',
+  '.netrc',
+  'auth.json',
+]);
+type ReturnedFile = z.infer<typeof returnedFile>;
+type RejectOutput = (message: string) => void;
+function validateReturnedPath(
+  file: ReturnedFile,
+  allowedPaths: string[],
+  aliases: Set<string>,
+  fail: RejectOutput,
+): void {
+  if (
+    /[\\:]/u.test(file.path) ||
+    [...file.path].some(
+      (character) => character.codePointAt(0)! < 32 || character.codePointAt(0)! === 127,
+    ) ||
+    file.path
+      .split('/')
+      .some((part) => part === '' || part === '.' || part.endsWith('.') || part.endsWith(' ')) ||
+    file.path.normalize('NFC') !== file.path
+  )
+    fail('noncanonical returned path');
+  const alias = file.path.normalize('NFC').toLowerCase();
+  if (aliases.has(alias)) fail('duplicate or aliased returned path');
+  aliases.add(alias);
+  if (
+    file.path
+      .split('/')
+      .some((part) => forbidden.has(part.toLowerCase()) || part.toLowerCase().startsWith('.env'))
+  )
+    fail('prohibited returned path');
+  if (!allowedPaths.some((path) => file.path === path || file.path.startsWith(`${path}/`)))
+    fail('returned path outside task');
+}
+function validateReturnedContent(file: ReturnedFile, fail: RejectOutput): number {
+  let size = 0;
+  if (file.content === null) {
+    if (file.afterDigest !== null || file.beforeDigest === null) fail('invalid deletion');
+  } else {
+    const bytes = Buffer.from(file.content, 'utf8');
+    size = bytes.length;
+    if (
+      bytes.length > 1024 * 1024 ||
+      bytes.toString('utf8') !== file.content ||
+      file.content.includes('\0')
+    )
+      fail('returned content is not bounded UTF-8 text');
+    if (`sha256:${createHash('sha256').update(bytes).digest('hex')}` !== file.afterDigest)
+      fail('returned content digest mismatch');
+    if (file.beforeDigest === file.afterDigest) fail('unchanged returned file');
+  }
+
+  return size;
+}

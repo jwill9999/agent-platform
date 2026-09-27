@@ -143,19 +143,7 @@ async function populateSpecialistWorkspace(
     ) {
       throw new Error(`specialist source path is forbidden: ${allowedPath}`);
     }
-    let selected = canonicalSource;
-    let absent = false;
-    for (const part of allowedPath.split('/')) {
-      selected = join(selected, part);
-      try {
-        if ((await lstat(selected)).isSymbolicLink())
-          throw new Error('specialist source symlinks are forbidden');
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-        absent = true;
-        break;
-      }
-    }
+    const absent = await sourcePathAbsent(canonicalSource, allowedPath);
     const requested = resolve(canonicalSource, allowedPath);
     const source = absent ? requested : await realpath(requested);
     if (!isInside(source, canonicalSource)) {
@@ -901,28 +889,14 @@ export class DockerIsolatedSpecialistLauncher {
       );
       stagingRoot = resolve(workspace.root, '..');
       homeForCleanup = workspace.codexHome;
-      const execution = this.#options.store.getSchedulerExecution(reservation.id)!;
-      const outputBinding =
-        envelope && roleProfile.patch
-          ? {
-              workspaceId: execution.workspaceId,
-              runId: packet.runId,
-              taskId: packet.taskId,
-              executionId: reservation.id,
-              role: packet.assignedRole,
-              contractVersion: packet.contractVersion,
-              policyDigest: packet.policyDigest,
-              inputMaterialDigest: packet.documentBinding!.materialDigest,
-              baselineHeadSha: envelope.binding.headSha,
-            }
-          : undefined;
-      const baseline = outputBinding
-        ? captureSpecialistOutputBaseline({
-            workspaceRoot: workspace.root,
-            expectedBinding: outputBinding,
-            writablePaths: packet.allowedPaths.map((path) => ({ kind: 'subtree' as const, path })),
-          })
-        : undefined;
+      const captured = captureImplementationOutput({
+        packet,
+        reservation,
+        envelope,
+        workspace,
+        patch: roleProfile.patch,
+        execution: this.#options.store.getSchedulerExecution(reservation.id)!,
+      });
       this.#options.store.bindSchedulerStaging(
         authority,
         stagingRoot,
@@ -1049,25 +1023,7 @@ export class DockerIsolatedSpecialistLauncher {
       ]);
       retainWorkspace = true;
       output = { ...parsed, retainedWorkspaceRoot: workspace.root };
-      if (baseline && outputBinding && envelope) {
-        const expected = {
-          baseline,
-          expectedBinding: outputBinding,
-          expectedBaselineDigest: baseline.baselineDigest,
-        };
-        const candidate = observeSpecialistOutput(expected);
-        output.implementationOutput = implementationOutputSchema.parse({
-          kind: 'implementation_output',
-          version: 1,
-          executionId: reservation.id,
-          attempt: execution.attemptNumber,
-          input: envelope,
-          baselineDigest: baseline.baselineDigest,
-          outputTreeDigest: candidate.outputTreeDigest,
-          files: collectSpecialistReturnedFiles({ ...expected, candidate }),
-          terminal: specialistTerminalResult(parsed),
-        });
-      }
+      if (captured) output.implementationOutput = collectImplementationOutput(captured, parsed);
     } catch (error) {
       launchError = error;
       // A managed phase persists its interruption before any failure cleanup.
@@ -1465,4 +1421,72 @@ export class DockerIsolatedSpecialistLauncher {
       if (this.#containerLocks.get(id) === queued) this.#containerLocks.delete(id);
     }
   }
+}
+
+async function sourcePathAbsent(canonicalSource: string, allowedPath: string): Promise<boolean> {
+  let selected = canonicalSource;
+  for (const part of allowedPath.split('/')) {
+    selected = join(selected, part);
+    try {
+      if ((await lstat(selected)).isSymbolicLink())
+        throw new Error('specialist source symlinks are forbidden');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function captureImplementationOutput(input: {
+  packet: TaskPacket;
+  reservation: DockerSpecialistReservation;
+  envelope: SpecialistInputEnvelope | undefined;
+  workspace: SpecialistWorkspace;
+  patch: boolean;
+  execution: NonNullable<ReturnType<WorkflowStore['getSchedulerExecution']>>;
+}) {
+  const { packet, reservation, envelope, workspace, patch, execution } = input;
+  if (!envelope || !patch) return undefined;
+  const outputBinding = {
+    workspaceId: execution.workspaceId,
+    runId: packet.runId,
+    taskId: packet.taskId,
+    executionId: reservation.id,
+    role: packet.assignedRole,
+    contractVersion: packet.contractVersion,
+    policyDigest: packet.policyDigest,
+    inputMaterialDigest: packet.documentBinding!.materialDigest,
+    baselineHeadSha: envelope.binding.headSha,
+  };
+  const baseline = captureSpecialistOutputBaseline({
+    workspaceRoot: workspace.root,
+    expectedBinding: outputBinding,
+    writablePaths: packet.allowedPaths.map((path) => ({ kind: 'subtree' as const, path })),
+  });
+  return { baseline, outputBinding, envelope, execution };
+}
+function collectImplementationOutput(
+  captured: NonNullable<ReturnType<typeof captureImplementationOutput>>,
+  parsed: SpecialistExecutionResult,
+): ImplementationOutput {
+  const { baseline, outputBinding, envelope, execution } = captured;
+  const expected = {
+    baseline,
+    expectedBinding: outputBinding,
+    expectedBaselineDigest: baseline.baselineDigest,
+  };
+  const candidate = observeSpecialistOutput(expected);
+  return implementationOutputSchema.parse({
+    kind: 'implementation_output',
+    version: 1,
+    executionId: execution.id,
+    attempt: execution.attemptNumber,
+    input: envelope,
+    baselineDigest: baseline.baselineDigest,
+    outputTreeDigest: candidate.outputTreeDigest,
+    files: collectSpecialistReturnedFiles({ ...expected, candidate }),
+    terminal: specialistTerminalResult(parsed),
+  });
 }

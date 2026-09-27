@@ -96,111 +96,8 @@ export class StandaloneCoordinators {
         call('beads.pushDolt', { workspaceRoot, idempotencyKey }),
     });
     const beadsBroker = new JournaledBeadsDoltBroker(this.#store, beads);
-    if (action.phase === 'task_accepted') {
-      const closer = new JournaledBeadsTaskCloser(beadsBroker, beads);
-      const gate = LocalExactHeadIntegrationGate.create({
-        workspaceRoot: this.#root,
-        gitPin: this.#gitPin,
-        artifacts: new JournaledArtifactRecorder(
-          new ContentAddressedArtifactStore(this.#config.artifactRoot),
-          this.#store,
-        ),
-        checkCommands: this.#config.checkCommands as Record<string, [string, ...string[]]>,
-      });
-      const orchestrator = new WorkflowOrchestrator({
-        store: this.#store,
-        contract: this.#contract,
-        closer,
-        launcher: this.#launcher,
-        integrationGate: gate,
-        ownerId: this.#owner,
-      });
-      const closeTransitionId = `${job.execution_id}:task-close`;
-      const integrationTransitionId = `${job.execution_id}:integration`;
-      if (!this.#store.getTransition(closeTransitionId)) {
-        const row = this.#db
-          .prepare('SELECT callback_json FROM delegate_callbacks WHERE callback_id=?')
-          .get(action.callbackId) as { callback_json: string } | undefined;
-        if (!row) throw new Error('coordinator_review_callback_missing');
-        const callback = delegateCallbackSchema.parse(JSON.parse(row.callback_json));
-        const execution = this.#store.getSchedulerExecution(callback.delegationId);
-        if (
-          !execution ||
-          callback.delegateRole !== 'code_reviewer' ||
-          callback.terminalStatus !== 'continue'
-        )
-          throw new Error('coordinator_review_not_accepted');
-        const terminal = specialistTerminalResult(execution.result);
-        if (!terminal) throw new Error('coordinator_review_result_missing');
-        const evidence = this.#store.getSecureEvidence(
-          callback.resultArtifactDigest,
-          action.runId,
-          action.taskId,
-        );
-        if (!evidence || evidence.headSha !== action.headSha || evidence.deletedAtMs !== null)
-          throw new Error('coordinator_review_evidence_missing');
-        const verified = await gate.verify({
-          contract: this.#contract,
-          runId: action.runId,
-          taskId: action.taskId,
-        });
-        if (verified.headSha !== action.headSha) throw new Error('coordinator_head_changed');
-        const reference = evidenceReferenceSchema.parse({
-          digest: evidence.digest,
-          mediaType: evidence.mediaType,
-          sizeBytes: evidence.sizeBytes,
-          kind: evidence.kind,
-        });
-        const packet: TaskPacket = orchestrator.createTaskPacket({
-          runId: action.runId,
-          taskId: action.taskId,
-          evidence: [reference],
-        });
-        await orchestrator.acceptAndCloseTask({
-          packet,
-          result: { ...terminal, changedFiles: verified.changedFiles, evidence: [reference] },
-          transitionId: closeTransitionId,
-          workspaceLeaseEpoch: fence.workspaceLeaseEpoch,
-          runLeaseEpoch: fence.runLeaseEpoch,
-          taskLeaseEpoch: fence.taskLeaseEpoch,
-        });
-      } else if (this.#store.getTransition(closeTransitionId)?.status !== 'committed') {
-        await closer.reconcilePreparedTaskTransition({
-          runId: action.runId,
-          taskId: action.taskId,
-          recoveryOwnerId: this.#owner,
-          recoveryRunLeaseEpoch: fence.runLeaseEpoch,
-          recoveryWorkspaceLeaseEpoch: fence.workspaceLeaseEpoch,
-          recoveryTaskLeaseEpoch: fence.taskLeaseEpoch,
-          contractVersion: action.contractVersion,
-          policyDigest: action.policyDigest,
-          nowMs: Date.now(),
-        });
-      }
-      if (!this.#store.getTransition(integrationTransitionId)) {
-        const verified = await gate.verify({
-          contract: this.#contract,
-          runId: action.runId,
-          taskId: action.taskId,
-        });
-        assertAuthority();
-        if (verified.headSha !== action.headSha) throw new Error('coordinator_head_changed');
-        this.#transition(
-          action,
-          fence,
-          integrationTransitionId,
-          'integration',
-          'feature_evaluation',
-          'internal.integration_verified',
-          { taskId: action.taskId },
-          {
-            headSha: action.headSha,
-            evidenceDigests: verified.evidence.map((item) => item.digest),
-          },
-        );
-      }
-      return { kind: 'task_acceptance', closeTransitionId, integrationTransitionId };
-    }
+    if (action.phase === 'task_accepted')
+      return this.#acceptTask(job, action, fence, assertAuthority, beadsBroker, beads);
     const git = LocalGitDeliveryPort.create({
       workspaceRoot: this.#root,
       remoteName: this.#config.remoteName,
@@ -230,132 +127,273 @@ export class StandaloneCoordinators {
         approvedProtectionDigest: this.#config.protectionDigest,
       },
     });
-    const binding = {
-      workspaceId: action.workspaceId,
-      runId: action.runId,
-      taskId: action.taskId,
-      repository: this.#contract.authority.github.repository,
-      actorRole: 'workflow_orchestrator' as const,
-      contractVersion: action.contractVersion,
-      policyDigest: action.policyDigest,
-    };
-    if (action.phase === 'pipeline') {
-      const ref = `refs/heads/task/${action.taskId}`;
-      const pushed = this.#db
-        .prepare(
-          `SELECT published_sha FROM delivery_approved_heads WHERE run_id=? AND task_id=?
-        UNION ALL SELECT published_sha FROM repair_approved_heads WHERE run_id=? AND task_id=?`,
-        )
-        .get(action.runId, action.taskId, action.runId, action.taskId) as {
-        published_sha: string | null;
-      };
-      await delivery.execute(
-        {
-          ...binding,
-          kind: 'git.push',
-          ref,
-          expectedRemoteSha: pushed.published_sha,
-          newSha: action.headSha,
-        },
-        fence,
-      );
-      const body = `Verified workflow task ${action.taskId}. Head: ${action.headSha}.`;
-      const pr = await delivery.execute(
-        {
-          ...binding,
-          kind: 'github.pr',
-          headRef: ref.slice('refs/heads/'.length),
-          headSha: action.headSha,
-          base: this.#contract.authority.github.base,
-          title: `${action.taskId}: verified task`,
-          body,
-          bodyDigest: `sha256:${createHash('sha256').update(body).digest('hex')}`,
-        },
-        fence,
-      );
-      const number = (pr.result as { pullRequestNumber: number }).pullRequestNumber;
-      const checks = await delivery.execute(
-        {
-          ...binding,
-          kind: 'github.checks',
-          pullRequestNumber: number,
-          headSha: action.headSha,
-          base: this.#contract.authority.github.base,
-          requiredChecks: this.#contract.authority.github.requiredChecks,
-          protectionDigest: this.#config.protectionDigest,
-          pollAttempt: 0,
-        },
-        fence,
-      );
-      const observed = checks.result as { checks: Record<string, string> };
-      if (
-        this.#contract.authority.github.requiredChecks.some(
-          (name) => observed.checks[name] !== 'success',
-        )
-      )
-        throw new Error('coordinator_pipeline_checks_not_passed');
-      const transitionId = `${job.execution_id}:pipeline`;
+    const binding = coordinatorBinding(this.#contract, action);
+    if (action.phase === 'pipeline') return this.#pipeline(job, action, fence, delivery, binding);
+    if (action.phase === 'delivery')
+      return this.#delivery(action, fence, delivery, binding, github);
+    if (action.phase === 'finalizing') return this.#finalizing(action, fence, beadsBroker);
+    throw new Error('coordinator_phase_unavailable');
+  }
+  async #acceptTask(
+    job: PhaseJob,
+    action: ExecutePhaseAction,
+    fence: DeliveryFence,
+    assertAuthority: () => void,
+    beadsBroker: JournaledBeadsDoltBroker,
+    beads: ReturnType<typeof createProductionBeadsDoltPort>,
+  ): Promise<CoordinatorProof> {
+    const closer = new JournaledBeadsTaskCloser(beadsBroker, beads);
+    const gate = LocalExactHeadIntegrationGate.create({
+      workspaceRoot: this.#root,
+      gitPin: this.#gitPin,
+      artifacts: new JournaledArtifactRecorder(
+        new ContentAddressedArtifactStore(this.#config.artifactRoot),
+        this.#store,
+      ),
+      checkCommands: this.#config.checkCommands as Record<string, [string, ...string[]]>,
+    });
+    const orchestrator = new WorkflowOrchestrator({
+      store: this.#store,
+      contract: this.#contract,
+      closer,
+      launcher: this.#launcher,
+      integrationGate: gate,
+      ownerId: this.#owner,
+    });
+    const closeTransitionId = `${job.execution_id}:task-close`;
+    const integrationTransitionId = `${job.execution_id}:integration`;
+    if (!this.#store.getTransition(closeTransitionId)) {
+      await this.#closeTask(action, fence, gate, orchestrator, closeTransitionId);
+    } else if (this.#store.getTransition(closeTransitionId)?.status !== 'committed') {
+      await closer.reconcilePreparedTaskTransition({
+        runId: action.runId,
+        taskId: action.taskId,
+        recoveryOwnerId: this.#owner,
+        recoveryRunLeaseEpoch: fence.runLeaseEpoch,
+        recoveryWorkspaceLeaseEpoch: fence.workspaceLeaseEpoch,
+        recoveryTaskLeaseEpoch: fence.taskLeaseEpoch,
+        contractVersion: action.contractVersion,
+        policyDigest: action.policyDigest,
+        nowMs: Date.now(),
+      });
+    }
+    if (!this.#store.getTransition(integrationTransitionId)) {
+      const verified = await gate.verify({
+        contract: this.#contract,
+        runId: action.runId,
+        taskId: action.taskId,
+      });
+      assertAuthority();
+      if (verified.headSha !== action.headSha) throw new Error('coordinator_head_changed');
       this.#transition(
         action,
         fence,
-        transitionId,
-        'pipeline',
-        'delivery',
-        'internal.pipeline_verified',
-        { taskId: action.taskId, checksOperationId: checks.id },
-        { headSha: action.headSha },
+        integrationTransitionId,
+        'integration',
+        'feature_evaluation',
+        'internal.integration_verified',
+        {
+          arguments: { taskId: action.taskId },
+          result: {
+            headSha: action.headSha,
+            evidenceDigests: verified.evidence.map((item) => item.digest),
+          },
+        },
       );
-      return { kind: 'pipeline', checksOperationId: checks.id, transitionId };
     }
-    if (action.phase === 'delivery') {
-      const pr = await github.observe({
+    return { kind: 'task_acceptance', closeTransitionId, integrationTransitionId };
+  }
+
+  async #closeTask(
+    action: ExecutePhaseAction,
+    fence: DeliveryFence,
+    gate: LocalExactHeadIntegrationGate,
+    orchestrator: WorkflowOrchestrator,
+    closeTransitionId: string,
+  ): Promise<void> {
+    const row = this.#db
+      .prepare('SELECT callback_json FROM delegate_callbacks WHERE callback_id=?')
+      .get(action.callbackId) as { callback_json: string } | undefined;
+    if (!row) throw new Error('coordinator_review_callback_missing');
+    const callback = delegateCallbackSchema.parse(JSON.parse(row.callback_json));
+    const execution = this.#store.getSchedulerExecution(callback.delegationId);
+    if (
+      !execution ||
+      callback.delegateRole !== 'code_reviewer' ||
+      callback.terminalStatus !== 'continue'
+    )
+      throw new Error('coordinator_review_not_accepted');
+    const terminal = specialistTerminalResult(execution.result);
+    if (!terminal) throw new Error('coordinator_review_result_missing');
+    const evidence = this.#store.getSecureEvidence(
+      callback.resultArtifactDigest,
+      action.runId,
+      action.taskId,
+    );
+    if (!evidence || evidence.headSha !== action.headSha || evidence.deletedAtMs !== null)
+      throw new Error('coordinator_review_evidence_missing');
+    const verified = await gate.verify({
+      contract: this.#contract,
+      runId: action.runId,
+      taskId: action.taskId,
+    });
+    if (verified.headSha !== action.headSha) throw new Error('coordinator_head_changed');
+    const reference = evidenceReferenceSchema.parse({
+      digest: evidence.digest,
+      mediaType: evidence.mediaType,
+      sizeBytes: evidence.sizeBytes,
+      kind: evidence.kind,
+    });
+    const packet: TaskPacket = orchestrator.createTaskPacket({
+      runId: action.runId,
+      taskId: action.taskId,
+      evidence: [reference],
+    });
+    await orchestrator.acceptAndCloseTask({
+      packet,
+      result: { ...terminal, changedFiles: verified.changedFiles, evidence: [reference] },
+      transitionId: closeTransitionId,
+      workspaceLeaseEpoch: fence.workspaceLeaseEpoch,
+      runLeaseEpoch: fence.runLeaseEpoch,
+      taskLeaseEpoch: fence.taskLeaseEpoch,
+    });
+  }
+  async #pipeline(
+    job: PhaseJob,
+    action: ExecutePhaseAction,
+    fence: DeliveryFence,
+    delivery: DurableDeliveryBroker,
+    binding: ReturnType<typeof coordinatorBinding>,
+  ): Promise<CoordinatorProof> {
+    const ref = `refs/heads/task/${action.taskId}`;
+    const pushed = this.#db
+      .prepare(
+        `SELECT published_sha FROM delivery_approved_heads WHERE run_id=? AND task_id=?
+        UNION ALL SELECT published_sha FROM repair_approved_heads WHERE run_id=? AND task_id=?`,
+      )
+      .get(action.runId, action.taskId, action.runId, action.taskId) as {
+      published_sha: string | null;
+    };
+    await delivery.execute(
+      {
+        ...binding,
+        kind: 'git.push',
+        ref,
+        expectedRemoteSha: pushed.published_sha,
+        newSha: action.headSha,
+      },
+      fence,
+    );
+    const body = `Verified workflow task ${action.taskId}. Head: ${action.headSha}.`;
+    const pr = await delivery.execute(
+      {
         ...binding,
         kind: 'github.pr',
-        headRef: `task/${action.taskId}`,
+        headRef: ref.slice('refs/heads/'.length),
         headSha: action.headSha,
         base: this.#contract.authority.github.base,
         title: `${action.taskId}: verified task`,
-        body: `Verified workflow task ${action.taskId}. Head: ${action.headSha}.`,
-        bodyDigest: `sha256:${createHash('sha256').update(`Verified workflow task ${action.taskId}. Head: ${action.headSha}.`).digest('hex')}`,
-      });
-      if (pr.kind !== 'expected') throw new Error('coordinator_pr_unavailable');
-      const merge = await delivery.execute(
-        {
-          ...binding,
-          kind: 'github.merge',
-          pullRequestNumber: (pr.result as { pullRequestNumber: number }).pullRequestNumber,
-          headSha: action.headSha,
-          base: this.#contract.authority.github.base,
-          requiredChecks: this.#contract.authority.github.requiredChecks,
-          protectionDigest: this.#config.protectionDigest,
-          reviewDecision: 'approved',
-          mergeMethod: this.#contract.authority.github.mergeMethod,
-          adminBypass: false,
-        },
-        fence,
-      );
-      return { kind: 'delivery', mergeOperationId: merge.id };
-    }
-    if (action.phase === 'finalizing') {
-      const finalizer = new FeatureFinalizationCoordinator({
-        store: this.#store,
-        contract: this.#contract,
-        broker: beadsBroker,
-      });
-      const lease = this.#store.acquireLease('closeout', action.runId, this.#owner, 30000);
-      const report = await finalizer.finalize({
-        runId: action.runId,
-        epicId: this.#contract.featureId,
-        fence: {
-          ownerId: this.#owner,
-          workspaceLeaseEpoch: fence.workspaceLeaseEpoch,
-          runLeaseEpoch: fence.runLeaseEpoch,
-          closeoutLeaseEpoch: lease.epoch,
-        },
-      });
-      return { kind: 'finalization', reportDigest: report.reportDigest };
-    }
-    throw new Error('coordinator_phase_unavailable');
+        body,
+        bodyDigest: `sha256:${createHash('sha256').update(body).digest('hex')}`,
+      },
+      fence,
+    );
+    const number = (pr.result as { pullRequestNumber: number }).pullRequestNumber;
+    const checks = await delivery.execute(
+      {
+        ...binding,
+        kind: 'github.checks',
+        pullRequestNumber: number,
+        headSha: action.headSha,
+        base: this.#contract.authority.github.base,
+        requiredChecks: this.#contract.authority.github.requiredChecks,
+        protectionDigest: this.#config.protectionDigest,
+        pollAttempt: 0,
+      },
+      fence,
+    );
+    const observed = checks.result as { checks: Record<string, string> };
+    if (
+      this.#contract.authority.github.requiredChecks.some(
+        (name) => observed.checks[name] !== 'success',
+      )
+    )
+      throw new Error('coordinator_pipeline_checks_not_passed');
+    const transitionId = `${job.execution_id}:pipeline`;
+    this.#transition(
+      action,
+      fence,
+      transitionId,
+      'pipeline',
+      'delivery',
+      'internal.pipeline_verified',
+      {
+        arguments: { taskId: action.taskId, checksOperationId: checks.id },
+        result: { headSha: action.headSha },
+      },
+    );
+    return { kind: 'pipeline', checksOperationId: checks.id, transitionId };
+  }
+
+  async #delivery(
+    action: ExecutePhaseAction,
+    fence: DeliveryFence,
+    delivery: DurableDeliveryBroker,
+    binding: ReturnType<typeof coordinatorBinding>,
+    github: ReturnType<typeof createProductionGitHubDeliveryPort>,
+  ): Promise<CoordinatorProof> {
+    const body = `Verified workflow task ${action.taskId}. Head: ${action.headSha}.`;
+    const pr = await github.observe({
+      ...binding,
+      kind: 'github.pr',
+      headRef: `task/${action.taskId}`,
+      headSha: action.headSha,
+      base: this.#contract.authority.github.base,
+      title: `${action.taskId}: verified task`,
+      body,
+      bodyDigest: `sha256:${createHash('sha256').update(body).digest('hex')}`,
+    });
+    if (pr.kind !== 'expected') throw new Error('coordinator_pr_unavailable');
+    const merge = await delivery.execute(
+      {
+        ...binding,
+        kind: 'github.merge',
+        pullRequestNumber: (pr.result as { pullRequestNumber: number }).pullRequestNumber,
+        headSha: action.headSha,
+        base: this.#contract.authority.github.base,
+        requiredChecks: this.#contract.authority.github.requiredChecks,
+        protectionDigest: this.#config.protectionDigest,
+        reviewDecision: 'approved',
+        mergeMethod: this.#contract.authority.github.mergeMethod,
+        adminBypass: false,
+      },
+      fence,
+    );
+    return { kind: 'delivery', mergeOperationId: merge.id };
+  }
+
+  async #finalizing(
+    action: ExecutePhaseAction,
+    fence: DeliveryFence,
+    beadsBroker: JournaledBeadsDoltBroker,
+  ): Promise<CoordinatorProof> {
+    const finalizer = new FeatureFinalizationCoordinator({
+      store: this.#store,
+      contract: this.#contract,
+      broker: beadsBroker,
+    });
+    const lease = this.#store.acquireLease('closeout', action.runId, this.#owner, 30000);
+    const report = await finalizer.finalize({
+      runId: action.runId,
+      epicId: this.#contract.featureId,
+      fence: {
+        ownerId: this.#owner,
+        workspaceLeaseEpoch: fence.workspaceLeaseEpoch,
+        runLeaseEpoch: fence.runLeaseEpoch,
+        closeoutLeaseEpoch: lease.epoch,
+      },
+    });
+    return { kind: 'finalization', reportDigest: report.reportDigest };
   }
   #transition(
     action: ExecutePhaseAction,
@@ -364,8 +402,7 @@ export class StandaloneCoordinators {
     from: 'integration' | 'pipeline',
     to: 'feature_evaluation' | 'delivery',
     operation: string,
-    args: unknown,
-    result: unknown,
+    effect: { arguments: unknown; result: unknown },
   ): void {
     const existing = this.#store.getTransition(id);
     if (existing?.status === 'committed') return;
@@ -394,9 +431,21 @@ export class StandaloneCoordinators {
         taskLeaseEpoch: fence.taskLeaseEpoch,
       },
       expectedExternalState: { status: 'internal' },
-      externalArguments: args,
+      externalArguments: effect.arguments,
       nowMs: Date.now(),
     });
-    this.#store.commitTransition(id, this.#owner, fence.runLeaseEpoch, result, Date.now());
+    this.#store.commitTransition(id, this.#owner, fence.runLeaseEpoch, effect.result, Date.now());
   }
+}
+
+function coordinatorBinding(contract: ExecutionContract, action: ExecutePhaseAction) {
+  return {
+    workspaceId: action.workspaceId,
+    runId: action.runId,
+    taskId: action.taskId,
+    repository: contract.authority.github.repository,
+    actorRole: 'workflow_orchestrator' as const,
+    contractVersion: action.contractVersion,
+    policyDigest: action.policyDigest,
+  };
 }

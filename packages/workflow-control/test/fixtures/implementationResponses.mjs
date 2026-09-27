@@ -41,7 +41,7 @@ createServer(async (req, res) => {
           input:
             'text(await tools.exec_command({cmd:' +
             JSON.stringify(
-              "printf 'verified fixture change\\n' > /workspace/packages/workflow-control/example.txt",
+              String.raw`printf 'verified fixture change\n' > /workspace/packages/workflow-control/example.txt`,
             ) +
             '}));',
         }

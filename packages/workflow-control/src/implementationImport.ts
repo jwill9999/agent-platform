@@ -108,25 +108,27 @@ class ImportWorkspace {
   }
   assertFiles(output: ImplementationOutput, side: 'before' | 'after') {
     for (const file of output.files) {
-      const absolute = this.path(file.path);
-      const expected = side === 'before' ? file.beforeDigest : file.afterDigest;
-      let stat;
-      try {
-        stat = lstatSync(absolute);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-      }
-      if (expected === null) {
-        if (stat) throw new Error('import expected absent file');
-        continue;
-      }
-      if (!stat?.isFile() || stat.nlink !== 1 || stat.size > 1024 * 1024)
-        throw new Error('import source is not a bounded regular file');
-      const content = readFileSync(absolute);
-      if (content.includes(0) || hash(content) !== expected)
-        throw new Error('import prior or resulting content mismatch');
-      new TextDecoder('utf-8', { fatal: true }).decode(content);
+      this.assertFile(file.path, side === 'before' ? file.beforeDigest : file.afterDigest);
     }
+  }
+  private assertFile(path: string, expected: string | null): void {
+    const absolute = this.path(path);
+    let stat;
+    try {
+      stat = lstatSync(absolute);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    if (expected === null) {
+      if (stat) throw new Error('import expected absent file');
+      return;
+    }
+    if (!stat?.isFile() || stat.nlink !== 1 || stat.size > 1024 * 1024)
+      throw new Error('import source is not a bounded regular file');
+    const content = readFileSync(absolute);
+    if (content.includes(0) || hash(content) !== expected)
+      throw new Error('import prior or resulting content mismatch');
+    new TextDecoder('utf-8', { fatal: true }).decode(content);
   }
   prepare(
     output: ImplementationOutput,

@@ -1,5 +1,4 @@
 import { coordinatorProofSchema, verifyCoordinatorProof } from './coordinatorReceipts.js';
-import { digestGovernedValue } from './governedOperations.js';
 import {
   initializeInterruptionSchema,
   assertExecutionNotInterrupted,
@@ -13,7 +12,11 @@ import Database from 'better-sqlite3';
 import { z } from 'zod';
 
 import { executionContractSchema } from './contracts.js';
-import { delegateCallbackSchema, delegateCallbackTarget } from './governedOperations.js';
+import {
+  digestGovernedValue,
+  delegateCallbackSchema,
+  delegateCallbackTarget,
+} from './governedOperations.js';
 import { deriveContractMaterialDigest } from './planning.js';
 import { runAcceptsWork } from './workCancellation.js';
 import {

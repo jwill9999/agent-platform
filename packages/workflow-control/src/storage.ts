@@ -1420,23 +1420,7 @@ export class WorkflowStore {
           throw new Error('delegate callback lacks immutable scheduler authorization');
         }
         this.#assertDelegateTerminalResult(execution, callback);
-        const imported =
-          callback.delegateRole === 'implementation_worker'
-            ? (this.#database
-                .prepare(
-                  "SELECT base_head,result_head FROM implementation_imports WHERE execution_id=? AND status='verified'",
-                )
-                .get(execution.id) as { base_head: string; result_head: string } | undefined)
-            : undefined;
-        const phaseInput = specialistInputEnvelopeSchema.safeParse(execution.packet);
-        if (
-          callback.delegateRole === 'implementation_worker' &&
-          phaseInput.success &&
-          (!imported || imported.base_head !== phaseInput.data.binding.headSha)
-        )
-          throw new Error('delegate callback lacks verified input-to-result import');
-        if (imported && imported.result_head !== callback.headSha)
-          throw new Error('delegate callback import result head mismatch');
+        const imported = this.#verifiedCallbackImport(callback, execution);
         const approval = this.#database
           .prepare(
             `SELECT 1 FROM plan_approvals WHERE run_id = ? AND status = 'active'
@@ -4089,41 +4073,67 @@ export class WorkflowStore {
         if (!phase) throw new Error('implementation import phase lease changed');
         // Synchronous Git/file steps prevent the event-loop heartbeat from running. Renew only
         // still-live, same-owner fences after full authority validation; never extend execution deadline.
-        if (input.renewLeaseTtlMs !== undefined) {
-          const renewalNow = Date.now();
-          const until = Math.min(execution.deadlineMs, renewalNow + input.renewLeaseTtlMs);
-          if (until <= renewalNow) throw new Error('implementation deadline elapsed');
-          for (const [kind, resourceId, epoch] of [
-            ['workspace', execution.workspaceId, execution.workspaceLeaseEpoch],
-            ['run', execution.runId, execution.runLeaseEpoch],
-            ['task', execution.taskId, execution.taskLeaseEpoch],
-          ] as const) {
-            const changed = this.#database
-              .prepare(
-                `UPDATE leases SET expires_at_ms=?
-              WHERE resource_type=? AND resource_id=? AND owner_id=? AND epoch=? AND expires_at_ms>?`,
-              )
-              .run(until, kind, resourceId, execution.ownerId, epoch, renewalNow).changes;
-            if (changed !== 1) throw new Error('implementation lease expired before renewal');
-          }
-          const changed = this.#database
-            .prepare(
-              `UPDATE phase_jobs SET lease_until_ms=?
-            WHERE execution_id=? AND status='started' AND lease_owner=? AND lease_epoch=? AND lease_until_ms>?`,
-            )
-            .run(
-              until,
-              execution.id,
-              execution.ownerId,
-              recovery?.phase_lease_epoch ?? output.input.binding.phaseLeaseEpoch,
-              renewalNow,
-            ).changes;
-          if (changed !== 1) throw new Error('implementation phase lease expired before renewal');
-        }
+        this.#renewImportLeases(
+          execution,
+          input.renewLeaseTtlMs,
+          recovery?.phase_lease_epoch ?? output.input.binding.phaseLeaseEpoch,
+        );
       },
     });
   }
 
+  #renewImportLeases(
+    execution: SchedulerExecutionRecord,
+    ttl: number | undefined,
+    phaseEpoch: number,
+  ): void {
+    if (ttl !== undefined) {
+      const renewalNow = Date.now();
+      const until = Math.min(execution.deadlineMs, renewalNow + ttl);
+      if (until <= renewalNow) throw new Error('implementation deadline elapsed');
+      for (const [kind, resourceId, epoch] of [
+        ['workspace', execution.workspaceId, execution.workspaceLeaseEpoch],
+        ['run', execution.runId, execution.runLeaseEpoch],
+        ['task', execution.taskId, execution.taskLeaseEpoch],
+      ] as const) {
+        const changed = this.#database
+          .prepare(
+            `UPDATE leases SET expires_at_ms=?
+              WHERE resource_type=? AND resource_id=? AND owner_id=? AND epoch=? AND expires_at_ms>?`,
+          )
+          .run(until, kind, resourceId, execution.ownerId, epoch, renewalNow).changes;
+        if (changed !== 1) throw new Error('implementation lease expired before renewal');
+      }
+      const changed = this.#database
+        .prepare(
+          `UPDATE phase_jobs SET lease_until_ms=?
+            WHERE execution_id=? AND status='started' AND lease_owner=? AND lease_epoch=? AND lease_until_ms>?`,
+        )
+        .run(until, execution.id, execution.ownerId, phaseEpoch, renewalNow).changes;
+      if (changed !== 1) throw new Error('implementation phase lease expired before renewal');
+    }
+  }
+  #verifiedCallbackImport(callback: DelegateCallback, execution: SchedulerExecutionRecord) {
+    const imported =
+      callback.delegateRole === 'implementation_worker'
+        ? (this.#database
+            .prepare(
+              "SELECT base_head,result_head FROM implementation_imports WHERE execution_id=? AND status='verified'",
+            )
+            .get(execution.id) as { base_head: string; result_head: string } | undefined)
+        : undefined;
+    const phaseInput = specialistInputEnvelopeSchema.safeParse(execution.packet);
+    if (
+      callback.delegateRole === 'implementation_worker' &&
+      phaseInput.success &&
+      (!imported || imported.base_head !== phaseInput.data.binding.headSha)
+    )
+      throw new Error('delegate callback lacks verified input-to-result import');
+    if (imported && imported.result_head !== callback.headSha)
+      throw new Error('delegate callback import result head mismatch');
+
+    return imported;
+  }
   getImplementationImport(
     executionId: string,
   ): { artifactDigest: string; status: string } | undefined {
