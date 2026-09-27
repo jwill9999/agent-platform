@@ -10,7 +10,7 @@ head before merge. Prior lifecycle evidence remains valid for its unchanged sour
 
 ---
 
-# Current session: development lifecycle implementation — 27 September 2026
+## Previous session: development lifecycle implementation — 27 September 2026
 
 PR275 was merged into `feature/harness-backlog-review` at
 `b53fdbb9cd3f184fc430d244df94c20dce48e7ff`. The active worktree is
