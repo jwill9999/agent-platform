@@ -1,3 +1,14 @@
+# Backlog capture — 27 September 2026
+
+Owner deferred Notion alignment. Beads `agent-platform-notion-alignment` records the audit,
+proposed scope and acceptance criteria; [spec](docs/tasks/agent-platform-notion-alignment.md).
+Capture branch: `task/notion-alignment-backlog`; implementation has not started.
+PR277 remains separate, with nine executed checks passing and no open Sonar issues.
+Owner intends to review and merge it into `feature/harness-backlog-review`; verify the merge
+on return rather than assuming completion. Revisit Notion alignment later, not as a PR277 blocker.
+
+---
+
 # Resumed: R1 run discovery — 27 September 2026
 
 PR276 is verified merged into `feature/harness-backlog-review` at `87c5cc4`; its final nine executed
