@@ -1,0 +1,7 @@
+{
+  "status": "blocked_before_model_launch",
+  "error": "specialist source path is forbidden: .agents/skills/feature-planning/SKILL.md",
+  "modelCallMade": false,
+  "scenarioInputs": "scenarios.txt",
+  "reviewResult": null
+}

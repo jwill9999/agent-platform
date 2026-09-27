@@ -1,4 +1,24 @@
-# PR278 integration confirmed — 27 September 2026
+# Standalone readiness checkpoint — 28 September 2026
+
+PR278 is integrated. Current branch: `task/standalone-readiness`, worktree
+`/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+[Readiness report](docs/reviews/standalone-host-readiness-2026-09-28.md) retains source and evidence.
+
+Canonical journal migration succeeded after backup/rehearsal, preserving runs/contracts/leases.
+Discovery for `.17` reports no matching run. The configured development host reached `ready` using
+existing account discovery and was stopped cleanly; no managed pilot or model generation ran.
+Private operator configuration remains under the canonical workspace journal directory.
+
+Current blocker: `.12` skill scenario review cannot launch because the current snapshot loader rejects
+`.agents/skills/` evidence. The attempt made no model call. Its gateway/networks are cleaned up.
+Older procedural reviews are integrated but do not establish all required behavioral scenarios.
+Next: resolve the supported read-only skill evidence path without weakening worker permissions, run
+those scenarios and reconcile `.10`/`.11`/`.12`; then finalize `.17` and prepare exact `.13` pilot plan.
+No staging, pilot launch or new implementation authority is inferred. Notion alignment stays deferred.
+
+---
+
+## PR278 integration confirmed — 27 September 2026
 
 GitHub confirms PR278 merged into `feature/harness-backlog-review` at
 `c9729617759be0cb0d3c89f7cb3b18f914553914` on 27 September at 22:22 UTC.
@@ -15,7 +35,7 @@ Notion alignment remains the separately deferred task. This post-merge handoff i
 
 ---
 
-# R2/R3 qualification handoff — 27 September 2026
+## R2/R3 qualification handoff — 27 September 2026
 
 Owner-approved R2 governed worker import and R3 standalone coordinator completion are implemented on
 `task/artifact-import-coordinator` in `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
