@@ -82,3 +82,31 @@ it.each(['docker_unavailable', 'image_unavailable', 'topology_invalid'])(
     }
   },
 );
+
+it('rejects changed runtime identity after release instead of adopting a different run', async () => {
+  docker.mode = 'docker_unavailable';
+  const root = await mkdtemp(join(tmpdir(), 'lifecycle-runtime-binding-'));
+  roots.push(root);
+  const accountFile = join(root, 'account.json'),
+    runtimeConfig = join(root, 'runtime.json'),
+    database = join(root, 'workflow.sqlite');
+  await writeFile(accountFile, '{}', { mode: 0o600 });
+  await writeFile(runtimeConfig, JSON.stringify({ runId: 'run-a' }), { mode: 0o600 });
+  const { WorkflowStore } = await import('../src/storage.js');
+  new WorkflowStore(database).close();
+  const config = {
+    stateDirectory: join(root, 'state'),
+    accountFile,
+    brokerImage: 'sha256:' + 'a'.repeat(64),
+    workerImage: 'sha256:' + 'b'.repeat(64),
+    containerUser: `${process.getuid?.() || 501}:20`,
+    controlPort: 19341,
+    clientVersion: 'fixture',
+    workflow: { database, runtimeConfig },
+  };
+  const host = await DevelopmentHost.create(config);
+  // Failing runtime parsing releases the owner without changing the bound input digest.
+  await expect(host.run()).rejects.toThrow();
+  await writeFile(runtimeConfig, JSON.stringify({ runId: 'run-b' }), { mode: 0o600 });
+  await expect(DevelopmentHost.create(config, true)).rejects.toThrow('service_identity_mismatch');
+});

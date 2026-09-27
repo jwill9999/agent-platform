@@ -10,6 +10,7 @@ import {
   type DevelopmentHostState,
   reconcileDevelopmentProbe,
   assertDevelopmentAdmission,
+  developmentOwnerAlive,
 } from './developmentHostJournal.js';
 import { runLocalBrokerCli } from './localCredentialBrokerCli.js';
 import { StandalonePhaseRuntime, readPhaseRuntimeConfig } from './phaseRuntime.js';
@@ -54,6 +55,7 @@ const codes = new Set([
   'probe_issue_failed',
   'probe_mount_unavailable',
   'invalid_configuration',
+  'process_identity_unavailable',
 ]);
 export function classifyDevelopmentError(error: unknown): string {
   if (error instanceof z.ZodError) return 'invalid_configuration';
@@ -75,6 +77,20 @@ async function privateFile(path: string): Promise<string> {
   )
     throw new Error('private_configuration_required');
   return readFile(path, 'utf8');
+}
+async function developmentFingerprint(config: Config, runtime?: string): Promise<string> {
+  const runtimeBytes = config.workflow
+    ? (runtime ?? (await privateFile(config.workflow.runtimeConfig)))
+    : null;
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        config,
+        runtimeDigest:
+          runtimeBytes === null ? null : createHash('sha256').update(runtimeBytes).digest('hex'),
+      }),
+    )
+    .digest('hex');
 }
 async function assertInputOutsideState(stateDirectory: string, file: string): Promise<void> {
   const state = await realpath(stateDirectory).catch((error: NodeJS.ErrnoException) => {
@@ -129,6 +145,14 @@ interface DockerInspection {
   State?: { Running?: boolean };
   HostConfig?: {
     Privileged?: boolean;
+    CapAdd?: string[] | null;
+    Devices?: unknown[];
+    DeviceRequests?: unknown[] | null;
+    PidMode?: string;
+    IpcMode?: string;
+    UTSMode?: string;
+    UsernsMode?: string;
+    GroupAdd?: string[] | null;
     ReadonlyRootfs?: boolean;
     CapDrop?: string[];
     SecurityOpt?: string[];
@@ -136,6 +160,19 @@ interface DockerInspection {
   };
   NetworkSettings?: { Networks?: Record<string, unknown> };
   Mounts?: Array<{ Source: string; Destination: string; RW: boolean; Type?: string }>;
+}
+export function assertBrokerHardening(host: DockerInspection['HostConfig']): void {
+  if (
+    !host ||
+    JSON.stringify(host.CapDrop) !== JSON.stringify(['ALL']) ||
+    JSON.stringify(host.SecurityOpt) !== JSON.stringify(['no-new-privileges'])
+  )
+    throw new Error('service_identity_mismatch');
+  for (const entries of [host.CapAdd, host.Devices, host.DeviceRequests, host.GroupAdd])
+    if (entries?.length) throw new Error('service_identity_mismatch');
+  for (const mode of [host.PidMode, host.UTSMode, host.UsernsMode])
+    if (mode) throw new Error('service_identity_mismatch');
+  if (host.IpcMode !== 'private') throw new Error('service_identity_mismatch');
 }
 async function inspect(
   kind: 'container' | 'network' | 'image',
@@ -178,6 +215,7 @@ export class DevelopmentHost {
   #renewTimer: ReturnType<typeof setInterval> | undefined;
   #fatal = false;
   #serviceQualified = false;
+  #runId: string | undefined;
   #stopping = false;
   #recovery: number;
   #recoverOnStart = false;
@@ -216,7 +254,7 @@ export class DevelopmentHost {
     }
     if (Number(config.containerUser.split(':')[0]) !== process.getuid?.())
       throw new Error('container_user_mismatch');
-    const digest = createHash('sha256').update(JSON.stringify(config)).digest('hex');
+    const digest = await developmentFingerprint(config);
     const journal = new DevelopmentHostJournal(join(config.stateDirectory, 'lifecycle.sqlite'));
     try {
       const owner = journal.claim(digest);
@@ -431,6 +469,7 @@ export class DevelopmentHost {
     throw new Error('control_unavailable');
   }
   async #definition(container: DockerInspection): Promise<void> {
+    assertBrokerHardening(container.HostConfig);
     const expectedImage = await inspect('image', this.#config.brokerImage);
     if (
       JSON.stringify(container.Config?.Entrypoint) !==
@@ -499,6 +538,7 @@ export class DevelopmentHost {
   }
   async #validateMember(id: string, suffix: string): Promise<void> {
     const member = await inspect('container', id);
+    if (!member) return; // Docker network snapshots can retain a just-removed endpoint.
     if (
       member?.Config?.Labels?.['io.agent-platform.specialist-execution'] &&
       this.#config.workflow &&
@@ -512,9 +552,9 @@ export class DevelopmentHost {
       try {
         const record = db
           .prepare(
-            "SELECT c.status,c.container_id,s.root FROM scheduler_executions e JOIN scheduler_containers c ON c.execution_id=e.id JOIN scheduler_staging s ON s.execution_id=e.id WHERE e.id=? AND e.status='active' AND e.process_identity=?",
+            "SELECT c.status,c.container_id,s.root FROM scheduler_executions e JOIN scheduler_containers c ON c.execution_id=e.id JOIN scheduler_staging s ON s.execution_id=e.id WHERE e.id=? AND e.run_id=? AND e.status='active' AND e.process_identity=?",
           )
-          .get(id, `docker:workflow-specialist-${id}`) as
+          .get(id, this.#runId, `docker:workflow-specialist-${id}`) as
           | { status: string; container_id: string | null; root: string }
           | undefined;
         if (!record || member.Name !== `/workflow-specialist-${id}`)
@@ -688,6 +728,10 @@ export class DevelopmentHost {
   }
   async #attachRuntime(): Promise<void> {
     if (!this.#config.workflow || this.#runtime) return;
+    const runtimeBytes = await privateFile(this.#config.workflow.runtimeConfig);
+    if ((await developmentFingerprint(this.#config, runtimeBytes)) !== this.#owner.config_digest)
+      throw new Error('service_identity_mismatch');
+    const supplied = JSON.parse(runtimeBytes) as Record<string, unknown>;
     const adapterConfig = join(this.#directory, 'adapter.json');
     await writeDevelopmentFile(
       adapterConfig,
@@ -701,10 +745,6 @@ export class DevelopmentHost {
     );
     const adapter = join(this.#directory, `broker-adapter-${this.#owner.epoch}.mjs`);
     await runLocalBrokerCli([adapterConfig, 'create-adapter', '--output', adapter]);
-    const supplied = JSON.parse(await privateFile(this.#config.workflow.runtimeConfig)) as Record<
-      string,
-      unknown
-    >;
     // Runtime authority remains in the approved journal; these transport settings belong to this owner.
     for (const key of ['credentialBrokerBinary', 'egressNetwork'])
       if (key in supplied) throw new Error('invalid_configuration');
@@ -724,6 +764,7 @@ export class DevelopmentHost {
       new URL(config.modelGateway.url).origin !== `http://development-gateway:18102`
     )
       throw new Error('topology_invalid');
+    this.#runId = config.runId;
     this.#runtime = await StandalonePhaseRuntime.create(
       this.#config.workflow.database,
       config,
@@ -919,17 +960,6 @@ function developmentStatus(config: Config, state: DevelopmentHostState | undefin
   };
 }
 
-function processAlive(pid: number | null | undefined): boolean {
-  if (!pid) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
-    return false;
-  }
-}
-
 export async function runDevelopmentCommand(command: string, path: string): Promise<unknown> {
   const config = developmentHostConfigSchema.parse(JSON.parse(await privateFile(path)));
   await assertInputOutsideState(config.stateDirectory, path);
@@ -939,7 +969,7 @@ export async function runDevelopmentCommand(command: string, path: string): Prom
   }
   config.stateDirectory = await realpath(config.stateDirectory);
   config.accountFile = await realpath(config.accountFile);
-  const fingerprint = createHash('sha256').update(JSON.stringify(config)).digest('hex');
+  const fingerprint = await developmentFingerprint(config);
   const journal = new DevelopmentHostJournal(
     join(config.stateDirectory, 'lifecycle.sqlite'),
     command === 'development-status',
@@ -954,7 +984,7 @@ export async function runDevelopmentCommand(command: string, path: string): Prom
       return { code: 'stop_requested' };
     }
     if (command === 'development-recover') {
-      const alive = processAlive(state?.pid);
+      const alive = developmentOwnerAlive(state);
       if (alive) {
         journal.request('recover');
         return { code: 'recovery_requested' };

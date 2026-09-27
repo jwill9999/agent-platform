@@ -1,17 +1,56 @@
 import Database from 'better-sqlite3';
-import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
 import { chmodSync, lstatSync } from 'node:fs';
 
 export interface DevelopmentHostState {
   service_id: string;
   config_digest: string;
   pid: number | null;
+  process_identity: string | null;
   epoch: number;
   lease_until_ms: number;
   code: string;
   observed_at_ms: number;
   stop_requested: number;
   recovery_requested: number;
+}
+
+export function developmentProcessIdentity(pid: number): string | undefined {
+  try {
+    process.kill(pid, 0);
+    let identity: string;
+    if (process.platform === 'linux') {
+      const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+      const start = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+      identity = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim() + ':' + start;
+    } else if (process.platform === 'darwin') {
+      const boot = execFileSync('/usr/sbin/sysctl', ['-n', 'kern.boottime'], {
+        env: {},
+        timeout: 2000,
+        encoding: 'utf8',
+      }).trim();
+      const start = execFileSync('/bin/ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'comm='], {
+        env: { LC_ALL: 'C' },
+        timeout: 2000,
+        encoding: 'utf8',
+      }).trim();
+      if (!start) return undefined;
+      identity = boot + ':' + start;
+    } else throw new Error('process_identity_unavailable');
+    return createHash('sha256').update(identity).digest('hex');
+  } catch (error) {
+    if (['ESRCH', 'ENOENT'].includes((error as NodeJS.ErrnoException).code ?? '')) return undefined;
+    throw new Error('process_identity_unavailable');
+  }
+}
+export function developmentOwnerAlive(owner: DevelopmentHostState | undefined): boolean {
+  if (!owner?.pid) return false;
+  const identity = developmentProcessIdentity(owner.pid);
+  if (!identity) return false;
+  if (!owner.process_identity) throw new Error('process_identity_unavailable');
+  return identity === owner.process_identity;
 }
 
 /** Private operator journal. Never mounted into a worker or used as workflow/task authority. */
@@ -42,6 +81,11 @@ export class DevelopmentHostJournal {
         CREATE TABLE IF NOT EXISTS development_events (
           sequence INTEGER PRIMARY KEY AUTOINCREMENT,code TEXT NOT NULL,observed_at_ms INTEGER NOT NULL);
       `);
+      const hostColumns = this.#db.prepare('PRAGMA table_info(development_host)').all() as Array<{
+        name: string;
+      }>;
+      if (!hostColumns.some((column) => column.name === 'process_identity'))
+        this.#db.exec('ALTER TABLE development_host ADD COLUMN process_identity TEXT');
       const columns = this.#db.prepare('PRAGMA table_info(development_probes)').all() as Array<{
         name: string;
       }>;
@@ -68,13 +112,8 @@ export class DevelopmentHostJournal {
         const old = this.state();
         if (old && old.config_digest !== configDigest) throw new Error('service_identity_mismatch');
         if (old?.pid) {
-          let alive = true;
-          try {
-            process.kill(old.pid, 0);
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code === 'ESRCH') alive = false;
-          }
-          if (alive || old.lease_until_ms > now) throw new Error('service_owner_active');
+          if (developmentOwnerAlive(old) || old.lease_until_ms > now)
+            throw new Error('service_owner_active');
         }
         if (!old)
           this.#db
@@ -91,6 +130,9 @@ export class DevelopmentHostJournal {
         code='starting',observed_at_ms=?,stop_requested=0 WHERE singleton=1`,
             )
             .run(process.pid, now + 15000, now);
+        this.#db
+          .prepare('UPDATE development_host SET process_identity=? WHERE singleton=1')
+          .run(developmentProcessIdentity(process.pid));
         return this.state()!;
       })
       .immediate();

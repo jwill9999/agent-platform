@@ -344,9 +344,9 @@ it.skipIf(!supplied)(
   30000,
 );
 
-it.skipIf(!supplied)(
-  'rejects an otherwise matching broker with only its command changed',
-  async () => {
+it.skipIf(!supplied).each(['command', 'capability', 'security-option', 'pid-namespace'])(
+  'rejects an otherwise matching broker with only its %s changed',
+  async (change) => {
     const { DevelopmentHost } = await import('../src/developmentHost.js');
     const root = await mkdtemp(join(homedir(), '.codex/lifecycle-command-'));
     const config = {
@@ -405,10 +405,13 @@ it.skipIf(!supplied)(
           '--mount',
           `type=bind,src=${src},dst=${dst}${ro ? ',readonly' : ''}`,
         ]),
+        ...(change === 'capability' ? ['--cap-add', 'SYS_ADMIN'] : []),
+        ...(change === 'security-option' ? ['--security-opt', 'seccomp=unconfined'] : []),
+        ...(change === 'pid-namespace' ? ['--pid', 'host'] : []),
         config.brokerImage,
         '/run/server.json',
         'serve',
-        'unapproved-command-argument',
+        ...(change === 'command' ? ['unapproved-command-argument'] : []),
       ]);
       await execute('/usr/local/bin/docker', [
         'network',

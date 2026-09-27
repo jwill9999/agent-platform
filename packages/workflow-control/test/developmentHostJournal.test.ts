@@ -15,6 +15,7 @@ import { afterEach, expect, it } from 'vitest';
 import {
   DevelopmentHostJournal,
   assertDevelopmentAdmission,
+  developmentOwnerAlive,
   reconcileDevelopmentProbe,
 } from '../src/developmentHostJournal.js';
 import {
@@ -23,6 +24,7 @@ import {
   writeDevelopmentFile,
   DevelopmentHost,
   runDevelopmentCommand,
+  assertBrokerHardening,
 } from '../src/developmentHost.js';
 const cleanup: Array<() => void> = [];
 afterEach(() => {
@@ -242,4 +244,33 @@ it('preserves a real workflow SQLite database at a generated destination', async
     }),
   ).rejects.toThrow('invalid_configuration');
   expect(readFileSync(database)).toEqual(original);
+});
+
+it('distinguishes a reused live PID from the recorded supervisor incarnation', () => {
+  const { journal, path } = fixture();
+  const owner = journal.claim('one');
+  expect(developmentOwnerAlive(owner)).toBe(true);
+  const db = new Database(path);
+  try {
+    db.prepare(
+      "UPDATE development_host SET process_identity='older-process-incarnation',lease_until_ms=0",
+    ).run();
+  } finally {
+    db.close();
+  }
+  expect(developmentOwnerAlive(journal.state())).toBe(false);
+  const replacement = journal.claim('one');
+  expect(replacement.epoch).toBe(owner.epoch + 1);
+  expect(developmentOwnerAlive(replacement)).toBe(true);
+});
+
+it.each([
+  { CapAdd: ['SYS_ADMIN'] },
+  { SecurityOpt: ['no-new-privileges', 'seccomp=unconfined'] },
+  { PidMode: 'host' },
+  { Devices: [{}] },
+])('rejects additional broker hardening authority %j', (extra) => {
+  const base = { CapDrop: ['ALL'], SecurityOpt: ['no-new-privileges'], IpcMode: 'private' };
+  expect(() => assertBrokerHardening(base)).not.toThrow();
+  expect(() => assertBrokerHardening({ ...base, ...extra })).toThrow('service_identity_mismatch');
 });
