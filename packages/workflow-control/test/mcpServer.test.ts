@@ -21,6 +21,7 @@ describe('workflow-control MCP', () => {
     expect(listed.tools.map((tool) => tool.name)).toEqual([
       'workflow_status',
       'workflow_resume_preview',
+      'workflow_discover',
     ]);
     expect(listed.tools.every((tool) => tool.annotations?.readOnlyHint === true)).toBe(true);
     const result = await client.callTool({
@@ -28,6 +29,16 @@ describe('workflow-control MCP', () => {
       arguments: { runId: 'missing' },
     });
     expect(result.content).toEqual([{ type: 'text', text: 'null' }]);
+    const discovery = await client.callTool({
+      name: 'workflow_discover',
+      arguments: { taskId: 'task' },
+    });
+    expect(discovery.content).toEqual([
+      {
+        type: 'text',
+        text: JSON.stringify({ status: 'unknown', reason: 'run_discovery_scope_unconfigured' }),
+      },
+    ]);
     await client.close();
     await server.close();
     store.close();

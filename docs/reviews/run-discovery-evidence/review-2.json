@@ -1,0 +1,85 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "beb05ee7-e074-431a-b6c8-5cb7e77d0afd",
+  "materialDigest": "a32cdd05b05558342b4981fc9f6aeb303556255df23828d80887a1077545f2c9",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "docs/testing/standalone-pilot-prerequisites.md",
+      "digest": "1e8994a0e0b73d3845218804e5deb388388bf1b900a19c71d0b5c34747dcaa18"
+    },
+    {
+      "path": "packages/workflow-control/src/cli.ts",
+      "digest": "800811bc8c939b99180de36873a19d6660f5884f1aa7515b81aa324f97672edc"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "061911165daf440a30851a87ebd5744a28c311f6d84584b740d8411cd9a095cf"
+    },
+    {
+      "path": "packages/workflow-control/src/mcpServer.ts",
+      "digest": "4bd4a9c4b83ac3c044459a3e1ea66169a8c5fc36494c5ff3ec403a0d68bd3488"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/runDiscovery.ts",
+      "digest": "299b87562f45c40967d6518049006efecd698d07521a45aaf8a6c7280661a84c"
+    },
+    {
+      "path": "packages/workflow-control/src/stateMachine.ts",
+      "digest": "be4776b2a63906500927f7101e261da786cbb53b03e2d60b6c9f4ff77795fadc"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "a5bf37773eafa11dabcd9064abfd4f3a3819ae871819bfe5d4e463a03bfc21d3"
+    },
+    {
+      "path": "packages/workflow-control/test/mcpServer.test.ts",
+      "digest": "c675ac3e3b2b2d6f04462413d02c33797aca5fd364f7ac7cd0db38bcf5884090"
+    },
+    {
+      "path": "packages/workflow-control/test/runDiscovery.test.ts",
+      "digest": "aad08131d0c3cd9b01827c8fec547376a1418d6070d53b35f00863d36eac9e19"
+    }
+  ],
+  "result": {
+    "events": [
+      { "type": "thread.started", "thread_id": "01a0e37c-32f4-7c71-9dc9-15cab0e9311d" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      { "type": "turn.started" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "Two actionable findings remain.\n\n1. **High — Repair-child reservation can bypass admission exclusivity.**  \n   **Evidence:** `storage.ts`: `createRun`, `prepareRepairChildIntent`; `runDiscovery.ts`: repair-child lookup.  \n   `createRun` rejects an overlapping *existing* repair-child intent, but the reverse ordering remains possible: admit a run whose contract contains task `child`, then reserve `child` under another nonterminal run. `prepareRepairChildIntent` does not check competing runs. Both owners persist; subsequent discovery merely reports the conflict. The independent-process test covers two `createRun` calls, not this competing reservation path.  \n   **Correction:** Enforce task exclusivity when reserving repair children, using the same atomic admission boundary. Test both orderings and an independent-process race between run admission and repair-child reservation.\n\n2. **Medium — Schema preflight does not validate required lease columns.**  \n   **Evidence:** `runDiscovery.ts`: `queryRunInventory`, specifically `SELECT * FROM leases` and its unchecked type assertion.  \n   An empty `leases` table with missing required columns passes this query and can produce `status: 'absent'`. With malformed rows, missing fields can instead be silently omitted or produce incorrect expiry information. This violates R1’s requirement to return unknown/error for an incomplete journal. The supplied schema-negative tests exercise `repair_child_intents`, not this case.  \n   **Correction:** Select required lease columns explicitly and validate returned lease fields. Add tests for an empty incomplete lease schema and malformed lease records, asserting canonical discovery returns `unknown`.\n\n**Qualification:** R1 should not yet be qualified. The revised evidence addresses the previously named discovery and two-start concurrency cases, but leaves these gaps. Supplied tests are source evidence only; no execution results establish that they passed. R2/R3 and execution authority remain separate, and this review is not human approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 115875,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1177,
+          "reasoning_output_tokens": 780
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

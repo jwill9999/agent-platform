@@ -1,13 +1,15 @@
 #!/usr/bin/env node
+import { discoverCanonicalRuns } from './runDiscovery.js';
 import {
   runDevelopmentCommand,
   classifyDevelopmentError,
   developmentExitCode,
 } from './developmentHost.js';
 import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { realpathSync, existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 
 import { WorkflowStore } from './storage.js';
 import { ContinuationJournal } from './continuationJournal.js';
@@ -26,7 +28,7 @@ import {
 
 function usage(): never {
   throw new Error(
-    'usage: workflow-control <migrate|status|timeline|validate-documents|coordinator|host-conformance|phase-runtime|standalone-conformance|bootstrap-preflight> <database-path> [run-id|runtime-config.json] [task-id|bootstrap-policy.json]',
+    'usage: workflow-control discover <codex-home> <workspace-root> <task-id> [material-digest] [policy-digest]; workflow-control <migrate|status|timeline|validate-documents|coordinator|host-conformance|phase-runtime|standalone-conformance|bootstrap-preflight> <database-path> [run-id|runtime-config.json] [task-id|bootstrap-policy.json]',
   );
 }
 
@@ -93,16 +95,40 @@ function validateDocumentsCommand(path: string, runId: string, taskId: string): 
   }
 }
 
+function discoverCommand(args: readonly string[], path: string, runId: string | undefined): string {
+  if (!runId || !args[3] || args.length > 6) usage();
+  return JSON.stringify(
+    discoverCanonicalRuns({
+      codexHome: path,
+      workspaceRoot: runId,
+      taskId: args[3],
+      ...(args[4] === undefined ? {} : { materialDigest: args[4] }),
+      ...(args[5] === undefined ? {} : { policyDigest: args[5] }),
+    }),
+  );
+}
+
 export function runCli(args: readonly string[]): string {
   const [command, path, runId] = args;
   if (command === undefined || path === undefined) usage();
+  if (command === 'discover') return discoverCommand(args, path, runId);
   if (command === 'validate-documents') {
     if (!runId || !args[3] || args.length !== 4) usage();
     return validateDocumentsCommand(path, runId, args[3]);
   }
   const store = new WorkflowStore(resolve(path));
   try {
-    if (command === 'migrate') return JSON.stringify({ ok: true, database: resolve(path) });
+    if (command === 'migrate') {
+      if (runId !== undefined) {
+        const workspaceId = `sha256:${createHash('sha256').update(realpathSync(runId)).digest('hex')}`;
+        store.bindWorkspaceIdentity(workspaceId);
+      }
+      return JSON.stringify({
+        ok: true,
+        database: resolve(path),
+        workspaceBound: runId !== undefined,
+      });
+    }
     if ((command === 'status' || command === 'timeline') && runId !== undefined) {
       const journal = new ContinuationJournal(resolve(path));
       try {

@@ -1,0 +1,57 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "c7a37d65-79f8-434f-a700-7e557f40bfde",
+  "materialDigest": "7951aafce46882eba1ce948fd6c53243aa15b68611b9fe92056379b9355aab24",
+  "manifest": [
+    {
+      "path": "docs/reviews/run-discovery-evidence/review-4.json",
+      "digest": "514f657d61bc3ba77ec52ce385bebc6ca1e9f5e9dd9f2801fe8c3115433e2bf9"
+    },
+    {
+      "path": "packages/workflow-control/src/cli.ts",
+      "digest": "b483251c4e32de63be154d803c0713f2faa6321396740733938850dca2fad37c"
+    },
+    {
+      "path": "packages/workflow-control/src/runDiscovery.ts",
+      "digest": "830c3ee8f7b5d4c93e2d9a0b11c8e86de0b87046c34820196ee4fdab4ceff58a"
+    },
+    {
+      "path": "packages/workflow-control/test/runDiscovery.test.ts",
+      "digest": "059249b111a5882b017e50910c80a3ba1d7b228c08d453e6e97584cccae3cefd"
+    }
+  ],
+  "result": {
+    "events": [
+      { "type": "thread.started", "thread_id": "01a0e38a-0548-7c93-b4f9-03438a6ed730" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      { "type": "turn.started" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "No actionable findings in the supplied refactor. The extracted validation, status classification, and CLI argument handling show no concrete behavior regression or security change.\n\nMissing evidence: pre-refactor source or diff and post-refactor test results; exact equivalence and test success cannot be independently verified.\n\nThis is not human approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 17833,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 98,
+          "reasoning_output_tokens": 30
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

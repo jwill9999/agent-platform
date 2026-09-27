@@ -1,7 +1,29 @@
-# Paused handoff — 27 September 2026
+# Resumed: R1 run discovery — 27 September 2026
 
-Owner requested a pause. Resume from this section; older checkpoints below are historical and do not
-supersede it. No further implementation, orchestration pilot, merge or staging promotion was started.
+PR276 is verified merged into `feature/harness-backlog-review` at `87c5cc4`; its final nine executed
+checks passed, with Sourcery and staging VM skipped. The Notion publishing and iMessage policy
+documentation tasks are closed and synced in Beads. Runtime adapters are still unimplemented.
+
+Current work: `agent-platform-pilot-zero.17`, R1 authoritative discovery and guarded admission,
+on `task/run-discovery-admission` in `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+The owner resumed and said continue; existing approved scope is retained. Supervised prerequisite
+mode applies; no managed run, merge or staging promotion. The canonical journal was inspected
+read-only (four cancelled runs, zero live leases); it was not migrated or given new execution authority.
+
+[Qualification report](docs/reviews/run-discovery-qualification.md) records fixes and verification.
+R1 source `d4580fe` passes 26 focused and 996 Linux tests (63 optional skipped); final independent
+review has no actionable findings. [PR277](https://github.com/jwill9999/agent-platform/pull/277) is draft
+and pushed; finish current-head hosted checks before recommending merge. The Sonar quality refactor
+passed 26 focused checks, the 996-test Linux suite and independent re-review. Sonar reports zero
+open issues on `d4580fe`; final publication-head hosted gates remain pending. R2 governed worker artifact
+import and R3 coordinator completion remain next in the same task; `.13` pilot planning stays blocked.
+Do not confuse run admission with approval to execute or claim a successful managed task cycle.
+
+---
+
+## Previous paused handoff — 27 September 2026
+
+Historical pause: this section is superseded by the resumed R1 checkpoint above. No further implementation, orchestration pilot, merge or staging promotion was started.
 
 ## Saved position and next action
 

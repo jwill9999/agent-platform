@@ -66,3 +66,15 @@ Its [design](../planning/standalone-pilot/development-lifecycle-design.md) and
 Supervised implementation and qualification are recorded in the
 [lifecycle report](../reviews/development-lifecycle-qualification.md), published through PR276. This work covers R4 operational readiness and interruption cleanup; it does not close
 R1–R3 or enable inherited/selected MCP access. PR275 remains the preceding tested baseline.
+
+## R1 implementation continuation
+
+PR276 is merged at `87c5cc469736de6d1508ec52309b64da62c3d740`. The owner resumed the existing
+approved scope. R1 is being qualified on `task/run-discovery-admission`, based on that feature merge.
+See [discovery qualification](../reviews/run-discovery-qualification.md) for behavior, explicit
+workspace provisioning, independent findings and test evidence. This is supervised prerequisite work;
+R2/R3 and the single-task pilot remain separate. Do not close this task based on the R1 component alone.
+
+R1 source `d4580fe` is locally qualified: 26 focused and 996 Linux tests pass (63 optional skipped),
+and final isolated review has no actionable findings. PR277 is draft pending current-head hosted
+checks. This does not qualify R2/R3 or launch the pilot.

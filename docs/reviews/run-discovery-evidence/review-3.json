@@ -1,0 +1,97 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "14ed80ba-55a5-4418-a9f4-ee9609a1d606",
+  "materialDigest": "2104048a616da276cdb25a3d299e5d93c5491346f1219041927bd11b0ca6b8b3",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "docs/reviews/run-discovery-evidence/focused.txt",
+      "digest": "8edff7e45f4bc871ce62be7b26dc473192e3e2dc6091a41914035b4e62aac564"
+    },
+    {
+      "path": "docs/reviews/run-discovery-qualification.md",
+      "digest": "c9be1811ba4999b631e45c80fbd45b1cf4b9f896b09725510f9ed115b34d9dd0"
+    },
+    {
+      "path": "docs/testing/standalone-pilot-prerequisites.md",
+      "digest": "1e8994a0e0b73d3845218804e5deb388388bf1b900a19c71d0b5c34747dcaa18"
+    },
+    {
+      "path": "packages/workflow-control/src/cli.ts",
+      "digest": "800811bc8c939b99180de36873a19d6660f5884f1aa7515b81aa324f97672edc"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "061911165daf440a30851a87ebd5744a28c311f6d84584b740d8411cd9a095cf"
+    },
+    {
+      "path": "packages/workflow-control/src/mcpServer.ts",
+      "digest": "4bd4a9c4b83ac3c044459a3e1ea66169a8c5fc36494c5ff3ec403a0d68bd3488"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/runDiscovery.ts",
+      "digest": "cc14f5ad155a2b4de98a7ffe2d9704ca60678b0cb23cf64945f3f0b141eab264"
+    },
+    {
+      "path": "packages/workflow-control/src/stateMachine.ts",
+      "digest": "be4776b2a63906500927f7101e261da786cbb53b03e2d60b6c9f4ff77795fadc"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "15fd892b81ff2d45696e2cfca25d312eaed19a3dfea27ce1597ac3c7b444d827"
+    },
+    {
+      "path": "packages/workflow-control/test/mcpServer.test.ts",
+      "digest": "c675ac3e3b2b2d6f04462413d02c33797aca5fd364f7ac7cd0db38bcf5884090"
+    },
+    {
+      "path": "packages/workflow-control/test/runAdmissionRepair.test.ts",
+      "digest": "189ba6abf4ff6620712627d4037dce0f6a707a708bb2b0b678d54f83c2d416d2"
+    },
+    {
+      "path": "packages/workflow-control/test/runDiscovery.test.ts",
+      "digest": "26bb756ccfea323f39d172b4b4d0b67fdd0b67903403b2de8201a3502ff6aea2"
+    }
+  ],
+  "result": {
+    "events": [
+      { "type": "thread.started", "thread_id": "01a0e380-42c8-7672-9cb6-5c2defb0baaf" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      { "type": "turn.started" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "Two actionable findings remain.\n\n- **High — Repair reservation does not recheck state and fences inside its transaction.**  \n  **Evidence:** `packages/workflow-control/src/storage.ts`, `prepareRepairChildIntent`. The `repair_planning` state and workspace/run/task leases are checked before acquiring the immediate transaction. Only document authority and competing ownership are checked inside it. Another process can complete cancellation or take over leases between those checks and insertion. A reservation can consequently be persisted against a cancelled parent; discovery classifies that parent as terminal and permits another run for the child.  \n  **Correction:** Repeat the parent-state and all lease checks inside the immediate transaction before reserving budget or inserting the intent. Add a process-level regression that interleaves cancellation or lease takeover between preliminary validation and transaction acquisition. The supplied repair-versus-admission tests do not exercise this race.\n\n- **Medium — Discovery drops closeout ownership.**  \n  **Evidence:** `packages/workflow-control/src/runDiscovery.ts`, `queryRunInventory` lease filter. Zod accepts `closeout`, but the subsequent filter retains only workspace, task and run leases. `storage.ts` binds closeout leases to run IDs, so a discovered finalizing run’s closeout owner, epoch and expiry are omitted. This leaves the R1 inventory incomplete during finalization.  \n  **Correction:** Include closeout leases whose resource IDs belong to the discovered runs. Test active and expired closeout leases and exclusion of unrelated runs.\n\n**Qualification:** Not yet. The supplied log reports 21 focused tests passing, but neither case above is covered. `docs/reviews/run-discovery-qualification.md` also explicitly leaves regression checks after the final corrections pending; their results are missing from the supplied evidence.\n\nThese findings concern R1 only. R2/R3 and execution authorization remain separate; this review grants no approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 119313,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 716,
+          "reasoning_output_tokens": 333
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

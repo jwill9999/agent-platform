@@ -105,7 +105,8 @@ async function setup(options: { publish?: boolean; approve?: boolean } = {}) {
   const store = new WorkflowStore(path);
   stores.push(store);
   const contractId = store.createContract(contract);
-  store.createRun(contractId, 'planning', 'run');
+  // Legacy planning/sibling states deliberately bypass production admission.
+  store.createRunForTest(contractId, 'planning', 'run');
   if (options.publish !== false)
     store.recordPlanningDocumentPublication({ runId: 'run', sourceRoot });
   const database = new Database(path);
@@ -588,7 +589,7 @@ it('rejects publication from an unrelated same-byte repository and unknown sourc
   const altered = structuredClone(f.contract);
   altered.featureId += '-unknown-revision';
   altered.planningDocuments!.sourceRevision = 'f'.repeat(40);
-  f.store.createRun(f.store.createContract(altered), 'planning', 'other-run');
+  f.store.createRunForTest(f.store.createContract(altered), 'planning', 'other-run');
   expect(() =>
     f.store.recordPlanningDocumentPublication({ runId: 'other-run', sourceRoot: f.sourceRoot }),
   ).toThrow();
@@ -1357,7 +1358,7 @@ it('retains legacy contract readability while refusing new execution and approva
     ),
   );
   const id = store.createContract(legacy);
-  store.createRun(id, 'planning', 'legacy');
+  store.createRunForTest(id, 'planning', 'legacy');
   expect(store.getExecutionContract('legacy')).toEqual(legacy);
   expect(() =>
     store.verifyPlanningDocuments({ runId: 'legacy', ownerId: 'owner', boundary: 'test.resume' }),
@@ -1377,7 +1378,7 @@ it('keeps legacy cleanup available while a separately reviewed replacement gets 
   const legacy = structuredClone(f.contract);
   delete legacy.planningDocuments;
   legacy.featureId += '-historical';
-  f.store.createRun(f.store.createContract(legacy), 'approved', 'historical');
+  f.store.createRunForTest(f.store.createContract(legacy), 'approved', 'historical');
   f.store.seedLineageApprovalForTest({
     runId: 'historical',
     materialDigest: deriveContractMaterialDigest(legacy),
@@ -1438,7 +1439,7 @@ it('keeps legacy cleanup available while a separately reviewed replacement gets 
 
 it('invalidates sibling runs sharing a publication and requires a new immutable contract', async () => {
   const f = await setup();
-  f.store.createRun(f.store.getRun('run')!.contractId, 'planning', 'sibling');
+  f.store.createRunForTest(f.store.getRun('run')!.contractId, 'planning', 'sibling');
   f.store.seedLineageApprovalForTest({
     runId: 'sibling',
     materialDigest: deriveContractMaterialDigest(f.contract),
@@ -1491,7 +1492,7 @@ it('rolls back a failed additive migration and reopens without rewriting histori
 
 it('quarantines sibling runs while an invalidation attempt is unresolved', async () => {
   const f = await setup();
-  f.store.createRun(f.store.getRun('run')!.contractId, 'planning', 'sibling');
+  f.store.createRunForTest(f.store.getRun('run')!.contractId, 'planning', 'sibling');
   f.store.seedLineageApprovalForTest({
     runId: 'sibling',
     materialDigest: deriveContractMaterialDigest(f.contract),
@@ -1517,7 +1518,7 @@ it('upgrades a historical journal through WorkflowStore without rewriting contra
   const legacy = structuredClone(f.contract);
   delete legacy.planningDocuments;
   legacy.featureId += '-old-schema';
-  f.store.createRun(f.store.createContract(legacy), 'approved', 'old-run');
+  f.store.createRunForTest(f.store.createContract(legacy), 'approved', 'old-run');
   f.store.seedLineageApprovalForTest({
     runId: 'old-run',
     materialDigest: deriveContractMaterialDigest(legacy),

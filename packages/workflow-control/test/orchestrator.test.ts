@@ -295,7 +295,8 @@ describe('Beads-authoritative scheduling', () => {
       kind: 'review' as const,
     };
     const contractId = store.createContract(contract);
-    store.createRun(contractId, 'approved', 'other-run');
+    // Seed historical conflicting ownership to test downstream defenses.
+    store.createRunForTest(contractId, 'approved', 'other-run');
     store.recordEvidence({
       ...foreignEvidence,
       producer: 'planner',
@@ -953,7 +954,8 @@ if (command === 'conformance') {
     const workspaceLeaseEpoch = orchestrator.acquireWorkspace(1000, 1000);
     const runLeaseEpoch = orchestrator.acquireRun('run-schedule', 1000, 1000);
     const contractId = store.createContract(contract);
-    store.createRun(contractId, 'implementing', 'other-active-run');
+    // Seed historical conflicting ownership to test downstream defenses.
+    store.createRunForTest(contractId, 'implementing', 'other-active-run');
     store.seedLineageApprovalForTest({
       runId: 'other-active-run',
       materialDigest: deriveContractMaterialDigest(contract),

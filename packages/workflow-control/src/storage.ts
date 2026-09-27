@@ -1,3 +1,4 @@
+import { queryRunInventory } from './runDiscovery.js';
 import { lstatSync } from 'node:fs';
 import {
   InterruptionCleanupJournal,
@@ -737,11 +738,21 @@ export class WorkflowStore {
   #documentGuardedOperation: string | undefined;
   #documentGuardedAuthority: (() => void) | undefined;
 
-  constructor(path: string) {
-    this.#database = new Database(path);
+  constructor(path: string, options: { readonly?: boolean } = {}) {
+    this.#database = new Database(path, {
+      readonly: options.readonly ?? false,
+      fileMustExist: options.readonly ?? false,
+    });
+    if (options.readonly) {
+      this.#database.pragma('query_only = ON');
+      return;
+    }
     this.#database.pragma('foreign_keys = ON');
     this.#database.pragma('journal_mode = WAL');
     this.#migrate();
+    this.#database.exec(
+      'CREATE TABLE IF NOT EXISTS workflow_journal_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), workspace_id TEXT NOT NULL)',
+    );
     initializeBootstrapSchema(this.#database);
     initializeDocumentApprovalSchema(this.#database);
   }
@@ -786,8 +797,41 @@ export class WorkflowStore {
     recoverDocumentVerification(this.#database, input);
   }
 
+  /** Explicit trusted provisioning, never called by discovery. Binding cannot be changed. */
+  bindWorkspaceIdentity(workspaceId: string): void {
+    if (!/^sha256:[a-f0-9]{64}$/u.test(workspaceId)) throw new Error('journal_workspace_invalid');
+    this.#database
+      .transaction(() => {
+        const rows = this.#database
+          .prepare('SELECT workspace_id, body_json FROM contracts')
+          .all() as Array<{ workspace_id: string; body_json: string }>;
+        if (
+          rows.some(
+            (row) =>
+              row.workspace_id !== workspaceId ||
+              executionContractSchema.parse(JSON.parse(row.body_json)).workspaceId !== workspaceId,
+          )
+        )
+          throw new Error('journal_workspace_conflict');
+        const bound = this.#database
+          .prepare('SELECT workspace_id FROM workflow_journal_identity WHERE singleton=1')
+          .get() as { workspace_id: string } | undefined;
+        if (bound && bound.workspace_id !== workspaceId)
+          throw new Error('journal_workspace_conflict');
+        this.#database
+          .prepare('INSERT OR IGNORE INTO workflow_journal_identity VALUES (1, ?)')
+          .run(workspaceId);
+      })
+      .immediate();
+  }
+
   createContract(contract: ExecutionContract, createdAtMs = Date.now()): string {
     executionContractSchema.parse(contract);
+    const binding = this.#database
+      .prepare('SELECT workspace_id FROM workflow_journal_identity WHERE singleton=1')
+      .get() as { workspace_id: string } | undefined;
+    if (binding && binding.workspace_id !== contract.workspaceId)
+      throw new Error('journal_workspace_conflict');
     const id = `${contract.featureId}:v${contract.contractVersion}:${contract.policyDigest}`;
     const body = JSON.stringify(contract);
     this.#database
@@ -824,7 +868,29 @@ export class WorkflowStore {
     if (state === 'pipeline') {
       throw new Error('pipeline runs must be entered through exact lineage import');
     }
-    return this.#createRunFixture(contractId, state, id);
+    return this.#database
+      .transaction(() => {
+        const existing = this.getRun(id);
+        if (existing) {
+          if (existing.contractId !== contractId)
+            throw new Error('run_admission_identity_conflict');
+          return existing;
+        }
+        const row = this.#database
+          .prepare('SELECT body_json FROM contracts WHERE id = ?')
+          .get(contractId) as { body_json: string } | undefined;
+        if (!row) throw new Error('run_admission_contract_missing');
+        const contract = executionContractSchema.parse(JSON.parse(row.body_json));
+        for (const task of contract.tasks) {
+          const inventory = queryRunInventory(this.#database, {
+            workspaceId: contract.workspaceId,
+            taskId: task.id,
+          });
+          if (inventory.active.length) throw new Error('run_admission_conflict');
+        }
+        return this.#createRunFixture(contractId, state, id);
+      })
+      .immediate();
   }
 
   /** Explicit fixture seam; unavailable in production and never used by orchestration code. */
@@ -7387,109 +7453,118 @@ export class WorkflowStore {
     if (contract.workspaceId !== input.workspaceId) {
       throw new Error('repair-child workspace differs from the run contract');
     }
-    const run = this.getRun(input.runId);
-    if (run?.state !== 'repair_planning') {
-      throw new Error('repair children require the repair_planning state');
-    }
-    this.#assertResourceLease(
-      'workspace',
-      input.workspaceId,
-      input.ownerId,
-      input.workspaceLeaseEpoch,
-      input.createdAtMs,
-    );
-    this.#assertResourceLease(
-      'run',
-      input.runId,
-      input.ownerId,
-      input.runLeaseEpoch,
-      input.createdAtMs,
-    );
-    this.#assertResourceLease(
-      'task',
-      input.chainTipTaskId,
-      input.ownerId,
-      input.taskLeaseEpoch,
-      input.createdAtMs,
-    );
     const requestJson = serializeDurableJson(input.request);
     const request = input.request as Record<string, unknown>;
-    return this.#database.transaction(() => {
-      assertDocuments();
-      if (
-        typeof request.featureId !== 'string' ||
-        typeof request.finding !== 'object' ||
-        request.finding === null ||
-        typeof (request.finding as Record<string, unknown>).id !== 'string'
-      ) {
-        throw new Error('repair-child budget request is malformed');
-      }
-      const remaining = this.remainingRepairBudgetForChild(
-        {
-          runId: input.runId,
-          featureId: request.featureId,
-          childId: input.id,
-          findingId: (request.finding as Record<string, unknown>).id as string,
-          policy: contract.retryPolicy,
-        },
-        workflowEvaluationMutationCapability,
-      );
-      if (JSON.stringify(request.remainingRetryBudget) !== JSON.stringify(remaining)) {
-        throw new Error('repair-child retry reservation changed before prepare');
-      }
-      this.#database
-        .prepare(
-          `INSERT OR IGNORE INTO repair_child_budget_reservations
-           (child_id, run_id, finding_id, created_at_ms) VALUES (?, ?, ?, ?)`,
-        )
-        .run(
-          input.id,
-          input.runId,
-          (request.finding as Record<string, unknown>).id,
+    return this.#database
+      .transaction(() => {
+        const run = this.getRun(input.runId);
+        if (run?.state !== 'repair_planning') {
+          throw new Error('repair children require the repair_planning state');
+        }
+        this.#assertResourceLease(
+          'workspace',
+          input.workspaceId,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
           input.createdAtMs,
         );
-      this.#database
-        .prepare(
-          `INSERT OR IGNORE INTO repair_child_intents
+        this.#assertResourceLease(
+          'run',
+          input.runId,
+          input.ownerId,
+          input.runLeaseEpoch,
+          input.createdAtMs,
+        );
+        this.#assertResourceLease(
+          'task',
+          input.chainTipTaskId,
+          input.ownerId,
+          input.taskLeaseEpoch,
+          input.createdAtMs,
+        );
+        assertDocuments();
+        const owners = queryRunInventory(this.#database, {
+          workspaceId: input.workspaceId,
+          taskId: input.id,
+        });
+        if (owners.active.some((owner) => owner.id !== input.runId))
+          throw new Error('run_admission_conflict');
+
+        if (
+          typeof request.featureId !== 'string' ||
+          typeof request.finding !== 'object' ||
+          request.finding === null ||
+          typeof (request.finding as Record<string, unknown>).id !== 'string'
+        ) {
+          throw new Error('repair-child budget request is malformed');
+        }
+        const remaining = this.remainingRepairBudgetForChild(
+          {
+            runId: input.runId,
+            featureId: request.featureId,
+            childId: input.id,
+            findingId: (request.finding as Record<string, unknown>).id as string,
+            policy: contract.retryPolicy,
+          },
+          workflowEvaluationMutationCapability,
+        );
+        if (JSON.stringify(request.remainingRetryBudget) !== JSON.stringify(remaining)) {
+          throw new Error('repair-child retry reservation changed before prepare');
+        }
+        this.#database
+          .prepare(
+            `INSERT OR IGNORE INTO repair_child_budget_reservations
+           (child_id, run_id, finding_id, created_at_ms) VALUES (?, ?, ?, ?)`,
+          )
+          .run(
+            input.id,
+            input.runId,
+            (request.finding as Record<string, unknown>).id,
+            input.createdAtMs,
+          );
+        this.#database
+          .prepare(
+            `INSERT OR IGNORE INTO repair_child_intents
          (id, workspace_id, run_id, sequence, finding_digest, chain_tip_task_id, request_json,
           status, owner_id, workspace_lease_epoch, run_lease_epoch, task_lease_epoch, result_json,
           created_at_ms, updated_at_ms)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?, ?, ?, NULL, ?, ?)`,
-        )
-        .run(
-          input.id,
-          input.workspaceId,
-          input.runId,
-          input.sequence,
-          input.findingDigest,
-          input.chainTipTaskId,
-          requestJson,
-          input.ownerId,
-          input.workspaceLeaseEpoch,
-          input.runLeaseEpoch,
-          input.taskLeaseEpoch,
-          input.createdAtMs,
-          input.createdAtMs,
-        );
-      const record = this.getRepairChildIntent(input.id);
-      if (
-        record === undefined ||
-        record.workspaceId !== input.workspaceId ||
-        record.runId !== input.runId ||
-        record.sequence !== input.sequence ||
-        record.findingDigest !== input.findingDigest ||
-        record.chainTipTaskId !== input.chainTipTaskId ||
-        record.ownerId !== input.ownerId ||
-        record.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
-        record.runLeaseEpoch !== input.runLeaseEpoch ||
-        record.taskLeaseEpoch !== input.taskLeaseEpoch ||
-        record.createdAtMs !== input.createdAtMs ||
-        serializeDurableJson(record.request) !== requestJson
-      ) {
-        throw new Error('repair-child identity already exists with different content');
-      }
-      return record;
-    })();
+          )
+          .run(
+            input.id,
+            input.workspaceId,
+            input.runId,
+            input.sequence,
+            input.findingDigest,
+            input.chainTipTaskId,
+            requestJson,
+            input.ownerId,
+            input.workspaceLeaseEpoch,
+            input.runLeaseEpoch,
+            input.taskLeaseEpoch,
+            input.createdAtMs,
+            input.createdAtMs,
+          );
+        const record = this.getRepairChildIntent(input.id);
+        if (
+          record === undefined ||
+          record.workspaceId !== input.workspaceId ||
+          record.runId !== input.runId ||
+          record.sequence !== input.sequence ||
+          record.findingDigest !== input.findingDigest ||
+          record.chainTipTaskId !== input.chainTipTaskId ||
+          record.ownerId !== input.ownerId ||
+          record.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+          record.runLeaseEpoch !== input.runLeaseEpoch ||
+          record.taskLeaseEpoch !== input.taskLeaseEpoch ||
+          record.createdAtMs !== input.createdAtMs ||
+          serializeDurableJson(record.request) !== requestJson
+        ) {
+          throw new Error('repair-child identity already exists with different content');
+        }
+        return record;
+      })
+      .immediate();
   }
 
   finalizeRepairChildIntent(

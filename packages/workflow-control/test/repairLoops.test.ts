@@ -429,7 +429,8 @@ describe('DurableRepairCoordinator', () => {
   it('rejects cross-run, cross-task, and wrong-producer evidence bindings', async () => {
     const { store, coordinator } = await setup();
     const contractId = store.createContract(store.getExecutionContract('run-repair'));
-    store.createRun(contractId, 'repair', 'other-run');
+    // Seed historical conflicting ownership to test downstream defenses.
+    store.createRunForTest(contractId, 'repair', 'other-run');
     const crossRun = evidence('9');
     const crossTask = evidence('a');
     const wrongProducer = evidence('b');
