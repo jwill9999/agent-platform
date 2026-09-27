@@ -10,17 +10,26 @@ Owner explicitly authorized completing the bounded startup/recovery work and sai
 Codex restarted. Continue without repeating that approval. Execution is supervised prerequisite
 implementation, not a managed pilot. No merge, staging or live pilot is authorized by this slice.
 
-Beads `agent-platform-pilot-zero.17` remains in progress; `.13` remains blocked. Requirements and
-current evidence are in [the lifecycle report](docs/reviews/development-lifecycle-qualification.md),
-which links the design, verification matrix and isolated reviews. Two implementation reviews found
-concrete blockers; repairs include independent fenced cleanup, atomic interrupted finalization,
-transport cancellation and explicit readiness. Final review and tests remain outstanding.
+Beads `agent-platform-pilot-zero.17` remains in progress; `.13` remains blocked. Active draft PR:
+[276](https://github.com/jwill9999/agent-platform/pull/276). Requirements, execution evidence and review
+history are in [the lifecycle report](docs/reviews/development-lifecycle-qualification.md).
 
-Intermediate evidence: real service startup/recovery test passed; connected deterministic worker
-interruption/recovery preserved a single marker; thirteen existing real-container role checks passed.
-Do not treat these intermediate revisions as final qualification or autonomous task success. Next:
-finish fault tests, rerun the full Linux package and connected container checks, obtain isolated
-re-review, publish for feature-branch review and sync Beads. Preserve the broader R1–R3 prerequisites.
+The development startup/recovery component is implemented and pushed. Source `cb6c547` passes
+971 Linux package tests (63 optional skipped), 36 focused journal/startup tests and all 21 connected
+lifecycle/topology scenarios. Earlier 13 real-container role checks remain applicable; the unchanged
+broker image completed a real model turn and denied its revoked token. Build/lint pass. Isolated
+review19 reports no remaining actionable implementation blockers; its summary-count mismatch is fixed.
+Retained evidence distinguishes injected faults, actual Docker/process recovery, and the delayed-probe
+journal-restart fixture. Probe dispatch uncertainty survives restart and migration; malformed runtime
+configuration is rejected before adapter generation. Effects remain uncertain after containment and
+block replay. This is component qualification, not a completed autonomous task cycle.
+
+Current publication boundary: PR276 remains unmerged. Final-head hosted browser/desktop/full
+verification, SonarCloud and docs/security gates must be green before recommending owner merge.
+Continue those gates under the existing approval; fix findings rather than requesting approval again.
+After component integration, remaining R1–R3 cover authoritative run discovery, governed implementation
+artifact import and required coordinator completion before the single-task pilot. `.17` stays in
+progress and `.13` blocked. No pilot, staging promotion or feature merge occurred in this session.
 Use the Git fallback in `/tmp/agent-platform-git-bin`; do not accept the Apple licence. Beads operations
 use `/Users/letuscode/projects/agent-platform`, not this worktree. Historical checkpoints follow.
 

@@ -1,0 +1,138 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "faa83989-5f5b-4956-804a-701a5fb0b58c",
+  "materialDigest": "902e401e89ca4252ac71c45a093d8c8fdd8b1fa2546d90c54f9b62766d20c760",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-addendum.md",
+      "digest": "83c1d0676c880f7b5ef4d1ba1f4f4c1fd56f7e4e8c72d8e9fc091f6b2d1d61f7"
+    },
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-design.md",
+      "digest": "7bf3e3b24ab06b1aa183bc1d1fbc24ad0ec601f23fbb590c5354c62598467556"
+    },
+    {
+      "path": "docs/testing/development-lifecycle.md",
+      "digest": "1f0a4a3eeaccc96acf0ed4c249a95e9c31f422a02dddcf94a374bf4475e098f3"
+    },
+    {
+      "path": "docs/workflow-control-development.md",
+      "digest": "dd41c9c31c448435b30d67caa1e464575352869017afa66d45261af7029b9029"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "digest": "f1f12cea5ce61bae083acfa18f1b5778f55c39b2cf9d3a786873b943cb37631a"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationWorker.ts",
+      "digest": "922b5059994abaa1b694f356b4442ed6f7c92987daf0c2fffa829db6f855231d"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHost.ts",
+      "digest": "7cc9279bea733c709efc2f4f08cbd8f0086f1e4d37b839ce48eab2f61f62adcb"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHostJournal.ts",
+      "digest": "37611bbdba189e3aa78ec2cf77fac91d6c74748dc7590ae0e7a33e0c5bb95a32"
+    },
+    {
+      "path": "packages/workflow-control/src/documentSources.ts",
+      "digest": "f52531076e4b28dd163634aa2516586829c0a128e474d537e55e1a1de98f087e"
+    },
+    {
+      "path": "packages/workflow-control/src/executionInterruptions.ts",
+      "digest": "fb07d6b147c08de0c05a3b6dfd26a897db8bdb1038aee6810caf9fb4a0912be9"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialBrokerCli.ts",
+      "digest": "44e78eacad363fa3857528ccaf75b76db67c4c0789b4a0647f0b99c8a8e9cf96"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialGateway.ts",
+      "digest": "0a7fe2bfab80cd94af9d71b3735ee24a31da4bf3b42af71ff32e6b573b2430f3"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialLeases.ts",
+      "digest": "06cdda9ea4cc0bfedf0a385d32a8efd6c1e506b48cc4db7292b7c2e79ba826c4"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "5f81b14c8205a59292fcab8885ebfc82c5084ef6c7881df7ff609b45182a3530"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "626cc138ca41e569b2d482f55a26bde6f4437ac010419a56521db84102c854ff"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "4174aff6d3862b09b961ae2e695849c28aef9ff2702e61a0e91109f1d72e2c96"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "2362c4f48b2032b0cdf0ada24ca1b51bc78a47ced5153bcb222807b20f22a724"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHost.integration.test.ts",
+      "digest": "e6f47f6923a882fdc9b1454959736aadbf5c2fc14fd3c56beefa079372b12439"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostJournal.test.ts",
+      "digest": "4ec5103132004ae3f156e2f78ea0b0cef0484a72f63885dcf1282a2e69acaf5b"
+    },
+    {
+      "path": "packages/workflow-control/test/executionInterruptions.test.ts",
+      "digest": "3e33085d67b5bf78df539d49a0f32d6392dbc775d844b38218d17180fe4d8ba5"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "0edb203ae4bb760149d37fe770d84654f00c465b37977ca3bc06459a7e608860"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0e04e-2db8-7ef3-8d4f-629d7d2aafe9"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "I\u2019m tracing cleanup retries and late acknowledgements through the runtime, launcher, and journals, especially where ownership changes or a worker transport remains open."
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "Four actionable findings remain in the supplied source.\n\n1. **High \u2014 Cleanup retries stall behind an outstanding worker attachment.**  \n   **Evidence:** `packages/workflow-control/src/phaseRuntime.ts`: `runOnce`, `#cleanupExecution`, `interruptActive`; `specialistLauncher.ts`: `abortTransport`.  \n   When container removal fails, cleanup releases the phase lease through `deferInterrupted`, but `#active` can remain awaiting `docker start --attach`. Subsequent `runOnce` calls return that same promise; repeated interruptions return because the phase lease has expired. Recovery therefore cannot perform its second cleanup attempt until the attachment finishes or shutdown aborts it\u2014potentially at the worker deadline.  \n   **Correction:** Run interruption reconciliation independently of the attached execution promise, or abort the attachment after interruption while preserving unconfirmed container cleanup. Test failed removal with an indefinitely outstanding attachment and verify autonomous retry/exhaustion.\n\n2. **Medium \u2014 Late issuance can recreate credentials after cleanup reports settlement.**  \n   **Evidence:** `packages/workflow-control/src/localCredentialBrokerCli.ts`: issuance `writeFileSync`; `specialistLauncher.ts`: `RevocableSpecialistCredentialBroker.issue`, `removeInterruptedCredentials`; `phaseRuntime.ts`: `#cleanupExecution`.  \n   An issue request can remain outstanding while interruption cleanup revokes its lease, removes the currently absent credential file, and finalizes the phase. A delayed issue response then writes `codex-auth.json`. The subsequent credential transition fails because the execution is terminal, but the blocked-phase paths perform no further file cleanup. The token remains revoked, yet credential material survives a reported settled outcome.  \n   **Correction:** Track and settle issuance/file-writing transports before confirming credential-file cleanup, including across restart. Add a delayed issuance acknowledgement test that inspects retained bytes after finalization.\n\n3. **Medium \u2014 Credential cleanup acknowledgements bypass cleanup fencing.**  \n   **Evidence:** `packages/workflow-control/src/specialistLauncher.ts`: `revokeCredential`, `RevocableSpecialistCredentialBroker.revoke`; `packages/workflow-control/src/storage.ts`: `advanceSchedulerCredential`.  \n   Container cleanup carries the interruption owner, epoch, batch and attempt. Credential cleanup does not: after asynchronous revocation/status calls, it updates authoritative `credential_status` without checking those fences. Rejecting a later `cleanup.confirm` does not undo that earlier stale write. This leaves the promised protection against late cleanup acknowledgements incomplete.  \n   **Correction:** Thread cleanup authority through credential reconciliation and validate it transactionally before each authoritative acknowledgement. Preserve permission for safe, uniquely targeted containment while rejecting stale journal updates.\n\n4. **Medium \u2014 Retained staging identity is not ownership-validated during recovery.**  \n   **Evidence:** `packages/workflow-control/src/storage.ts`: `bindSchedulerStaging`; `packages/workflow-control/src/specialistLauncher.ts`: `removeInterruptedCredentials`.  \n   The durable staging record stores only a pathname and timestamp. Recovery checks directory type, symlink status and permissions, but not UID or the original directory identity. A replacement private directory at that pathname can therefore have its contents removed. Conversely, any `lstat` failure is treated as absence and can lead to confirmed settlement despite unavailable retained evidence.  \n   **Correction:** Persist and verify staging ownership/identity, distinguish `ENOENT` from inspection errors, and retain an explicit unresolved reconciliation outcome when evidence disappears or identity changes.\n\n**Missing evidence:** No executed test results were supplied. The shown tests do not establish the outstanding-attachment retry case, late issuance/file recreation, stale credential acknowledgements after takeover, or staging replacement/error handling. Terminal-run recovery, competing runtime owners, and both terminal-result/interruption race orderings also need connected execution evidence.\n\nThis is a source review, not human approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 167587,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 3268,
+          "reasoning_output_tokens": 2459
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

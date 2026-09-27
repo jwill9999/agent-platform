@@ -1,0 +1,146 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "006fea8b-0131-492b-b70f-cff0496e1222",
+  "materialDigest": "6736944101ca632af07480956a60289e7e0631e475a55ee94fad2b68a84e8bde",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-addendum.md",
+      "digest": "83c1d0676c880f7b5ef4d1ba1f4f4c1fd56f7e4e8c72d8e9fc091f6b2d1d61f7"
+    },
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-design.md",
+      "digest": "7bf3e3b24ab06b1aa183bc1d1fbc24ad0ec601f23fbb590c5354c62598467556"
+    },
+    {
+      "path": "docs/testing/development-lifecycle.md",
+      "digest": "1f0a4a3eeaccc96acf0ed4c249a95e9c31f422a02dddcf94a374bf4475e098f3"
+    },
+    {
+      "path": "docs/workflow-control-development.md",
+      "digest": "dd41c9c31c448435b30d67caa1e464575352869017afa66d45261af7029b9029"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "digest": "f1f12cea5ce61bae083acfa18f1b5778f55c39b2cf9d3a786873b943cb37631a"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationWorker.ts",
+      "digest": "922b5059994abaa1b694f356b4442ed6f7c92987daf0c2fffa829db6f855231d"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHost.ts",
+      "digest": "95bc06990c490fa23d5852333cd05e184635192bf9e38ad8746661d739e412ce"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHostJournal.ts",
+      "digest": "26579b414622e1209831e944da03264e1153f7665fcacfe1343306f0a96b5600"
+    },
+    {
+      "path": "packages/workflow-control/src/documentSources.ts",
+      "digest": "f52531076e4b28dd163634aa2516586829c0a128e474d537e55e1a1de98f087e"
+    },
+    {
+      "path": "packages/workflow-control/src/executionInterruptions.ts",
+      "digest": "8223d60a46749d2b562165c611b40b076a449b3704f4563b56ef1760bb55f30c"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialBrokerCli.ts",
+      "digest": "44e78eacad363fa3857528ccaf75b76db67c4c0789b4a0647f0b99c8a8e9cf96"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialGateway.ts",
+      "digest": "0a7fe2bfab80cd94af9d71b3735ee24a31da4bf3b42af71ff32e6b573b2430f3"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialLeases.ts",
+      "digest": "06cdda9ea4cc0bfedf0a385d32a8efd6c1e506b48cc4db7292b7c2e79ba826c4"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "5f81b14c8205a59292fcab8885ebfc82c5084ef6c7881df7ff609b45182a3530"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "1f0e7ad0d566fc995b71f65eaa3ca7345b4d43b04e663fe31a14fba4454869e1"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "24d8e9a4cd8dbdf3f280bff594f5563be881b5378a5ff43ad69064e8f9b0f925"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "58ecc932bcdb4e5265f11f579378875cb440f1ab9d48a2f0166ca5c9d230c573"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHost.integration.test.ts",
+      "digest": "67f592b56ad980da2beb94894c4e249cf8f953f74fb16d2db50fb2d5d026e708"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostFailures.test.ts",
+      "digest": "613dfb2e1a8885edb0fe677353039ccddab9d10f84bd8d181e1ae2a8200fa8bb"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostJournal.test.ts",
+      "digest": "ea15f4de97e77245564aaf6c072bc07b03c5da65bc1c19b849c1d429540c6d1f"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentWorkflowFixture.ts",
+      "digest": "49316e8bc66ad313503b534e2c10a2d0c0bbd18204942bf5dae6ab79486a767e"
+    },
+    {
+      "path": "packages/workflow-control/test/executionInterruptions.test.ts",
+      "digest": "3e33085d67b5bf78df539d49a0f32d6392dbc775d844b38218d17180fe4d8ba5"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "0e006066c63e4f354117c030c975c555e35c117ce9b5b66241cc33f0d528b134"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0e062-81dd-70c1-9515-a3db3d2a9b8a"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "I\u2019m checking the remaining restart and cleanup paths, particularly where recovery depends on resources that may be unavailable after a crash. I\u2019ll separate code defects from checks whose results were not supplied."
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "Three actionable findings in the supplied material:\n\n1. **P2 \u2014 Generated files can overwrite operator configuration.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts`, `#attachRuntime`, `#provision`, `runDevelopmentCommand`.  \n   Account paths inside the state directory are rejected, but operator configuration paths are not protected. For example, an allowed `workflow.runtimeConfig` pointing to `stateDirectory/adapter.json` is overwritten before it is read. Atomic replacement and single-link validation still permit replacing that regular user file.  \n   **Correction:** Reject collisions between input configuration files and generated destinations before any writes, including canonical-path aliases. Protect the development command\u2019s own configuration file as well.\n\n2. **P2 \u2014 Missing source checkout prevents recovery of existing workers.**  \n   **Evidence:** `packages/workflow-control/src/phaseRuntime.ts`, `StandalonePhaseRuntime.create`; `packages/workflow-control/src/developmentHost.ts`, `#attachRuntime`.  \n   Even with `cleanupOnly=true`, runtime construction requires `realpath(config.sourceRoot)` to succeed. If the checkout was removed or its volume is unavailable after a coordinator crash, recovery exits before attempting Docker cancellation or broker revocation, although those obligations have durable execution identities and do not require source access.  \n   **Correction:** Construct cleanup capability independently of source availability. Resolve and validate the source checkout when admitting new execution; preserve admission denial while attempting available cleanup obligations.\n\n3. **P2 \u2014 Probe adoption rejects supported repository-digest image references.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts`, `#validateMember`, `#provision`, `#qualify`.  \n   Probe validation compares Docker\u2019s `member.Image` directly with `config.brokerImage`. Docker reports the image ID, whereas configuration also permits `repository@sha256:\u2026`. Following a crash with a running probe, this comparison rejects the legitimate container during topology validation, before normal probe reconciliation. Shutdown may subsequently remove it, but the recovery invocation unnecessarily fails.  \n   **Correction:** Compare against the resolved pinned image\u2019s `Id`, as broker definition validation already does. Cover restart during an active probe using a repository-digest reference.\n\n**Evidence gaps:** The supplied tests are source, not execution results. No logs establish the five previously passed connected cases or the newest identity rechecks. The supplied material also does not demonstrate the full mandatory fault matrix, including both listener failures, interruption-first completion/callback races, and delayed acknowledgements after timeout and exhaustion.\n\nNo additional optional improvements. This review is not human approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 175549,
+          "cached_input_tokens": 0,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 2647,
+          "reasoning_output_tokens": 2070
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

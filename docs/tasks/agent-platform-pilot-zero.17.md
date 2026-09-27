@@ -62,6 +62,7 @@ or launch the pilot; the initial proposal-only wording above is historical conte
 On 27 September the owner authorized the next
 [development startup/recovery component](../planning/standalone-pilot/development-lifecycle-addendum.md).
 Its [design](../planning/standalone-pilot/development-lifecycle-design.md) and
-[verification plan](../testing/development-lifecycle.md) are being independently reviewed before
-implementation. This work covers R4 operational readiness and interruption cleanup; it does not close
+[verification plan](../testing/development-lifecycle.md) received independent planning review.
+Supervised implementation and qualification are recorded in the
+[lifecycle report](../reviews/development-lifecycle-qualification.md), published through PR276. This work covers R4 operational readiness and interruption cleanup; it does not close
 R1–R3 or enable inherited/selected MCP access. PR275 remains the preceding tested baseline.

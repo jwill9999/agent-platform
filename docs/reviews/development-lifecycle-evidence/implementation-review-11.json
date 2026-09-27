@@ -1,0 +1,146 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "e57edc9b-ad7b-4e1f-bdca-2fb74bb9b7b1",
+  "materialDigest": "3ca32bbb68a83e5a22dc9ca97fb3b2203a41804ab70ca76d03ef39638c4f21ea",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-addendum.md",
+      "digest": "83c1d0676c880f7b5ef4d1ba1f4f4c1fd56f7e4e8c72d8e9fc091f6b2d1d61f7"
+    },
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-design.md",
+      "digest": "7bf3e3b24ab06b1aa183bc1d1fbc24ad0ec601f23fbb590c5354c62598467556"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/broker-image-binding.json",
+      "digest": "931dbabd528eca973ec720d368b55fa5ddab5a4eb17385f822c9a86675f6222c"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/local-verification.json",
+      "digest": "5594a11564f74412285e307e48462c73aafb8339eb81348cab00a6f9932b767d"
+    },
+    {
+      "path": "docs/testing/development-lifecycle.md",
+      "digest": "1f0a4a3eeaccc96acf0ed4c249a95e9c31f422a02dddcf94a374bf4475e098f3"
+    },
+    {
+      "path": "docs/workflow-control-development.md",
+      "digest": "5e9d965832bd3a8915002a07d9097182dbb5192ea5673979a70d13d36361d83f"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "digest": "f1f12cea5ce61bae083acfa18f1b5778f55c39b2cf9d3a786873b943cb37631a"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationWorker.ts",
+      "digest": "922b5059994abaa1b694f356b4442ed6f7c92987daf0c2fffa829db6f855231d"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHost.ts",
+      "digest": "33219eced27c065d529c283f5e2b4fc56c61baefbd0142a10ab42c6ab6985d66"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHostJournal.ts",
+      "digest": "3d9b850a3d167596954e78218ad11676c9ff4880e3c27883314904a7cd1c4d2b"
+    },
+    {
+      "path": "packages/workflow-control/src/documentSources.ts",
+      "digest": "f52531076e4b28dd163634aa2516586829c0a128e474d537e55e1a1de98f087e"
+    },
+    {
+      "path": "packages/workflow-control/src/executionInterruptions.ts",
+      "digest": "d220df4a2023cee181b4ee1da8037091b4db93cf1a3e869ec9cb2562c7da0ac7"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialBrokerCli.ts",
+      "digest": "44e78eacad363fa3857528ccaf75b76db67c4c0789b4a0647f0b99c8a8e9cf96"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialGateway.ts",
+      "digest": "0a7fe2bfab80cd94af9d71b3735ee24a31da4bf3b42af71ff32e6b573b2430f3"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialLeases.ts",
+      "digest": "06cdda9ea4cc0bfedf0a385d32a8efd6c1e506b48cc4db7292b7c2e79ba826c4"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "5f81b14c8205a59292fcab8885ebfc82c5084ef6c7881df7ff609b45182a3530"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "b392a696a43cc3fc97ce7c43325bf32c67fe86c2b5642bff8213d2dadda918a9"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "4fdb2647494631e8cde1573ec3d1798d41bcf3b408c49217b5b740ba4e250dd7"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "0ef9db07ff6ff8947e90f314c4292fd5dd805709593a5c44c17ca29ee88ba606"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHost.integration.test.ts",
+      "digest": "dd997e295e521d01f02ccd83a3024394fa1e515f2a6763abd80b444d4114ada6"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostFailures.test.ts",
+      "digest": "2a13b5ebe7c0c08eaf3b33046f5185de415f37f5f2ee3343b7febcc89637315d"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostJournal.test.ts",
+      "digest": "fdd7aa0633c6a2023bf9348ab01a5eb1bc38666abcb607a126aa6e5486601849"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentWorkflowFixture.ts",
+      "digest": "49316e8bc66ad313503b534e2c10a2d0c0bbd18204942bf5dae6ab79486a767e"
+    },
+    {
+      "path": "packages/workflow-control/test/executionInterruptions.test.ts",
+      "digest": "3e33085d67b5bf78df539d49a0f32d6392dbc775d844b38218d17180fe4d8ba5"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "a2830a3c01124b0d291a949ea12640fa0ea7f8e78be9820c20c5427dc28eb751"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0e07b-ba39-7181-aaa5-9255e21b2f58"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "1. **High \u2014 Worker topology validation does not preserve role isolation.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts`, `#workerDefinition`.  \n   A bound worker passes validation with additional capabilities, `seccomp=unconfined`, host namespaces, or a writable `/workspace` mount for a read-only role. The checks require only that `CapDrop` includes `ALL`, security options include `no-new-privileges`, and mount sources fall beneath staging. Broker hardening repairs do not cover workers.  \n   **Proposed correction:** Compare worker configuration against its persisted role-specific launch policy, including capability/security allowlists, namespaces, devices, mount destinations and write permissions. Add negative cases for otherwise correctly bound workers.\n\n2. **Medium \u2014 Healthy control checks can continually refresh readiness while topology verification is stale.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts`, `#startTopologyMonitor`, `#monitor`, runtime admission callback; `developmentHostJournal.ts`, `assertDevelopmentAdmission`.  \n   Topology checks run independently and perform multiple sequential Docker inspections. While a check is outstanding, successful control heartbeats continue publishing `ready`, refreshing `observed_at_ms`. Dispatch checks that timestamp without checking the last successful topology observation. Slow Docker inspection therefore permits admission using topology older than the readiness freshness limit.  \n   **Proposed correction:** Track topology freshness separately and require it at dispatch. Bound the complete topology-check duration and invalidate admission when its freshness expires.\n\n3. **Medium \u2014 Background runtime diagnostics bypass the redaction policy.**  \n   **Evidence:** `packages/workflow-control/src/phaseRuntime.ts`, `start`.  \n   Both background `runOnce()` rejection handlers print `String(error)` directly. Exceptions from journal operations and admission callbacks are therefore outside the supervisor\u2019s allowlisted error classification and can expose arbitrary diagnostic content. The supplied redaction test covers persisted source-verification failure codes, not these logging paths.  \n   **Proposed correction:** Emit fixed allowlisted runtime error codes and test injected sensitive exception text through both background rejection handlers.\n\n**Missing evidence:** The supplied verification explicitly leaves the exact-image connected rerun and final hosted checks pending. It also supplies no completed real-generation qualification result or complete disposition of mandatory fault scenarios and skipped checks. Four-module byte equality establishes that binding only; it does not establish those behavioral results.\n\nReview limited to supplied evidence; no execution or state changes. This is not human approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 193213,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1024,
+          "reasoning_output_tokens": 516
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

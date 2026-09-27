@@ -1,0 +1,142 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "625cf313-c24a-43cf-9199-c40e90f951d9",
+  "materialDigest": "a70c97cdc6cc62109eb1fb3740c7752c79cc2a3d5ede61290ab409d876324ff8",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-addendum.md",
+      "digest": "83c1d0676c880f7b5ef4d1ba1f4f4c1fd56f7e4e8c72d8e9fc091f6b2d1d61f7"
+    },
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-design.md",
+      "digest": "7bf3e3b24ab06b1aa183bc1d1fbc24ad0ec601f23fbb590c5354c62598467556"
+    },
+    {
+      "path": "docs/testing/development-lifecycle.md",
+      "digest": "1f0a4a3eeaccc96acf0ed4c249a95e9c31f422a02dddcf94a374bf4475e098f3"
+    },
+    {
+      "path": "docs/workflow-control-development.md",
+      "digest": "dd41c9c31c448435b30d67caa1e464575352869017afa66d45261af7029b9029"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "digest": "f1f12cea5ce61bae083acfa18f1b5778f55c39b2cf9d3a786873b943cb37631a"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationWorker.ts",
+      "digest": "922b5059994abaa1b694f356b4442ed6f7c92987daf0c2fffa829db6f855231d"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHost.ts",
+      "digest": "9d2d07bc96941978afa01010f475b663de243f246e61e602eb0d6a318dc3105e"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHostJournal.ts",
+      "digest": "6dd232a4959e15ab3b7a1079d0954419ab3404de4c14ea960c698b9b6cf6c57d"
+    },
+    {
+      "path": "packages/workflow-control/src/documentSources.ts",
+      "digest": "f52531076e4b28dd163634aa2516586829c0a128e474d537e55e1a1de98f087e"
+    },
+    {
+      "path": "packages/workflow-control/src/executionInterruptions.ts",
+      "digest": "1bd01dea30cbb301ffb3fee4675322e6b45aa702e8ac761fdefaaf81756cfb32"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialBrokerCli.ts",
+      "digest": "44e78eacad363fa3857528ccaf75b76db67c4c0789b4a0647f0b99c8a8e9cf96"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialGateway.ts",
+      "digest": "0a7fe2bfab80cd94af9d71b3735ee24a31da4bf3b42af71ff32e6b573b2430f3"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialLeases.ts",
+      "digest": "06cdda9ea4cc0bfedf0a385d32a8efd6c1e506b48cc4db7292b7c2e79ba826c4"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "5f81b14c8205a59292fcab8885ebfc82c5084ef6c7881df7ff609b45182a3530"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "0bc2007bc5ad4967cccc3d76ccdd28fe32d9d3393dfee825c8ac1273499c7289"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "24d8e9a4cd8dbdf3f280bff594f5563be881b5378a5ff43ad69064e8f9b0f925"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "58ecc932bcdb4e5265f11f579378875cb440f1ab9d48a2f0166ca5c9d230c573"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHost.integration.test.ts",
+      "digest": "639451f3c187355857f8b4f6c6de02460d84158bbd6644992b5d75decbf8e9cb"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostJournal.test.ts",
+      "digest": "4dbd5312273f783172170ab06782c19799bca5a2327cad4b888b6a172d25fc94"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentWorkflowFixture.ts",
+      "digest": "49316e8bc66ad313503b534e2c10a2d0c0bbd18204942bf5dae6ab79486a767e"
+    },
+    {
+      "path": "packages/workflow-control/test/executionInterruptions.test.ts",
+      "digest": "3e33085d67b5bf78df539d49a0f32d6392dbc775d844b38218d17180fe4d8ba5"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "2f743fb0cebf72f20f1ee946c2e10ab5a101260405d39ae87e70c109f5ba9a67"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0e05d-0d1c-7943-9ad4-9faca29a31ad"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "I\u2019m checking the supplied source for remaining cleanup, ownership, and recovery races. I\u2019ll distinguish code findings from gaps in execution evidence."
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "1. **High \u2014 Generated configuration can overwrite the account file.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts`, `create`, `#provision`, `#attachRuntime`.  \n   Configuration permits `accountFile` to resolve to `stateDirectory/server.json` or `adapter.json`. Subsequent `writeFile` calls overwrite that account file. Those writes also follow existing symlinks at generated-file paths. This violates DL-5\u2019s account-preservation requirement.  \n   **Correction:** Reject account/generated-path aliases, validate generated destinations without following symlinks, and replace generated files safely without modifying aliased user files.\n\n2. **High \u2014 Network membership checks accept containers without proving their execution identity.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts`, `#validateMember`.  \n   A container carrying an active execution\u2019s label passes the specialist check without matching its actual Docker ID against `scheduler_containers.container_id`. The `process_identity` comparison checks a database string, not the inspected container. Probe members need only matching labels and a name prefix; even outbound membership is accepted. Consequently, unrecorded containers or probes attached to both networks can pass topology validation.  \n   **Correction:** Match members to durable container/probe records and exact Docker IDs. Validate their permitted networks and relevant image, mount, and privilege settings; reject unrecorded members.\n\n3. **Medium \u2014 Broker adoption omits executable configuration checks.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts`, `DockerInspection`, `#definition`.  \n   Adoption checks image, user, selected hardening settings, mounts, and ports, but never checks `Entrypoint`, `Cmd`, or environment overrides. A same-name container with the expected labels and mounts but a different command can be adopted and started with access to the account and control key. The supplied rejection test changes several checked settings, so it does not cover this case.  \n   **Correction:** Validate the complete expected broker execution configuration before starting or adopting it. Add a case that changes only the command or entrypoint.\n\n4. **Medium \u2014 Cleanup settlement is treated as effect reconciliation.**  \n   **Evidence:** `packages/workflow-control/src/phaseRuntime.ts`, `#confirmCleanup`, `cleanupStatus`; `packages/workflow-control/src/executionInterruptions.ts`, `finishAttempt`; `packages/workflow-control/src/developmentHost.ts`, `#publishReadiness`.  \n   An interruption becomes settled after cancellation, revocation, and credential-file cleanup. There is no persisted task-effect assessment or reconciliation outcome, and readiness can then become `ready`. Retaining staging bytes does not establish the design\u2019s required `none_verified`, `recorded_effects`, or `uncertain` outcome. The marker assertion occurs in test code, not runtime reconciliation.  \n   **Correction:** Record effect uncertainty durably and distinguish containment completion from reconciliation. Gate further dispatch on the required reconciliation decision while preserving the blocked interrupted phase.\n\n**Missing evidence:** The supplied material contains test definitions, not execution results for the latest fixes. It also does not demonstrate simultaneous startup, competing recovery processes, interruption-versus-result/callback transaction races, listener failure ordering, or delayed probe creation after timeout. The reported earlier results do not qualify these revisions.\n\nStatic review only; no commands executed or state changed."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 172241,
+          "cached_input_tokens": 0,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 3313,
+          "reasoning_output_tokens": 2588
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}
