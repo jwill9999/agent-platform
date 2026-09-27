@@ -117,7 +117,7 @@ export class StandalonePhaseRuntime {
   #closing: Promise<void> | undefined;
   #reservation: DockerSpecialistReservation | undefined;
   #fatalAdmission = false;
-  #cleanup = new Map<string, Promise<void>>();
+  readonly #cleanup = new Map<string, Promise<void>>();
 
   private constructor(input: {
     store: WorkflowStore;
@@ -239,11 +239,20 @@ export class StandalonePhaseRuntime {
 
   cleanupStatus(): 'settled' | 'pending' | 'exhausted' {
     const rows = this.#journal.interruptions().list(this.#config.runId);
-    return rows.some((row) => row.state === 'exhausted')
-      ? 'exhausted'
-      : rows.some((row) => row.state === 'pending')
-        ? 'pending'
-        : 'settled';
+    if (rows.some((row) => row.state === 'exhausted')) return 'exhausted';
+    if (rows.some((row) => row.state === 'pending')) return 'pending';
+    if (
+      this.#journal
+        .list()
+        .some(
+          (job) =>
+            job.run_id === this.#config.runId &&
+            job.status === 'started' &&
+            job.lease_owner !== this.#owner,
+        )
+    )
+      return 'pending';
+    return 'settled';
   }
 
   requestCleanupRecovery(): number {
@@ -687,7 +696,7 @@ export class StandalonePhaseRuntime {
     const cleanup = this.#journal.interruptions();
     const settled = cleanup
       .list(job.run_id)
-      .find((row) => row.execution_id === reservation.id && row.state === 'settled');
+      .some((row) => row.execution_id === reservation.id && row.state === 'settled');
     if (settled) {
       this.#journal.finalizeInterrupted(job);
       return;
@@ -698,12 +707,38 @@ export class StandalonePhaseRuntime {
       return;
     }
     const attempt = cleanup.begin(claimed, Date.now());
+    this.#launcher.abortTransport(reservation.id);
+    await this.#performCleanup(attempt, reservation);
+    const outcome = cleanup.finishAttempt(attempt, Date.now());
+    if (outcome.state !== 'settled') {
+      this.#journal.deferInterrupted(job, Date.now());
+      return;
+    }
+    this.#journal.finalizeInterrupted(job);
+  }
+  async #performCleanup(
+    attempt: import('./executionInterruptions.js').ExecutionInterruption,
+    reservation: DockerSpecialistReservation,
+  ): Promise<void> {
     this.#launcher.beginInterruptionCleanup(attempt);
-    const exists = this.#store.getSchedulerExecution(reservation.id) !== undefined;
-    const results = await Promise.allSettled([
-      exists ? this.#launcher.stopContainer(reservation) : Promise.resolve(),
-      exists ? this.#launcher.revokeCredential(reservation.id) : Promise.resolve(),
-    ]);
+    try {
+      const exists = this.#store.getSchedulerExecution(reservation.id) !== undefined;
+      const results = await Promise.allSettled([
+        exists ? this.#launcher.stopContainer(reservation) : Promise.resolve(),
+        exists ? this.#launcher.revokeCredential(reservation.id) : Promise.resolve(),
+      ]);
+      await this.#confirmCleanup(attempt, results, exists, reservation);
+    } finally {
+      this.#launcher.endInterruptionCleanup(reservation.id);
+    }
+  }
+  async #confirmCleanup(
+    attempt: import('./executionInterruptions.js').ExecutionInterruption,
+    results: PromiseSettledResult<void>[],
+    exists: boolean,
+    reservation: DockerSpecialistReservation,
+  ): Promise<void> {
+    const cleanup = this.#journal.interruptions();
     for (const [index, operation] of ['cancel', 'revoke'].entries()) {
       if (results[index]?.status === 'fulfilled')
         cleanup.confirm(attempt, operation as 'cancel' | 'revoke', Date.now());
@@ -716,13 +751,6 @@ export class StandalonePhaseRuntime {
         /* Leave durable settlement pending if credential material could not be removed. */
       }
     }
-    this.#launcher.endInterruptionCleanup(reservation.id);
-    const outcome = cleanup.finishAttempt(attempt, Date.now());
-    if (outcome.state !== 'settled') {
-      this.#journal.deferInterrupted(job, Date.now());
-      return;
-    }
-    this.#journal.finalizeInterrupted(job);
   }
   async #recover(job: PhaseJob): Promise<void> {
     // Cleanup has its own narrow lease and cannot dispatch or advance the workflow.

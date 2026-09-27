@@ -1,3 +1,4 @@
+import { lstatSync } from 'node:fs';
 import {
   InterruptionCleanupJournal,
   type ExecutionInterruption,
@@ -3660,54 +3661,67 @@ export class WorkflowStore {
       from: readonly SchedulerCredentialStatus[];
       to: SchedulerCredentialStatus;
       nowMs?: number;
+      cleanup?: ExecutionInterruption;
     },
     capability?: symbol,
   ): SchedulerExecutionRecord {
     if (capability !== workflowCredentialJournalCapability) {
       throw new Error('credential journal mutation requires broker capability');
     }
-    const execution = this.getSchedulerExecution(input.id);
-    if (execution === undefined || execution.status !== 'active') {
-      throw new Error('active scheduler execution not found for credential transition');
-    }
-    if (execution.credentialLeaseId !== input.leaseId) {
-      throw new Error('scheduler credential lease identity changed');
-    }
-    if (execution.credentialStatus === input.to) return execution;
-    const normativeTransitions: Readonly<
-      Record<SchedulerCredentialStatus, readonly SchedulerCredentialStatus[]>
-    > = {
-      pending: ['issuing', 'revoking'],
-      issuing: ['issued', 'revoking'],
-      issued: ['revoking'],
-      revoking: ['revoked'],
-      revoked: [],
-      legacy_quarantined: [],
-    };
-    if (!normativeTransitions[execution.credentialStatus].includes(input.to)) {
-      throw new Error(
-        `credential transition ${execution.credentialStatus} -> ${input.to} is forbidden`,
-      );
-    }
-    if (!input.from.includes(execution.credentialStatus)) {
-      throw new Error(
-        `credential transition ${execution.credentialStatus} -> ${input.to} is not allowed`,
-      );
-    }
-    if (
-      !this.#compareAndSwapSchedulerCredential({
-        id: input.id,
-        leaseId: input.leaseId,
-        expected: execution.credentialStatus,
-        to: input.to,
-        nowMs: input.nowMs,
+    return this.#database
+      .transaction(() => {
+        if (input.cleanup) {
+          if (
+            input.cleanup.execution_id !== input.id ||
+            !['revoking', 'revoked'].includes(input.to)
+          )
+            throw new Error('cleanup_transition_forbidden');
+          this.assertInterruptionCleanup(input.cleanup);
+        } else assertExecutionNotInterrupted(this.#database, input.id);
+        const execution = this.getSchedulerExecution(input.id);
+        if (execution === undefined || execution.status !== 'active') {
+          throw new Error('active scheduler execution not found for credential transition');
+        }
+        if (execution.credentialLeaseId !== input.leaseId) {
+          throw new Error('scheduler credential lease identity changed');
+        }
+        if (execution.credentialStatus === input.to) return execution;
+        const normativeTransitions: Readonly<
+          Record<SchedulerCredentialStatus, readonly SchedulerCredentialStatus[]>
+        > = {
+          pending: ['issuing', 'revoking'],
+          issuing: ['issued', 'revoking'],
+          issued: ['revoking'],
+          revoking: ['revoked'],
+          revoked: [],
+          legacy_quarantined: [],
+        };
+        if (!normativeTransitions[execution.credentialStatus].includes(input.to)) {
+          throw new Error(
+            `credential transition ${execution.credentialStatus} -> ${input.to} is forbidden`,
+          );
+        }
+        if (!input.from.includes(execution.credentialStatus)) {
+          throw new Error(
+            `credential transition ${execution.credentialStatus} -> ${input.to} is not allowed`,
+          );
+        }
+        if (
+          !this.#compareAndSwapSchedulerCredential({
+            id: input.id,
+            leaseId: input.leaseId,
+            expected: execution.credentialStatus,
+            to: input.to,
+            nowMs: input.nowMs,
+          })
+        ) {
+          const current = this.getSchedulerExecution(input.id);
+          if (current?.credentialStatus === input.to) return current;
+          throw new Error('credential transition lost compare-and-swap race');
+        }
+        return this.getSchedulerExecution(input.id)!;
       })
-    ) {
-      const current = this.getSchedulerExecution(input.id);
-      if (current?.credentialStatus === input.to) return current;
-      throw new Error('credential transition lost compare-and-swap race');
-    }
-    return this.getSchedulerExecution(input.id)!;
+      .immediate();
   }
 
   #compareAndSwapSchedulerCredential(input: {
@@ -3999,6 +4013,13 @@ export class WorkflowStore {
     capability: typeof workflowContainerJournalCapability,
     nowMs = Date.now(),
   ): void {
+    const identity = lstatSync(root, { bigint: true });
+    if (
+      !identity.isDirectory() ||
+      identity.isSymbolicLink() ||
+      Number(identity.uid) !== process.getuid?.()
+    )
+      throw new Error('staging_identity_changed');
     if (capability !== workflowContainerJournalCapability || !isAbsolute(root))
       throw new Error('invalid_staging_authority');
     this.#database
@@ -4018,16 +4039,43 @@ export class WorkflowStore {
           .get(authority.id) as { root: string } | undefined;
         if (existing && existing.root !== root) throw new Error('staging_identity_changed');
         this.#database
-          .prepare('INSERT OR IGNORE INTO scheduler_staging VALUES (?,?,?)')
-          .run(authority.id, root, nowMs);
+          .prepare(
+            'INSERT OR IGNORE INTO scheduler_staging (execution_id,root,created_at_ms,device,inode,uid) VALUES (?,?,?,?,?,?)',
+          )
+          .run(
+            authority.id,
+            root,
+            nowMs,
+            String(identity.dev),
+            String(identity.ino),
+            Number(identity.uid),
+          );
       })
       .immediate();
   }
 
-  getSchedulerStaging(id: string): { root: string; created_at_ms: number } | undefined {
+  getSchedulerStaging(id: string):
+    | {
+        root: string;
+        created_at_ms: number;
+        device: string | null;
+        inode: string | null;
+        uid: number | null;
+      }
+    | undefined {
     return this.#database
-      .prepare('SELECT root,created_at_ms FROM scheduler_staging WHERE execution_id=?')
-      .get(id) as { root: string; created_at_ms: number } | undefined;
+      .prepare(
+        'SELECT root,created_at_ms,device,inode,uid FROM scheduler_staging WHERE execution_id=?',
+      )
+      .get(id) as
+      | {
+          root: string;
+          created_at_ms: number;
+          device: string | null;
+          inode: string | null;
+          uid: number | null;
+        }
+      | undefined;
   }
 
   getSchedulerExecution(id: string): SchedulerExecutionRecord | undefined {

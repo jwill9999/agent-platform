@@ -1,5 +1,5 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, rename, mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,9 +118,11 @@ it.skipIf(!supplied)(
   120000,
 );
 
-it.skipIf(!supplied || !process.env.WORKFLOW_DEVELOPMENT_WORKER_IMAGE)(
-  'interrupts a real fixture worker and reconciles without repeating its recorded effect',
-  async () => {
+it
+  .skipIf(!supplied || !process.env.WORKFLOW_DEVELOPMENT_WORKER_IMAGE)
+  .each(['live', 'restart', 'replaced-staging'])(
+  'interrupts a real fixture worker and reconciles without repeating its recorded effect (%s)',
+  async (mode) => {
     const { developmentWorkflowFixture } = await import('./developmentWorkflowFixture.js');
     const f = await developmentWorkflowFixture();
     const root = await mkdtemp(join(homedir(), '.codex/lifecycle-connected-'));
@@ -145,7 +147,7 @@ it.skipIf(!supplied || !process.env.WORKFLOW_DEVELOPMENT_WORKER_IMAGE)(
     );
     const path = join(root, 'config.json');
     await writeFile(path, JSON.stringify(config), { mode: 0o600 });
-    const child = spawn(process.execPath, [cli, 'development-host', path], {
+    let child = spawn(process.execPath, [cli, 'development-host', path], {
       env: { WORKFLOW_GIT_BINARY: process.env.WORKFLOW_GIT_BINARY },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -182,6 +184,11 @@ it.skipIf(!supplied || !process.env.WORKFLOW_DEVELOPMENT_WORKER_IMAGE)(
       );
       const before = await readFile(marker, 'utf8');
       expect(before.trim().split('\n')).toHaveLength(1);
+      if (mode === 'replaced-staging') {
+        await rename(staging, staging + '-retained');
+        await mkdir(staging, { mode: 0o700 });
+        await writeFile(join(staging, 'do-not-delete'), 'replacement');
+      }
       const failedAt = Date.now();
       await execute('/usr/local/bin/docker', ['stop', '--time', '1', `ap-dev-${serviceId}`], {
         timeout: 5000,
@@ -194,11 +201,30 @@ it.skipIf(!supplied || !process.env.WORKFLOW_DEVELOPMENT_WORKER_IMAGE)(
       );
       expect(Date.now() - failedAt).toBeLessThan(6000);
       expect(interrupted.interruptions[0]).toMatchObject({ state: 'pending', revoke: 0 });
-      await command('development-recover');
+      if (mode === 'restart') {
+        child.kill('SIGKILL');
+        await until(status, (s) => s.service.lease_until_ms <= Date.now(), 20000);
+        child = spawn(process.execPath, [cli, 'development-recover', path], {
+          env: { WORKFLOW_GIT_BINARY: process.env.WORKFLOW_GIT_BINARY },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        child.stdout!.on('data', (b) => log.push(String(b)));
+        child.stderr!.on('data', (b) => log.push(String(b)));
+      } else await command('development-recover');
+      if (mode === 'replaced-staging') {
+        const exhausted = await until(status, (s) => s.interruptions?.[0]?.state === 'exhausted');
+        expect(exhausted.effectiveCode).not.toBe('ready');
+        expect(await readFile(join(staging, 'do-not-delete'), 'utf8')).toBe('replacement');
+        await rm(staging, { recursive: true, force: true });
+        await rename(staging + '-retained', staging);
+        await command('development-recover');
+      }
       await until(status, (s) => s.interruptions?.[0]?.state === 'settled');
       expect(await readFile(marker, 'utf8')).toBe(before);
-      await expect(readFile(join(staging,'codex-auth.json'))).rejects.toMatchObject({code:'ENOENT'});
-      await expect(readFile(join(staging,'codex-home/config.toml'))).rejects.toMatchObject({code:'ENOENT'});
+      expect((await readFile(join(staging, 'codex-auth.json'))).length).toBe(0);
+      await expect(readFile(join(staging, 'codex-home/config.toml'))).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
       expect(
         (
           db.prepare("SELECT COUNT(*) AS n FROM scheduler_executions WHERE id!='child'").get() as {
@@ -242,10 +268,74 @@ it.skipIf(!supplied || !process.env.WORKFLOW_DEVELOPMENT_WORKER_IMAGE)(
           ]).catch(() => undefined);
       }
       db.close();
-      if (staging) await rm(staging, { recursive: true, force: true });
+      if (staging) {
+        await rm(staging, { recursive: true, force: true });
+        await rm(staging + '-retained', { recursive: true, force: true });
+      }
       await rm(f.root, { recursive: true, force: true });
       await rm(root, { recursive: true, force: true });
     }
   },
   120000,
+);
+
+it.skipIf(!supplied)(
+  'rejects a same-name container with unapproved configuration without stopping it',
+  async () => {
+    const { DevelopmentHost } = await import('../src/developmentHost.js');
+    const root = await mkdtemp(join(homedir(), '.codex/lifecycle-rejection-'));
+    const config = {
+      ...JSON.parse(await readFile(supplied!, 'utf8')),
+      stateDirectory: join(root, 'state'),
+    };
+    delete config.workflow;
+    const host = await DevelopmentHost.create(config);
+    const db = new Database(join(root, 'state/lifecycle.sqlite'), { readonly: true });
+    const owner = db.prepare('SELECT service_id,config_digest FROM development_host').get() as {
+      service_id: string;
+      config_digest: string;
+    };
+    db.close();
+    const name = `ap-dev-${owner.service_id}`;
+    try {
+      await execute(
+        '/usr/local/bin/docker',
+        [
+          'run',
+          '--detach',
+          '--name',
+          name,
+          '--label',
+          `io.agent-platform.development=${owner.service_id}`,
+          '--label',
+          `io.agent-platform.development-config=${owner.config_digest}`,
+          '--entrypoint',
+          'node',
+          config.brokerImage,
+          '-e',
+          'setInterval(()=>{},1000)',
+        ],
+        { timeout: 10000 },
+      );
+      await expect(host.run()).rejects.toThrow('service_identity_mismatch');
+      expect(
+        (
+          await execute('/usr/local/bin/docker', [
+            'inspect',
+            '--format',
+            '{{.State.Running}}',
+            name,
+          ])
+        ).stdout.trim(),
+      ).toBe('true');
+    } finally {
+      await execute('/usr/local/bin/docker', ['rm', '--force', name]).catch(() => undefined);
+      for (const suffix of ['internal', 'outbound'])
+        await execute('/usr/local/bin/docker', ['network', 'rm', `${name}-${suffix}`]).catch(
+          () => undefined,
+        );
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+  30000,
 );

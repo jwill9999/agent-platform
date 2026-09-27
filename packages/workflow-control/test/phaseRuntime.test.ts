@@ -44,6 +44,8 @@ async function setup(
     revokeFailure?: boolean;
     removeFailure?: boolean;
     issueFailure?: boolean;
+    issueDelayMs?: number;
+    revokeDelayMs?: number;
     admission?: () => Promise<void>;
     verifySource?: () => Promise<void>;
   } = {},
@@ -122,15 +124,25 @@ async function setup(
         return 'generation-one';
       },
       issue: async (root, _executionId, leaseId, generation) => {
-        const authFile = join(root, 'auth.json');
-        await writeFile(authFile, '{}');
+        const authFile = join(root, 'codex-auth.json');
         credentials.set(leaseId, 'active');
+        if (options.issueDelayMs)
+          await new Promise((resolve) => setTimeout(resolve, options.issueDelayMs));
+        await writeFile(authFile, '{}', { flag: 'wx' });
         if (options.issueFailure) throw new Error('lost_issuance_reply');
         return { authFile, leaseId, generation };
       },
       revoke: async (leaseId) => {
-        revocationSawInterruption.push((db.prepare("SELECT COUNT(*) AS n FROM execution_interruptions WHERE run_id='run'").get() as {n:number}).n>0);
+        revocationSawInterruption.push(
+          (
+            db
+              .prepare("SELECT COUNT(*) AS n FROM execution_interruptions WHERE run_id='run'")
+              .get() as { n: number }
+          ).n > 0,
+        );
         if (brokerState.revokeFailure) throw new Error('offline');
+        if (options.revokeDelayMs)
+          await new Promise((resolve) => setTimeout(resolve, options.revokeDelayMs));
         credentials.set(leaseId, 'revoked');
       },
       observe: async (leaseId) => credentials.get(leaseId) ?? 'revoked',
@@ -694,4 +706,71 @@ it('records ambiguous issuance before compensating revocation within the cleanup
   expect(f.revocationSawInterruption).toEqual([true]);
   expect(f.journal.interruptions().list('run')[0]).toMatchObject({ state: 'settled', attempt: 1 });
   expect(f.launches.some((args) => args[0] === 'create')).toBe(false);
+});
+
+it('seals the credential pathname before a delayed issuance reply can recreate token bytes', async () => {
+  const f = await setup({ issueDelayMs: 2500 });
+  const work = f.runtime.runOnce();
+  while (!f.credentials.size) await new Promise((resolve) => setTimeout(resolve, 10));
+  f.brokerState.healthFailure = true;
+  expect(await work).toBe(false);
+  const interrupted = f.journal.interruptions().list('run')[0]!;
+  expect(interrupted.state).toBe('settled');
+  const staging = f.store.getSchedulerStaging(interrupted.execution_id)!;
+  expect((await readFile(join(staging.root, 'codex-auth.json'))).length).toBe(0);
+  expect(f.launches.some((args) => args[0] === 'create')).toBe(false);
+}, 10000);
+
+it('rejects a late credential acknowledgement after cleanup ownership changes', async () => {
+  const f = await setup({ delayMs: 10000, revokeDelayMs: 500 });
+  const work = f.runtime.runOnce();
+  const rejected = expect(work).rejects.toThrow('cleanup_fence_rejected');
+  while (!f.launches.some((args) => args[0] === 'start'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  f.brokerState.healthFailure = true;
+  while (
+    !f.db.prepare("SELECT 1 FROM scheduler_executions WHERE credential_status='revoking'").get()
+  )
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  f.db.prepare("UPDATE execution_interruptions SET owner='replacement',epoch=epoch+1").run();
+  await rejected;
+  expect(
+    f.db.prepare("SELECT credential_status FROM scheduler_executions WHERE id!='child'").get(),
+  ).toEqual({ credential_status: 'revoking' });
+  expect(f.journal.interruptions().list('run')[0]?.state).toBe('pending');
+}, 10000);
+
+it('finishes pending cleanup after the run becomes terminal without advancing it', async () => {
+  const f = await setup({ delayMs: 10000, revokeFailure: true });
+  const work = f.runtime.runOnce();
+  while (!f.launches.some((args) => args[0] === 'start'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  await f.runtime.interruptActive('service_stopped');
+  expect(await work).toBe(false);
+  f.db.prepare("UPDATE runs SET state='cancelled'").run();
+  f.brokerState.revokeFailure = false;
+  f.db.prepare('UPDATE execution_interruptions SET next_attempt_ms=0').run();
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.journal.interruptions().list('run')[0]?.state).toBe('settled');
+  expect(f.journal.list()[0]?.status).toBe('blocked');
+  expect(f.store.getRun('run')?.state).toBe('cancelled');
+  expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+});
+
+it('preserves committed success when interruption loses the completion race', async () => {
+  const f = await setup();
+  expect(await f.runtime.runOnce()).toBe(true);
+  const completed = f.journal.list().find((job) => job.status === 'completed')!;
+  expect(f.journal.interrupt(completed, 'service_stopped', Date.now())).toBe(false);
+  expect(f.journal.interruptions().list('run')).toEqual([]);
+  expect(f.store.getSchedulerExecution(completed.execution_id!)?.status).toBe('completed');
+});
+
+it('reports pending recovery for an orphan whose phase lease has not expired', async () => {
+  const f = await setup();
+  const claim = f.journal.claim('previous-runtime', 60000, Date.now())!;
+  f.journal.start(claim, Date.now());
+  expect(f.runtime.cleanupStatus()).toBe('pending');
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.launches).toEqual([]);
 });

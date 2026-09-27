@@ -49,12 +49,16 @@ const codes = new Set([
   'probe_mount_unavailable',
   'invalid_configuration',
 ]);
-export const classifyDevelopmentError = (error: unknown) =>
-  error instanceof z.ZodError
-    ? 'invalid_configuration'
-    : error instanceof Error && codes.has(error.message)
-      ? error.message
-      : 'cleanup_pending';
+export function classifyDevelopmentError(error: unknown): string {
+  if (error instanceof z.ZodError) return 'invalid_configuration';
+  if (error instanceof Error && codes.has(error.message)) return error.message;
+  return 'cleanup_pending';
+}
+export function developmentExitCode(code: string): number {
+  if (code === 'invalid_configuration') return 2;
+  if (['cleanup_pending', 'cleanup_exhausted', 'journal_unavailable'].includes(code)) return 4;
+  return 3;
+}
 async function privateFile(path: string): Promise<string> {
   const info = await lstat(path);
   if (
@@ -206,15 +210,23 @@ export class DevelopmentHost {
     );
   }
   #publishReadiness(): void {
+    if (this.#stopping || this.#journal.state()?.stop_requested) {
+      this.#serviceQualified = false;
+      this.#observe('service_stopped');
+      return;
+    }
     const cleanup = this.#runtime?.cleanupStatus();
-    this.#observe(
-      cleanup === 'pending'
-        ? 'cleanup_pending'
-        : cleanup === 'exhausted'
-          ? 'cleanup_exhausted'
-          : 'ready',
-    );
+    if (cleanup === 'pending') {
+      this.#observe('cleanup_pending');
+      return;
+    }
+    if (cleanup === 'exhausted') {
+      this.#observe('cleanup_exhausted');
+      return;
+    }
+    this.#observe('ready');
   }
+
   async #control(body: unknown, timeout = 3000): Promise<Record<string, unknown>> {
     this.#guard();
     let response: Response;
@@ -406,10 +418,14 @@ export class DevelopmentHost {
       throw new Error('service_stopped');
     this.#assertLabels(container.Config?.Labels);
     await this.#definition(container);
-    const networks = Object.keys(container.NetworkSettings?.Networks ?? {}).sort();
+    const networks = Object.keys(container.NetworkSettings?.Networks ?? {}).sort((a, b) =>
+      a.localeCompare(b),
+    );
     if (
       JSON.stringify(networks) !==
-      JSON.stringify([`${this.#prefix}-internal`, `${this.#prefix}-outbound`].sort())
+      JSON.stringify(
+        [`${this.#prefix}-internal`, `${this.#prefix}-outbound`].sort((a, b) => a.localeCompare(b)),
+      )
     )
       throw new Error('topology_invalid');
     for (const [suffix, internal] of [
@@ -421,38 +437,40 @@ export class DevelopmentHost {
       if (network?.Internal !== internal) throw new Error('topology_invalid');
       for (const id of Object.keys(network?.Containers ?? {})) {
         if (id === container.Id) continue;
-        const member = await inspect('container', id);
-        if (
-          member?.Config?.Labels?.['io.agent-platform.specialist-execution'] &&
-          this.#config.workflow &&
-          suffix === 'internal'
-        ) {
-          const id = member.Config.Labels['io.agent-platform.specialist-execution'];
-          const db = new Database(this.#config.workflow.database, {
-            readonly: true,
-            fileMustExist: true,
-          });
-          try {
-            if (
-              !db
-                .prepare(
-                  "SELECT 1 FROM scheduler_executions WHERE id=? AND status='active' AND process_identity=?",
-                )
-                .get(id, `docker:workflow-specialist-${id}`)
-            )
-              throw new Error('topology_invalid');
-          } finally {
-            db.close();
-          }
-          if (Object.keys(member.NetworkSettings?.Networks ?? {}).length !== 1)
-            throw new Error('topology_invalid');
-          continue;
-        }
-        this.#assertLabels(member?.Config?.Labels);
-        if (!member?.Name?.startsWith(`/${this.#prefix}-probe-`))
-          throw new Error('topology_invalid');
+        await this.#validateMember(id, suffix);
       }
     }
+  }
+  async #validateMember(id: string, suffix: string): Promise<void> {
+    const member = await inspect('container', id);
+    if (
+      member?.Config?.Labels?.['io.agent-platform.specialist-execution'] &&
+      this.#config.workflow &&
+      suffix === 'internal'
+    ) {
+      const id = member.Config.Labels['io.agent-platform.specialist-execution'];
+      const db = new Database(this.#config.workflow.database, {
+        readonly: true,
+        fileMustExist: true,
+      });
+      try {
+        if (
+          !db
+            .prepare(
+              "SELECT 1 FROM scheduler_executions WHERE id=? AND status='active' AND process_identity=?",
+            )
+            .get(id, `docker:workflow-specialist-${id}`)
+        )
+          throw new Error('topology_invalid');
+      } finally {
+        db.close();
+      }
+      if (Object.keys(member.NetworkSettings?.Networks ?? {}).length !== 1)
+        throw new Error('topology_invalid');
+      return;
+    }
+    this.#assertLabels(member?.Config?.Labels);
+    if (!member?.Name?.startsWith(`/${this.#prefix}-probe-`)) throw new Error('topology_invalid');
   }
   async #removeProbe(id: string, removeToken = true): Promise<void> {
     const name = `${this.#prefix}-probe-${id}`;
@@ -467,21 +485,33 @@ export class DevelopmentHost {
       await rm(join(this.#directory, `probe-${id}`), { force: true, recursive: true });
   }
   async #reconcileProbes(): Promise<void> {
+    let failed = false;
     for (const probe of this.#journal.pendingProbes()) {
-      await this.#removeProbe(probe.id);
-      await this.#control({
-        operation: 'revoke',
-        leaseId: `probe:${probe.id}`,
-        generation: probe.generation,
-      });
-      const status = await this.#control({
-        operation: 'probe-status',
-        requestId: probe.id,
-        generation: probe.generation,
-      });
-      if (status.status !== 'revoked') throw new Error('cleanup_pending');
-      this.#journal.settleProbe(this.#owner, probe.id);
+      const results = await Promise.allSettled([
+        this.#removeProbe(probe.id).then(() =>
+          this.#journal.confirmProbe(this.#owner, probe.id, 'cancel'),
+        ),
+        this.#revokeProbe(probe).then(() =>
+          this.#journal.confirmProbe(this.#owner, probe.id, 'revoke'),
+        ),
+      ]);
+      if (results.some((result) => result.status === 'rejected')) failed = true;
+      else this.#journal.settleProbe(this.#owner, probe.id);
     }
+    if (failed) throw new Error('cleanup_pending');
+  }
+  async #revokeProbe(probe: { id: string; generation: string }): Promise<void> {
+    await this.#control({
+      operation: 'revoke',
+      leaseId: `probe:${probe.id}`,
+      generation: probe.generation,
+    });
+    const status = await this.#control({
+      operation: 'probe-status',
+      requestId: probe.id,
+      generation: probe.generation,
+    });
+    if (status.status !== 'revoked') throw new Error('cleanup_pending');
   }
   async #probe(id: string, token: string): Promise<{ status: number; valid: boolean }> {
     const directory = join(this.#directory, `probe-${id}`);
@@ -613,6 +643,8 @@ export class DevelopmentHost {
           throw new Error('broker_generation_changed');
         const state = this.#journal.state()!;
         if (
+          this.#stopping ||
+          state.stop_requested ||
           !this.#serviceQualified ||
           this.#runtime?.cleanupStatus() !== 'settled' ||
           state.code !== 'ready' ||
@@ -624,8 +656,72 @@ export class DevelopmentHost {
     );
     this.#runtime.start();
   }
-  async run(): Promise<void> {
-    let shutdownFailure: string | undefined;
+  async #monitor(topology: () => Promise<void> | undefined): Promise<void> {
+    while (!this.#stopping && !this.#fatal) {
+      const state = this.#journal.state()!;
+      if (state.stop_requested) break;
+      if (state.recovery_requested !== this.#recovery) {
+        this.#serviceQualified = false;
+        this.#observe('starting');
+        await topology();
+        this.#observe('starting');
+        this.#recovery = state.recovery_requested;
+        this.#runtime?.requestCleanupRecovery();
+        try {
+          await this.#provision();
+          await this.#qualify();
+          this.#serviceQualified = true;
+          this.#publishReadiness();
+        } catch (error) {
+          this.#observe(classifyDevelopmentError(error));
+        }
+      }
+      try {
+        if ((await this.#health()) !== this.#generation)
+          throw new Error('broker_generation_changed');
+        if (this.#serviceQualified) this.#publishReadiness();
+      } catch (error) {
+        const code = classifyDevelopmentError(error);
+        this.#serviceQualified = false;
+        this.#observe(code);
+        await this.#runtime?.interruptActive(code);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+  async #shutdown(): Promise<string | undefined> {
+    this.#stopping = true;
+    this.#serviceQualified = false;
+    const results = await Promise.allSettled([this.#runtime?.close(), this.#reconcileProbes()]);
+    let outcome = results.some((result) => result.status === 'rejected')
+      ? 'cleanup_pending'
+      : undefined;
+    if (!this.#fatal) {
+      this.#guard();
+      const owned = this.#verifiedContainerId
+        ? await inspect('container', this.#verifiedContainerId)
+        : undefined;
+      if (owned) {
+        this.#assertLabels(owned.Config?.Labels);
+        await docker(['stop', '--time', '2', owned.Id]);
+      }
+      if (this.#config.workflow) {
+        const status = developmentStatus(this.#config, this.#journal.state()) as {
+          interruptions: Array<{ state: string }>;
+        };
+        if (status.interruptions.some((row) => row.state === 'exhausted'))
+          outcome = 'cleanup_exhausted';
+        else if (status.interruptions.some((row) => row.state === 'pending'))
+          outcome = 'cleanup_pending';
+      }
+      outcome ??= this.#journal.state()?.code;
+      if (outcome === 'cleanup_pending' || outcome === 'cleanup_exhausted') this.#observe(outcome);
+      this.#journal.release(this.#owner);
+      if (outcome === 'cleanup_pending' || outcome === 'cleanup_exhausted') return outcome;
+    }
+    return undefined;
+  }
+  #startRenewal(): void {
     this.#renewTimer = setInterval(() => {
       try {
         this.#journal.renew(this.#owner);
@@ -634,15 +730,12 @@ export class DevelopmentHost {
         void this.#runtime?.interruptActive('journal_unavailable').catch(() => undefined);
       }
     }, 2000);
+  }
+  #startTopologyMonitor() {
     let topologyCheck: Promise<void> | undefined;
     const topologyTimer = setInterval(() => {
       if (topologyCheck || this.#fatal) return;
-      try {
-        if (!this.#serviceQualified) return;
-      } catch {
-        this.#fatal = true;
-        return;
-      }
+      if (!this.#serviceQualified) return;
       topologyCheck = this.#topology()
         .catch(async (error: unknown) => {
           const code = classifyDevelopmentError(error);
@@ -657,8 +750,21 @@ export class DevelopmentHost {
           topologyCheck = undefined;
         });
     }, 2000);
+    return {
+      pending: () => topologyCheck,
+      stop: async () => {
+        clearInterval(topologyTimer);
+        await topologyCheck;
+      },
+    };
+  }
+  async run(): Promise<void> {
+    let shutdownFailure: string | undefined;
+    this.#startRenewal();
+    const topology = this.#startTopologyMonitor();
     const stop = () => {
       this.#stopping = true;
+      this.#serviceQualified = false;
     };
     process.once('SIGINT', stop);
     process.once('SIGTERM', stop);
@@ -669,37 +775,7 @@ export class DevelopmentHost {
       await this.#qualify();
       this.#serviceQualified = true;
       this.#publishReadiness();
-      while (!this.#stopping && !this.#fatal) {
-        const state = this.#journal.state()!;
-        if (state.stop_requested) break;
-        if (state.recovery_requested !== this.#recovery) {
-          this.#serviceQualified = false;
-          this.#observe('starting');
-          await topologyCheck;
-          this.#observe('starting');
-          this.#recovery = state.recovery_requested;
-          this.#runtime?.requestCleanupRecovery();
-          try {
-            await this.#provision();
-            await this.#qualify();
-            this.#serviceQualified = true;
-            this.#publishReadiness();
-          } catch (error) {
-            this.#observe(classifyDevelopmentError(error));
-          }
-        }
-        try {
-          if ((await this.#health()) !== this.#generation)
-            throw new Error('broker_generation_changed');
-          if (this.#serviceQualified) this.#publishReadiness();
-        } catch (error) {
-          const code = classifyDevelopmentError(error);
-          this.#serviceQualified = false;
-          this.#observe(code);
-          await this.#runtime?.interruptActive(code);
-        }
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
+      await this.#monitor(topology.pending);
       if (this.#fatal) throw new Error('journal_unavailable');
     } catch (error) {
       try {
@@ -711,35 +787,50 @@ export class DevelopmentHost {
     } finally {
       process.removeListener('SIGINT', stop);
       process.removeListener('SIGTERM', stop);
-      clearInterval(topologyTimer);
-      await topologyCheck;
+      await topology.stop();
       try {
-        await this.#runtime?.interruptActive('service_stopped');
-        const cleanupState = this.#runtime?.cleanupStatus();
-        await this.#runtime?.close();
-        if (cleanupState && cleanupState !== 'settled')
-          this.#observe(cleanupState === 'exhausted' ? 'cleanup_exhausted' : 'cleanup_pending');
-        if (!this.#fatal) {
-          this.#guard();
-          await this.#reconcileProbes();
-          const owned = this.#verifiedContainerId
-            ? await inspect('container', this.#verifiedContainerId)
-            : undefined;
-          if (owned) {
-            this.#assertLabels(owned.Config?.Labels);
-            await docker(['stop', '--time', '2', owned.Id]);
-          }
-          const outcome = this.#journal.state()?.code;
-          this.#journal.release(this.#owner);
-          if (outcome === 'cleanup_pending' || outcome === 'cleanup_exhausted')
-            shutdownFailure = outcome;
-        }
+        shutdownFailure = await this.#shutdown();
       } finally {
         if (this.#renewTimer) clearInterval(this.#renewTimer);
         this.#journal.close();
       }
     }
     if (shutdownFailure) throw new Error(shutdownFailure);
+  }
+}
+
+function developmentStatus(config: Config, state: DevelopmentHostState | undefined): unknown {
+  let interruptions: unknown[] = [];
+  if (config.workflow) {
+    const db = new Database(config.workflow.database, { readonly: true, fileMustExist: true });
+    try {
+      interruptions = db
+        .prepare(
+          'SELECT execution_id,run_id,reason,state,cancel,revoke,settle,attempt,batch FROM execution_interruptions',
+        )
+        .all();
+    } finally {
+      db.close();
+    }
+  }
+  return {
+    service: state,
+    effectiveCode:
+      state?.code === 'ready' && state.lease_until_ms <= Date.now()
+        ? 'service_owner_lost'
+        : state?.code,
+    interruptions,
+  };
+}
+
+function processAlive(pid: number | null | undefined): boolean {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+    return false;
   }
 }
 
@@ -760,43 +851,13 @@ export async function runDevelopmentCommand(command: string, path: string): Prom
   try {
     const state = journal.state();
     if (state && state.config_digest !== fingerprint) throw new Error('service_identity_mismatch');
-    if (command === 'development-status') {
-      let interruptions: unknown[] = [];
-      if (config.workflow) {
-        const db = new Database(config.workflow.database, { readonly: true, fileMustExist: true });
-        try {
-          interruptions = db
-            .prepare(
-              'SELECT execution_id,run_id,reason,state,cancel,revoke,settle,attempt,batch FROM execution_interruptions',
-            )
-            .all();
-        } finally {
-          db.close();
-        }
-      }
-      return {
-        service: state,
-        effectiveCode:
-          state?.code === 'ready' && state.lease_until_ms <= Date.now()
-            ? 'service_owner_lost'
-            : state?.code,
-        interruptions,
-      };
-    }
+    if (command === 'development-status') return developmentStatus(config, state);
     if (command === 'development-stop') {
       journal.request('stop');
       return { code: 'stop_requested' };
     }
     if (command === 'development-recover') {
-      let alive = false;
-      if (state?.pid) {
-        try {
-          process.kill(state.pid, 0);
-          alive = true;
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
-        }
-      }
+      const alive = processAlive(state?.pid);
       if (alive) {
         journal.request('recover');
         return { code: 'recovery_requested' };

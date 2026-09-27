@@ -36,6 +36,10 @@ it('retains lost probe issuance intent across reopening until revocation is conf
   } finally {
     observer.close();
   }
+  journal.confirmProbe(owner, id, 'revoke');
+  journal.settleProbe(owner, id);
+  expect(journal.pendingProbes()).toHaveLength(1);
+  journal.confirmProbe(owner, id, 'cancel');
   journal.settleProbe(owner, id);
   expect(journal.pendingProbes()).toEqual([]);
 });

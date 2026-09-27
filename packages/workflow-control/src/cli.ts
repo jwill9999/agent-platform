@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-import { runDevelopmentCommand, classifyDevelopmentError } from './developmentHost.js';
+import {
+  runDevelopmentCommand,
+  classifyDevelopmentError,
+  developmentExitCode,
+} from './developmentHost.js';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
@@ -213,12 +217,7 @@ if (
         }) + '\n',
       );
       const code = classifyDevelopmentError(error);
-      process.exitCode =
-        code === 'invalid_configuration'
-          ? 2
-          : ['cleanup_pending', 'cleanup_exhausted', 'journal_unavailable'].includes(code)
-            ? 4
-            : 3;
+      process.exitCode = developmentExitCode(code);
     } else {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
       process.exitCode = 1;

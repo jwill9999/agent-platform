@@ -24,7 +24,7 @@ export interface ExecutionInterruption {
 
 /** Shared workflow schema: interruption and terminal commitment use the same SQLite writer lock. */
 export function initializeInterruptionSchema(db: Database.Database): void {
-  db.exec(`CREATE TABLE IF NOT EXISTS scheduler_staging (execution_id TEXT PRIMARY KEY, root TEXT NOT NULL UNIQUE, created_at_ms INTEGER NOT NULL);
+  db.exec(`CREATE TABLE IF NOT EXISTS scheduler_staging (execution_id TEXT PRIMARY KEY, root TEXT NOT NULL UNIQUE, created_at_ms INTEGER NOT NULL, device TEXT, inode TEXT, uid INTEGER);
   CREATE TABLE IF NOT EXISTS execution_interruptions (
     execution_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, run_id TEXT NOT NULL,
     reason TEXT NOT NULL, observed_at_ms INTEGER NOT NULL, broker_generation TEXT,
@@ -35,6 +35,17 @@ export function initializeInterruptionSchema(db: Database.Database): void {
     cancel INTEGER NOT NULL DEFAULT 0, revoke INTEGER NOT NULL DEFAULT 0,
     settle INTEGER NOT NULL DEFAULT 0
   );`);
+  const fields = new Set(
+    (db.prepare('PRAGMA table_info(scheduler_staging)').all() as Array<{ name: string }>).map(
+      (row) => row.name,
+    ),
+  );
+  for (const [name, type] of [
+    ['device', 'TEXT'],
+    ['inode', 'TEXT'],
+    ['uid', 'INTEGER'],
+  ])
+    if (!fields.has(name!)) db.exec(`ALTER TABLE scheduler_staging ADD COLUMN ${name} ${type}`);
 }
 
 export function getInterruption(
@@ -171,7 +182,9 @@ export class InterruptionCleanupJournal {
         const current = getInterruption(this.db, row.execution_id)!;
         if (current.attempt !== row.attempt) throw new Error('cleanup_attempt_expired');
         const settled = current.cancel === 1 && current.revoke === 1 && current.settle === 1;
-        const state = settled ? 'settled' : current.attempt >= 3 ? 'exhausted' : 'pending';
+        let state: ExecutionInterruption['state'] = 'pending';
+        if (settled) state = 'settled';
+        else if (current.attempt >= 3) state = 'exhausted';
         this.db
           .prepare(
             `UPDATE execution_interruptions SET state=?,attempt_deadline_ms=0,

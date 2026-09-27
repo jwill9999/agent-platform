@@ -8,8 +8,9 @@ import {
   type SpecialistModelConnection,
 } from './specialistRoleProfile.js';
 import { modelGatewayConfigSchema, type ModelGatewayConfig } from './modelGatewayConfig.js';
+import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { cp, lstat, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, realpath, rm, rename, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify, isDeepStrictEqual } from 'node:util';
@@ -659,7 +660,7 @@ export class RevocableSpecialistCredentialBroker {
     return this.#conformance();
   }
 
-  async revoke(executionId: string): Promise<void> {
+  async revoke(executionId: string, cleanup?: ExecutionInterruption): Promise<void> {
     const leaseId = this.leaseId(executionId);
     let generation: string | null = null;
     for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -676,7 +677,7 @@ export class RevocableSpecialistCredentialBroker {
       if (execution.credentialStatus === 'revoking') break;
       try {
         this.#store.advanceSchedulerCredential(
-          { id: executionId, leaseId, from: [execution.credentialStatus], to: 'revoking' },
+          { id: executionId, leaseId, from: [execution.credentialStatus], to: 'revoking', cleanup },
           workflowCredentialJournalCapability,
         );
         break;
@@ -688,14 +689,14 @@ export class RevocableSpecialistCredentialBroker {
     }
     if (generation === null) {
       this.#store.advanceSchedulerCredential(
-        { id: executionId, leaseId, from: ['revoking'], to: 'revoked' },
+        { id: executionId, leaseId, from: ['revoking'], to: 'revoked', cleanup },
         workflowCredentialJournalCapability,
       );
       return;
     }
     await this.#revokeAndConfirm(leaseId, generation);
     this.#store.advanceSchedulerCredential(
-      { id: executionId, leaseId, from: ['revoking'], to: 'revoked' },
+      { id: executionId, leaseId, from: ['revoking'], to: 'revoked', cleanup },
       workflowCredentialJournalCapability,
     );
   }
@@ -787,7 +788,10 @@ export class DockerIsolatedSpecialistLauncher {
   }
 
   revokeCredential(executionId: string): Promise<void> {
-    return this.#options.credentialBroker.revoke(executionId);
+    return this.#options.credentialBroker.revoke(
+      executionId,
+      this.#cleanupAuthorities.get(executionId),
+    );
   }
 
   launch(packet: TaskPacket, reservation: DockerSpecialistReservation): Promise<unknown> {
@@ -830,6 +834,23 @@ export class DockerIsolatedSpecialistLauncher {
     return launched;
   }
 
+  #assertBoundInput(
+    packet: TaskPacket,
+    reservation: DockerSpecialistReservation,
+    envelope?: SpecialistInputEnvelope,
+  ): void {
+    const persisted = this.#options.store.getSchedulerExecution(reservation.id);
+    if (
+      persisted?.status !== 'active' ||
+      persisted.runId !== packet.runId ||
+      persisted.taskId !== packet.taskId ||
+      persisted.role !== reservation.role ||
+      persisted.deadlineMs !== reservation.deadlineMs ||
+      !isDeepStrictEqual(persisted.packet, envelope ?? packet)
+    )
+      throw new Error('specialist input differs from durable scheduler input');
+  }
+
   async #launch(
     packet: TaskPacket,
     reservation: DockerSpecialistReservation,
@@ -844,16 +865,7 @@ export class DockerIsolatedSpecialistLauncher {
     let output: SpecialistExecutionResult | undefined;
     let launchError: unknown;
     try {
-      const persisted = this.#options.store.getSchedulerExecution(reservation.id);
-      if (
-        persisted?.status !== 'active' ||
-        persisted.runId !== packet.runId ||
-        persisted.taskId !== packet.taskId ||
-        persisted.role !== reservation.role ||
-        persisted.deadlineMs !== reservation.deadlineMs ||
-        !isDeepStrictEqual(persisted.packet, envelope ?? packet)
-      )
-        throw new Error('specialist input differs from durable scheduler input');
+      this.#assertBoundInput(packet, reservation, envelope);
       const roleProfile = specialistRoleProfile(packet.assignedRole, packet.allowedOperations);
       this.#assertCanStart(reservation);
       const credentialBrokerGeneration = await this.#options.credentialBroker.assertConformant();
@@ -1049,14 +1061,22 @@ export class DockerIsolatedSpecialistLauncher {
     if (!this.#settled(executionId)) throw new Error('container_cleanup_unconfirmed');
     const staging = this.#options.store.getSchedulerStaging(executionId);
     if (!staging) return;
-    const stat = await lstat(staging.root).catch(() => undefined);
-    if (!stat) return;
-    if (!stat.isDirectory() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0)
+    const stat = await lstat(staging.root, { bigint: true });
+    if (
+      !stat.isDirectory() ||
+      stat.isSymbolicLink() ||
+      (Number(stat.mode) & 0o077) !== 0 ||
+      Number(stat.uid) !== staging.uid ||
+      String(stat.dev) !== staging.device ||
+      String(stat.ino) !== staging.inode
+    )
       throw new Error('staging_identity_changed');
-    await Promise.all([
-      rm(join(staging.root, 'codex-auth.json'), { force: true }),
-      rm(join(staging.root, 'codex-home'), { force: true, recursive: true }),
-    ]);
+    // Atomic empty tombstone defeats a late broker CLI write (which requires exclusive creation).
+    // An already-open old inode cannot repopulate the new pathname. Keep this non-secret guard.
+    const tombstone = join(staging.root, `credential-seal-${randomUUID()}`);
+    await writeFile(tombstone, '', { mode: 0o600, flag: 'wx' });
+    await rename(tombstone, join(staging.root, 'codex-auth.json'));
+    await rm(join(staging.root, 'codex-home'), { force: true, recursive: true });
   }
 
   isContainerSettled(executionId: string): boolean {

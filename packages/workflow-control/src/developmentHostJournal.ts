@@ -38,10 +38,18 @@ export class DevelopmentHostJournal {
         recovery_requested INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS development_probes (
           id TEXT PRIMARY KEY,generation TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending',
-          created_at_ms INTEGER NOT NULL);
+          created_at_ms INTEGER NOT NULL,cancel INTEGER NOT NULL DEFAULT 0,revoke INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS development_events (
           sequence INTEGER PRIMARY KEY AUTOINCREMENT,code TEXT NOT NULL,observed_at_ms INTEGER NOT NULL);
       `);
+      const columns = this.#db.prepare('PRAGMA table_info(development_probes)').all() as Array<{
+        name: string;
+      }>;
+      for (const column of ['cancel', 'revoke'])
+        if (!columns.some((item) => item.name === column))
+          this.#db.exec(
+            `ALTER TABLE development_probes ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`,
+          );
     }
   }
   close(): void {
@@ -159,11 +167,25 @@ export class DevelopmentHostJournal {
       .prepare("SELECT id,generation FROM development_probes WHERE state='pending'")
       .all() as Array<{ id: string; generation: string }>;
   }
+  confirmProbe(owner: DevelopmentHostState, id: string, step: 'cancel' | 'revoke'): void {
+    this.#db
+      .transaction(() => {
+        this.assertOwner(owner);
+        this.#db
+          .prepare(`UPDATE development_probes SET ${step}=1 WHERE id=? AND state='pending'`)
+          .run(id);
+      })
+      .immediate();
+  }
   settleProbe(owner: DevelopmentHostState, id: string): void {
     this.#db
       .transaction(() => {
         this.assertOwner(owner);
-        this.#db.prepare("UPDATE development_probes SET state='settled' WHERE id=?").run(id);
+        this.#db
+          .prepare(
+            "UPDATE development_probes SET state='settled' WHERE id=? AND cancel=1 AND revoke=1",
+          )
+          .run(id);
       })
       .immediate();
   }

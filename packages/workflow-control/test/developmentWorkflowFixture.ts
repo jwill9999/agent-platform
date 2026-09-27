@@ -18,9 +18,9 @@ export async function developmentWorkflowFixture() {
   db.prepare('UPDATE contracts SET body_json=?').run(JSON.stringify(contract));
   db.prepare('UPDATE plan_approvals SET material_digest=?').run(materialDigest);
   db.prepare("UPDATE runs SET state='implementing'").run();
-  const { callbackId, approvalIntent, ...original } = f.callback;
-  void callbackId;
-  void approvalIntent;
+  const original = { ...f.callback };
+  Reflect.deleteProperty(original, 'callbackId');
+  Reflect.deleteProperty(original, 'approvalIntent');
   const identity = {
     ...original,
     materialDigest,
