@@ -12,6 +12,8 @@ import {
   assertDevelopmentAdmission,
   developmentOwnerAlive,
 } from './developmentHostJournal.js';
+import { specialistRoleProfile } from './specialistRoleProfile.js';
+import { SPECIALIST_SECCOMP } from './specialistSeccomp.js';
 import { runLocalBrokerCli } from './localCredentialBrokerCli.js';
 import { StandalonePhaseRuntime, readPhaseRuntimeConfig } from './phaseRuntime.js';
 
@@ -43,6 +45,7 @@ const codes = new Set([
   'service_owner_active',
   'service_owner_lost',
   'topology_invalid',
+  'topology_stale',
   'control_unavailable',
   'control_auth_rejected',
   'broker_generation_changed',
@@ -161,11 +164,14 @@ interface DockerInspection {
   NetworkSettings?: { Networks?: Record<string, unknown> };
   Mounts?: Array<{ Source: string; Destination: string; RW: boolean; Type?: string }>;
 }
-export function assertBrokerHardening(host: DockerInspection['HostConfig']): void {
+export function assertBrokerHardening(
+  host: DockerInspection['HostConfig'],
+  security = ['no-new-privileges'],
+): void {
   if (
     !host ||
     JSON.stringify(host.CapDrop) !== JSON.stringify(['ALL']) ||
-    JSON.stringify(host.SecurityOpt) !== JSON.stringify(['no-new-privileges'])
+    JSON.stringify(host.SecurityOpt) !== JSON.stringify(security)
   )
     throw new Error('service_identity_mismatch');
   for (const entries of [host.CapAdd, host.Devices, host.DeviceRequests, host.GroupAdd])
@@ -173,6 +179,59 @@ export function assertBrokerHardening(host: DockerInspection['HostConfig']): voi
   for (const mode of [host.PidMode, host.UTSMode, host.UsernsMode])
     if (mode) throw new Error('service_identity_mismatch');
   if (host.IpcMode !== 'private') throw new Error('service_identity_mismatch');
+}
+/** The whole check has one deadline; heartbeats cannot extend topology freshness. */
+export async function checkDevelopmentTopology(
+  check: () => Promise<void>,
+  timeout = 5000,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      check(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('topology_stale')), timeout);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function assertDevelopmentWorkerPolicy(
+  member: DockerInspection,
+  root: string,
+  packet: { assignedRole: string; allowedOperations: string[] },
+): void {
+  const profile = specialistRoleProfile(packet.assignedRole, packet.allowedOperations);
+  const security = ['no-new-privileges'];
+  if (profile.patch || profile.test || profile.artifacts)
+    security.push('seccomp=' + JSON.stringify(SPECIALIST_SECCOMP));
+  assertBrokerHardening(member.HostConfig, security);
+  if (
+    member.HostConfig?.Privileged ||
+    !member.HostConfig?.ReadonlyRootfs ||
+    Object.keys(member.HostConfig?.PortBindings ?? {}).length
+  )
+    throw new Error('topology_invalid');
+  const expected = new Map<string, { source: string; rw: boolean }>([
+    ['/workspace', { source: join(root, 'workspace'), rw: profile.patch }],
+    ['/scratch', { source: join(root, 'scratch'), rw: profile.test }],
+    ['/evidence', { source: join(root, 'evidence'), rw: profile.artifacts }],
+    ['/codex-home', { source: join(root, 'codex-home'), rw: true }],
+    ['/codex-home/config.toml', { source: join(root, 'codex-home/config.toml'), rw: false }],
+    ['/codex-home/auth.json', { source: join(root, 'codex-auth.json'), rw: false }],
+    ['/run/specialist/prompt.txt', { source: join(root, 'task-packet.json'), rw: false }],
+    ['/run/approved-documents', { source: join(root, 'approved-documents'), rw: false }],
+  ]);
+  for (const mount of member.Mounts ?? []) {
+    if (mount.Type === 'tmpfs' && mount.Destination === '/tmp') continue;
+    const match = expected.get(mount.Destination);
+    if (!match || mount.Type !== 'bind' || match.source !== mount.Source || match.rw !== mount.RW)
+      throw new Error('topology_invalid');
+    expected.delete(mount.Destination);
+  }
+  if (expected.size) throw new Error('topology_invalid');
 }
 async function inspect(
   kind: 'container' | 'network' | 'image',
@@ -215,6 +274,7 @@ export class DevelopmentHost {
   #renewTimer: ReturnType<typeof setInterval> | undefined;
   #fatal = false;
   #serviceQualified = false;
+  #topologyObservedAt = 0;
   #runId: string | undefined;
   #stopping = false;
   #recovery: number;
@@ -299,6 +359,10 @@ export class DevelopmentHost {
     if (this.#stopping || this.#journal.state()?.stop_requested) {
       this.#serviceQualified = false;
       this.#observe('service_stopped');
+      return;
+    }
+    if (Date.now() - this.#topologyObservedAt > 5000) {
+      this.#observe('topology_stale');
       return;
     }
     const cleanup = this.#runtime?.cleanupStatus();
@@ -552,16 +616,16 @@ export class DevelopmentHost {
       try {
         const record = db
           .prepare(
-            "SELECT c.status,c.container_id,s.root FROM scheduler_executions e JOIN scheduler_containers c ON c.execution_id=e.id JOIN scheduler_staging s ON s.execution_id=e.id WHERE e.id=? AND e.run_id=? AND e.status='active' AND e.process_identity=?",
+            "SELECT c.status,c.container_id,s.root,e.packet_json FROM scheduler_executions e JOIN scheduler_containers c ON c.execution_id=e.id JOIN scheduler_staging s ON s.execution_id=e.id WHERE e.id=? AND e.run_id=? AND e.status='active' AND e.process_identity=?",
           )
           .get(id, this.#runId, `docker:workflow-specialist-${id}`) as
-          | { status: string; container_id: string | null; root: string }
+          | { status: string; container_id: string | null; root: string; packet_json: string }
           | undefined;
         if (!record || member.Name !== `/workflow-specialist-${id}`)
           throw new Error('topology_invalid');
         if (record.status !== 'acknowledged' || record.container_id !== member.Id)
           throw new Error('topology_invalid');
-        await this.#workerDefinition(member, record.root);
+        await this.#workerDefinition(member, record.root, record.packet_json);
       } finally {
         db.close();
       }
@@ -584,17 +648,15 @@ export class DevelopmentHost {
     )
       throw new Error('topology_invalid');
   }
-  async #workerDefinition(member: DockerInspection, root: string): Promise<void> {
+  async #workerDefinition(member: DockerInspection, root: string, packet: string): Promise<void> {
+    const input = z
+      .object({ assignedRole: z.string(), allowedOperations: z.array(z.string()) })
+      .parse(JSON.parse(packet));
+    assertDevelopmentWorkerPolicy(member, root, input);
     if (
       Object.keys(member.NetworkSettings?.Networks ?? {}).length !== 1 ||
       member.Image !== (await inspect('image', this.#config.workerImage))?.Id ||
-      member.Config?.User !== this.#config.containerUser ||
-      member.HostConfig?.Privileged ||
-      !member.HostConfig?.ReadonlyRootfs ||
-      !member.HostConfig?.CapDrop?.includes('ALL') ||
-      !member.HostConfig?.SecurityOpt?.includes('no-new-privileges') ||
-      !member.Mounts?.length ||
-      member.Mounts.some((mount) => mount.Type !== 'tmpfs' && !mount.Source.startsWith(root + '/'))
+      member.Config?.User !== this.#config.containerUser
     )
       throw new Error('topology_invalid');
   }
@@ -696,7 +758,7 @@ export class DevelopmentHost {
     }
   }
   async #qualify(): Promise<void> {
-    await this.#topology();
+    await this.#checkedTopology();
     await this.#reconcileProbes();
     const conformance = await this.#control({ operation: 'conformance' });
     if (conformance.passed !== true || conformance.generation !== this.#generation)
@@ -725,6 +787,7 @@ export class DevelopmentHost {
     } finally {
       await this.#reconcileProbes();
     }
+    await this.#checkedTopology();
   }
   async #attachRuntime(): Promise<void> {
     if (!this.#config.workflow || this.#runtime) return;
@@ -778,6 +841,8 @@ export class DevelopmentHost {
           this.#stopping,
           this.#serviceQualified,
           this.#runtime?.cleanupStatus() ?? 'pending',
+          Date.now(),
+          this.#topologyObservedAt,
         );
       },
       true,
@@ -868,12 +933,17 @@ export class DevelopmentHost {
       }
     }, 2000);
   }
+  async #checkedTopology(): Promise<void> {
+    const started = Date.now();
+    await checkDevelopmentTopology(() => this.#topology());
+    this.#topologyObservedAt = started;
+  }
   #startTopologyMonitor() {
     let topologyCheck: Promise<void> | undefined;
     const topologyTimer = setInterval(() => {
       if (topologyCheck || this.#fatal) return;
       if (!this.#serviceQualified) return;
-      topologyCheck = this.#topology()
+      topologyCheck = this.#checkedTopology()
         .catch(async (error: unknown) => {
           const code = classifyDevelopmentError(error);
           this.#serviceQualified = false;

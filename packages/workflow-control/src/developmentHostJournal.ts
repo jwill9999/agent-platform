@@ -273,7 +273,9 @@ export function assertDevelopmentAdmission(
   qualified: boolean,
   cleanup: string,
   now = Date.now(),
+  topologyObservedAt = 0,
 ): void {
+  if (now - topologyObservedAt > 5000) throw new Error('topology_stale');
   if (
     stopping ||
     state.stop_requested ||

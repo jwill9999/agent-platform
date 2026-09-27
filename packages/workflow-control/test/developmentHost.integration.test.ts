@@ -438,3 +438,74 @@ it.skipIf(!supplied).each(['command', 'capability', 'security-option', 'pid-name
   },
   30000,
 );
+
+it
+  .skipIf(!supplied)
+  .each(['none', 'capability', 'security-option', 'pid-namespace', 'source-write'])(
+  'enforces role-specific worker topology against Docker inspection: %s',
+  async (change) => {
+    const { assertDevelopmentWorkerPolicy } = await import('../src/developmentHost.js');
+    const { SPECIALIST_SECCOMP } = await import('../src/specialistSeccomp.js');
+    const root = await mkdtemp(join(homedir(), '.codex/lifecycle-worker-policy-'));
+    const config = JSON.parse(await readFile(supplied!, 'utf8'));
+    const name = 'lifecycle-worker-policy-' + root.split('-').at(-1);
+    const paths = ['workspace', 'scratch', 'evidence', 'codex-home', 'approved-documents'];
+    const mounts = [
+      ['workspace', '/workspace', change === 'source-write'],
+      ['scratch', '/scratch', true],
+      ['evidence', '/evidence', true],
+      ['codex-home', '/codex-home', true],
+      ['codex-home/config.toml', '/codex-home/config.toml', false],
+      ['codex-auth.json', '/codex-home/auth.json', false],
+      ['task-packet.json', '/run/specialist/prompt.txt', false],
+      ['approved-documents', '/run/approved-documents', false],
+    ] as const;
+    try {
+      for (const path of paths) await mkdir(join(root, path));
+      for (const path of ['codex-home/config.toml', 'codex-auth.json', 'task-packet.json'])
+        await writeFile(join(root, path), '{}');
+      const seccomp = join(root, 'seccomp.json');
+      await writeFile(seccomp, JSON.stringify(SPECIALIST_SECCOMP));
+      await execute('/usr/local/bin/docker', [
+        'create',
+        '--name',
+        name,
+        '--network',
+        'none',
+        '--read-only',
+        '--cap-drop',
+        'ALL',
+        '--security-opt',
+        'no-new-privileges',
+        '--security-opt',
+        change === 'security-option' ? 'seccomp=unconfined' : `seccomp=${seccomp}`,
+        '--user',
+        config.containerUser,
+        '--tmpfs',
+        '/tmp:rw,nosuid,nodev,noexec,size=512m',
+        ...(change === 'capability' ? ['--cap-add', 'SYS_ADMIN'] : []),
+        ...(change === 'pid-namespace' ? ['--pid', 'host'] : []),
+        ...mounts.flatMap(([src, dst, rw]) => [
+          '--volume',
+          `${join(root, src)}:${dst}:${rw ? 'rw' : 'ro'}`,
+        ]),
+        config.workerImage,
+        'true',
+      ]);
+      const member = JSON.parse(
+        (await execute('/usr/local/bin/docker', ['inspect', name])).stdout,
+      )[0];
+      const check = () =>
+        assertDevelopmentWorkerPolicy(member, root, {
+          assignedRole: 'code_reviewer',
+          allowedOperations: ['workspace.read', 'process.test', 'artifact.write'],
+        });
+      if (change === 'none') expect(check).not.toThrow();
+      else expect(check).toThrow();
+    } finally {
+      await execute('/usr/local/bin/docker', ['rm', '--force', name]).catch(() => undefined);
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+  30000,
+);

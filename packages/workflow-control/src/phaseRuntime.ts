@@ -330,12 +330,12 @@ export class StandalonePhaseRuntime {
     if (this.#closing !== undefined) throw new Error('phase runtime is closing');
     if (this.#timer !== undefined) return;
     this.#timer = setInterval(() => {
-      void this.runOnce().catch((error: unknown) =>
-        process.stderr.write(`phase runtime: ${String(error)}\n`),
+      void this.runOnce().catch(() =>
+        process.stderr.write('phase runtime: background_tick_failed\n'),
       );
     }, this.#config.pollIntervalMs);
-    void this.runOnce().catch((error: unknown) =>
-      process.stderr.write(`phase runtime: ${String(error)}\n`),
+    void this.runOnce().catch(() =>
+      process.stderr.write('phase runtime: background_start_failed\n'),
     );
   }
   async close(): Promise<void> {

@@ -967,3 +967,27 @@ it('bounds waiting for a held container lock and prevents a late start', async (
   expect(await work).toBe(false);
   expect(f.launches.some((args) => args[0] === 'start')).toBe(false);
 }, 12000);
+
+it('redacts sensitive exceptions from both background runtime rejection paths', async () => {
+  const f = await setup();
+  const diagnostics: string[] = [];
+  const write = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+    diagnostics.push(String(chunk));
+    return true;
+  });
+  const tick = vi
+    .spyOn(f.runtime, 'runOnce')
+    .mockRejectedValue(new Error('secret-sentinel bearer-token'));
+  try {
+    f.runtime.start();
+    await vi.waitFor(() => expect(diagnostics.join('')).toContain('background_tick_failed'), {
+      timeout: 2000,
+    });
+    expect(diagnostics.join('')).toContain('background_start_failed');
+    expect(diagnostics.join('')).not.toContain('secret-sentinel');
+  } finally {
+    await f.runtime.close();
+    tick.mockRestore();
+    write.mockRestore();
+  }
+});

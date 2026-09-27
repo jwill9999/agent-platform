@@ -136,14 +136,16 @@ it('denies admission immediately for either signal or durable stop, even with fr
   const { journal } = fixture();
   const owner = journal.claim('one');
   journal.observe(owner, 'ready');
-  expect(() => assertDevelopmentAdmission(journal.state()!, false, true, 'settled')).not.toThrow();
-  expect(() => assertDevelopmentAdmission(journal.state()!, true, true, 'settled')).toThrow(
-    'control_unavailable',
-  );
+  expect(() =>
+    assertDevelopmentAdmission(journal.state()!, false, true, 'settled', Date.now(), Date.now()),
+  ).not.toThrow();
+  expect(() =>
+    assertDevelopmentAdmission(journal.state()!, true, true, 'settled', Date.now(), Date.now()),
+  ).toThrow('control_unavailable');
   journal.request('stop');
-  expect(() => assertDevelopmentAdmission(journal.state()!, false, true, 'settled')).toThrow(
-    'control_unavailable',
-  );
+  expect(() =>
+    assertDevelopmentAdmission(journal.state()!, false, true, 'settled', Date.now(), Date.now()),
+  ).toThrow('control_unavailable');
 });
 
 it.each(['symlink', 'hardlink'] as const)(
@@ -273,4 +275,27 @@ it.each([
   const base = { CapDrop: ['ALL'], SecurityOpt: ['no-new-privileges'], IpcMode: 'private' };
   expect(() => assertBrokerHardening(base)).not.toThrow();
   expect(() => assertBrokerHardening({ ...base, ...extra })).toThrow('service_identity_mismatch');
+});
+
+it('rejects stale topology even when broker readiness is freshly refreshed', () => {
+  const { journal } = fixture();
+  const owner = journal.claim('one');
+  journal.observe(owner, 'ready');
+  expect(() =>
+    assertDevelopmentAdmission(
+      journal.state()!,
+      false,
+      true,
+      'settled',
+      Date.now(),
+      Date.now() - 5001,
+    ),
+  ).toThrow('topology_stale');
+});
+
+it('bounds the entire topology check rather than each individual inspection', async () => {
+  const { checkDevelopmentTopology } = await import('../src/developmentHost.js');
+  await expect(checkDevelopmentTopology(() => new Promise(() => undefined), 10)).rejects.toThrow(
+    'topology_stale',
+  );
 });
