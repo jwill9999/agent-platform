@@ -3547,6 +3547,38 @@ export class WorkflowStore {
       .get(id) as SchedulerContainerRecord | undefined;
   }
 
+  /** Trusted launcher proof that its Docker create callback was never invoked. A crash before
+   * this acknowledgement deliberately leaves create_pending uncertain; never infer absence. */
+  recordRejectedSchedulerCreate(authority: SchedulerContainerAuthority, capability?: symbol): void {
+    if (capability !== workflowContainerJournalCapability)
+      throw new Error('container journal mutation requires launcher capability');
+    this.#database
+      .transaction(() => {
+        const execution = this.getSchedulerExecution(authority.id);
+        if (!execution || execution.status !== 'active')
+          throw new Error('active scheduler execution required');
+        for (const key of [
+          'ownerId',
+          'workspaceLeaseEpoch',
+          'runLeaseEpoch',
+          'taskLeaseEpoch',
+        ] as const)
+          if (execution[key] !== authority[key])
+            throw new Error('container execution fence changed');
+        const state = this.getSchedulerContainer(authority.id);
+        if (
+          state?.status !== 'create_pending' ||
+          state.containerId !== null ||
+          execution.processIdentity !== `docker:${state.name}`
+        )
+          throw new Error('container create rejection is stale');
+        this.#database
+          .prepare("UPDATE scheduler_containers SET status='not_dispatched' WHERE execution_id=?")
+          .run(authority.id);
+      })
+      .immediate();
+  }
+
   advanceSchedulerContainer(
     input: {
       execution: SchedulerContainerAuthority;

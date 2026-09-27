@@ -11,6 +11,7 @@ import {
   reconcileDevelopmentProbe,
   assertDevelopmentAdmission,
   developmentOwnerAlive,
+  developmentEffectiveCode,
 } from './developmentHostJournal.js';
 import { specialistInputEnvelopeSchema } from './specialistInput.js';
 import { specialistRoleProfile } from './specialistRoleProfile.js';
@@ -81,6 +82,13 @@ export function developmentExitCode(code: string): number {
   if (['cleanup_pending', 'cleanup_exhausted', 'journal_unavailable'].includes(code)) return 4;
   return 3;
 }
+function parseDevelopmentJson(bytes: string): unknown {
+  try {
+    return JSON.parse(bytes);
+  } catch {
+    throw new Error('invalid_configuration');
+  }
+}
 async function privateFile(path: string): Promise<string> {
   const info = await lstat(path);
   if (
@@ -96,6 +104,7 @@ async function developmentFingerprint(config: Config, runtime?: string): Promise
   const runtimeBytes = config.workflow
     ? (runtime ?? (await privateFile(config.workflow.runtimeConfig)))
     : null;
+  if (runtimeBytes !== null) parseDevelopmentJson(runtimeBytes);
   return createHash('sha256')
     .update(
       JSON.stringify({
@@ -352,7 +361,7 @@ export class DevelopmentHost {
   #observe(code: string): void {
     this.#guard();
     const previous = this.#journal.state()?.code;
-    this.#journal.observe(this.#owner, code);
+    this.#journal.observe(this.#owner, code, Date.now(), this.#topologyObservedAt + 5000);
     if (previous === code) return;
     process.stdout.write(
       JSON.stringify({
@@ -803,7 +812,7 @@ export class DevelopmentHost {
     const runtimeBytes = await privateFile(this.#config.workflow.runtimeConfig);
     if ((await developmentFingerprint(this.#config, runtimeBytes)) !== this.#owner.config_digest)
       throw new Error('service_identity_mismatch');
-    const supplied = JSON.parse(runtimeBytes) as Record<string, unknown>;
+    const supplied = parseDevelopmentJson(runtimeBytes) as Record<string, unknown>;
     const adapterConfig = join(this.#directory, 'adapter.json');
     await writeDevelopmentFile(
       adapterConfig,
@@ -1035,23 +1044,14 @@ function developmentStatus(config: Config, state: DevelopmentHostState | undefin
   }
   return {
     service: state,
-    effectiveCode:
-      state?.code === 'ready' && state.lease_until_ms <= Date.now()
-        ? 'service_owner_lost'
-        : state?.code,
+    effectiveCode: developmentEffectiveCode(state),
     interruptions,
   };
 }
 
 export async function runDevelopmentCommand(command: string, path: string): Promise<unknown> {
   const bytes = await privateFile(path);
-  let supplied: unknown;
-  try {
-    supplied = JSON.parse(bytes);
-  } catch {
-    throw new Error('invalid_configuration');
-  }
-  const config = developmentHostConfigSchema.parse(supplied);
+  const config = developmentHostConfigSchema.parse(parseDevelopmentJson(bytes));
   await assertInputOutsideState(config.stateDirectory, path);
   if (command === 'development-host') {
     await (await DevelopmentHost.create(config)).run();

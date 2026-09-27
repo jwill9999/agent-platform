@@ -12,6 +12,7 @@ export interface DevelopmentHostState {
   lease_until_ms: number;
   code: string;
   observed_at_ms: number;
+  ready_until_ms: number;
   stop_requested: number;
   recovery_requested: number;
 }
@@ -83,6 +84,10 @@ export class DevelopmentHostJournal {
       const hostColumns = this.#db.prepare('PRAGMA table_info(development_host)').all() as Array<{
         name: string;
       }>;
+      if (!hostColumns.some((column) => column.name === 'ready_until_ms'))
+        this.#db.exec(
+          'ALTER TABLE development_host ADD COLUMN ready_until_ms INTEGER NOT NULL DEFAULT 0',
+        );
       if (!hostColumns.some((column) => column.name === 'process_identity'))
         this.#db.exec('ALTER TABLE development_host ADD COLUMN process_identity TEXT');
       const columns = this.#db.prepare('PRAGMA table_info(development_probes)').all() as Array<{
@@ -156,7 +161,12 @@ export class DevelopmentHostJournal {
       })
       .immediate();
   }
-  observe(owner: DevelopmentHostState, code: string, now = Date.now()): void {
+  observe(
+    owner: DevelopmentHostState,
+    code: string,
+    now = Date.now(),
+    readyUntil = now + 5000,
+  ): void {
     if (!/^[a-z][a-z0-9_]{0,95}$/u.test(code)) throw new Error('invalid_status_code');
     this.#db
       .transaction(() => {
@@ -166,8 +176,10 @@ export class DevelopmentHostJournal {
             .prepare('INSERT INTO development_events(code,observed_at_ms) VALUES(?,?)')
             .run(code, now);
         this.#db
-          .prepare('UPDATE development_host SET code=?,observed_at_ms=? WHERE singleton=1')
-          .run(code, now);
+          .prepare(
+            'UPDATE development_host SET code=?,observed_at_ms=?,ready_until_ms=? WHERE singleton=1',
+          )
+          .run(code, now, code === 'ready' ? Math.min(now + 5000, readyUntil) : 0);
       })
       .immediate();
   }
@@ -281,7 +293,19 @@ export function assertDevelopmentAdmission(
     !qualified ||
     cleanup !== 'settled' ||
     state.code !== 'ready' ||
+    now >= (state.ready_until_ms ?? 0) ||
     now - state.observed_at_ms > 5000
   )
     throw new Error('control_unavailable');
+}
+
+export function developmentEffectiveCode(
+  state: DevelopmentHostState | undefined,
+  now = Date.now(),
+): string | undefined {
+  if (state?.code !== 'ready') return state?.code;
+  if (state.lease_until_ms <= now) return 'service_owner_lost';
+  if (state.stop_requested) return 'service_stopped';
+  if (now >= (state.ready_until_ms ?? 0)) return 'topology_stale';
+  return 'ready';
 }

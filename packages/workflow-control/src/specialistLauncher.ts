@@ -945,16 +945,31 @@ export class DockerIsolatedSpecialistLauncher {
       await lifecycle?.admission();
       this.#advance(authority, 'not_dispatched', 'create_pending');
       this.#assertCanStart(reservation);
-      const created = await this.#options.store.dispatchSchedulerContainer(
-        authority,
-        this.#options.sourceRoot,
-        () => {
-          lifecycle?.assertAdmission?.();
-          return this.#docker(createArgs, Math.min(60_000, reservation.deadlineMs - this.#clock()));
-        },
-        workflowContainerJournalCapability,
-        this.#clock,
-      );
+      let createInvoked = false;
+      let created: { stdout: string; stderr: string };
+      try {
+        created = await this.#options.store.dispatchSchedulerContainer(
+          authority,
+          this.#options.sourceRoot,
+          () => {
+            lifecycle?.assertAdmission?.();
+            createInvoked = true;
+            return this.#docker(
+              createArgs,
+              Math.min(60_000, reservation.deadlineMs - this.#clock()),
+            );
+          },
+          workflowContainerJournalCapability,
+          this.#clock,
+        );
+      } catch (error) {
+        if (!createInvoked)
+          this.#options.store.recordRejectedSchedulerCreate(
+            authority,
+            workflowContainerJournalCapability,
+          );
+        throw error;
+      }
       const containerId = created.stdout.trim();
       if (!/^[a-f0-9]{64}$/u.test(containerId))
         throw new Error('specialist create acknowledgement is invalid');

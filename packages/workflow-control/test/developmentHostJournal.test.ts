@@ -18,6 +18,7 @@ import {
   DevelopmentHostJournal,
   assertDevelopmentAdmission,
   developmentOwnerAlive,
+  developmentEffectiveCode,
   reconcileDevelopmentProbe,
 } from '../src/developmentHostJournal.js';
 import {
@@ -302,7 +303,7 @@ it('bounds the entire topology check rather than each individual inspection', as
   );
 });
 
-it.each(['permissions', 'uid', 'json'])(
+it.each(['permissions', 'uid', 'json', 'runtime-json'])(
   'reports invalid private configuration through the CLI: %s',
   (kind) => {
     const root = mkdtempSync(join(tmpdir(), 'lifecycle-invalid-'));
@@ -317,13 +318,23 @@ it.each(['permissions', 'uid', 'json'])(
         accountFile,
         brokerImage: 'sha256:' + 'a'.repeat(64),
         workerImage: 'sha256:' + 'b'.repeat(64),
-        containerUser: `${(process.getuid?.() ?? 501) + 1}:20`,
+        containerUser: `${(process.getuid?.() ?? 501) + (kind === 'uid' ? 1 : 0)}:20`,
         controlPort: 19341,
         clientVersion: 'fixture',
       }),
       { mode: kind === 'permissions' ? 0o644 : 0o600 },
     );
     if (kind === 'json') writeFileSync(config, '{');
+    if (kind === 'runtime-json') {
+      const runtimeConfig = join(root, 'runtime.json'),
+        database = join(root, 'workflow.sqlite');
+      writeFileSync(runtimeConfig, '{', { mode: 0o600 });
+      writeFileSync(database, '');
+      const body = JSON.parse(readFileSync(config, 'utf8'));
+      body.workflow = { runtimeConfig, database };
+      writeFileSync(config, JSON.stringify(body));
+    }
+
     const result = spawnSync(
       process.execPath,
       [fileURLToPath(new URL('../dist/cli.js', import.meta.url)), 'development-host', config],
@@ -334,3 +345,22 @@ it.each(['permissions', 'uid', 'json'])(
     expect(result.stdout + result.stderr).not.toContain('cleanup_pending');
   },
 );
+
+it('persists readiness expiry so status and admission agree while the owner lease is live', () => {
+  const { journal, path } = fixture();
+  const now = Date.now(),
+    owner = journal.claim('one', now);
+  journal.observe(owner, 'ready', now, now + 1000);
+  const observer = new DevelopmentHostJournal(path, true);
+  try {
+    const state = observer.state()!;
+    expect(state.lease_until_ms).toBeGreaterThan(now + 2000);
+    expect(developmentEffectiveCode(state, now + 999)).toBe('ready');
+    expect(developmentEffectiveCode(state, now + 1000)).toBe('topology_stale');
+    expect(() =>
+      assertDevelopmentAdmission(state, false, true, 'settled', now + 1000, now),
+    ).toThrow('control_unavailable');
+  } finally {
+    observer.close();
+  }
+});
