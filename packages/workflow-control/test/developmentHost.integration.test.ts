@@ -120,7 +120,7 @@ it.skipIf(!supplied)(
 
 it
   .skipIf(!supplied || !process.env.WORKFLOW_DEVELOPMENT_WORKER_IMAGE)
-  .each(['live', 'restart', 'restart-missing-source', 'replaced-staging'])(
+  .each(['live', 'restart', 'restart-missing-source', 'replaced-staging', 'delayed-ack'])(
   'interrupts a real fixture worker and reconciles without repeating its recorded effect (%s)',
   async (mode) => {
     const { developmentWorkflowFixture } = await import('./developmentWorkflowFixture.js');
@@ -184,6 +184,23 @@ it
       );
       const before = await readFile(marker, 'utf8');
       expect(before.trim().split('\n')).toHaveLength(1);
+      if (mode === 'delayed-ack') {
+        // Inject the durable state visible while Docker creation has succeeded but its response is delayed.
+        const recorded = db
+          .prepare('SELECT container_id FROM scheduler_containers WHERE execution_id=?')
+          .get(executionId) as { container_id: string };
+        db.prepare(
+          "UPDATE scheduler_containers SET status='create_pending',container_id=NULL WHERE execution_id=?",
+        ).run(executionId);
+        await new Promise((resolve) => setTimeout(resolve, 4500));
+        expect((await status()).effectiveCode).toBe('ready');
+        expect(
+          db.prepare('SELECT 1 FROM execution_interruptions WHERE execution_id=?').get(executionId),
+        ).toBeUndefined();
+        db.prepare(
+          "UPDATE scheduler_containers SET status='acknowledged',container_id=? WHERE execution_id=?",
+        ).run(recorded.container_id, executionId);
+      }
       if (mode === 'replaced-staging') {
         await rename(staging, staging + '-retained');
         await mkdir(staging, { mode: 0o700 });

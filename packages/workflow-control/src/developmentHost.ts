@@ -135,7 +135,7 @@ interface DockerInspection {
     PortBindings?: Record<string, Array<{ HostIp: string; HostPort: string }>>;
   };
   NetworkSettings?: { Networks?: Record<string, unknown> };
-  Mounts?: Array<{ Source: string; Destination: string; RW: boolean }>;
+  Mounts?: Array<{ Source: string; Destination: string; RW: boolean; Type?: string }>;
 }
 async function inspect(
   kind: 'container' | 'network' | 'image',
@@ -210,8 +210,10 @@ export class DevelopmentHost {
     config.stateDirectory = await realpath(config.stateDirectory);
     config.accountFile = await realpath(config.accountFile);
     await assertInputOutsideState(config.stateDirectory, config.accountFile);
-    if (config.workflow)
+    if (config.workflow) {
       await assertInputOutsideState(config.stateDirectory, config.workflow.runtimeConfig);
+      await assertInputOutsideState(config.stateDirectory, config.workflow.database);
+    }
     if (Number(config.containerUser.split(':')[0]) !== process.getuid?.())
       throw new Error('container_user_mismatch');
     const digest = createHash('sha256').update(JSON.stringify(config)).digest('hex');
@@ -508,19 +510,23 @@ export class DevelopmentHost {
         fileMustExist: true,
       });
       try {
-        if (
-          !db
-            .prepare(
-              "SELECT 1 FROM scheduler_executions e JOIN scheduler_containers c ON c.execution_id=e.id WHERE e.id=? AND e.status='active' AND e.process_identity=? AND c.container_id=? AND c.status='acknowledged'",
-            )
-            .get(id, `docker:workflow-specialist-${id}`, member.Id)
-        )
+        const record = db
+          .prepare(
+            "SELECT c.status,c.container_id,s.root FROM scheduler_executions e JOIN scheduler_containers c ON c.execution_id=e.id JOIN scheduler_staging s ON s.execution_id=e.id WHERE e.id=? AND e.status='active' AND e.process_identity=?",
+          )
+          .get(id, `docker:workflow-specialist-${id}`) as
+          | { status: string; container_id: string | null; root: string }
+          | undefined;
+        if (!record || member.Name !== `/workflow-specialist-${id}`)
           throw new Error('topology_invalid');
+        if (record.status === 'acknowledged') {
+          if (record.container_id !== member.Id) throw new Error('topology_invalid');
+        } else if (record.status !== 'create_pending') throw new Error('topology_invalid');
+        await this.#workerDefinition(member, record.root);
       } finally {
         db.close();
       }
-      if (Object.keys(member.NetworkSettings?.Networks ?? {}).length !== 1)
-        throw new Error('topology_invalid');
+
       return;
     }
     this.#assertLabels(member?.Config?.Labels);
@@ -536,6 +542,20 @@ export class DevelopmentHost {
       member.Config?.User !== this.#config.containerUser ||
       member.HostConfig?.Privileged ||
       !member.HostConfig?.ReadonlyRootfs
+    )
+      throw new Error('topology_invalid');
+  }
+  async #workerDefinition(member: DockerInspection, root: string): Promise<void> {
+    if (
+      Object.keys(member.NetworkSettings?.Networks ?? {}).length !== 1 ||
+      member.Image !== (await inspect('image', this.#config.workerImage))?.Id ||
+      member.Config?.User !== this.#config.containerUser ||
+      member.HostConfig?.Privileged ||
+      !member.HostConfig?.ReadonlyRootfs ||
+      !member.HostConfig?.CapDrop?.includes('ALL') ||
+      !member.HostConfig?.SecurityOpt?.includes('no-new-privileges') ||
+      !member.Mounts?.length ||
+      member.Mounts.some((mount) => mount.Type !== 'tmpfs' && !mount.Source.startsWith(root + '/'))
     )
       throw new Error('topology_invalid');
   }

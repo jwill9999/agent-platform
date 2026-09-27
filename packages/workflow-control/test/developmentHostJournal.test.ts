@@ -22,6 +22,7 @@ import {
   developmentHostConfigSchema,
   writeDevelopmentFile,
   DevelopmentHost,
+  runDevelopmentCommand,
 } from '../src/developmentHost.js';
 const cleanup: Array<() => void> = [];
 afterEach(() => {
@@ -179,4 +180,66 @@ it('rejects an account inside the generated state directory before opening its j
     }),
   ).rejects.toThrow('invalid_configuration');
   expect(readFileSync(accountFile, 'utf8')).toBe('preserve');
+});
+
+it.each(['runtime', 'command'] as const)(
+  'preserves an input %s file colliding with generated state',
+  async (kind) => {
+    const root = mkdtempSync(join(tmpdir(), 'lifecycle-input-'));
+    cleanup.push(() => rmSync(root, { recursive: true, force: true }));
+    const stateDirectory = join(root, 'state');
+    mkdirSync(stateDirectory, { mode: 0o700 });
+    const accountFile = join(root, 'account.json');
+    writeFileSync(accountFile, '{}', { mode: 0o600 });
+    const path = join(stateDirectory, 'adapter.json');
+    const config = {
+      stateDirectory,
+      accountFile,
+      brokerImage: 'sha256:' + 'a'.repeat(64),
+      workerImage: 'sha256:' + 'b'.repeat(64),
+      containerUser: `${process.getuid?.() || 501}:20`,
+      controlPort: 19341,
+      clientVersion: 'fixture',
+    };
+    const bytes = kind === 'runtime' ? 'preserve-runtime' : JSON.stringify(config);
+    writeFileSync(path, bytes, { mode: 0o600 });
+    const action =
+      kind === 'runtime'
+        ? DevelopmentHost.create({
+            ...config,
+            workflow: { database: join(root, 'workflow.sqlite'), runtimeConfig: path },
+          })
+        : runDevelopmentCommand('development-host', path);
+    await expect(action).rejects.toThrow('invalid_configuration');
+    expect(readFileSync(path, 'utf8')).toBe(bytes);
+  },
+);
+
+it('preserves a real workflow SQLite database at a generated destination', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lifecycle-db-'));
+  cleanup.push(() => rmSync(root, { recursive: true, force: true }));
+  const stateDirectory = join(root, 'state');
+  mkdirSync(stateDirectory, { mode: 0o700 });
+  const accountFile = join(root, 'account.json'),
+    runtimeConfig = join(root, 'runtime.json'),
+    database = join(stateDirectory, 'adapter.json');
+  writeFileSync(accountFile, '{}', { mode: 0o600 });
+  writeFileSync(runtimeConfig, '{}', { mode: 0o600 });
+  const db = new Database(database);
+  db.exec("CREATE TABLE retained(value TEXT); INSERT INTO retained VALUES('preserve');");
+  db.close();
+  const original = readFileSync(database);
+  await expect(
+    DevelopmentHost.create({
+      stateDirectory,
+      accountFile,
+      brokerImage: 'sha256:' + 'a'.repeat(64),
+      workerImage: 'sha256:' + 'b'.repeat(64),
+      containerUser: `${process.getuid?.() || 501}:20`,
+      controlPort: 19341,
+      clientVersion: 'fixture',
+      workflow: { database, runtimeConfig },
+    }),
+  ).rejects.toThrow('invalid_configuration');
+  expect(readFileSync(database)).toEqual(original);
 });

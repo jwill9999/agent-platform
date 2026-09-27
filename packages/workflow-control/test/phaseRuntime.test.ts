@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { InterruptionCleanupJournal } from '../src/executionInterruptions.js';
 import { ContinuationJournal } from '../src/continuationJournal.js';
 import { runParentContinuation } from '../src/continuationProcess.js';
 import { executionContractSchema, type ExecutionContract } from '../src/contracts.js';
@@ -20,7 +21,11 @@ import {
   RevocableSpecialistCredentialBroker,
 } from '../src/specialistLauncher.js';
 import { continuationFixture, terminalResult } from './continuationFixture.js';
-import { WorkflowStore, workflowContainerJournalCapability } from '../src/storage.js';
+import {
+  WorkflowStore,
+  workflowContainerJournalCapability,
+  workflowGovernedPersistenceCapability,
+} from '../src/storage.js';
 import { schedulerDockerFixture } from './schedulerDockerFixture.js';
 import {
   specialistInputEnvelopeSchema,
@@ -776,3 +781,84 @@ it('reports pending recovery for an orphan whose phase lease has not expired', a
   expect(await f.runtime.runOnce()).toBe(false);
   expect(f.launches).toEqual([]);
 });
+
+it('rejects late success and callback commitment when interruption wins the transaction race', async () => {
+  const f = await setup({ delayMs: 10000 });
+  const work = f.runtime.runOnce();
+  while (!f.launches.some((args) => args[0] === 'start'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  const job = f.journal.list().find((job) => job.status === 'started')!;
+  const execution = f.store.getSchedulerExecution(job.execution_id!)!;
+  f.journal.interrupt(job, 'service_stopped', Date.now());
+  expect(() =>
+    f.store.finishSchedulerExecution({
+      id: execution.id,
+      status: 'completed',
+      ownerId: execution.ownerId,
+      workspaceLeaseEpoch: execution.workspaceLeaseEpoch,
+      runLeaseEpoch: execution.runLeaseEpoch,
+      taskLeaseEpoch: execution.taskLeaseEpoch,
+      result: terminalResult,
+    }),
+  ).toThrow('execution_interrupted');
+  const identity = {
+    ...Object.fromEntries(Object.entries(f.callback).filter(([key]) => key !== 'callbackId')),
+    delegationId: execution.id,
+  };
+  const callback = { ...identity, callbackId: digestGovernedValue(identity) };
+  expect(() =>
+    f.store.recordDelegateCallbackAndTransition(
+      { callback, target: 'task_verification', ownerId: execution.ownerId, nowMs: Date.now() },
+      workflowGovernedPersistenceCapability,
+    ),
+  ).toThrow('execution_interrupted');
+  await f.runtime.interruptActive('service_stopped');
+  expect(await work).toBe(false);
+  expect(f.store.getRun('run')?.state).toBe('task_verification');
+  expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+});
+
+it.each(['cancel', 'revoke', 'settle'] as const)(
+  'recovers a crash after the %s effect before its durable acknowledgement',
+  async (position) => {
+    const f = await setup({ delayMs: 10000 });
+    const work = f.runtime.runOnce().catch(() => false);
+    while (!f.launches.some((args) => args[0] === 'start'))
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    const original = InterruptionCleanupJournal.prototype.confirm;
+    let injected = false;
+    const fault = vi
+      .spyOn(InterruptionCleanupJournal.prototype, 'confirm')
+      .mockImplementation(function (this: InterruptionCleanupJournal, row, operation, now) {
+        if (operation === position && !injected) {
+          injected = true;
+          throw new Error('injected_crash_before_ack');
+        }
+        return original.call(this, row, operation, now);
+      });
+    try {
+      await f.runtime.interruptActive('service_stopped').catch(() => undefined);
+      await work;
+      expect(injected).toBe(true);
+    } finally {
+      fault.mockRestore();
+    }
+    f.db.prepare('UPDATE phase_jobs SET lease_until_ms=0').run();
+    f.db
+      .prepare(
+        'UPDATE execution_interruptions SET lease_until_ms=0,attempt_deadline_ms=0,next_attempt_ms=0',
+      )
+      .run();
+    await f.runtime.runOnce();
+    expect(f.journal.interruptions().list('run')[0]).toMatchObject({
+      state: 'settled',
+      cancel: 1,
+      revoke: 1,
+      settle: 1,
+      effects: 'uncertain',
+    });
+    expect(f.journal.list()[0]?.status).toBe('blocked');
+    expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+    expect(f.store.getRun('run')?.state).toBe('task_verification');
+  },
+);
