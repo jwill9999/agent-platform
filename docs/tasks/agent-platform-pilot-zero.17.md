@@ -75,6 +75,6 @@ See [discovery qualification](../reviews/run-discovery-qualification.md) for beh
 workspace provisioning, independent findings and test evidence. This is supervised prerequisite work;
 R2/R3 and the single-task pilot remain separate. Do not close this task based on the R1 component alone.
 
-R1 source `f01f287` is locally qualified: 26 focused and 996 Linux tests pass (63 optional skipped),
+R1 source `d4580fe` is locally qualified: 26 focused and 996 Linux tests pass (63 optional skipped),
 and final isolated review has no actionable findings. PR277 is draft pending current-head hosted
 checks. This does not qualify R2/R3 or launch the pilot.

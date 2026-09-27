@@ -11,9 +11,11 @@ mode applies; no managed run, merge or staging promotion. The canonical journal 
 read-only (four cancelled runs, zero live leases); it was not migrated or given new execution authority.
 
 [Qualification report](docs/reviews/run-discovery-qualification.md) records fixes and verification.
-R1 source `f01f287` passes 26 focused and 996 Linux tests (63 optional skipped); final independent
+R1 source `d4580fe` passes 26 focused and 996 Linux tests (63 optional skipped); final independent
 review has no actionable findings. [PR277](https://github.com/jwill9999/agent-platform/pull/277) is draft
-and pushed; finish current-head hosted checks before recommending merge. R2 governed worker artifact
+and pushed; finish current-head hosted checks before recommending merge. The Sonar quality refactor
+passed 26 focused checks, the 996-test Linux suite and independent re-review. Sonar reports zero
+open issues on `d4580fe`; final publication-head hosted gates remain pending. R2 governed worker artifact
 import and R3 coordinator completion remain next in the same task; `.13` pilot planning stays blocked.
 Do not confuse run admission with approval to execute or claim a successful managed task cycle.
 

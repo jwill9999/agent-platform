@@ -3,7 +3,7 @@
 Beads: `agent-platform-pilot-zero.17`, requirement R1 and scenarios SP-01–SP-03.
 Source baseline: PR276 merge `87c5cc469736de6d1508ec52309b64da62c3d740`.
 Branch: `task/run-discovery-admission`; destination: `feature/harness-backlog-review`.
-Status: locally qualified at source `f01f287`; final hosted checks pending on [PR277](https://github.com/jwill9999/agent-platform/pull/277). No live pilot or merge.
+Status: locally qualified at source `d4580fe`; final hosted checks pending on [PR277](https://github.com/jwill9999/agent-platform/pull/277). No live pilot or merge.
 
 ## Behavior and authority boundary
 
@@ -70,6 +70,14 @@ Native full-suite failures included macOS path/timing limitations and earlier fi
 Linux is the full-suite qualification environment. Optional Docker/model suites are not claimed run.
 The application frontend is unchanged; these tests establish infrastructure behavior, not UI coverage.
 
-Build and package lint passed after final corrections; monorepo typechecking passed before those
-corrections and the package build rechecked the changed TypeScript. Hosted verification remains a
-separate gate. Earlier native failures are not presented as a passing native full suite.
+Build and package lint passed after the quality refactor; monorepo typechecking passed after the
+functional corrections. Hosted verification remains a separate gate. Earlier native failures are not
+presented as a passing native full suite.
+
+Sonar initially reported five findings despite its overall passing gate. The
+[quality refactor](run-discovery-evidence/quality-refactor.diff) extracts validation, status selection
+and CLI discovery without changing behavior, and consolidates the filesystem import.
+[Review five](run-discovery-evidence/review-5.json) requested the diff and updated evidence;
+[review six](run-discovery-evidence/review-6.json) checked both and found no actionable findings.
+The 26 focused checks and full Linux suite (996 passed, 63 optional skipped) passed again.
+Hosted Sonar on `d4580fe` reports zero open issues. Final publication-head hosted checks remain pending.
