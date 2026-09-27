@@ -7532,133 +7532,137 @@ export class WorkflowStore {
     if (input.stopDeadlineMs < input.requestedAtMs) {
       throw new Error('cancellation stop deadline precedes the request');
     }
-    return this.#database.transaction(() => {
-      const existing = this.getWorkflowCancellation(input.runId);
-      if (existing !== undefined) {
-        if (
-          existing.id !== input.id ||
-          existing.requestedBy !== input.requestedBy ||
-          existing.reason !== input.reason ||
-          existing.requestedAtMs !== input.requestedAtMs ||
-          existing.stopDeadlineMs !== input.stopDeadlineMs ||
-          serializeDurableJson(existing.retainedEvidence) !==
-            serializeDurableJson(input.retainedEvidence)
-        ) {
-          throw new Error('immutable cancellation request changed');
+    const started = performance.now();
+    return this.#database
+      .transaction(() => {
+        const checkedAt = input.nowMs + Math.max(0, Math.floor(performance.now() - started));
+        const existing = this.getWorkflowCancellation(input.runId);
+        if (existing !== undefined) {
+          if (
+            existing.id !== input.id ||
+            existing.requestedBy !== input.requestedBy ||
+            existing.reason !== input.reason ||
+            existing.requestedAtMs !== input.requestedAtMs ||
+            existing.stopDeadlineMs !== input.stopDeadlineMs ||
+            serializeDurableJson(existing.retainedEvidence) !==
+              serializeDurableJson(input.retainedEvidence)
+          ) {
+            throw new Error('immutable cancellation request changed');
+          }
+          return existing;
         }
-        return existing;
-      }
-      const contract = this.#contractForRun(input.runId);
-      const run = this.getRun(input.runId);
-      const invalidEvidence = input.retainedEvidence.some((reference) => {
-        if (
-          typeof reference !== 'object' ||
-          reference === null ||
-          !('digest' in reference) ||
-          !('mediaType' in reference) ||
-          !('sizeBytes' in reference) ||
-          !('kind' in reference)
-        ) {
-          return true;
-        }
-        const candidate = reference as Record<string, unknown>;
-        return (
-          this.#database
-            .prepare(
-              `SELECT 1 FROM secure_evidence
+        const contract = this.#contractForRun(input.runId);
+        const run = this.getRun(input.runId);
+        const invalidEvidence = input.retainedEvidence.some((reference) => {
+          if (
+            typeof reference !== 'object' ||
+            reference === null ||
+            !('digest' in reference) ||
+            !('mediaType' in reference) ||
+            !('sizeBytes' in reference) ||
+            !('kind' in reference)
+          ) {
+            return true;
+          }
+          const candidate = reference as Record<string, unknown>;
+          return (
+            this.#database
+              .prepare(
+                `SELECT 1 FROM secure_evidence
                WHERE digest = ? AND run_id = ? AND workspace_id = ?
                  AND contract_version = ? AND policy_digest = ?
                  AND media_type = ? AND size_bytes = ? AND kind = ?
                  AND accepted_at_ms IS NOT NULL AND deleted_at_ms IS NULL
                LIMIT 1`,
-            )
-            .get(
-              candidate.digest,
-              input.runId,
-              contract.workspaceId,
-              contract.contractVersion,
-              contract.policyDigest,
-              candidate.mediaType,
-              candidate.sizeBytes,
-              candidate.kind,
-            ) === undefined
-        );
-      });
-      if (invalidEvidence) {
-        throw new Error('cancellation retained evidence is not recorded');
-      }
-      const cancellable = new Set<WorkflowState>([
-        'approved',
-        'scheduling',
-        'implementing',
-        'task_verification',
-        'task_review',
-        'repair',
-        'task_accepted',
-        'integration',
-        'feature_evaluation',
-        'repair_planning',
-        'pipeline',
-        'waiting',
-        'approval_waiting',
-        'delivery',
-        'finalizing',
-        'recovering',
-        'escalated',
-      ]);
-      if (run === undefined || !cancellable.has(run.state)) {
-        throw new Error('workflow run is not cancellable');
-      }
-      const preparedMerge = this.#database
-        .prepare(
-          `SELECT 1 FROM delivery_operations
+              )
+              .get(
+                candidate.digest,
+                input.runId,
+                contract.workspaceId,
+                contract.contractVersion,
+                contract.policyDigest,
+                candidate.mediaType,
+                candidate.sizeBytes,
+                candidate.kind,
+              ) === undefined
+          );
+        });
+        if (invalidEvidence) {
+          throw new Error('cancellation retained evidence is not recorded');
+        }
+        const cancellable = new Set<WorkflowState>([
+          'approved',
+          'scheduling',
+          'implementing',
+          'task_verification',
+          'task_review',
+          'repair',
+          'task_accepted',
+          'integration',
+          'feature_evaluation',
+          'repair_planning',
+          'pipeline',
+          'waiting',
+          'approval_waiting',
+          'delivery',
+          'finalizing',
+          'recovering',
+          'escalated',
+        ]);
+        if (run === undefined || !cancellable.has(run.state)) {
+          throw new Error('workflow run is not cancellable');
+        }
+        const preparedMerge = this.#database
+          .prepare(
+            `SELECT 1 FROM delivery_operations
            WHERE run_id = ? AND status = 'prepared'
              AND (kind = 'github.merge' OR kind LIKE 'feature.github.%') LIMIT 1`,
-        )
-        .get(input.runId);
-      if (preparedMerge !== undefined || run.mergeVerified) {
-        throw new Error(
-          'verified or prepared merge must reconcile to finalizing before cancellation',
+          )
+          .get(input.runId);
+        if (preparedMerge !== undefined || run.mergeVerified) {
+          throw new Error(
+            'verified or prepared merge must reconcile to finalizing before cancellation',
+          );
+        }
+        this.#assertResourceLease(
+          'workspace',
+          contract.workspaceId,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          checkedAt,
         );
-      }
-      this.#assertResourceLease(
-        'workspace',
-        contract.workspaceId,
-        input.ownerId,
-        input.workspaceLeaseEpoch,
-        input.nowMs,
-      );
-      this.#assertResourceLease(
-        'run',
-        input.runId,
-        input.ownerId,
-        input.runLeaseEpoch,
-        input.nowMs,
-      );
-      this.#database
-        .prepare(
-          `INSERT INTO workflow_cancellations
+        this.#assertResourceLease(
+          'run',
+          input.runId,
+          input.ownerId,
+          input.runLeaseEpoch,
+          checkedAt,
+        );
+        this.#database
+          .prepare(
+            `INSERT INTO workflow_cancellations
            (id, run_id, requested_by, reason, requested_at_ms, stop_deadline_ms, status,
             owned_work_stopped, incomplete_cleanup_json, retained_evidence_json, completed_at_ms)
            VALUES (?, ?, ?, ?, ?, ?, 'requested', 0, '[]', ?, NULL)`,
-        )
-        .run(
-          input.id,
-          input.runId,
-          input.requestedBy,
-          input.reason,
-          input.requestedAtMs,
-          input.stopDeadlineMs,
-          serializeDurableJson(input.retainedEvidence),
-        );
-      this.#database
-        .prepare(
-          `UPDATE runs SET state = 'cancelling', version = version + 1, updated_at_ms = ?
+          )
+          .run(
+            input.id,
+            input.runId,
+            input.requestedBy,
+            input.reason,
+            input.requestedAtMs,
+            input.stopDeadlineMs,
+            serializeDurableJson(input.retainedEvidence),
+          );
+        this.#database
+          .prepare(
+            `UPDATE runs SET state = 'cancelling', version = version + 1, updated_at_ms = ?
            WHERE id = ? AND state = ?`,
-        )
-        .run(input.nowMs, input.runId, run.state);
-      return this.getWorkflowCancellation(input.runId)!;
-    })();
+          )
+          .run(checkedAt, input.runId, run.state);
+        return this.getWorkflowCancellation(input.runId)!;
+      })
+      .immediate();
   }
 
   completeWorkflowCancellation(

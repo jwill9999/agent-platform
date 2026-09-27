@@ -1,3 +1,4 @@
+import { workflowCancellationMutationCapability } from '../src/storage.js';
 import { documentFixture } from './documentFixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -303,6 +304,60 @@ class HangingCleanupPort implements CancellationCleanupClient {
 }
 
 describe('WorkflowCancellationCoordinator', () => {
+  it('holds the writer lock before reading cancellation state', async () => {
+    const fixture = await createStore('implementing');
+    const raw = new Database(fixture.database, { timeout: 0 });
+    const ownerId = 'concurrent-cancellation-owner';
+    const workspaceLeaseEpoch = fixture.store.acquireLease(
+      'workspace',
+      workspaceId,
+      ownerId,
+      1000,
+      1000,
+    ).epoch;
+    const runLeaseEpoch = fixture.store.acquireLease(
+      'run',
+      'run-recovery',
+      ownerId,
+      1000,
+      1000,
+    ).epoch;
+    const read = fixture.store.getWorkflowCancellation.bind(fixture.store);
+    const spy = vi
+      .spyOn(fixture.store, 'getWorkflowCancellation')
+      .mockImplementationOnce((runId) => {
+        const result = read(runId);
+        expect(() =>
+          raw.prepare('UPDATE runs SET updated_at_ms=updated_at_ms WHERE id=?').run(runId),
+        ).toThrow('database is locked');
+        return result;
+      });
+    try {
+      expect(
+        fixture.store.requestWorkflowCancellation(
+          {
+            id: 'writer-lock-cancel',
+            runId: 'run-recovery',
+            requestedBy: 'operator',
+            reason: 'test writer admission',
+            requestedAtMs: 1000,
+            nowMs: 1000,
+            stopDeadlineMs: 2000,
+            retainedEvidence: [fixture.evidence],
+            ownerId,
+            workspaceLeaseEpoch,
+            runLeaseEpoch,
+          },
+          workflowCancellationMutationCapability,
+        ),
+      ).toMatchObject({ status: 'requested' });
+    } finally {
+      spy.mockRestore();
+      raw.close();
+      fixture.store.close();
+    }
+  });
+
   it('blocks cancellation until prepared feature delivery operations are recovered', async () => {
     const fixture = await createStore('implementing');
     const raw = new Database(fixture.database);

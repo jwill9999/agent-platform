@@ -423,7 +423,7 @@ it
     } catch (error) {
       throw new Error(
         JSON.stringify({
-          failure: String(error),
+          failure: error instanceof Error ? error.stack : String(error),
           supervisorErrors,
           modelTrace: (await docker(['logs', name]).catch(() => ({ stdout: '' }))).stdout,
           phases: db.prepare('SELECT status,failure_code FROM phase_jobs').all(),
