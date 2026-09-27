@@ -39,12 +39,7 @@ export interface RunInventory {
   }>;
 }
 
-/** Caller owns the read snapshot or admission transaction. Never migrates or writes. */
-export function queryRunInventory(
-  database: Database.Database,
-  query: RunDiscoveryQuery,
-  nowMs = Date.now(),
-): RunInventory {
+function validateInventory(database: Database.Database, query: RunDiscoveryQuery): void {
   if (!query.taskId.trim() || !/^sha256:[a-f0-9]{64}$/u.test(query.workspaceId))
     throw new Error('run_discovery_invalid_identity');
   for (const digest of [query.materialDigest, query.policyDigest]) {
@@ -62,6 +57,34 @@ export function queryRunInventory(
     if (executionContractSchema.parse(JSON.parse(row.body_json)).workspaceId !== row.workspace_id)
       throw new Error('run_discovery_identity_mismatch');
   }
+}
+
+function inventoryStatus(
+  active: DiscoveredRun[],
+  terminal: DiscoveredRun[],
+  query: RunDiscoveryQuery,
+): RunInventory['status'] {
+  if (
+    active.length > 1 ||
+    active.some(
+      (run) =>
+        (query.materialDigest !== undefined && run.materialDigest !== query.materialDigest) ||
+        (query.policyDigest !== undefined && run.policyDigest !== query.policyDigest),
+    )
+  )
+    return 'conflict';
+  if (active.length) return 'matching';
+  if (terminal.length) return 'terminal_only';
+  return 'absent';
+}
+
+/** Caller owns the read snapshot or admission transaction. Never migrates or writes. */
+export function queryRunInventory(
+  database: Database.Database,
+  query: RunDiscoveryQuery,
+  nowMs = Date.now(),
+): RunInventory {
+  validateInventory(database, query);
   const rows = database
     .prepare(
       `SELECT r.id, r.contract_id, r.state, r.version,
@@ -126,21 +149,8 @@ export function queryRunInventory(
       expiresAtMs: lease.expires_at_ms,
       expired: lease.expires_at_ms <= nowMs,
     }));
-  const conflicts =
-    active.length > 1 ||
-    active.some(
-      (run) =>
-        (query.materialDigest !== undefined && run.materialDigest !== query.materialDigest) ||
-        (query.policyDigest !== undefined && run.policyDigest !== query.policyDigest),
-    );
   return {
-    status: conflicts
-      ? 'conflict'
-      : active.length
-        ? 'matching'
-        : terminal.length
-          ? 'terminal_only'
-          : 'absent',
+    status: inventoryStatus(active, terminal, query),
     workspaceId: query.workspaceId,
     taskId: query.taskId,
     active,

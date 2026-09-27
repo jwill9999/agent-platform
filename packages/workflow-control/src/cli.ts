@@ -7,10 +7,9 @@ import {
 } from './developmentHost.js';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
-import { realpathSync } from 'node:fs';
+import { realpathSync, existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 
 import { WorkflowStore } from './storage.js';
 import { ContinuationJournal } from './continuationJournal.js';
@@ -96,21 +95,23 @@ function validateDocumentsCommand(path: string, runId: string, taskId: string): 
   }
 }
 
+function discoverCommand(args: readonly string[], path: string, runId: string | undefined): string {
+  if (!runId || !args[3] || args.length > 6) usage();
+  return JSON.stringify(
+    discoverCanonicalRuns({
+      codexHome: path,
+      workspaceRoot: runId,
+      taskId: args[3],
+      ...(args[4] === undefined ? {} : { materialDigest: args[4] }),
+      ...(args[5] === undefined ? {} : { policyDigest: args[5] }),
+    }),
+  );
+}
+
 export function runCli(args: readonly string[]): string {
   const [command, path, runId] = args;
   if (command === undefined || path === undefined) usage();
-  if (command === 'discover') {
-    if (!runId || !args[3] || args.length > 6) usage();
-    return JSON.stringify(
-      discoverCanonicalRuns({
-        codexHome: path,
-        workspaceRoot: runId,
-        taskId: args[3],
-        ...(args[4] === undefined ? {} : { materialDigest: args[4] }),
-        ...(args[5] === undefined ? {} : { policyDigest: args[5] }),
-      }),
-    );
-  }
+  if (command === 'discover') return discoverCommand(args, path, runId);
   if (command === 'validate-documents') {
     if (!runId || !args[3] || args.length !== 4) usage();
     return validateDocumentsCommand(path, runId, args[3]);
