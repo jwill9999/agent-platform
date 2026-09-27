@@ -1,10 +1,29 @@
-# R2 artifact import and R3 coordinator qualification — draft
+# R2 artifact import and R3 coordinator qualification
 
-Status: incomplete; not merge-ready. Beads: `agent-platform-pilot-zero.17`.
+Status: R2/R3 prerequisite qualification complete; owner feature-branch integration outstanding. Beads: `agent-platform-pilot-zero.17`.
 Branch: `task/artifact-import-coordinator`.
-[Draft PR278](https://github.com/jwill9999/agent-platform/pull/278) is preservation only.
+[PR278](https://github.com/jwill9999/agent-platform/pull/278) targets the feature branch; owner integration remains outstanding.
 Baseline: PR277 merged to `feature/harness-backlog-review` at
 `b7be3d6fcbf62c257e68f24dc46eca397cd02ffb`.
+
+## Current qualification checkpoint
+
+Source `4e4a3a1a` passes the Node 24 qualification:
+
+- [Full workflow regression](evidence/artifact-import-coordinator/final-regression.txt): 1,125 passed, 76 gated tests skipped.
+- [Connected Docker journeys](evidence/artifact-import-coordinator/thirteen-connected-with-config.txt): all 13 passed, including cancellation cleanup, changed approval documents, process restart and lost notification.
+- Unchanged role/launcher path: [role and tool enforcement](evidence/artifact-import-coordinator/role-final.txt): all 25 passed.
+- [Focused cleanup and completion-fence checks](evidence/artifact-import-coordinator/import-cleanup-completion-fences.txt): 115 passed.
+- [Node 24 adapter and pinned Git checks](evidence/artifact-import-coordinator/node24-adapter-check.txt): 40 passed.
+- [Provenance manifest](evidence/artifact-import-coordinator/configuration-qualification-manifest.json): source, built output, configuration and retained-result hashes verified unchanged during qualification.
+
+All nine executed [hosted checks](evidence/artifact-import-coordinator/final-source-hosted-checks.json) passed on that source, including browser E2E, desktop E2E, full verification and SonarCloud. The [CI execution record](evidence/artifact-import-coordinator/final-source-hosted-ci.json) binds job URLs and results to the source commit. The staging packaged macOS VM check was skipped. Publication-head checks remain authoritative on PR278.
+
+Reviews 22 and 23 drove fixes for durable cleanup after expired import recovery, fresh coordinator completion fences and killed-process fixture shutdown. Reviews 24–26 requested configuration provenance, hosted results and a lease-expiry contention test. All are retained: 26 exact configuration hashes recomputed across 13 successful scenarios, nine hosted successes bound to the source SHA, and 10 cancellation tests passing. [Final review 27](evidence/artifact-import-coordinator/review-27.json) confirms those findings are resolved and establishes no additional production blocker. Its stale provenance-label finding is corrected: the final manifest identifies one qualified source commit, labels the earlier baseline and records the cancellation repair history. Source/build/evidence hashes were rechecked after that metadata-only correction. Historical sections below preserve earlier failed or superseded checkpoints.
+
+These are prerequisite tests using real Docker/Codex tools and production runtime, with controlled model responses, dummy credentials and disposable GitHub/Beads services. They do not prove a live paid autonomous pilot or real remote delivery. Cancellation proves interruption cleanup and blocked work while the run remains `cancelling`; it does not prove terminal cancellation. Recorded dispatch timings end at specialist reservation, not first model response, and establish no latency SLO.
+
+The canonical real journal contains four cancelled runs and no live leases, but lacks the R1 workspace identity binding. Discovery correctly returns unavailable. Provisioning and rechecking that binding belongs to the subsequent pilot readiness assessment; no real journal migration was performed.
 
 ## Scope and execution mode
 
@@ -16,7 +35,7 @@ orchestrated task cycle. No live pilot, real delivery mutation, merge or staging
 The canonical journal was inspected read-only: four cancelled runs and no live leases at admission.
 Notion alignment remains a separate deferred task.
 
-## R2 implemented draft
+## R2 implementation and historical qualification
 
 The worker returns a bounded UTF-8 regular-file envelope with task, execution, base, approved-material
 and content digests. It supports additions, modifications and deletions; limits are 256 files,
@@ -56,7 +75,7 @@ private-workspace threat model. Its requested missing/replaced/symlinked registr
 CAS publication tests now pass. Per-command authority renewal also fixes an observed synchronous
 clone lease-expiry regression without extending the execution deadline.
 
-## R3 implemented draft and missing qualification
+## R3 implementation and historical qualification
 
 Typed coordinator proofs and receipts distinguish actual committed broker operations from generic
 callback evidence. Phase bookkeeping can queue one successor from a verified coordinator receipt.
@@ -229,3 +248,72 @@ required. PR278 stays draft; Beads .17 stays in progress and .13 remains blocked
 while a previous owner's resource leases are still valid. Coordinator and planner recovery now share
 the admission-wait decision. The [focused runtime check](evidence/artifact-import-coordinator/planner-owner-wait.txt)
 proves no worker launch, interruption or retry charge during this wait. Review 18 is pending.
+
+## Final repair review checkpoint
+
+[Review 18](evidence/artifact-import-coordinator/review-18.json) found import recovery could terminally
+block while a previous owner's resource lease remained valid. The [expanded runtime test](evidence/artifact-import-coordinator/import-owner-wait.txt)
+now proves waiting without retry charge, followed by successful reconciliation after lease expiry
+without relaunching the worker. The proposed predecessor-only permission restriction was resolved
+against the existing frozen feature/repair policy, which explicitly supports implementation repair
+after QA-only work; it is not a new mandatory policy.
+
+[Review 19](evidence/artifact-import-coordinator/review-19.json) found contradictory evaluator status
+and criterion outcomes. These now block before either evaluation persistence or callback creation.
+[Review 20](evidence/artifact-import-coordinator/review-20.json) found a cancellation race at final
+child commitment and a request-builder mismatch with the supported QA predecessor. Finalization now
+rechecks current state and fences inside its transaction, leaving uncertain external effects prepared
+for reconciliation. The builder uses the approved feature/repair envelope. The
+[53 focused tests](evidence/artifact-import-coordinator/cancellation-repair-tests.txt) pass.
+
+[Review 21](evidence/artifact-import-coordinator/review-21.json) reports no remaining concrete defect
+in those fixes. This is static independent review with explicit evidence limits, not pilot approval.
+The previous [nine connected journeys](evidence/artifact-import-coordinator/nine-connected-checkpoint.txt)
+passed, and a final rebuilt-source rerun is running. Final full regression and hosted gates also remain
+pending. Earlier serial regression was not used as final evidence because test/source edits occurred
+during its run and produced six cached-module failures; the dedicated focused run passed afterward.
+
+
+## Import recovery and completion fence review
+
+[Review 22](evidence/artifact-import-coordinator/review-22.json) found retained import failures could
+strand active scheduler capacity, and coordinator completion could reuse a timestamp captured before
+synchronous document verification. Import failure now uses durable interruption cleanup, retaining
+uncertain import evidence while settling the scheduler. Completion samples elapsed time after writer
+acquisition and applies it to resource and phase fences. The [115-test focused run](evidence/artifact-import-coordinator/import-cleanup-completion-fences.txt)
+passes, including expired import recovery without worker replay and rejection with no receipt or successor.
+
+[Review 23](evidence/artifact-import-coordinator/review-23.json) confirms both production fixes and
+identifies a signal-terminated test process that could be awaited twice. The fixture now recognizes
+both exit code and signal as terminal. Four additional connected failure modes are under qualification
+for SP-12: cancellation, changed verification documents, killed runtime/restart and lost notification.
+The first fixture attempt used an incorrect deterministic lifecycle-worker image and a closed setup
+store; those fixture/configuration errors are corrected. They are not claimed as product defects or
+passing qualification. A rerun uses the pinned real Codex image and a freshly opened production store.
+
+
+## Interpreter qualification correction
+
+The thirteen connected scenarios passed on the earlier host invocation, but its PATH selected Node
+25.8.2 despite the interactive shell showing Node 24. The broad run then failed copied-interpreter
+adapter fixtures. That run is not the final supported-environment result. Explicit PATH selection
+uses the repository Node 24.14.0; the 40 adapter/Git checks pass there.
+
+Hosted verification exposed a separate deployment prerequisite: the shared runner Node binary is
+group-writable, so production pin checks correctly reject it during ref transactions. CI now makes
+an owner-only private copy for tests, leaving the shared toolcache and production restrictions
+unchanged. This is test-environment provisioning within qualification, not a wider worker grant.
+The Node 24 full suite and connected rerun, final evidence review and hosted gates remain pending.
+
+## Cancellation contention found during evidence qualification
+
+The configuration-retention rerun passed 12 scenarios but exposed a cancellation request failure.
+[Repeated real-container attempts](evidence/artifact-import-coordinator/cancellation-contention-reproduction.txt)
+located SQLite snapshot-upgrade contention at the production cancellation INSERT. This was not
+treated as a passing or merely environmental test. The request now acquires the writer lock before
+reading workflow state and checks resource leases using elapsed time after lock acquisition.
+The immutable request identity/timestamps remain unchanged. A
+[competing-writer regression](evidence/artifact-import-coordinator/cancellation-writer-regression.txt)
+passes with the existing cancellation suite and real competing-writer lease-expiry test (10 tests). The failed
+[13-scenario run](evidence/artifact-import-coordinator/configuration-run-cancellation-failure.txt)
+is retained separately. The production fix at `bb534b1` plus the extra regression at `4e4a3a1` pass the final full suite (1,125) and all 13 connected scenarios with configuration readback.

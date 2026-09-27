@@ -1,4 +1,70 @@
 {
+  "kind": "supervised-review-evidence",
+  "executionId": "5deeabe7-9017-4421-9957-cac9ea47bc6b",
+  "materialDigest": "26d5b10d2e748bd2b09cbb1ee695d31d3b5f5e66899418a4b18419ffe827749d",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "41ebe91f00e4ed4671a826ee977ea025bf880e6316f71a289c2a271282a4d13e"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "digest": "5506e93362f1413d26be6d1dbb76344972f666f824dbb45af81869057c5c1634"
+    },
+    {
+      "path": "packages/workflow-control/src/effectiveTaskAuthority.ts",
+      "digest": "7de59262f8824dab46eb382f09c1a2430eb091e7b49f5ae7284c1338d8fcae6a"
+    },
+    {
+      "path": "packages/workflow-control/src/featureEvaluation.ts",
+      "digest": "8f2c8fa41843da9fdf0e13037d13867ef57a4ea184ed72068302d424fde60c5f"
+    },
+    {
+      "path": "packages/workflow-control/src/integrationGate.ts",
+      "digest": "6cd31748e4fd14678d16325dae412ffec9e352258c2a4c380083612ac6380cb3"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "dae6cb8c5730f680f59f1c68e0c977db5a4d9130412dfdbb7f22fcaa3d16587c"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "170deb76f9d9aafe9982067379cd7ceca2c0e719852c250f8e8a37c3972f8f60"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanning.ts",
+      "digest": "040307144eaaef6aa715e692e5ab4c99adb55c9fe894fffb09b2c899f1fbe6e4"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanningJournal.ts",
+      "digest": "629ebbf71c105f9bf5fcfa87e634109af1066566707eb2d4f3072a8633ac50f0"
+    },
+    {
+      "path": "packages/workflow-control/src/sourceGit.ts",
+      "digest": "d5e4fc571788fec8a6d4f34dae85fb8e1eceb344f0bdc06d04900290545f6533"
+    },
+    {
+      "path": "packages/workflow-control/src/standaloneCoordinators.ts",
+      "digest": "d2a7b60e978304ef653143657a34061d49a55484f16ebdbd3087fde2358a4e8c"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "44ff173009cd7f49dd5c6dee9c68d2461f19242da41dbfc097e5c0dcedd9281c"
+    },
+    {
+      "path": "packages/workflow-control/test/effectiveTaskAuthority.test.ts",
+      "digest": "6a0b5a2ff2307f4fc75e8978344438c0179e1746259b6db41fc3846953fd54d7"
+    },
+    {
+      "path": "packages/workflow-control/test/repairPlanning.test.ts",
+      "digest": "34e01c75c3612e8415b60af1630576cab37217e1037c13491049703b7594198b"
+    }
+  ],
+  "formalApproval": false,
   "review": 15,
   "messages": [
     "1. **High \u2014 Async claim escapes its SQLite transaction and causes handoff failure.**  \n   **Evidence:** `packages/workflow-control/src/storage.ts`, `dispatchRepairPlanning`; `packages/workflow-control/src/standaloneCoordinators.ts`, `completeRepairPlanning`.  \n   The claim effect returns the Promise from `call('beads.claimIssue', \u2026)` directly through `transaction(...).immediate()`. `better-sqlite3` rejects transaction callbacks returning Promises, although the external claim may already have started. This leaves an uncertain external effect and forces recovery. Other dispatch methods in the supplied store correctly wrap asynchronous results.  \n   **Correction:** Return `{ value }` from the synchronous transaction, then return/await `.value` outside it. Preserve read-back reconciliation for a claim that succeeded before the error.\n\n2. **High \u2014 Effective child authority can exceed its predecessor\u2019s permissions.**  \n   **Evidence:** `packages/workflow-control/src/effectiveTaskAuthority.ts`, `assertChildPermissions`; `packages/workflow-control/src/featureEvaluation.ts`, `DurableRepairChildBroker.#assertRequest`.  \n   Both validate paths and operations against feature-wide authority, without enforcing containment within the predecessor. A child can therefore regain paths or operations excluded from its parent while declaring `authorityExpanded: false`. The request builder intersects permissions, but the broker and authoritative resolver do not enforce that invariant. The supplied tests check an invalid operation, not a valid feature operation withheld from the parent.  \n   **Correction:** Validate child paths and operations against the resolved predecessor as well as contract/repair policy bounds. Add cases for valid feature permissions absent from the parent and permissions narrowed by an earlier child.\n\n3. **Medium \u2014 The implementation child receives no repair proposal.**  \n   **Evidence:** `packages/workflow-control/src/phaseRuntime.ts`, `#packet` and `#addRepairContext`; `packages/workflow-control/src/repairPlanning.ts`, `buildRepairChildRequest`.  \n   The committed child request retains the finding, hypothesis and evaluation evidence, but implementation packet construction only reads `repair_dispatches`. Feature-evaluation children are created through `repair_child_intents`, so their packets retain the generic objective and empty evidence without the planner\u2019s proposed repair.  \n   **Correction:** Populate child implementation context from its committed, bound repair-child request, including the failed criterion, hypothesis and evidence. Preserve the original planner callback identity; select the child only in the successor action.\n\n4. **Medium \u2014 Planner handoff recovery does not renew resource leases.**  \n   **Evidence:** `packages/workflow-control/src/phaseRuntime.ts`, `#recover` and `#recoverRepairPlanning`.  \n   Recovery renews the phase-job lease, but acquires workspace/run/task leases only once before awaiting handoff effects. Unlike normal specialist execution, it has no resource heartbeat. A handoff taking longer than `leaseTtlMs` loses authority despite a live phase lease, then consumes recovery retries and can exhaust them.  \n   **Correction:** Maintain validated resource-lease renewal throughout handoff recovery, stop dispatch on renewal failure, and retain the original execution deadline.\n\nMissing evidence: the connected failure trace and implementations of `CoordinatorTransport`, `LocalGitDeliveryPort`, document-source resolution and coordinator-proof verification were not supplied. Their behavior cannot be independently confirmed here. These findings come from static review only; missing qualification is not counted as a defect."

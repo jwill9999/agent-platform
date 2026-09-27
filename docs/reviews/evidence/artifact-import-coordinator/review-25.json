@@ -1,0 +1,84 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "2a023f6d-81ac-495a-9d5d-c4f6112f8b80",
+  "materialDigest": "be059ab9097744ea68dc0b95d820f27d13712ae1ed07a2371ac5a33793aa5ab7",
+  "manifest": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "digest": "7a281b86c0c19451c466b851124d9e970dacf320b3112d313740e873c63189a6"
+    },
+    {
+      "path": "docs/reviews/artifact-import-coordinator-qualification.md",
+      "digest": "b123310e1052b28db8fd18d119393943c51aa2741c1bc5c52072dcb3c54e9fd5"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/final-regression.txt",
+      "digest": "d86880fb5907c397973a421c3cf10a4f3264975c7ee4a72d88c52171f8f0da61"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/import-cleanup-completion-fences.txt",
+      "digest": "154d964fa6b4e8b4b6ccdc0b32b38c3c73f38fc56580208d151b92471c8d9605"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/qualification-manifest.json",
+      "digest": "3d4553b6d8c5b4c89baade19310ef031a3e836097192ba30ae59a4b5159a9a51"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-23.json",
+      "digest": "2c7dc623b0e553dbadaef9be22733f0850e40ec72137e012ff8a32bc077192ae"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-24.json",
+      "digest": "76f5cb66e21db68413ca97c8150da91b0653a075f0502fac6b257dcc390c1448"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/role-final.txt",
+      "digest": "55ef71d9a819f854e9fdd1845cfb9e7e2c62e83fc7de0ebeb2d1b5276d230834"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/source-hosted-ci.json",
+      "digest": "4183154d177c268b8df0ed9750d15155a4a134b5b7c363e42ad313075fcd227e"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/thirteen-connected.txt",
+      "digest": "ff04bf286ec71ec1eb1ff73ef7ab4c8664336fa1dad16648a442c4d0b8813548"
+    },
+    {
+      "path": "docs/reviews/run-discovery-qualification.md",
+      "digest": "3fd4ba1617a33ff8e6becd80ef69923dfb83a34b4c0f9c8615ec815bce188607"
+    },
+    {
+      "path": "docs/testing/standalone-pilot-prerequisites.md",
+      "digest": "1e8994a0e0b73d3845218804e5deb388388bf1b900a19c71d0b5c34747dcaa18"
+    },
+    {
+      "path": "packages/workflow-control/src/sourceGit.ts",
+      "digest": "d5e4fc571788fec8a6d4f34dae85fb8e1eceb344f0bdc06d04900290545f6533"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/coordinatorServices.mjs",
+      "digest": "b400f81b211598d48f5f58c76c8a16b9836ac1f032666290079d839b85e2a158"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.integration.test.ts",
+      "digest": "b990addfe856573ff3ed7cc4e8d307ff664ac00bab1f8053ad5fad89568b05aa"
+    },
+    {
+      "path": "session.md",
+      "digest": "febeaf59d287b0c55468a057ed208d3cc207f684ffefc57fa416859b43cc1b56"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "- **Medium \u2014 Hosted evidence resolves only part of review24\u2019s finding.**  \n  **Evidence:** `docs/reviews/evidence/artifact-import-coordinator/source-hosted-ci.json`, `docs/reviews/artifact-import-coordinator-qualification.md`, `session.md`.  \n  **Reason:** The snapshot binds successful `verify`, `docker`, `e2e` and `desktop-e2e` jobs to exact source `e7cab36e7aa07384722f1bcbba3d5cc7fd559cc0`, with run/job URLs. It also records the staging VM skip. It does **not** substantiate the reports\u2019 claim that nine executed checks passed, including SonarCloud: the other five successful checks are absent.  \n  **Proposed correction:** Retain exact-revision results and URLs for those remaining checks, including SonarCloud, or narrow the reports to the four evidenced successes.\n\n- **Medium \u2014 Configuration provenance correction awaits execution evidence.**  \n  **Evidence:** `packages/workflow-control/test/implementationImport.integration.test.ts`, `docs/reviews/evidence/artifact-import-coordinator/thirteen-connected.txt`, `docs/reviews/evidence/artifact-import-coordinator/qualification-manifest.json`.  \n  **Reason:** `recordConnectedStartup` addresses the identified retention gap: it emits actual runtime/broker settings, hashes their exact bytes, includes coordinator configuration, and records successful broker health and an observed running model container. No credential contents are visibly included. However, the supplied connected log contains no startup records, and the qualification manifest still identifies the earlier test digest (`7e0f275c\u2026`), whereas the supplied test\u2019s manifest digest is `b990addf\u2026`. The correction is implemented but not yet demonstrated by retained results.  \n  **Proposed correction:** After the ongoing run succeeds, retain and read back all 13 startup records and outcomes, and bind the new log and changed test digest in an updated provenance record. Preserve the distinction between the unchanged production source and the revised qualification harness.\n\nNo additional concrete implementation defect is established by the supplied evidence. The configuration finding can close upon successful rerun and provenance readback; the hosted finding still needs the missing check results. This review is not human approval."
+        }
+      }
+    ]
+  },
+  "formalApproval": false
+}

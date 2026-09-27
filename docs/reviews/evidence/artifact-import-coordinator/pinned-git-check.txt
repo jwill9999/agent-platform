@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/standaloneCoordinators.test.ts (1 test) 704ms
+   ✓ renews cancelled coordinator transport only after admission and never after permanent stop 703ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  22:05:05
+   Duration  1.27s (transform 299ms, setup 0ms, collect 396ms, tests 704ms, environment 0ms, prepare 37ms)
+

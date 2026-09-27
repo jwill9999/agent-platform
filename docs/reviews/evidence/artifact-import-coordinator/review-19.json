@@ -1,0 +1,84 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "d77df0a0-56dc-4d63-be59-b05b22e9357f",
+  "materialDigest": "f8e8c744a83afad69ba28a12e784db0f6b78a58e97cd0ce909c55848447a0e6c",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "docs/workflow-control-evidence-evaluation.md",
+      "digest": "048905692a7bb1c78693edefc2d86406922da300e3551758bc364e9efaa83974"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "bc57a4bfb7c4ac39d507d1168a770f69cd84fd863308026ae26bffdbba0b5de7"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "digest": "23e53b93abf0bf0103ee9464860a92418970f779d3831d5e2c55872cfbbd4caa"
+    },
+    {
+      "path": "packages/workflow-control/src/effectiveTaskAuthority.ts",
+      "digest": "db1363ec26939bb2e2b1bf2f49a02e540692f23e2b575eef7f46beab17867ad4"
+    },
+    {
+      "path": "packages/workflow-control/src/featureEvaluation.ts",
+      "digest": "cb00f075c9024577c7982c86136d777d6fd8abdeed66f5ca0416b862470fb7be"
+    },
+    {
+      "path": "packages/workflow-control/src/integrationGate.ts",
+      "digest": "9e45c3d12452be2cb9aaec9eba377aacfdb3ac8ba11aa0b54d7f3cf3cb1475bd"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "015778ef080523286677eb7462ecfb3c57fea3787e06d38ed644af01e1581c07"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "ffeff24fbbd67affa79cb3354434e32032d18763f7d4fa9e793f279ceda58a74"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanning.ts",
+      "digest": "53f75b26f4b0e6e1686d4d7c6143c1d27fe42dd5989fa7778014a6982cd8e9c7"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanningJournal.ts",
+      "digest": "27dbddf1355f38e9e13c6cbe4c6dda4dd869ab8335dea9aea0eb3a22fbaa8ab1"
+    },
+    {
+      "path": "packages/workflow-control/src/standaloneCoordinators.ts",
+      "digest": "6fba3b198c41b4b24bdebda7b6cc5134152d12f9bf56bfc2d49874434ab4585f"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "95a4d031ed651fa263635c2ff4836370fb7e9ff3697ad2f34352b43b8a06ad7d"
+    },
+    {
+      "path": "packages/workflow-control/test/effectiveTaskAuthority.test.ts",
+      "digest": "6a0b5a2ff2307f4fc75e8978344438c0179e1746259b6db41fc3846953fd54d7"
+    },
+    {
+      "path": "packages/workflow-control/test/featureEvaluation.test.ts",
+      "digest": "1dd4f54a76c2584bac86aa08ff2e986acfed23b92324255e6de0e3aee15c426c"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseJobs.test.ts",
+      "digest": "5c28dd8c2e00cd0c2cb29e50fd1a3cf5e82f1fc0920fe6f3aaee773c34ac70d9"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "a806dedf48ab92afdad5709d1b94ca7cd6a7b16157fe6d12cdf74f8c6acfacbc"
+    },
+    {
+      "path": "packages/workflow-control/test/repairPlanning.test.ts",
+      "digest": "21bb7945672a9dfeb7e96c088eb3d8433fdff8b26c943166b2ffcf381a9e94e2"
+    }
+  ],
+  "formalApproval": false,
+  "review": 19,
+  "messages": [
+    "- **Medium \u2014 `packages/workflow-control/src/phaseRuntime.ts`, `#completeSpecialist` / `phaseTerminalStatus`:** Feature-evaluation outcomes can contradict their persisted evaluation. A result with every criterion passed but `status: 'needs_repair'` passes the exact-partition check and produces a `repair` callback, while `ContractEvaluator` records verdict `passed`. `StandaloneCoordinators.repairPlanningContext` then rejects the successor because no failed evaluation exists. **Correction:** Validate consistency between terminal status, findings, transition intent and criterion outcomes before persisting either evaluation or callback; block inconsistent results. Add a regression covering this case.\n\nThe predecessor-subset recommendation is **optional policy change**, not a defect: the supplied broker and effective-task resolver bound children by the frozen feature contract and explicit repair policy. The QA-only predecessor test confirms those intended semantics.\n\nThe concrete **import-contention fix is resolved by inspection**: recovery defers on another live resource owner without charging retries, and the expanded import test asserts that wait, then successful reconciliation after lease expiry, with only one worker launch.\n\n**Evidence limits:** Supplied test source was reviewed, not executed. No test-run results or connected production qualification evidence were supplied. This review is not pilot or human approval."
+  ]
+}

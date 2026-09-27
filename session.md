@@ -1,41 +1,23 @@
-# R2/R3 implementation checkpoint — 27 September 2026
+# R2/R3 qualification handoff — 27 September 2026
 
-PR277 is merged into `feature/harness-backlog-review` at `b7be3d6`.
-The owner authorized completing R2 governed import and R3 coordinator completion under
-`agent-platform-pilot-zero.17`, including the broker-private import workspace.
-Active checkout: `/Users/letuscode/projects/agent-platform-workflow-evaluation`;
-branch: `task/artifact-import-coordinator`; [draft PR278](https://github.com/jwill9999/agent-platform/pull/278).
-Supervised prerequisite mode applies. No pilot, merge or staging promotion is authorized here.
+Owner-approved R2 governed worker import and R3 standalone coordinator completion are implemented on
+`task/artifact-import-coordinator` in `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+[PR278](https://github.com/jwill9999/agent-platform/pull/278) targets `feature/harness-backlog-review`.
+PR277 was merged at `b7be3d6`. This remains supervised prerequisite work; no pilot or staging promotion.
 
-The controlled real-Docker feature-evaluation repair journey now passes end to end (130 seconds):
-failed evaluation → read-only planner → durable child creation/claim → child implementation,
-verification, review, acceptance and reevaluation → workflow closure. It records one child claim
-and three close effects (predecessor, child, epic). The existing eight shorter journeys are being
-rerun with it. Model responses, credentials and external GitHub/Beads remain disposable fixtures;
-this is not live pilot or production-service evidence.
+Source `4e4a3a1` passes 1,125 Node 24 regression tests (76 gated skipped), all 13 connected Docker
+journeys and all 25 role/tool enforcement checks. All nine executed source-head hosted checks pass,
+including browser and desktop E2E and SonarCloud. Staging packaged VM testing remains separate.
+The [qualification report](docs/reviews/artifact-import-coordinator-qualification.md) retains failures,
+repairs, source/build hashes, review findings and limits. Independent review is complete; its final provenance-label correction is applied and hashes rechecked.
+Publication-head CI and documentation-mirror delivery are recorded on PR278 and Beads.
 
-Review 14's pipeline observation gap is fixed with a durable before-deadline qualification record.
-Review 15's async transaction, proposal context, recovery heartbeat and document ancestry findings
-are addressed; review 16 confirmed those corrections. Review 16 additionally found stranded active
-planner executions after recovery exhaustion. The latest patch routes exhaustion through durable
-interruption cleanup; its restart/journal test passes. Review 17 found live predecessor leases could consume recovery
-retries; both coordinator paths now wait without charging retries. The focused runtime test passes;
-review 18 is in progress.
-
-The broad regression attempt passed 1088 tests and failed 22. It exposed an obsolete repair-child
-fixture, a missing test Git fallback, and timing contention. After fixture corrections and serial
-rerun, all 114 tests in the five affected files passed. Separate new private-document checks (2),
-planner exhaustion (1), and cross-finding child-budget (1) pass. Current final-source full regression,
-connected tests, independent review and hosted detailed quality checks remain outstanding.
-
-R3 remains under qualification, not complete. Continue under the existing approved scope; preserve
-all failed evidence and exact source boundaries. Feature-to-staging delivery is required only when
-its approved intent/contract exists; no staging authority is implied by this work.
-
-Continue under existing owner authorization. PR278 stays draft, `.17` in progress, `.13` blocked.
-The separate Notion alignment task remains deferred. Preserve earlier failed evidence, and refresh
-Beads, Notion, session and hosted checks as work advances. Task-owned review gateway/networks remain
-in use for independent reviews and need cleanup after the final review.
+Beads `agent-platform-pilot-zero.17` remains in progress until required integration;
+`.13` pilot planning stays blocked. Notion alignment remains a separate deferred task.
+The next owner action is PR278 merge review once its publication-head checks are green.
+Then verify the merged baseline and prepare the bounded single-task pilot readiness assessment.
+The canonical journal has four cancelled runs and no live leases, but no R1 identity binding:
+provision and verify discovery before attempting a pilot. No journal migration or live pilot occurred.
 
 The historical entries below retain their original evidence and may describe superseded statuses.
 

@@ -78,3 +78,14 @@ R2/R3 and the single-task pilot remain separate. Do not close this task based on
 R1 source `d4580fe` is locally qualified: 26 focused and 996 Linux tests pass (63 optional skipped),
 and final isolated review has no actionable findings. PR277 is draft pending current-head hosted
 checks. This does not qualify R2/R3 or launch the pilot.
+
+
+## R2/R3 implementation continuation
+
+PR277 is merged. The owner authorized completing governed import and standalone coordinators,
+including the private workspace design. Implementation is on `task/artifact-import-coordinator`,
+[draft PR278](https://github.com/jwill9999/agent-platform/pull/278). The
+[qualification report](../reviews/artifact-import-coordinator-qualification.md) records the connected
+journeys, independent review findings and their corrections. Node 24 qualification passes 1,125 regression tests, 13 connected Docker journeys and 25 role/tool checks.
+All nine executed source-head hosted checks pass; independent evidence review is complete and its final metadata correction is applied. Keep this prerequisite open until required integration and
+qualification succeed; controlled model/external-service tests do not constitute the live pilot.
