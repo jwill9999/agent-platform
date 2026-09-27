@@ -1,0 +1,127 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "f2afef72-694d-4e73-a6d4-150223aefdee",
+  "materialDigest": "7f6b0b16b4f9998f797cfbe44a6dff846e8e6a270be3407deea3fcea23e066c5",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "docs/reviews/artifact-import-coordinator-qualification.md",
+      "digest": "4f7f1032b402a1e0cdc5bb94307f9d60a9358615fdd263baa2869aab1053a931"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/full-suite-git-config-failure.txt",
+      "digest": "04d39b4eb314f814a3f3f1cda08369a1698d399cb3136d80123139a5c44e0161"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/nine-connected-final.txt",
+      "digest": "31dfe1c097bebe0a8266dd54f96355b51fc5459cc1bfb5c603f7295c10b2ee65"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/pinned-git-check.txt",
+      "digest": "e446dc1271c2f49b18580521e6849225c74a0a4b199fcb3bc46a44aa6ed8b52f"
+    },
+    {
+      "path": "docs/testing/standalone-pilot-prerequisites.md",
+      "digest": "1e8994a0e0b73d3845218804e5deb388388bf1b900a19c71d0b5c34747dcaa18"
+    },
+    {
+      "path": "docs/workflow-control-evidence-evaluation.md",
+      "digest": "048905692a7bb1c78693edefc2d86406922da300e3551758bc364e9efaa83974"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "aaded6911e918fb68af54ececcc41a1aa5b9c59a60bf073443af3969aaac0ed5"
+    },
+    {
+      "path": "packages/workflow-control/src/coordinatorReceipts.ts",
+      "digest": "c8870110990460c9b659ee8364d2ea6030fca32624ed75e2afe25d628c0582b3"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "digest": "23e53b93abf0bf0103ee9464860a92418970f779d3831d5e2c55872cfbbd4caa"
+    },
+    {
+      "path": "packages/workflow-control/src/effectiveTaskAuthority.ts",
+      "digest": "db1363ec26939bb2e2b1bf2f49a02e540692f23e2b575eef7f46beab17867ad4"
+    },
+    {
+      "path": "packages/workflow-control/src/featureEvaluation.ts",
+      "digest": "e7b49c80bea4b55a6f40e81be9a3c804e65c97f2fffd0c3ebfae143ce86f7092"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationImport.ts",
+      "digest": "e0d70e0b1f79c85ca9e15b902e4ccdf5bb0f307faeb1ee8575f6305f6e207a12"
+    },
+    {
+      "path": "packages/workflow-control/src/integrationGate.ts",
+      "digest": "9e45c3d12452be2cb9aaec9eba377aacfdb3ac8ba11aa0b54d7f3cf3cb1475bd"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "aaa0c2cedf522a41686839f900c7a36839ae3b8d4a2adea55b8599507de9eaa7"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "2e1719f7e6b3676909552882cd895ba36a46c64de2b4102cb25057ed0a04ab59"
+    },
+    {
+      "path": "packages/workflow-control/src/repairChildContract.ts",
+      "digest": "a6f481333c920e08d4b29eea24cc3981689ef0673b336f8dcf269b348c56e637"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanning.ts",
+      "digest": "0f016d39515255b5d302a4feb88c9e308f6873adecae860920d9055d9a47e9b0"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanningJournal.ts",
+      "digest": "4297d40a531435d82b9095f9894f04f6b7df41cd264c06009af1f85f1f3d7ff9"
+    },
+    {
+      "path": "packages/workflow-control/src/standaloneCoordinators.ts",
+      "digest": "8733428908ab8f700d299edf1997d3f033074ae045ad069450d7f16702671661"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "35487fd7faaad086dcbce48107b07b4521e306ee02e2e42ef43918381b52afec"
+    },
+    {
+      "path": "packages/workflow-control/test/effectiveTaskAuthority.test.ts",
+      "digest": "6a0b5a2ff2307f4fc75e8978344438c0179e1746259b6db41fc3846953fd54d7"
+    },
+    {
+      "path": "packages/workflow-control/test/evaluationCriteria.test.ts",
+      "digest": "6a742863eab5105e1d619b0e5df1a9826d36f860cc85970dd73e20f2abe1d3a5"
+    },
+    {
+      "path": "packages/workflow-control/test/featureEvaluation.test.ts",
+      "digest": "89ca9f50e799d0bea20b6b63caad62e86308b51a84fbba030ee2d92c06785f93"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/coordinatorServices.mjs",
+      "digest": "b400f81b211598d48f5f58c76c8a16b9836ac1f032666290079d839b85e2a158"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.integration.test.ts",
+      "digest": "fb1b8ba5170b81af4c7ee5c0cdaab9d02acf6aab0ce09f0eee6db7cf1f6c11ec"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseJobs.test.ts",
+      "digest": "904d391b7bab7c99a3c380f5cb5bfed3c87c179a2462da4dd85bd53c3c5be080"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "810a3e7dbc8d232fb570e35fc4f566cb74c0d10b5e8ce781bdd7baf23137090a"
+    },
+    {
+      "path": "packages/workflow-control/test/repairPlanning.test.ts",
+      "digest": "5a4643bc0af5cb0ff6bdf9a8ffdcadea4e75ba08ca0a0345502677af5f6aa2f6"
+    }
+  ],
+  "formalApproval": false,
+  "messages": [
+    "The two production fixes resolve the reported issues on static inspection: failed retained-import recovery now enters durable cleanup, and coordinator completion checks resource and phase leases using elapsed time sampled inside the completion transaction. Final qualification remains incomplete.\n\n- **Medium \u2014 Lost-notification test waits for an exit event that already occurred.**  \n  **Evidence:** `packages/workflow-control/test/implementationImport.integration.test.ts`, `stopProcess`, `injectConnectedFailure`, and the successful-run supervisor shutdown block.  \n  **Reason:** The lost-notification scenario kills and awaits the original coordinator but retains it in `supervisors`. Successful shutdown subsequently checks only `exitCode`. A process terminated by SIGKILL has `exitCode === null` and a populated `signalCode`; registering another `once('exit')` listener then waits indefinitely. This can time out an otherwise successful journey.  \n  **Correction:** Treat either populated exit field as terminal, or retain and reuse each process\u2019s exit promise.\n\n- **High \u2014 Required connected failure qualification has no passing evidence yet.**  \n  **Evidence:** `docs/testing/standalone-pilot-prerequisites.md`, SP-12; `nine-connected-final.txt`; `implementationImport.integration.test.ts`.  \n  **Reason:** The retained log covers nine scenarios. The supplied source now defines thirteen, including cancellation, document alteration, runtime restart, and lost notification. Their presence does not establish execution or success; component tests do not replace the required production composition.  \n  **Correction:** Retain passing results for all four additional scenarios after correcting the shutdown wait, including observed persistent outcomes and absence of duplicate effects.\n\n- **Medium \u2014 Final-source regression and provenance evidence remain missing.**  \n  **Evidence:** `artifact-import-coordinator-qualification.md`, `full-suite-git-config-failure.txt`, `pinned-git-check.txt`, `phaseRuntime.test.ts`, `phaseJobs.test.ts`.  \n  **Reason:** The full run still reports one failure; the isolated passing rerun does not establish a green full run. Its retained-import test name also predates the supplied parameterized expiry case. No supplied execution result establishes that the new expiry and elapsed-time regressions passed. The logs themselves omit source SHA, invocation/configuration, and image identity needed to bind qualification to the reviewed source.  \n  **Correction:** Supply final-source focused regression results, the configured full-suite result, required hosted gates, and the matrix\u2019s execution metadata.\n\nNo additional concrete production defect is established by the supplied evidence. Optional suggestions: none. This assessment is not approval."
+  ]
+}

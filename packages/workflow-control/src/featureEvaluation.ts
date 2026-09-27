@@ -1,3 +1,9 @@
+import {
+  remainingRetryBudgetSchema,
+  repairChildRequestSchema,
+  type RepairChildRequest,
+} from './repairChildContract.js';
+export type { RepairChildRequest } from './repairChildContract.js';
 import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 
@@ -7,10 +13,9 @@ import {
   EXECUTION_CONTRACT_VERSION,
   evidenceReferenceSchema,
   executionContractSchema,
-  findingSchema,
   relativePathSchema,
-  workflowOperationSchema,
   workflowRoleSchema,
+  workflowOperationSchema,
   type EvidenceReference,
   type ExecutionContract,
   type WorkflowOperation,
@@ -34,15 +39,6 @@ import {
 const identifierSchema = z.string().min(1).max(200);
 const digestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const shaSchema = z.string().regex(/^[a-f0-9]{40}$/u);
-const remainingRetryBudgetSchema = z
-  .object({
-    implementationAttempts: z.number().int().nonnegative(),
-    findingAttempts: z.number().int().nonnegative(),
-    infrastructureAttempts: z.number().int().nonnegative(),
-    waitDeadlineSeconds: z.number().int().positive(),
-  })
-  .strict();
-
 const criterionEvaluationSchema = z
   .object({
     criterion: z.string().min(1),
@@ -66,7 +62,7 @@ export const featureEvaluationRequestSchema = z
   })
   .strict();
 
-const persistedEvaluationResultSchema = featureEvaluationRequestSchema
+export const persistedEvaluationResultSchema = featureEvaluationRequestSchema
   .extend({
     verdict: z.enum(['passed', 'needs_repair']),
     failedCriteria: z.array(z.string()),
@@ -81,34 +77,6 @@ export interface FeatureEvaluationResult {
   failedCriteria: string[];
   record: EvaluationRecord;
 }
-
-const repairChildRequestSchema = z
-  .object({
-    workspaceId: digestSchema,
-    runId: identifierSchema,
-    featureId: identifierSchema,
-    id: identifierSchema,
-    sequence: z.number().int().positive(),
-    parentEpicId: identifierSchema,
-    dependsOn: identifierSchema,
-    chainTipTaskId: identifierSchema,
-    branchParent: z.string().regex(/^task\/[A-Za-z0-9._-]+$/u),
-    branchParentSha: shaSchema,
-    evaluationId: digestSchema,
-    finding: findingSchema,
-    findingDigest: digestSchema,
-    remainingRetryBudget: remainingRetryBudgetSchema,
-    assignedRole: workflowRoleSchema,
-    allowedPaths: z.array(relativePathSchema),
-    allowedOperations: z.array(workflowOperationSchema),
-    authorityExpanded: z.literal(false),
-    actorRole: z.literal('workflow_orchestrator'),
-    contractVersion: z.literal(EXECUTION_CONTRACT_VERSION),
-    policyDigest: digestSchema,
-  })
-  .strict();
-
-export type RepairChildRequest = z.infer<typeof repairChildRequestSchema>;
 
 export interface RepairChildFence {
   ownerId: string;
@@ -504,7 +472,15 @@ export class DurableRepairChildBroker {
     return new DurableRepairChildBroker({ ...input, clock: Date.now });
   }
 
-  async execute(input: unknown, fence: RepairChildFence): Promise<RepairChildIntentRecord> {
+  async execute(input: unknown, authority: RepairChildFence): Promise<RepairChildIntentRecord> {
+    // Copy only fence fields: structural callers may carry an execution id that must
+    // never overwrite the immutable child id when preparing an intent.
+    const fence: RepairChildFence = {
+      ownerId: authority.ownerId,
+      workspaceLeaseEpoch: authority.workspaceLeaseEpoch,
+      runLeaseEpoch: authority.runLeaseEpoch,
+      taskLeaseEpoch: authority.taskLeaseEpoch,
+    };
     const request = repairChildRequestSchema.parse(input);
     this.#store.assertRunUsesContract(request.runId, this.#contract);
     const replay = this.#store.getRepairChildIntent(request.id);

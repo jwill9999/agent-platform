@@ -1,0 +1,185 @@
+{
+  "sourceCommit": "6f02a7d4161cbb42ce37145fda74b22329d9d6bd",
+  "issues": [
+    {
+      "key": "AaDj_vlkuh_NfUB9WwXl",
+      "rule": "typescript:S6582",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/coordinatorReceipts.ts",
+      "line": 70,
+      "message": "Prefer using an optional chain expression instead, as it's more concise and easier to read."
+    },
+    {
+      "key": "AaDj_vlkuh_NfUB9WwXm",
+      "rule": "typescript:S6582",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/coordinatorReceipts.ts",
+      "line": 102,
+      "message": "Prefer using an optional chain expression instead, as it's more concise and easier to read."
+    },
+    {
+      "key": "AaDj-znbobAzMXtwfXh5",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/coordinatorReceipts.ts",
+      "line": 123,
+      "message": "Refactor this function to reduce its Cognitive Complexity from 29 to the 15 allowed."
+    },
+    {
+      "key": "AaDj-zm2obAzMXtwfXh1",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/implementationImport.ts",
+      "line": 109,
+      "message": "Refactor this function to reduce its Cognitive Complexity from 17 to the 15 allowed."
+    },
+    {
+      "key": "AaDj-zmsobAzMXtwfXhx",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/implementationOutput.ts",
+      "line": 33,
+      "message": "Refactor this function to reduce its Cognitive Complexity from 28 to the 15 allowed."
+    },
+    {
+      "key": "AaDj-zmsobAzMXtwfXhy",
+      "rule": "typescript:S7758",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/implementationOutput.ts",
+      "line": 60,
+      "message": "Prefer `String#codePointAt()` over `String#charCodeAt()`."
+    },
+    {
+      "key": "AaDj-zmsobAzMXtwfXhz",
+      "rule": "typescript:S7758",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/implementationOutput.ts",
+      "line": 60,
+      "message": "Prefer `String#codePointAt()` over `String#charCodeAt()`."
+    },
+    {
+      "key": "AaDj-zmsobAzMXtwfXh0",
+      "rule": "typescript:S2871",
+      "severity": "CRITICAL",
+      "type": "BUG",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/implementationOutput.ts",
+      "line": 104,
+      "message": "Provide a compare function to avoid sorting elements alphabetically."
+    },
+    {
+      "key": "AaDj-zmjobAzMXtwfXhw",
+      "rule": "typescript:S3863",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/phaseJobs.ts",
+      "line": 2,
+      "message": "'./governedOperations.js' imported multiple times."
+    },
+    {
+      "key": "AaDj-znMobAzMXtwfXh2",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/phaseRuntime.ts",
+      "line": 509,
+      "message": "Refactor this function to reduce its Cognitive Complexity from 23 to the 15 allowed."
+    },
+    {
+      "key": "AaDj-znMobAzMXtwfXh3",
+      "rule": "typescript:S107",
+      "severity": "MAJOR",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/phaseRuntime.ts",
+      "line": 837,
+      "message": "Private async method #completeSpecialist has too many parameters (10). Maximum allowed is 7."
+    },
+    {
+      "key": "AaDj-znMobAzMXtwfXh4",
+      "rule": "typescript:S1848",
+      "severity": "MAJOR",
+      "type": "BUG",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/phaseRuntime.ts",
+      "line": 1080,
+      "message": "Either remove this useless object instantiation of \"TrustedSourceGit\" or use it."
+    },
+    {
+      "key": "AaDj-zl_obAzMXtwfXhu",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/specialistLauncher.ts",
+      "line": 121,
+      "message": "Refactor this function to reduce its Cognitive Complexity from 23 to the 15 allowed."
+    },
+    {
+      "key": "AaDj-zl_obAzMXtwfXhv",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/specialistLauncher.ts",
+      "line": 880,
+      "message": "Refactor this function to reduce its Cognitive Complexity from 19 to the 15 allowed."
+    },
+    {
+      "key": "AaDj-znlobAzMXtwfXh6",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/standaloneCoordinators.ts",
+      "line": 78,
+      "message": "Refactor this function to reduce its Cognitive Complexity from 31 to the 15 allowed."
+    },
+    {
+      "key": "AaDj-znlobAzMXtwfXh7",
+      "rule": "typescript:S4624",
+      "severity": "MAJOR",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/standaloneCoordinators.ts",
+      "line": 319,
+      "message": "Refactor this code to not use nested template literals."
+    },
+    {
+      "key": "AaDj-znlobAzMXtwfXh8",
+      "rule": "typescript:S107",
+      "severity": "MAJOR",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/standaloneCoordinators.ts",
+      "line": 360,
+      "message": "Private method #transition has too many parameters (8). Maximum allowed is 7."
+    },
+    {
+      "key": "AaDj-zopobAzMXtwfXh9",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/storage.ts",
+      "line": 1362,
+      "message": "Refactor this function to reduce its Cognitive Complexity from 17 to the 15 allowed."
+    },
+    {
+      "key": "AaDj-zopobAzMXtwfXh-",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/src/storage.ts",
+      "line": 3977,
+      "message": "Refactor this function to reduce its Cognitive Complexity from 19 to the 15 allowed."
+    },
+    {
+      "key": "AaDj-zhvobAzMXtwfXht",
+      "rule": "javascript:S7780",
+      "severity": "MINOR",
+      "type": "CODE_SMELL",
+      "component": "jwill9999_agent-platform:packages/workflow-control/test/fixtures/implementationResponses.mjs",
+      "line": 44,
+      "message": "`String.raw` should be used to avoid escaping `\\`."
+    }
+  ]
+}

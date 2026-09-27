@@ -1,0 +1,45 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ❯ test/implementationImport.integration.test.ts (13 tests | 2 failed | 9 skipped) 82148ms
+   × qualifies cancel-active through production runtime, Docker, credential broker and retained evidence 1890ms
+     → {"failure":"TypeError: The database connection is not open","supervisorErrors":[],"modelTrace":"","phases":[{"status":"started","failure_code":null}],"executions":[{"status":"active","result_json":null}],"interruptions":[]}
+   ✓ qualifies alter-documents through production runtime, Docker, credential broker and retained evidence 1759ms
+   ✓ qualifies restart-active through production runtime, Docker, credential broker and retained evidence 32138ms
+   × qualifies lost-notification through production runtime, Docker, credential broker and retained evidence 46361ms
+     → {"failure":"Error: connected injection boundary unavailable","supervisorErrors":[],"modelTrace":"","phases":[{"status":"started","failure_code":null}],"executions":[{"status":"active","result_json":null}],"interruptions":[]}
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/implementationImport.integration.test.ts > qualifies cancel-active through production runtime, Docker, credential broker and retained evidence
+Error: {"failure":"TypeError: The database connection is not open","supervisorErrors":[],"modelTrace":"","phases":[{"status":"started","failure_code":null}],"executions":[{"status":"active","result_json":null}],"interruptions":[]}
+ ❯ test/implementationImport.integration.test.ts:420:13
+    418|       ).toEqual({ n: 0 });
+    419|     } catch (error) {
+    420|       throw new Error(
+       |             ^
+    421|         JSON.stringify({
+    422|           failure: String(error),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/implementationImport.integration.test.ts > qualifies lost-notification through production runtime, Docker, credential broker and retained evidence
+Error: {"failure":"Error: connected injection boundary unavailable","supervisorErrors":[],"modelTrace":"","phases":[{"status":"started","failure_code":null}],"executions":[{"status":"active","result_json":null}],"interruptions":[]}
+ ❯ test/implementationImport.integration.test.ts:420:13
+    418|       ).toEqual({ n: 0 });
+    419|     } catch (error) {
+    420|       throw new Error(
+       |             ^
+    421|         JSON.stringify({
+    422|           failure: String(error),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed | 9 skipped (13)
+   Start at  22:10:31
+   Duration  82.60s (transform 210ms, setup 0ms, collect 274ms, tests 82.15s, environment 0ms, prepare 37ms)
+
+undefined
+/Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/implementationImport.integration.test.ts -t cancel-active|alter-documents|restart-active|lost-notification --maxWorkers=1 --minWorkers=1

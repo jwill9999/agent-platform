@@ -1,3 +1,5 @@
+import { implementationWorkspace } from './implementationImport.js';
+import { resolveEffectiveTask } from './effectiveTaskAuthority.js';
 import {
   establishDocumentSource,
   resolveDocumentSource,
@@ -360,10 +362,30 @@ function verifyCurrentSources(
     byTask.set(row.task_id, row.ref);
   }
   const publishedRoot = current.sourceRoot;
+  const ownedRoot = implementationWorkspace(database, input.runId, publishedRoot);
+  const inheritedRef = (ref: string): string => {
+    if (ownedRoot === publishedRoot) return ref;
+    const taskId = accepted.find((row) => row.ref === ref)?.task_id;
+    if (!taskId || current.taskIds.includes(taskId)) return ref;
+    const row = database
+      .prepare('SELECT c.body_json FROM contracts c JOIN runs r ON r.contract_id=c.id WHERE r.id=?')
+      .get(input.runId) as { body_json: string };
+    const task = resolveEffectiveTask(
+      database,
+      executionContractSchema.parse(JSON.parse(row.body_json)),
+      input.runId,
+      taskId,
+    );
+    if (!task) throw new Error('document_task_unknown');
+    return `refs/heads/task/${task.ancestorTaskId}`;
+  };
   const refs: (string | undefined)[] =
-    byTask.size === 0 ? [undefined] : [...new Set(byTask.values())];
-  if (input.additionalSourceRef !== undefined && !refs.includes(input.additionalSourceRef))
-    refs.push(input.additionalSourceRef);
+    byTask.size === 0 ? [undefined] : [...new Set([...byTask.values()].map(inheritedRef))];
+  if (
+    input.additionalSourceRef !== undefined &&
+    !refs.includes(inheritedRef(input.additionalSourceRef))
+  )
+    refs.push(inheritedRef(input.additionalSourceRef));
   for (const ref of refs) {
     current.sourceRoot = resolveDocumentSource(current.sourceIdentity, publishedRoot, ref);
     if (
@@ -372,6 +394,17 @@ function verifyCurrentSources(
     )
       throw new Error('document_source_changed');
     verifyBytes(database, current);
+  }
+  if (ownedRoot !== publishedRoot) {
+    // Generated repair branches exist only in the registered private clone. Verify its
+    // approved bytes too, while retaining the canonical repository as document authority.
+    const authoritativeRoot = current.sourceRoot;
+    try {
+      current.sourceRoot = ownedRoot;
+      verifyBytes(database, current);
+    } finally {
+      current.sourceRoot = authoritativeRoot;
+    }
   }
 }
 

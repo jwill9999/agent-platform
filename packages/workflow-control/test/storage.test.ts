@@ -73,6 +73,7 @@ const contract: ExecutionContract = {
 };
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -81,6 +82,8 @@ async function createStore(): Promise<{
   store: WorkflowStore;
   input: PrepareTransitionInput;
 }> {
+  // Lease tests use explicit logical timestamps; real filesystem duration must not advance that clock.
+  vi.spyOn(Date, 'now').mockReturnValue(1000);
   const root = await mkdtemp(join(tmpdir(), 'workflow-store-'));
   roots.push(root);
   const store = new WorkflowStore(join(root, 'workflow.sqlite'));
@@ -227,6 +230,9 @@ describe('WorkflowStore', () => {
 
   it('uses CAS versions, idempotency keys, and fenced commits', async () => {
     const { store, input } = await createStore();
+    // This tests transition identity, not the separate short-lease expiry cases below.
+    store.acquireLease('workspace', contract.workspaceId, 'owner-1', 60000, 1000);
+    store.acquireLease('run', input.runId, 'owner-1', 60000, 1000);
     const prepared = store.prepareTransition(input);
     expect(prepared.status).toBe('prepared');
     expect(() =>
@@ -504,7 +510,17 @@ describe('JournaledMutationBroker recovery', () => {
             });
           } else pending = broker.execute(request);
           const failure = expect(pending).rejects.toThrow();
-          await observing;
+          await Promise.race([
+            observing,
+            pending.then(
+              () => {
+                throw new Error(`observation not reached: ${operation}/${recovery}/${change}`);
+              },
+              (error: unknown) => {
+                throw error;
+              },
+            ),
+          ]);
           if (change === 'documents')
             await writeFile(
               join(root, 'document-source/fixture-spec.md'),
@@ -527,6 +543,33 @@ describe('JournaledMutationBroker recovery', () => {
     },
     30_000,
   );
+
+  it('reconciles a lost acknowledgement under the same live owner without duplicating the effect', async () => {
+    const { store, input } = await createStore();
+    const port = new FakeMutationPort();
+    const broker = new JournaledMutationBroker(
+      store,
+      port,
+      (boundary) => {
+        if (boundary === 'after_external_mutation') throw new Error('lost acknowledgement');
+      },
+      () => 1000,
+    );
+    await expect(broker.execute(input)).rejects.toThrow('lost acknowledgement');
+    const recovery = new JournaledMutationBroker(store, port, undefined, () => 1000);
+    const result = await recovery.reconcilePrepared({
+      runId: input.runId,
+      recoveryOwnerId: input.leaseOwnerId,
+      recoveryLeaseEpoch: input.leaseEpoch,
+      recoveryWorkspaceLeaseEpoch: input.transitionContext.workspaceLeaseEpoch,
+      currentContractVersion: input.contractVersion,
+      currentPolicyDigest: input.policyDigest,
+      nowMs: 1000,
+    });
+    expect(result).toEqual([expect.objectContaining({ status: 'committed' })]);
+    expect(port.mutations).toBe(1);
+    store.close();
+  });
 
   it.each([
     'before_prepare',

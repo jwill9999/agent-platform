@@ -1,3 +1,5 @@
+import { assertBootstrapExecutablePin } from './bootstrapAdapterRuntime.js';
+import type { WorkflowStore } from './storage.js';
 import type { DeliveryDocumentSource } from './documentApproval.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -38,6 +40,7 @@ export interface BrokeredRemoteRefClient {
     ref: string;
     expectedOldSha: string | null;
     newSha: string;
+    objectSourceRoot?: string;
   }): Promise<void>;
 }
 
@@ -92,13 +95,17 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
   readonly #observeRemoteRef: BrokeredRemoteRefClient['observeRef'];
   readonly #pushRemoteRef: BrokeredRemoteRefClient['pushCas'];
   readonly #gitBinary: string;
+  readonly #gitPin?: { path: string; digest: string };
   readonly #gitCommonDir: string;
 
+  readonly #ownedSourceRoot?: string;
   private constructor(input: {
     workspaceRoot: string;
+    ownedSourceRoot?: string;
     remoteName: string;
     remote: BrokeredRemoteRefClient;
     gitBinary?: string;
+    gitPin?: { path: string; digest: string };
     documents?: DeliveryDocumentSource & { assertDispatch?: () => void };
     bootstrap?: {
       policy: BootstrapPolicy;
@@ -107,20 +114,36 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     };
   }) {
     this.#workspaceRoot = realpathSync(input.workspaceRoot);
+    this.#ownedSourceRoot = input.ownedSourceRoot;
     this.#bootstrap = input.bootstrap;
     this.#documents = input.documents;
-    this.#sourceRoot =
-      input.documents?.sourceRoot ?? input.bootstrap?.policy.sourceRoot ?? this.#workspaceRoot;
+    this.#sourceRoot = realpathSync(
+      input.ownedSourceRoot ??
+        input.documents?.sourceRoot ??
+        input.bootstrap?.policy.sourceRoot ??
+        this.#workspaceRoot,
+    );
     if (
       input.bootstrap &&
       input.documents &&
       realpathSync(input.bootstrap.policy.sourceRoot) !== this.#sourceRoot
     )
       throw new Error('bootstrap document source differs from approved policy');
+    if (
+      input.ownedSourceRoot &&
+      input.documents &&
+      realpathSync(input.documents.sourceRoot) !== this.#workspaceRoot
+    )
+      throw new Error('owned workspace document identity mismatch');
     this.#remoteName = input.remoteName;
     this.#observeRemoteRef = input.remote.observeRef.bind(input.remote);
     this.#pushRemoteRef = input.remote.pushCas.bind(input.remote);
-    this.#gitBinary = input.gitBinary ?? (process.platform === 'win32' ? 'git' : '/usr/bin/git');
+    this.#gitPin = input.gitPin;
+    if (this.#gitPin) assertBootstrapExecutablePin(this.#gitPin);
+    this.#gitBinary =
+      input.gitPin?.path ??
+      input.gitBinary ??
+      (process.platform === 'win32' ? 'git' : '/usr/bin/git');
     const topLevel = realpathSync(this.#git(['rev-parse', '--show-toplevel']).trim());
     if (topLevel !== this.#sourceRoot) {
       throw new Error('Git delivery workspace is not the canonical repository top-level');
@@ -132,6 +155,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
   }
 
   static create(input: {
+    gitPin?: { path: string; digest: string };
     workspaceRoot: string;
     remoteName: string;
     remote: BrokeredRemoteRefClient;
@@ -139,11 +163,26 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     return new LocalGitDeliveryPort(input);
   }
 
+  static createForWorkflow(input: {
+    store: WorkflowStore;
+    runId: string;
+    workspaceRoot: string;
+    gitPin: { path: string; digest: string };
+    remoteName: string;
+    remote: BrokeredRemoteRefClient;
+  }): LocalGitDeliveryPort {
+    const root = realpathSync(input.workspaceRoot);
+    const ownedSourceRoot = input.store.getImplementationWorkspace(input.runId, root);
+    if (ownedSourceRoot === root) throw new Error('broker-owned delivery workspace unavailable');
+    return new LocalGitDeliveryPort({ ...input, ownedSourceRoot });
+  }
+
   static createForTest(input: {
     workspaceRoot: string;
     remoteName: string;
     remote: BrokeredRemoteRefClient;
     gitBinary?: string;
+    gitPin?: { path: string; digest: string };
   }): LocalGitDeliveryPort {
     if (process.env.NODE_ENV !== 'test') {
       throw new Error('test Git delivery configuration is unavailable outside the test runtime');
@@ -212,8 +251,10 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       remoteName: this.#remoteName,
       remote: { observeRef: this.#observeRemoteRef, pushCas: this.#pushRemoteRef },
       gitBinary: this.#gitBinary,
+      gitPin: this.#gitPin,
       bootstrap: this.#bootstrap,
       documents,
+      ownedSourceRoot: this.#ownedSourceRoot,
     });
     if (port.#gitCommonDir !== this.#gitCommonDir)
       throw new Error('delivery document source belongs to another repository');
@@ -328,6 +369,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
         ref: gitRequest.ref,
         expectedOldSha: gitRequest.expectedRemoteSha,
         newSha: gitRequest.newSha,
+        ...(this.#ownedSourceRoot ? { objectSourceRoot: this.#ownedSourceRoot } : {}),
       });
       return { ref: gitRequest.ref, sha: gitRequest.newSha };
     }
@@ -547,12 +589,15 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     extraEnvironment: NodeJS.ProcessEnv = {},
     input?: string,
   ): Buffer {
+    if (this.#gitPin) assertBootstrapExecutablePin(this.#gitPin);
     return execFileSync(
       this.#gitBinary,
       [
         '--no-replace-objects',
         '-c',
         'core.hooksPath=/dev/null',
+        '-c',
+        'core.fsmonitor=false',
         '-c',
         'commit.gpgSign=false',
         '-c',

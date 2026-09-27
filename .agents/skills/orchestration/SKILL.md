@@ -29,10 +29,12 @@ leases and ownership; never initialize a database merely because lookup failed.
 - Failed, ambiguous, or unavailable lookup: report unknown state; do not create a possible duplicate.
 - Completed or cancelled run: inspect its outcome; do not restart it or assume its grants apply anew.
 
-The current MCP status and preview tools require a known run ID; a null response for that ID does
-not establish absence of other matching runs. Until an authoritative task/workspace discovery route
-is verified, classify new-run discovery as unavailable/unknown and block creation. Record the actual
-lookup source and coverage rather than inferring absence from an unset environment variable.
+Use the canonical read-only discovery route documented in the
+[R1 qualification report](../../../docs/reviews/run-discovery-qualification.md). Its CLI accepts the
+canonical workspace and task; configured MCP discovery exposes the same inventory. Known-ID status
+and resume previews alone do not establish absence of other runs. Missing configuration, an unbound
+journal or ambiguous results remain blockers. Guarded admission is separate from discovery and from
+runtime launch; finding no run does not itself grant authority to create or execute one.
 
 ## Verify the actual execution path
 
@@ -43,9 +45,11 @@ binding, result import, phase coordination, notification/continuation, and evide
 Confirm effective model selection and budget without exposing credentials or issuing a paid call.
 Read source when documentation and installed capabilities disagree; record the mismatch.
 
-The repository MCP server currently exposes status and resume preview only. Neither launches work.
-The standalone phase runtime currently rejects implementation artifact import; phase completion
-and desktop continuation also have explicit unsupported paths. Recheck these in
+The repository MCP discovery, status and resume preview tools do not launch work.
+The standalone phase runtime now has governed private-workspace artifact import and coordinator
+execution paths. Check the [R2/R3 qualification report](../../../docs/reviews/artifact-import-coordinator-qualification.md)
+for the tested source, outstanding gates and controlled-service evidence limits before treating a
+route as ready. Desktop continuation remains a separate host capability. Recheck the actual paths in
 [phase runtime](../../../packages/workflow-control/src/phaseRuntime.ts),
 [phase jobs](../../../packages/workflow-control/src/phaseJobs.ts), and
 [continuation worker](../../../packages/workflow-control/src/continuationWorker.ts).

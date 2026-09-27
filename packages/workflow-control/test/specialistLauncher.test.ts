@@ -63,6 +63,28 @@ describe('specialist launcher', () => {
     await expect(readFile(join(workspace.codexHome, 'auth.json'), 'utf8')).resolves.toBe('{}\n');
   });
 
+  it.each(['new-subtree', 'nested/deeper/new.ts'])(
+    'stages an absent approved destination: %s',
+    async (path) => {
+      const source = await mkdtemp(join(tmpdir(), 'workflow-source-'));
+      cleanup.push(source);
+      await writeFile(join(source, 'unapproved.txt'), 'excluded');
+      const workspace = await prepareSpecialistWorkspace(source, [path]);
+      cleanup.push(join(workspace.root, '..'));
+      await expect(stat(join(workspace.root, path))).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(join(workspace.root, 'unapproved.txt'))).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
+      await mkdir(join(workspace.root, 'nested/deeper'), { recursive: true });
+      await writeFile(join(workspace.root, path), 'new');
+      await expect(stat(join(source, path))).rejects.toMatchObject({ code: 'ENOENT' });
+      await symlink(source, join(source, 'alias'));
+      await expect(prepareSpecialistWorkspace(source, ['alias/missing.ts'])).rejects.toThrow(
+        'symlinks',
+      );
+    },
+  );
+
   it('builds a hardened codex exec container invocation with only private mounts', async () => {
     const privateRoot = await mkdtemp(join(tmpdir(), 'workflow-specialist-'));
     cleanup.push(privateRoot);

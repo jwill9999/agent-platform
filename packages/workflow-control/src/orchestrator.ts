@@ -255,7 +255,7 @@ export class WorkflowOrchestrator {
     /** Trusted composition supplies exact-head evidence binding; storage validates it atomically. */
     completionCallback?: (input: { executionId: string; result: unknown }) => unknown;
   }): Promise<unknown> {
-    assertTaskPacketWithinContract(this.#contract, input.packet);
+    this.#store.assertTaskPacketAuthority(input.packet);
     this.#store.assertRunUsesContract(input.packet.runId, this.#contract);
     this.#store.verifyPlanningDocuments({
       runId: input.packet.runId,
@@ -269,9 +269,10 @@ export class WorkflowOrchestrator {
     if (run?.state !== 'scheduling') {
       throw new Error('workflow run is not in the scheduling state');
     }
-    const beadsSnapshots = await this.#closer.readTaskSnapshots(
-      this.#contract.tasks.map((task) => task.id),
-    );
+    const beadsSnapshots = await this.#closer.readTaskSnapshots([
+      ...this.#contract.tasks.map((task) => task.id),
+      ...this.#store.listCommittedRepairChildIds(input.packet.runId),
+    ]);
     if (!selectBeadsReadyTasks(this.#contract, beadsSnapshots).includes(input.packet.taskId)) {
       throw new Error('task is not ready in authoritative Beads state');
     }
@@ -531,7 +532,7 @@ export class WorkflowOrchestrator {
     taskLeaseEpoch: number;
     transitionId: string;
   }): Promise<AgentResult> {
-    assertTaskPacketWithinContract(this.#contract, input.packet);
+    this.#store.assertTaskPacketAuthority(input.packet);
     this.#store.assertRunUsesContract(input.packet.runId, this.#contract);
     this.#store.verifyPlanningDocuments({
       runId: input.packet.runId,
@@ -566,9 +567,10 @@ export class WorkflowOrchestrator {
     const run = this.#store.getRun(input.packet.runId);
     if (run?.state !== 'task_accepted') throw new Error('run is not ready for brokered task close');
     const result = agentResultSchema.parse(input.result);
-    const authoritativeSnapshots = await this.#closer.readTaskSnapshots(
-      this.#contract.tasks.map((task) => task.id),
-    );
+    const authoritativeSnapshots = await this.#closer.readTaskSnapshots([
+      ...this.#contract.tasks.map((task) => task.id),
+      ...this.#store.listCommittedRepairChildIds(input.packet.runId),
+    ]);
     const snapshots = new Map(authoritativeSnapshots.map((snapshot) => [snapshot.id, snapshot]));
     if (snapshots.get(input.packet.taskId)?.status !== 'in_progress') {
       throw new Error('accepted task is not in progress in authoritative Beads state');

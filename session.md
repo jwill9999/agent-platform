@@ -1,4 +1,29 @@
-# Resumed: R1 run discovery — 27 September 2026
+# R2/R3 qualification handoff — 27 September 2026
+
+Owner-approved R2 governed worker import and R3 standalone coordinator completion are implemented on
+`task/artifact-import-coordinator` in `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+[PR278](https://github.com/jwill9999/agent-platform/pull/278) targets `feature/harness-backlog-review`.
+PR277 was merged at `b7be3d6`. This remains supervised prerequisite work; no pilot or staging promotion.
+
+Source `4e4a3a1` passes 1,125 Node 24 regression tests (76 gated skipped), all 13 connected Docker
+journeys and all 25 role/tool enforcement checks. All nine executed source-head hosted checks pass,
+including browser and desktop E2E and SonarCloud. Staging packaged VM testing remains separate.
+The [qualification report](docs/reviews/artifact-import-coordinator-qualification.md) retains failures,
+repairs, source/build hashes, review findings and limits. Independent review is complete; its final provenance-label correction is applied and hashes rechecked.
+Publication-head CI and documentation-mirror delivery are recorded on PR278 and Beads.
+
+Beads `agent-platform-pilot-zero.17` remains in progress until required integration;
+`.13` pilot planning stays blocked. Notion alignment remains a separate deferred task.
+The next owner action is PR278 merge review once its publication-head checks are green.
+Then verify the merged baseline and prepare the bounded single-task pilot readiness assessment.
+The canonical journal has four cancelled runs and no live leases, but no R1 identity binding:
+provision and verify discovery before attempting a pilot. No journal migration or live pilot occurred.
+
+The historical entries below retain their original evidence and may describe superseded statuses.
+
+---
+
+## Historical: R1 run discovery — 27 September 2026
 
 PR276 is verified merged into `feature/harness-backlog-review` at `87c5cc4`; its final nine executed
 checks passed, with Sourcery and staging VM skipped. The Notion publishing and iMessage policy

@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/phaseRuntime.test.ts (59 tests | 58 skipped) 3709ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > renews live import fences across synchronous work longer than the initial lease without extending execution deadline 3709ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 58 skipped (59)
+   Start at  19:54:24
+   Duration  4.38s (transform 313ms, setup 0ms, collect 448ms, tests 3.71s, environment 0ms, prepare 46ms)
+

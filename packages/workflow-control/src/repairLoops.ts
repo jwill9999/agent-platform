@@ -1,3 +1,4 @@
+import { TrustedSourceGit } from './sourceGit.js';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
@@ -69,6 +70,7 @@ export const repairDispatchPacketSchema = z
     runId: identifierSchema,
     taskId: identifierSchema,
     findingId: identifierSchema,
+    canonicalFinding: repairFindingSchema.optional(),
     failureHeadSha: z.string().regex(/^[a-f0-9]{40}$/u),
     source: repairFailureSourceSchema,
     producerRole: workflowRoleSchema,
@@ -330,6 +332,35 @@ export class DurableRepairCoordinator {
     );
   }
 
+  static createForWorkflow(input: {
+    store: WorkflowStore;
+    contract: unknown;
+    ownerId: string;
+    fence: RepairFenceProvider;
+    workspaceRoot: string;
+    runId: string;
+    gitPin: { path: string; digest: string };
+  }): DurableRepairCoordinator {
+    const contract = executionContractSchema.parse(input.contract);
+    const canonical = realpathSync(input.workspaceRoot);
+    if (`sha256:${createHash('sha256').update(canonical).digest('hex')}` !== contract.workspaceId)
+      throw new Error('repair workspace root does not match the execution contract');
+    const root = input.store.getImplementationWorkspace(input.runId, canonical);
+    if (root === canonical) throw new Error('repair requires broker-owned workspace');
+    const git = new TrustedSourceGit(root, input.gitPin.path, input.gitPin.digest);
+    git.assertSafeIndex();
+    const verifier = new LocalGitRepairHeadVerifier(root, (args) => git.run([...args]).toString());
+    verifier.assertWorkspaceRoot(root);
+    return new DurableRepairCoordinator(
+      input.store,
+      contract,
+      input.ownerId,
+      input.fence,
+      verifier,
+      Date.now,
+    );
+  }
+
   static createForTest(input: {
     store: WorkflowStore;
     contract: unknown;
@@ -351,16 +382,106 @@ export class DurableRepairCoordinator {
     );
   }
 
+  #verifyObservation(
+    finding: RepairFinding,
+    observation: RepairFinding,
+    evidenceCreatedAt: (
+      reference: EvidenceReference,
+      roles: readonly WorkflowRole[],
+    ) => ReturnType<WorkflowStore['getTaskEvidenceBindingCreatedAt']>,
+  ) {
+    for (const key of [
+      'id',
+      'runId',
+      'taskId',
+      'source',
+      'producerRole',
+      'acceptanceCriterion',
+    ] as const)
+      if (observation[key] !== finding[key])
+        throw new Error('repair observation changes finding identity');
+    const originalBindings = finding.evidence.map((reference) =>
+      evidenceCreatedAt(reference, [finding.producerRole]),
+    );
+    if (originalBindings.some((binding) => !binding))
+      throw new Error('repair finding references unbound producer evidence');
+    const failureEvidenceBindings = observation.evidence.map((reference) =>
+      evidenceCreatedAt(reference, [finding.producerRole]),
+    );
+    if (failureEvidenceBindings.includes(undefined)) {
+      throw new Error('repair finding references unbound producer evidence');
+    }
+    const failureHeads = new Set(failureEvidenceBindings.map((binding) => binding!.headSha));
+    if (failureHeads.has('') || failureHeads.size !== 1) {
+      throw new Error('repair finding evidence must bind to one canonical failure head');
+    }
+    const failureHeadSha = [...failureHeads][0]!;
+    this.#headVerifier.assertCanonicalCommit(failureHeadSha);
+    if (findingDigest(observation) !== findingDigest(finding)) {
+      const originalHeads = new Set(originalBindings.map((binding) => binding!.headSha));
+      if (originalHeads.size !== 1) throw new Error('original repair finding spans heads');
+      this.#headVerifier.assertStrictDescendant([...originalHeads][0]!, failureHeadSha);
+      if (
+        Math.min(...failureEvidenceBindings.map((binding) => binding!.createdAtMs)) <=
+        Math.max(...originalBindings.map((binding) => binding!.createdAtMs))
+      )
+        throw new Error('repair observation is not newer than original finding');
+    }
+    return { failureEvidenceBindings, failureHeadSha };
+  }
+
+  #verifyChangedEvidence(
+    changedEvidence: EvidenceReference[],
+    ownerRole: WorkflowRole,
+    failureEvidenceBindings: Array<ReturnType<WorkflowStore['getTaskEvidenceBindingCreatedAt']>>,
+    failureHeadSha: string,
+    evidenceCreatedAt: (
+      reference: EvidenceReference,
+      roles: readonly WorkflowRole[],
+    ) => ReturnType<WorkflowStore['getTaskEvidenceBindingCreatedAt']>,
+  ) {
+    const changeEvidenceBindings = changedEvidence.map((reference) =>
+      evidenceCreatedAt(reference, [ownerRole]),
+    );
+    if (changeEvidenceBindings.includes(undefined)) {
+      throw new Error('repair change references unbound owner evidence');
+    }
+    const failureEvidenceAtMs = Math.max(
+      ...failureEvidenceBindings.map((binding) => binding!.createdAtMs),
+    );
+    const changeEvidenceTimes = changeEvidenceBindings.map((binding) => binding!.createdAtMs);
+    const changeEvidenceAtMs =
+      changeEvidenceTimes.length === 0 ? null : Math.max(...changeEvidenceTimes);
+    const changeEvidenceMinAtMs =
+      changeEvidenceTimes.length === 0 ? null : Math.min(...changeEvidenceTimes);
+    const changeHeads = new Set(changeEvidenceBindings.map((binding) => binding!.headSha));
+    if (changeEvidenceBindings.some((binding) => binding!.headSha === '')) {
+      throw new Error('repair change evidence requires a nonempty repaired head');
+    }
+    if (changeEvidenceBindings.length > 0 && changeHeads.size !== 1) {
+      throw new Error('repair change evidence must bind to one repaired head');
+    }
+    const changeHeadSha = changeHeads.size === 1 ? [...changeHeads][0]! : null;
+    if (changeHeadSha !== null) {
+      this.#headVerifier.assertStrictDescendant(failureHeadSha, changeHeadSha);
+    }
+    if (changeEvidenceMinAtMs !== null && changeEvidenceMinAtMs <= failureEvidenceAtMs) {
+      throw new Error('repair evidence does not prove a newer changed condition');
+    }
+    return { changeEvidenceMinAtMs, changeEvidenceAtMs, changeHeadSha, failureEvidenceAtMs };
+  }
+
   dispatch(input: {
     dispatchId: string;
     finding: unknown;
+    observation?: unknown;
     hypothesis: string;
     change: unknown;
   }): RepairDecision {
     const finding = repairFindingSchema.parse(input.finding);
     const change = repairChangeSchema.parse(input.change);
     this.#store.assertRunUsesContract(finding.runId, this.#contract);
-    const task = this.#contract.tasks.find((candidate) => candidate.id === finding.taskId);
+    const task = this.#store.getEffectiveTask(finding.runId, finding.taskId);
     if (task === undefined) {
       throw new Error('repair finding references an unknown task');
     }
@@ -398,46 +519,21 @@ export class DurableRepairCoordinator {
         policyDigest: this.#contract.policyDigest,
         allowedProducerRoles,
       });
-    const failureEvidenceBindings = finding.evidence.map((reference) =>
-      evidenceCreatedAt(reference, [finding.producerRole]),
+    const observation =
+      input.observation === undefined ? finding : repairFindingSchema.parse(input.observation);
+    const { failureEvidenceBindings, failureHeadSha } = this.#verifyObservation(
+      finding,
+      observation,
+      evidenceCreatedAt,
     );
-    if (failureEvidenceBindings.some((binding) => binding === undefined)) {
-      throw new Error('repair finding references unbound producer evidence');
-    }
-    const failureHeads = new Set(failureEvidenceBindings.map((binding) => binding!.headSha));
-    if (failureHeads.has('') || failureHeads.size !== 1) {
-      throw new Error('repair finding evidence must bind to one canonical failure head');
-    }
-    const failureHeadSha = [...failureHeads][0]!;
-    this.#headVerifier.assertCanonicalCommit(failureHeadSha);
-    const changeEvidenceBindings = changedEvidence.map((reference) =>
-      evidenceCreatedAt(reference, [ownerRole]),
-    );
-    if (changeEvidenceBindings.some((binding) => binding === undefined)) {
-      throw new Error('repair change references unbound owner evidence');
-    }
-    const failureEvidenceAtMs = Math.max(
-      ...failureEvidenceBindings.map((binding) => binding!.createdAtMs),
-    );
-    const changeEvidenceTimes = changeEvidenceBindings.map((binding) => binding!.createdAtMs);
-    const changeEvidenceAtMs =
-      changeEvidenceTimes.length === 0 ? null : Math.max(...changeEvidenceTimes);
-    const changeEvidenceMinAtMs =
-      changeEvidenceTimes.length === 0 ? null : Math.min(...changeEvidenceTimes);
-    const changeHeads = new Set(changeEvidenceBindings.map((binding) => binding!.headSha));
-    if (changeEvidenceBindings.some((binding) => binding!.headSha === '')) {
-      throw new Error('repair change evidence requires a nonempty repaired head');
-    }
-    if (changeEvidenceBindings.length > 0 && changeHeads.size !== 1) {
-      throw new Error('repair change evidence must bind to one repaired head');
-    }
-    const changeHeadSha = changeHeads.size === 1 ? [...changeHeads][0]! : null;
-    if (changeHeadSha !== null) {
-      this.#headVerifier.assertStrictDescendant(failureHeadSha, changeHeadSha);
-    }
-    if (changeEvidenceMinAtMs !== null && changeEvidenceMinAtMs <= failureEvidenceAtMs) {
-      throw new Error('repair evidence does not prove a newer changed condition');
-    }
+    const { changeEvidenceMinAtMs, changeEvidenceAtMs, changeHeadSha, failureEvidenceAtMs } =
+      this.#verifyChangedEvidence(
+        changedEvidence,
+        ownerRole,
+        failureEvidenceBindings,
+        failureHeadSha,
+        evidenceCreatedAt,
+      );
     const evidence = [...finding.evidence, ...changedEvidence];
     const packetForAttempt = (taskAttempt: number, findingAttempt: number) =>
       repairDispatchPacketSchema.parse({
@@ -445,13 +541,14 @@ export class DurableRepairCoordinator {
         runId: finding.runId,
         taskId: finding.taskId,
         findingId: finding.id,
+        canonicalFinding: finding,
         failureHeadSha,
         source: finding.source,
         producerRole: finding.producerRole,
         ownerRole,
-        summary: finding.summary,
+        summary: observation.summary,
         acceptanceCriterion: finding.acceptanceCriterion,
-        evidence: finding.evidence,
+        evidence: observation.evidence,
         hypothesis: input.hypothesis.trim(),
         change: normalizedChange,
         remainingBudget: {
@@ -503,7 +600,7 @@ export class DurableRepairCoordinator {
     const dispatch = this.#store.getRepairDispatch(dispatchId);
     if (dispatch === undefined) throw new Error('repair dispatch not found');
     const packet = repairDispatchPacketSchema.parse(dispatch.packet);
-    const task = this.#contract.tasks.find((candidate) => candidate.id === packet.taskId);
+    const task = this.#store.getEffectiveTask(packet.runId, packet.taskId);
     if (task === undefined) throw new Error('repair dispatch task is no longer in the contract');
     if (
       result.status !== 'passed' ||

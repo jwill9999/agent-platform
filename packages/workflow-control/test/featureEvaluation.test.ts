@@ -23,6 +23,7 @@ import {
   type RepairChildMutationPort,
   type RepairChildRequest,
 } from '../src/index.js';
+import { workflowEvaluationMutationCapability } from '../src/storage.js';
 import { createProductionBeadsDoltPort } from '../src/reconciliation.js';
 
 const roots: string[] = [];
@@ -113,7 +114,7 @@ async function setup() {
     contract,
     clock: () => 1000,
   });
-  return { store, vault };
+  return { store, vault, root };
 }
 
 async function evidence(
@@ -166,6 +167,34 @@ function evaluationRequest(references: Awaited<ReturnType<typeof evidence>>[]) {
 }
 
 describe('ContractEvaluator', () => {
+  it('separates initial task-head evaluation from unapproved integrated-head delivery', async () => {
+    const { store, vault, root } = await setup();
+    const db = new Database(join(root, 'workflow.sqlite'));
+    try {
+      db.prepare('INSERT INTO feature_delivery_required_intents VALUES(?,?,?,?)').run(
+        'run-evaluation',
+        'fixture-intent',
+        '{}',
+        100,
+      );
+      const refs = await Promise.all([
+        evidence(vault, 'initial behavior'),
+        evidence(vault, 'initial security'),
+      ]);
+      expect(
+        new ContractEvaluator({ store, contract }).evaluate(evaluationRequest(refs), 2000).record
+          .headSha,
+      ).toBe(headSha);
+      db.prepare("UPDATE runs SET state='finalizing'").run();
+      expect(() =>
+        new ContractEvaluator({ store, contract }).evaluate(evaluationRequest(refs), 3000),
+      ).toThrow('active exact approval');
+    } finally {
+      db.close();
+      store.close();
+    }
+  });
+
   it('maps every criterion to secure exact-head evidence and freezes accepted evidence', async () => {
     const { store, vault } = await setup();
     const references = await Promise.all([
@@ -295,7 +324,7 @@ function repairRequest(overrides: Partial<RepairChildRequest> = {}): RepairChild
 }
 
 async function repairSetup(port = new MemoryRepairPort()) {
-  const { store, vault } = await setup();
+  const { store, vault, root } = await setup();
   const references = await Promise.all([
     evidence(vault, 'behavior'),
     evidence(vault, 'security failure'),
@@ -354,12 +383,16 @@ async function repairSetup(port = new MemoryRepairPort()) {
     finding,
     findingDigest: deriveEvaluationDigest(finding),
   });
-  return { store, port, fence, broker, request };
+  return { store, port, fence, broker, request, root };
 }
 
 describe('DurableRepairChildBroker', () => {
   it('creates an in-envelope append-only repair child idempotently', async () => {
     const { broker, port, fence, request } = await repairSetup();
+    // Explicit feature repair policy permits implementation after a read-only QA task.
+    expect(contract.tasks[0]!.assignedRole).toBe('qa_evaluator');
+    expect(contract.tasks[0]!.allowedOperations).not.toContain('workspace.patch');
+    expect(request.allowedOperations).toContain('workspace.patch');
     await expect(broker.execute(request, fence)).resolves.toMatchObject({
       id: 'feature-evaluation.repair.1',
       status: 'committed',
@@ -368,6 +401,17 @@ describe('DurableRepairChildBroker', () => {
     await expect(broker.execute(request, fence)).resolves.toMatchObject({
       status: 'committed',
     });
+    expect(port.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let an execution identity overwrite the child identity through an extended fence', async () => {
+    const { broker, port, fence, request, store } = await repairSetup();
+    const executionAuthority = { ...fence, id: 'unrelated-execution' };
+    await expect(broker.execute(request, executionAuthority)).resolves.toMatchObject({
+      id: request.id,
+      status: 'committed',
+    });
+    expect(store.getRepairChildIntent('unrelated-execution')).toBeUndefined();
     expect(port.mutate).toHaveBeenCalledTimes(1);
   });
 
@@ -922,4 +966,66 @@ describe('OfficialRepairChildPort', () => {
     expect(refSha).toBe('2'.repeat(40));
     await expect(port.observe(request)).resolves.toMatchObject({ kind: 'conflict' });
   });
+});
+
+it('charges child verifier retries with new finding IDs against the feature reservation budget', async () => {
+  const { store, broker, request, fence, root } = await repairSetup();
+  await broker.execute(request, fence);
+  const db = new Database(join(root, 'workflow.sqlite'));
+  try {
+    db.prepare(
+      `INSERT INTO repair_dispatches
+      (id,run_id,task_id,finding_id,task_attempt,finding_attempt,owner_role,finding_digest,
+       failure_head_sha,change_digest,packet_json,status,created_at_ms,updated_at_ms)
+      VALUES('child-retry','run-evaluation',?,'new-verifier-finding',2,1,'implementation_worker',?,?,?,'{}','dispatched',2200,2200)`,
+    ).run(request.id, request.findingDigest, headSha, request.findingDigest);
+    const input = {
+      runId: request.runId,
+      featureId: request.featureId,
+      childId: request.id,
+      findingId: request.finding.id,
+      policy: contract.retryPolicy,
+    };
+    expect(
+      store.remainingRepairBudgetForChild(input, workflowEvaluationMutationCapability)
+        .findingAttempts,
+    ).toBe(0);
+    expect(() =>
+      store.remainingRepairBudgetForChild(
+        { ...input, childId: 'feature-evaluation.repair.2', findingId: 'another-finding' },
+        workflowEvaluationMutationCapability,
+      ),
+    ).toThrow('retry budget is exhausted');
+  } finally {
+    db.close();
+    store.close();
+  }
+});
+
+it('retains uncertain child effects when cancellation wins during final observation', async () => {
+  const { store, broker, request, fence, root, port } = await repairSetup();
+  const original = port.observe.bind(port);
+  port.observe = async (value) => {
+    const observed = await original(value);
+    if (port.created.has(value.id)) {
+      const peer = new Database(join(root, 'workflow.sqlite'));
+      peer.prepare("UPDATE runs SET state='cancelling' WHERE id=?").run(value.runId);
+      peer.close();
+    }
+    return observed;
+  };
+  await expect(broker.execute(request, fence)).rejects.toThrow('repair_planning state');
+  expect(store.getRepairChildIntent(request.id)?.status).toBe('prepared');
+  const peer = new Database(join(root, 'workflow.sqlite'));
+  try {
+    expect(
+      peer
+        .prepare('SELECT COUNT(*) AS n FROM repair_approved_heads WHERE task_id=?')
+        .get(request.id),
+    ).toEqual({ n: 0 });
+  } finally {
+    peer.close();
+    store.close();
+  }
+  expect(port.mutate).toHaveBeenCalledTimes(1);
 });

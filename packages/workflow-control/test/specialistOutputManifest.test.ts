@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { collectSpecialistReturnedFiles } from '../src/specialistOutputManifest.js';
 
 import {
   captureSpecialistOutputBaseline,
@@ -79,6 +80,72 @@ function observe(baseline: SpecialistOutputBaseline): SpecialistOutputCandidate 
 function verify(baseline: SpecialistOutputBaseline, candidate: SpecialistOutputCandidate): void {
   verifySpecialistOutput({ ...expectation(baseline), candidate });
 }
+
+describe('bounded returned implementation bytes', () => {
+  function collect(baseline: SpecialistOutputBaseline) {
+    return collectSpecialistReturnedFiles({
+      ...expectation(baseline),
+      candidate: observe(baseline),
+    });
+  }
+  it('exports verified UTF-8 additions, replacements and deletions with prior digests', () => {
+    file('edit.txt', 'old');
+    file('delete.txt', 'deleted');
+    const baseline = capture(
+      ['edit.txt', 'delete.txt', 'new.txt'].map((path) => ({ kind: 'file', path })),
+    );
+    file('edit.txt', 'new');
+    file('new.txt', '\ufeffunicode 🐈');
+    rmSync(join(root, 'delete.txt'));
+    const files = collect(baseline);
+    expect(files.map((entry) => [entry.path, entry.content])).toEqual([
+      ['delete.txt', null],
+      ['edit.txt', 'new'],
+      ['new.txt', '\ufeffunicode 🐈'],
+    ]);
+    expect(files[0]?.beforeDigest).toMatch(/^sha256:/);
+    expect(files[1]?.beforeDigest).not.toBe(files[1]?.afterDigest);
+    expect(files[2]?.beforeDigest).toBeNull();
+  });
+  it('exports files beneath new parent directories but rejects standalone empty directories', () => {
+    mkdirSync(join(root, 'work'));
+    const baseline = capture([{ kind: 'subtree', path: 'work' }]);
+    file('work/new/deeper/example.txt', 'new source');
+    expect(collect(baseline).map((entry) => entry.path)).toEqual(['work/new/deeper/example.txt']);
+    mkdirSync(join(root, 'work/empty'));
+    expect(() => collect(baseline)).toThrow();
+  });
+  it.each([Buffer.from([0xff]), Buffer.from('nul\0byte'), Buffer.alloc(1024 * 1024 + 1, 97)])(
+    'rejects invalid text or oversized bytes',
+    (content) => {
+      const baseline = capture([{ kind: 'file', path: 'new.txt' }]);
+      file('new.txt', content);
+      expect(() => collect(baseline)).toThrow();
+    },
+  );
+  it('rejects mode changes and rename-shaped output', () => {
+    file('old.txt', 'same');
+    const baseline = capture([
+      { kind: 'file', path: 'old.txt' },
+      { kind: 'file', path: 'new.txt' },
+    ]);
+    chmodSync(join(root, 'old.txt'), 0o644);
+    expect(() => collect(baseline)).toThrow('mode change');
+    chmodSync(join(root, 'old.txt'), 0o600);
+    renameSync(join(root, 'old.txt'), join(root, 'new.txt'));
+    expect(() => collect(baseline)).toThrow('rename-shaped');
+  });
+  it('rejects a copied candidate and a tree changed after observation', () => {
+    const baseline = capture([{ kind: 'file', path: 'new.txt' }]);
+    file('new.txt', 'first');
+    const candidate = observe(baseline);
+    expect(() =>
+      collectSpecialistReturnedFiles({ ...expectation(baseline), candidate: { ...candidate } }),
+    ).toThrow();
+    file('new.txt', 'second');
+    expect(() => collectSpecialistReturnedFiles({ ...expectation(baseline), candidate })).toThrow();
+  });
+});
 
 describe('execution-bound specialist output candidates', () => {
   it('captures a complete unchanged tree including directories without changing bytes or permissions', () => {

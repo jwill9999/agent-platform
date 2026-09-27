@@ -1,4 +1,9 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
+import { specialistInputEnvelopeSchema } from './specialistInput.js';
+import { repairDispatchPacketSchema } from './repairLoops.js';
+import { implementationOutputSchema } from './implementationOutput.js';
+import { specialistTerminalResult } from './specialistTerminalResult.js';
 
 import { z } from 'zod';
 
@@ -185,13 +190,15 @@ function redact(content: Uint8Array, mediaType: string): { content: Uint8Array; 
 function assertNoResidualSecrets(
   content: Uint8Array,
   approvedIdentifiers: ReadonlySet<string>,
+  entropyContent: Uint8Array = content,
 ): void {
   const text = Buffer.from(content).toString('utf8');
   const residual = [...directSecretPatterns, keyValueSecretPattern].some((pattern) => {
     pattern.lastIndex = 0;
     return pattern.test(text);
   });
-  const scanText = text
+  const scanText = Buffer.from(entropyContent)
+    .toString('utf8')
     .replace(/\bsha256:[a-f0-9]{64}\b/giu, '')
     .replace(/\b(?:commit|head|sha)\s*[:=]\s*[a-f0-9]{40}\b/giu, '');
   const unknownHighEntropy = scanText.match(/[^\s"'`,;:()[\]{}<>]{24,}/gu)?.some((candidate) => {
@@ -296,6 +303,59 @@ export class SecureEvidenceVault {
   /** Trusted launcher ingestion: the specialist never receives a write capability.
    * The caller authenticates as orchestrator; producer and role come from its scheduler record.
    */
+  #repairIdentifiers(executionId: string): string[] {
+    const execution = this.#store.getSchedulerExecution(executionId);
+    const parsed = specialistInputEnvelopeSchema.safeParse(execution?.packet);
+    if (!parsed.success) return [];
+    const context = parsed.data.task.repairContext;
+    if (!context) return [];
+    const dispatch = this.#store.getRepairDispatch(context.dispatchId);
+    if (
+      !execution ||
+      dispatch?.status !== 'dispatched' ||
+      dispatch.runId !== execution.runId ||
+      dispatch.taskId !== execution.taskId ||
+      dispatch.failureHeadSha !== context.failureHeadSha
+    )
+      throw new Error('repair input dispatch binding rejected');
+    const packet = repairDispatchPacketSchema.parse(dispatch.packet);
+    if (
+      context.summary !== packet.summary ||
+      context.hypothesis !== packet.hypothesis ||
+      !isDeepStrictEqual(parsed.data.task.evidence, packet.evidence)
+    )
+      throw new Error('repair input context changed');
+    // Entropy scanner splits on colons; exempt only segments of this verified journal ID.
+    return context.dispatchId.split(':');
+  }
+
+  async recordSpecialistInput(input: {
+    executionId: string;
+    capability: EvidenceCapability;
+  }): Promise<SecureEvidenceResult> {
+    const execution = this.#store.getSchedulerExecution(input.executionId);
+    if (execution?.status !== 'active') throw new Error('specialist input execution unavailable');
+    const envelope = specialistInputEnvelopeSchema.parse(execution.packet);
+    return this.#record(
+      {
+        content: Buffer.from(JSON.stringify(envelope)),
+        mediaType: 'application/json',
+        kind: 'artifact',
+        producer: execution.ownerId,
+        producerRole: 'workflow_orchestrator',
+        workspaceId: execution.workspaceId,
+        runId: execution.runId,
+        taskId: execution.taskId,
+        contractVersion: envelope.task.contractVersion,
+        policyDigest: envelope.task.policyDigest,
+        headSha: envelope.binding.headSha,
+        capability: input.capability,
+      },
+      'workflow_orchestrator',
+      this.#repairIdentifiers(execution.id),
+    );
+  }
+
   async recordSpecialistResult(input: {
     executionId: string;
     content: Uint8Array;
@@ -306,6 +366,27 @@ export class SecureEvidenceVault {
     if (execution?.status !== 'active' || execution.credentialStatus !== 'revoked')
       throw new Error('specialist result ingestion requires settled credential-revoked execution');
     this.#store.assertRunUsesContract(execution.runId, this.#contract);
+    const output = implementationOutputSchema.safeParse(
+      JSON.parse(Buffer.from(input.content).toString('utf8')),
+    );
+    const identifiers = [execution.id, ...this.#repairIdentifiers(execution.id)];
+    if (output.success) {
+      if (
+        output.data.executionId !== execution.id ||
+        !isDeepStrictEqual(output.data.input, execution.packet)
+      )
+        throw new Error('implementation evidence input binding rejected');
+      identifiers.push(...output.data.files.map((file) => file.path));
+    } else {
+      const terminal = specialistTerminalResult(
+        JSON.parse(Buffer.from(input.content).toString('utf8')),
+      );
+      const task = this.#store.getEffectiveTask(execution.runId, execution.taskId);
+      for (const path of terminal?.changedFiles ?? []) {
+        if (task?.allowedPaths.some((root) => path === root || path.startsWith(`${root}/`)))
+          identifiers.push(path);
+      }
+    }
     return this.#record(
       {
         content: input.content,
@@ -322,6 +403,8 @@ export class SecureEvidenceVault {
         capability: input.capability,
       },
       'workflow_orchestrator',
+      identifiers,
+      output.success,
     );
   }
 
@@ -372,6 +455,7 @@ export class SecureEvidenceVault {
     input: SecureEvidenceInput,
     capabilityRole: WorkflowRole,
     approvedBootstrapIdentifiers: readonly string[] = [],
+    implementationSource = false,
   ): Promise<SecureEvidenceResult> {
     workflowRoleSchema.parse(input.producerRole);
     if (input.content.byteLength === 0 || input.content.byteLength > this.#maxBytes) {
@@ -414,6 +498,12 @@ export class SecureEvidenceVault {
     if (!Number.isFinite(createdAtMs)) throw new Error('evidence clock must be finite');
     const retentionUntilMs = createdAtMs + 30 * 24 * 60 * 60 * 1000;
     const processed = redact(input.content, input.mediaType);
+    // Source code naturally contains long identifiers and strings. Keep direct secret
+    // detection on every byte, but apply generic entropy heuristics only to envelope metadata.
+    const metadata = implementationSource
+      ? JSON.parse(Buffer.from(processed.content).toString('utf8'))
+      : undefined;
+    if (metadata) for (const file of metadata.files) file.content = null;
     assertNoResidualSecrets(
       processed.content,
       new Set([
@@ -423,6 +513,7 @@ export class SecureEvidenceVault {
         input.headSha,
         ...approvedBootstrapIdentifiers,
       ]),
+      metadata ? Buffer.from(JSON.stringify(metadata)) : processed.content,
     );
     assertMedia(processed.content, input.mediaType);
     if (processed.content.byteLength === 0 || processed.content.byteLength > this.#maxBytes) {

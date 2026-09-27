@@ -1,3 +1,11 @@
+import { assertRepairPlanningResult, repairChildContext } from './repairPlanning.js';
+import {
+  StandaloneCoordinators,
+  standaloneCoordinatorConfigSchema,
+} from './standaloneCoordinators.js';
+import { repairDispatchPacketSchema } from './repairLoops.js';
+import { ContractEvaluator } from './featureEvaluation.js';
+import { TrustedSourceGit } from './sourceGit.js';
 import { withinCleanupDeadline } from './executionInterruptions.js';
 import { modelGatewayConfigSchema } from './modelGatewayConfig.js';
 import { execFile } from 'node:child_process';
@@ -15,13 +23,18 @@ import {
 } from './authorization.js';
 import {
   assertAgentResultAccepted,
-  assertTaskPacketWithinContract,
+  assertFeatureEvaluationResult,
   type AgentResult,
   type ExecutionContract,
   type TaskPacket,
 } from './contracts.js';
 import { digestGovernedValue, type DelegateCallback } from './governedOperations.js';
-import { PhaseJobJournal, type PhaseJob, type ExecutePhaseAction } from './phaseJobs.js';
+import {
+  PhaseJobJournal,
+  PHASE_JOB_DISPATCH,
+  type PhaseJob,
+  type ExecutePhaseAction,
+} from './phaseJobs.js';
 import { SecureEvidenceVault, type EvidenceCapability } from './secureEvidence.js';
 import {
   DockerIsolatedSpecialistLauncher,
@@ -29,6 +42,8 @@ import {
   type DockerSpecialistReservation,
 } from './specialistLauncher.js';
 import { specialistTerminalResult } from './specialistTerminalResult.js';
+import { implementationOutputSchema } from './implementationOutput.js';
+import { assertBootstrapExecutablePin } from './bootstrapAdapterRuntime.js';
 import { specialistInputEnvelopeSchema } from './specialistInput.js';
 import { WorkflowStore } from './storage.js';
 
@@ -39,8 +54,13 @@ export const phaseRuntimeConfigSchema = z
     runId: z.string().min(1),
     sourceRoot: absolute,
     gitBinary: absolute.default('/usr/bin/git'),
+    gitBinaryDigest: z
+      .string()
+      .regex(/^sha256:[a-f0-9]{64}$/u)
+      .optional(),
     credentialBrokerBinary: absolute,
     modelGateway: modelGatewayConfigSchema.optional(),
+    coordinators: standaloneCoordinatorConfigSchema.optional(),
     image: z
       .string()
       .regex(/^(?:[^\s]+@)?sha256:[a-f0-9]{64}$/u, 'immutable specialist image digest required'),
@@ -81,10 +101,26 @@ function phaseTerminalStatus(
   if (
     terminal.status === 'blocked' ||
     terminal.recommendedTransition === 'escalate' ||
-    terminal.changedFiles.length > 0 ||
+    (phase !== 'implementing' && terminal.changedFiles.length > 0) ||
     terminal.remainingRisks.length > 0
   ) {
     return 'blocked';
+  }
+  if (phase === 'repair_planning') {
+    try {
+      if (!packet.repairPlanningContext) return 'blocked';
+      assertRepairPlanningResult(terminal, packet.repairPlanningContext);
+      return 'continue';
+    } catch {
+      return 'blocked';
+    }
+  }
+  if (phase === 'feature_evaluation') {
+    try {
+      assertFeatureEvaluationResult(terminal, packet.acceptanceCriteria);
+    } catch {
+      return 'blocked';
+    }
   }
   try {
     assertAgentResultAccepted(
@@ -94,6 +130,11 @@ function phaseTerminalStatus(
     );
     return 'continue';
   } catch {
+    if (
+      (phase === 'task_verification' || phase === 'task_review') &&
+      !terminal.findings[0]?.repairHypothesis?.trim()
+    )
+      return 'blocked';
     return 'repair';
   }
 }
@@ -120,6 +161,8 @@ export class StandalonePhaseRuntime {
   #reservation: DockerSpecialistReservation | undefined;
   #fatalAdmission = false;
   readonly #onFatal?: () => void;
+  readonly #cleanupOnly: boolean;
+  readonly #coordinators?: StandaloneCoordinators;
   readonly #cleanup = new Map<string, Promise<void>>();
 
   private constructor(input: {
@@ -133,6 +176,8 @@ export class StandalonePhaseRuntime {
     admission?: () => Promise<void>;
     assertAdmission?: () => void;
     onFatal?: () => void;
+    cleanupOnly?: boolean;
+    database?: string;
   }) {
     if (!(input.launcher instanceof DockerIsolatedSpecialistLauncher))
       throw new Error('isolated specialist launcher required');
@@ -142,15 +187,33 @@ export class StandalonePhaseRuntime {
     this.#config = input.config;
     this.#owner = input.owner;
     this.#onFatal = input.onFatal;
+    this.#cleanupOnly = input.cleanupOnly ?? false;
     this.#process = input.process;
     this.#verifySource = input.verifySource;
     this.#admission = input.admission ?? (async () => undefined);
     this.#assertAdmission = input.assertAdmission ?? (() => undefined);
     this.#contract = input.store.getExecutionContract(input.config.runId);
+    if (input.config.coordinators && !this.#cleanupOnly) {
+      if (!input.database || !input.config.gitBinaryDigest)
+        throw new Error('coordinator_production_binding_missing');
+      this.#coordinators = new StandaloneCoordinators({
+        database: input.database,
+        store: input.store,
+        contract: this.#contract,
+        config: input.config.coordinators,
+        sourceRoot: input.config.sourceRoot,
+        gitPin: { path: input.config.gitBinary, digest: input.config.gitBinaryDigest },
+        launcher: input.launcher,
+        owner: input.owner,
+      });
+    }
     this.#vault = new SecureEvidenceVault({
       store: input.store,
       contract: this.#contract,
       capabilityBroker: this.#capabilities,
+      // JSON escaping can expand the bounded 16 MiB UTF-8 file payload sixfold.
+      maxBytes: 110 * 1024 * 1024,
+      maxRunBytes: 220 * 1024 * 1024,
     });
   }
 
@@ -163,6 +226,17 @@ export class StandalonePhaseRuntime {
     assertAdmission?: () => void,
   ): Promise<StandalonePhaseRuntime> {
     const config = readPhaseRuntimeConfig(configInput);
+    const gitPin = cleanupOnly
+      ? undefined
+      : {
+          path: await realpath(config.gitBinary),
+          digest:
+            config.gitBinaryDigest ??
+            `sha256:${createHash('sha256')
+              .update(await readFile(config.gitBinary))
+              .digest('hex')}`,
+        };
+    if (gitPin) assertBootstrapExecutablePin(gitPin);
     if (!(await stat(config.credentialBrokerBinary).catch(() => undefined))?.isFile())
       throw new Error('standalone_credential_broker_unavailable');
     const sourceRoot = cleanupOnly ? config.sourceRoot : await realpath(config.sourceRoot);
@@ -195,9 +269,15 @@ export class StandalonePhaseRuntime {
       };
       const owner = `phase-runtime:${randomUUID()}`;
       return new StandalonePhaseRuntime({
+        database,
         store,
         journal,
-        config,
+        config: {
+          ...config,
+          sourceRoot,
+          gitBinary: gitPin?.path ?? config.gitBinary,
+          gitBinaryDigest: gitPin?.digest,
+        },
         owner,
         process: processIdentity,
         admission,
@@ -207,24 +287,23 @@ export class StandalonePhaseRuntime {
           store,
           ownerId: owner,
           sourceRoot,
+          executionSourceRoot: (runId) => store.getImplementationWorkspace(runId, sourceRoot),
           image: config.image,
           credentialBroker: broker,
           egressNetwork: config.egressNetwork,
           containerUser: config.containerUser,
           modelGateway: config.modelGateway,
         }),
+        cleanupOnly,
         verifySource: async (action, paths) => {
-          await realpath(sourceRoot);
-          const head = await execute(config.gitBinary, ['-C', sourceRoot, 'rev-parse', 'HEAD'], {
-            env: {},
-            timeout: 10_000,
-          });
-          const dirty = await execute(
-            config.gitBinary,
-            ['-C', sourceRoot, 'status', '--porcelain', '--untracked-files=all', '--', ...paths],
-            { env: {}, timeout: 10_000 },
+          if (!gitPin) throw new Error('cleanup_only_runtime');
+          const repository = new TrustedSourceGit(
+            store.getImplementationWorkspace(config.runId, sourceRoot),
+            gitPin.path,
+            gitPin.digest,
           );
-          if (head.stdout.trim() !== action.headSha || dirty.stdout.trim() !== '')
+          repository.assertClean(paths);
+          if (repository.run(['rev-parse', 'HEAD']).toString().trim() !== action.headSha)
             throw new Error('phase_source_head_or_tree_stale');
         },
       });
@@ -246,6 +325,8 @@ export class StandalonePhaseRuntime {
     admission?: () => Promise<void>;
     assertAdmission?: () => void;
     onFatal?: () => void;
+    cleanupOnly?: boolean;
+    database?: string;
   }): StandalonePhaseRuntime {
     if (process.env.NODE_ENV !== 'test') throw new Error('test phase runtime unavailable');
     return new StandalonePhaseRuntime(input);
@@ -348,6 +429,7 @@ export class StandalonePhaseRuntime {
     if (this.#closing !== undefined) return this.#closing;
     if (this.#timer !== undefined) clearInterval(this.#timer);
     this.#timer = undefined;
+    this.#coordinators?.abort();
     this.#closing = (async () => {
       try {
         let cancellationError: unknown;
@@ -372,6 +454,7 @@ export class StandalonePhaseRuntime {
         }
         if (cancellationError !== undefined) throw cancellationError;
       } finally {
+        this.#coordinators?.close();
         this.#journal.close();
         this.#store.close();
       }
@@ -398,11 +481,17 @@ export class StandalonePhaseRuntime {
   }
 
   #packet(action: ExecutePhaseAction): TaskPacket {
-    if (action.phase === 'implementing') throw new Error('phase_artifact_import_unavailable');
-    if (action.phase !== 'task_verification' && action.phase !== 'task_review')
+    if (
+      action.phase !== 'implementing' &&
+      action.phase !== 'task_verification' &&
+      action.phase !== 'task_review' &&
+      action.phase !== 'feature_evaluation' &&
+      action.phase !== 'repair_planning'
+    )
       throw new Error('phase_executor_unavailable');
-    const task = this.#contract.tasks.find((item) => item.id === action.taskId);
-    const role = task?.phaseRoles?.[action.phase];
+    const task = this.#store.getEffectiveTask(action.runId, action.taskId);
+    const role =
+      action.phase === 'implementing' ? task?.assignedRole : task?.phaseRoles?.[action.phase];
     if (task === undefined || role === undefined)
       throw new Error('phase_role_authority_unavailable');
     if (!task.allowedOperations.includes('artifact.write'))
@@ -430,13 +519,54 @@ export class StandalonePhaseRuntime {
       retryBudget: this.#contract.retryPolicy,
       evidence: [],
     };
+    const child = this.#store.getRepairChildIntent(action.taskId);
+    if (child?.status === 'committed') {
+      const request = child.request as import('./featureEvaluation.js').RepairChildRequest;
+      packet.repairChildContext = repairChildContext(request);
+      packet.evidence = request.finding.evidence;
+    }
+    if (action.phase === 'repair_planning') {
+      if (!this.#coordinators) throw new Error('repair_planning_coordinator_unavailable');
+      packet.repairPlanningContext = this.#coordinators.repairPlanningContext(action);
+      packet.evidence = packet.repairPlanningContext.failedCriteria.flatMap(
+        (item) => item.evidence,
+      );
+    }
+    this.#addRepairContext(action, packet);
     if (
       !packet.allowedOperations.includes('workspace.read') ||
       (role === 'test_runner' && !packet.allowedOperations.includes('process.test'))
     )
       throw new Error('phase_operation_authority_unavailable');
-    assertTaskPacketWithinContract(this.#contract, packet, action.phase);
+    if (
+      action.phase === 'implementing' &&
+      (role !== 'implementation_worker' || !packet.allowedOperations.includes('workspace.patch'))
+    )
+      throw new Error('phase_patch_authority_unavailable');
+    this.#store.assertTaskPacketAuthority(
+      packet,
+      action.phase === 'implementing' ? undefined : action.phase,
+    );
     return packet;
+  }
+
+  #addRepairContext(action: ExecutePhaseAction, packet: TaskPacket): void {
+    if (action.phase === 'implementing') {
+      const active = this.#store.listActiveRepairDispatches(action.runId, action.taskId);
+      if (active.length > 1) throw new Error('ambiguous_active_repair');
+      if (active[0]) {
+        const repair = repairDispatchPacketSchema.parse(active[0].packet);
+        if (repair.failureHeadSha !== action.headSha)
+          throw new Error('repair_context_head_mismatch');
+        packet.repairContext = {
+          dispatchId: repair.dispatchId,
+          failureHeadSha: repair.failureHeadSha,
+          summary: repair.summary,
+          hypothesis: repair.hypothesis,
+        };
+        packet.evidence = repair.evidence;
+      }
+    }
   }
 
   async #runOnce(): Promise<boolean> {
@@ -467,6 +597,52 @@ export class StandalonePhaseRuntime {
       this.#journal.releaseClaim(claim, Date.now());
       throw error;
     }
+    if (PHASE_JOB_DISPATCH[action.phase].endsWith('_coordinator'))
+      return this.#startCoordinator(claim, action, fences);
+    return this.#runSpecialist(claim, action, fences);
+  }
+
+  async #startCoordinator(
+    claim: PhaseJob,
+    action: ExecutePhaseAction,
+    fences: ResourceFences,
+  ): Promise<boolean> {
+    if (!this.#coordinators) {
+      this.#journal.block(claim, 'phase_coordinator_configuration_missing', Date.now());
+      return false;
+    }
+    try {
+      await this.#verifySource(action, []);
+      const job = this.#journal.start(claim, Date.now());
+      return await this.#runCoordinator(job, action, fences);
+    } catch {
+      const current = this.#journal.get(claim.id)!;
+      if (current.status === 'started')
+        this.#journal.deferCoordinator(
+          current,
+          this.#contract.retryPolicy.infrastructureAttempts,
+          Date.now(),
+        );
+      else this.#journal.block(current, 'phase_coordinator_admission_failed', Date.now());
+      return false;
+    }
+  }
+
+  #reserveAttempt(job: PhaseJob, action: ExecutePhaseAction): number | undefined {
+    if (action.phase !== 'implementing') return 1;
+    try {
+      return this.#journal.reserveImplementationAttempt(job, Date.now());
+    } catch {
+      this.#journal.block(job, 'phase_implementation_attempt_rejected', Date.now());
+      return undefined;
+    }
+  }
+
+  async #runSpecialist(
+    claim: PhaseJob,
+    action: ExecutePhaseAction,
+    fences: ResourceFences,
+  ): Promise<boolean> {
     let packet: TaskPacket;
     try {
       packet = this.#packet(action);
@@ -480,6 +656,8 @@ export class StandalonePhaseRuntime {
       return false;
     }
     const job = this.#journal.start(claim, Date.now());
+    const attemptNumber = this.#reserveAttempt(job, action);
+    if (attemptNumber === undefined) return false;
     let heartbeatError: unknown;
     let cancellation: Promise<void> | undefined;
     const heartbeat = setInterval(
@@ -511,7 +689,7 @@ export class StandalonePhaseRuntime {
       binding: {
         executionDigest: digestGovernedValue(reservation.id),
         ownerDigest: digestGovernedValue(this.#owner),
-        callbackId: action.callbackId,
+        callbackId: action.callbackId ?? action.coordinatorReceiptId!,
         headSha: action.headSha,
         runVersion: action.runVersion,
         phaseLeaseEpoch: job.lease_epoch,
@@ -566,11 +744,12 @@ export class StandalonePhaseRuntime {
       const evidenceCapability: EvidenceCapability = { token, observedProcess: this.#process };
       this.#store.createSchedulerExecution({
         id: reservation.id,
+        attemptNumber,
         workspaceId: action.workspaceId,
         runId: action.runId,
         taskId: action.taskId,
         role: packet.assignedRole,
-        mode: 'read_only',
+        mode: action.phase === 'implementing' ? 'mutating' : 'read_only',
         deadlineMs,
         ownerId: this.#owner,
         workspaceLeaseEpoch: fences.workspace,
@@ -581,18 +760,8 @@ export class StandalonePhaseRuntime {
         packet: inputEnvelope,
       });
       this.#reservation = reservation;
-      const inputEvidence = await this.#vault.record({
-        content: Buffer.from(JSON.stringify(inputEnvelope)),
-        mediaType: 'application/json',
-        kind: 'artifact',
-        producer: this.#owner,
-        producerRole: 'workflow_orchestrator',
-        workspaceId: action.workspaceId,
-        runId: action.runId,
-        taskId: action.taskId,
-        contractVersion: action.contractVersion,
-        policyDigest: action.policyDigest,
-        headSha: action.headSha,
+      const inputEvidence = await this.#vault.recordSpecialistInput({
+        executionId: reservation.id,
         capability: evidenceCapability,
       });
       if (inputEvidence.reference.digest !== digestGovernedValue(inputEnvelope))
@@ -616,68 +785,38 @@ export class StandalonePhaseRuntime {
       const terminal = specialistTerminalResult(raw);
       if (terminal === undefined) throw new Error('invalid_specialist_terminal_result');
       await this.#verifySource(action, packet.allowedPaths);
-      // Keep the structured answer only, with trusted execution identity to avoid cross-role digest aliasing.
-      const result = {
-        executionDigest: digestGovernedValue(reservation.id),
-        events: [
-          {
-            type: 'item.completed',
-            item: { type: 'agent_message', text: JSON.stringify(terminal) },
-          },
-        ],
-      };
-      const resultEvidence = await this.#vault.recordSpecialistResult({
+      let resultHead = action.headSha;
+      if (action.phase === 'implementing') {
+        resultHead = await this.#importSpecialistOutput(
+          raw,
+          action,
+          packet,
+          reservation.id,
+          fences,
+          evidenceCapability,
+        );
+      }
+      await this.#completeSpecialist({
+        job: job,
+        action: action,
+        packet: packet,
+        fences: fences,
         executionId: reservation.id,
-        content: Buffer.from(JSON.stringify(result)),
-        headSha: action.headSha,
-        capability: evidenceCapability,
+        terminal: terminal,
+        resultHead: resultHead,
+        inputDigest: inputEvidence.reference.digest,
+        evidenceCapability: evidenceCapability,
+        inputProducer: this.#owner,
       });
-      if (resultEvidence.reference.digest !== digestGovernedValue(result))
-        throw new Error('phase_result_evidence_redacted');
-      const terminalStatus = phaseTerminalStatus(terminal, packet, action.phase);
-      const identity = {
-        kind: 'workflow.delegate_callback' as const,
-        workspaceId: action.workspaceId,
-        parentRunId: action.runId,
-        parentTaskId: action.taskId,
-        parentState: action.phase,
-        parentRunVersion: action.runVersion,
-        delegationId: reservation.id,
-        delegateAgentId: this.#launcher.processIdentity(reservation),
-        delegateRole: packet.assignedRole,
-        attemptNumber: 1,
-        contractVersion: action.contractVersion,
-        policyDigest: action.policyDigest,
-        materialDigest: action.materialDigest,
-        workspaceLeaseEpoch: fences.workspace,
-        parentRunLeaseEpoch: fences.run,
-        taskLeaseEpoch: fences.task,
-        headSha: action.headSha,
-        inputProducerIdentity: this.#owner,
-        resultProducerIdentity: this.#launcher.processIdentity(reservation),
-        inputArtifactDigest: inputEvidence.reference.digest,
-        terminalStatus,
-        resultArtifactDigest: resultEvidence.reference.digest,
-      };
-      const callback: DelegateCallback = { ...identity, callbackId: digestGovernedValue(identity) };
-      this.#store.finishSchedulerExecution({
-        id: reservation.id,
-        status: 'completed',
-        ownerId: this.#owner,
-        workspaceLeaseEpoch: fences.workspace,
-        runLeaseEpoch: fences.run,
-        taskLeaseEpoch: fences.task,
-        result,
-        callback,
-      });
-      this.#journal.complete(
-        job,
-        { executionId: reservation.id, evidenceDigest: resultEvidence.reference.digest },
-        Date.now(),
-      );
       return true;
     } catch (error) {
-      await this.#failExecution(job, reservation, fences, error);
+      if (this.#canDeferPlanner(action, reservation.id, heartbeatError)) {
+        this.#journal.deferCoordinator(
+          job,
+          this.#contract.retryPolicy.infrastructureAttempts,
+          Date.now(),
+        );
+      } else await this.#failExecution(job, reservation, fences, error);
       return false;
     } finally {
       clearInterval(heartbeat);
@@ -687,6 +826,272 @@ export class StandalonePhaseRuntime {
       this.#reservation = undefined;
       if (token !== undefined) this.#capabilities.revoke(token);
     }
+  }
+
+  async #importSpecialistOutput(
+    raw: unknown,
+    action: ExecutePhaseAction,
+    packet: TaskPacket,
+    executionId: string,
+    fences: ResourceFences,
+    evidenceCapability: EvidenceCapability,
+  ): Promise<string> {
+    const output = implementationOutputSchema.parse(
+      typeof raw === 'object' && raw !== null && 'implementationOutput' in raw
+        ? raw.implementationOutput
+        : undefined,
+    );
+    const artifactBytes = Buffer.from(JSON.stringify(output));
+    const artifact = await this.#vault.recordSpecialistResult({
+      executionId: executionId,
+      content: artifactBytes,
+      headSha: action.headSha,
+      capability: evidenceCapability,
+    });
+    if (artifact.reference.digest !== digestGovernedValue(output))
+      throw new Error('phase_implementation_evidence_redacted');
+    const persisted = await this.#vault.read({
+      digest: artifact.reference.digest,
+      runId: action.runId,
+      taskId: action.taskId,
+      capability: evidenceCapability,
+    });
+    const imported = this.#store.importImplementation({
+      authority: {
+        id: executionId,
+        ownerId: this.#owner,
+        workspaceLeaseEpoch: fences.workspace,
+        runLeaseEpoch: fences.run,
+        taskLeaseEpoch: fences.task,
+      },
+      sourceRoot: this.#config.sourceRoot,
+      gitBinary: this.#config.gitBinary,
+      gitBinaryDigest: this.#config.gitBinaryDigest,
+      artifact: persisted,
+      artifactDigest: artifact.reference.digest,
+      renewLeaseTtlMs: Math.min(this.#config.leaseTtlMs, 60000),
+    });
+    const resultHead = imported.resultHead;
+    await this.#verifySource({ ...action, headSha: resultHead }, packet.allowedPaths);
+    return resultHead;
+  }
+
+  #canDeferPlanner(
+    action: ExecutePhaseAction,
+    executionId: string,
+    heartbeatError: unknown,
+  ): boolean {
+    return (
+      action.phase === 'repair_planning' &&
+      !!this.#store.getRepairPlanningHandoff(executionId) &&
+      !this.#closing &&
+      heartbeatError === undefined
+    );
+  }
+
+  async #runCoordinator(
+    job: PhaseJob,
+    action: ExecutePhaseAction,
+    fences: ResourceFences,
+  ): Promise<boolean> {
+    if (this.#cleanupOnly || this.#fatalAdmission || !this.#coordinators)
+      throw new Error('coordinator_admission_unavailable');
+    await this.#admission();
+    const assertDispatchAuthority = () => {
+      this.#assertAdmission();
+      if (this.#closing || this.#fatalAdmission)
+        throw new Error('coordinator_admission_unavailable');
+      for (const [kind, id, epoch] of [
+        ['workspace', action.workspaceId, fences.workspace],
+        ['run', action.runId, fences.run],
+        ['task', action.taskId, fences.task],
+      ] as const)
+        this.#store.assertResourceLease(kind, id, this.#owner, epoch, Date.now());
+      const current = this.#journal.get(job.id);
+      if (
+        current?.status !== 'started' ||
+        current.lease_owner !== this.#owner ||
+        current.lease_epoch !== job.lease_epoch ||
+        current.lease_until_ms <= Date.now()
+      )
+        throw new Error('coordinator_phase_lease_stale');
+    };
+    const assertAuthority = () => {
+      assertDispatchAuthority();
+      this.#store.verifyPlanningDocuments({
+        runId: action.runId,
+        taskId: action.taskId,
+        boundary: 'phase.coordinator',
+        ownerId: this.#owner,
+        runLeaseEpoch: fences.run,
+        expectedSourceRoot: this.#config.sourceRoot,
+      });
+      this.#assertAdmission();
+    };
+    const heartbeat = setInterval(
+      () => {
+        try {
+          assertAuthority();
+          this.#journal.renew(job, this.#config.leaseTtlMs, Date.now());
+          this.#fences(action);
+        } catch {
+          // Cancel this attempt; a freshly admitted recovery can reconcile the same intent.
+          this.#coordinators?.cancelExecution();
+        }
+      },
+      Math.floor(this.#config.leaseTtlMs / 3),
+    );
+    try {
+      const proof = await this.#coordinators.execute(
+        job,
+        action,
+        {
+          ownerId: this.#owner,
+          workspaceLeaseEpoch: fences.workspace,
+          runLeaseEpoch: fences.run,
+          taskLeaseEpoch: fences.task,
+        },
+        assertAuthority,
+        assertDispatchAuthority,
+      );
+      this.#journal.completeCoordinator(job, proof, fences, Date.now());
+      return true;
+    } finally {
+      clearInterval(heartbeat);
+    }
+  }
+
+  async #completeSpecialist(input: {
+    job: PhaseJob;
+    action: ExecutePhaseAction;
+    packet: TaskPacket;
+    fences: ResourceFences;
+    executionId: string;
+    terminal: AgentResult;
+    resultHead: string;
+    inputDigest: string;
+    evidenceCapability: EvidenceCapability;
+    inputProducer: string;
+  }): Promise<boolean> {
+    const {
+      job,
+      action,
+      packet,
+      fences,
+      executionId,
+      terminal,
+      resultHead,
+      inputDigest,
+      evidenceCapability,
+      inputProducer,
+    } = input;
+    // Keep the structured answer only, with trusted execution identity to avoid cross-role digest aliasing.
+    const result = { executionDigest: digestGovernedValue(executionId), terminal };
+    const resultEvidence = await this.#vault.recordSpecialistResult({
+      executionId: executionId,
+      content: Buffer.from(JSON.stringify(result)),
+      headSha: resultHead,
+      capability: evidenceCapability,
+    });
+    if (resultEvidence.reference.digest !== digestGovernedValue(result))
+      throw new Error('phase_result_evidence_redacted');
+    const terminalStatus = phaseTerminalStatus(terminal, packet, action.phase);
+    if (
+      (action.phase === 'task_verification' || action.phase === 'task_review') &&
+      terminalStatus === 'continue'
+    ) {
+      if (
+        this.#store.listActiveRepairDispatches(action.runId, action.taskId).length &&
+        !this.#coordinators
+      )
+        throw new Error('repair_acceptance_coordinator_unavailable');
+      this.#coordinators?.acceptRepairResult(
+        action,
+        {
+          ownerId: this.#owner,
+          workspaceLeaseEpoch: fences.workspace,
+          runLeaseEpoch: fences.run,
+          taskLeaseEpoch: fences.task,
+        },
+        terminal,
+        resultEvidence.reference,
+      );
+    }
+    if (action.phase === 'feature_evaluation' && terminalStatus !== 'blocked') {
+      new ContractEvaluator({ store: this.#store, contract: this.#contract }).evaluate({
+        workspaceId: action.workspaceId,
+        runId: action.runId,
+        taskId: action.taskId,
+        headSha: resultHead,
+        contractVersion: action.contractVersion,
+        policyDigest: action.policyDigest,
+        evaluatorRole: packet.assignedRole,
+        summary: terminal.summary,
+        criteria: packet.acceptanceCriteria.map((criterion) => ({
+          criterion,
+          status: terminal.acceptanceCriteria.passed.includes(criterion) ? 'passed' : 'failed',
+          summary: terminal.summary,
+          evidence: [resultEvidence.reference],
+        })),
+      });
+    }
+    if (action.phase === 'repair_planning' && terminalStatus === 'continue') {
+      if (!this.#coordinators) throw new Error('repair_planning_coordinator_unavailable');
+      await this.#coordinators.completeRepairPlanning({
+        job,
+        action,
+        terminal,
+        resultDigest: resultEvidence.reference.digest,
+        authority: {
+          id: executionId,
+          ownerId: this.#owner,
+          workspaceLeaseEpoch: fences.workspace,
+          runLeaseEpoch: fences.run,
+          taskLeaseEpoch: fences.task,
+        },
+      });
+    }
+    const identity = {
+      kind: 'workflow.delegate_callback' as const,
+      workspaceId: action.workspaceId,
+      parentRunId: action.runId,
+      parentTaskId: action.taskId,
+      parentState: action.phase,
+      parentRunVersion: action.runVersion,
+      delegationId: executionId,
+      delegateAgentId: this.#store.getSchedulerExecution(executionId)!.processIdentity,
+      delegateRole: packet.assignedRole,
+      attemptNumber: this.#store.getSchedulerExecution(executionId)!.attemptNumber,
+      contractVersion: action.contractVersion,
+      policyDigest: action.policyDigest,
+      materialDigest: action.materialDigest,
+      workspaceLeaseEpoch: fences.workspace,
+      parentRunLeaseEpoch: fences.run,
+      taskLeaseEpoch: fences.task,
+      headSha: resultHead,
+      inputProducerIdentity: inputProducer,
+      resultProducerIdentity: this.#store.getSchedulerExecution(executionId)!.processIdentity,
+      inputArtifactDigest: inputDigest,
+      terminalStatus,
+      resultArtifactDigest: resultEvidence.reference.digest,
+    };
+    const callback: DelegateCallback = { ...identity, callbackId: digestGovernedValue(identity) };
+    this.#store.finishSchedulerExecution({
+      id: executionId,
+      status: 'completed',
+      ownerId: this.#owner,
+      workspaceLeaseEpoch: fences.workspace,
+      runLeaseEpoch: fences.run,
+      taskLeaseEpoch: fences.task,
+      result,
+      callback,
+    });
+    this.#journal.complete(
+      job,
+      { executionId: executionId, evidenceDigest: resultEvidence.reference.digest },
+      Date.now(),
+    );
+    return true;
   }
 
   async #failExecution(
@@ -788,6 +1193,25 @@ export class StandalonePhaseRuntime {
       }
     }
   }
+  async #recoverCoordinator(job: PhaseJob, action: ExecutePhaseAction): Promise<void> {
+    try {
+      await this.#runCoordinator(job, action, this.#fences(action));
+    } catch (error) {
+      this.#deferCoordinatorRecovery(job, error);
+    }
+  }
+
+  #deferCoordinatorRecovery(job: PhaseJob, error: unknown): void {
+    if (error instanceof Error && error.message === 'resource lease is held by another owner')
+      this.#journal.deferCoordinatorAdmission(job, Date.now());
+    else
+      this.#journal.deferCoordinator(
+        job,
+        this.#contract.retryPolicy.infrastructureAttempts,
+        Date.now(),
+      );
+  }
+
   async #recover(job: PhaseJob): Promise<void> {
     // Cleanup has its own narrow lease and cannot dispatch or advance the workflow.
     const heartbeat = setInterval(
@@ -801,6 +1225,11 @@ export class StandalonePhaseRuntime {
       Math.floor(this.#config.leaseTtlMs / 3),
     );
     try {
+      const action = this.#journal.action(job);
+      if (PHASE_JOB_DISPATCH[action.phase].endsWith('_coordinator')) {
+        await this.#recoverCoordinator(job, action);
+        return;
+      }
       const execution = this.#store.getSchedulerExecution(job.execution_id!);
       if (execution?.status === 'completed') {
         this.#journal.complete(
@@ -810,6 +1239,21 @@ export class StandalonePhaseRuntime {
         );
         return;
       }
+      if (
+        execution &&
+        this.#journal
+          .interruptions()
+          .list(job.run_id)
+          .some((row) => row.execution_id === execution.id)
+      ) {
+        await this.#cleanupExecution(
+          job,
+          { id: execution.id, role: execution.role, deadlineMs: execution.deadlineMs },
+          new Error('phase_recovery_cleanup_required'),
+        );
+        return;
+      }
+      if (execution && (await this.#recoverRetained(job, execution.id))) return;
       if (execution) {
         await this.#failExecution(
           job,
@@ -839,6 +1283,191 @@ export class StandalonePhaseRuntime {
       } else this.#journal.block(job, 'phase_restart_requires_new_authorized_attempt', Date.now());
     } finally {
       clearInterval(heartbeat);
+    }
+  }
+
+  async #recoverRetained(job: PhaseJob, executionId: string): Promise<boolean> {
+    if (this.#store.getRepairPlanningHandoff(executionId)) {
+      try {
+        await this.#recoverRepairPlanning(job);
+      } catch (error) {
+        this.#deferCoordinatorRecovery(job, error);
+      }
+      return true;
+    }
+    if (this.#store.getImplementationImport(executionId)) {
+      try {
+        await this.#recoverImport(job);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'resource lease is held by another owner')
+          this.#journal.deferCoordinatorAdmission(job, Date.now());
+        else {
+          const execution = this.#store.getSchedulerExecution(executionId)!;
+          await this.#cleanupExecution(
+            job,
+            { id: execution.id, role: execution.role, deadlineMs: execution.deadlineMs },
+            new Error('implementation_import_reconciliation_required'),
+          );
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  async #recoverRepairPlanning(job: PhaseJob): Promise<void> {
+    if (this.#cleanupOnly || this.#fatalAdmission || this.#closing)
+      throw new Error('repair planning recovery unavailable');
+    await this.#admission();
+    this.#assertAdmission();
+    const action = this.#journal.action(job);
+    const fences = this.#fences(action);
+    const execution = this.#store.adoptRepairPlanningHandoff({
+      authority: {
+        id: job.execution_id!,
+        ownerId: this.#owner,
+        workspaceLeaseEpoch: fences.workspace,
+        runLeaseEpoch: fences.run,
+        taskLeaseEpoch: fences.task,
+      },
+      phaseLeaseEpoch: job.lease_epoch,
+      sourceRoot: this.#config.sourceRoot,
+    });
+    const envelope = specialistInputEnvelopeSchema.parse(execution.packet);
+    const handoff = this.#store.getRepairPlanningHandoff(execution.id)!;
+    await this.#verifySource(action, envelope.task.allowedPaths);
+    const capability = this.#capabilities.issue({
+      workspaceId: action.workspaceId,
+      runId: action.runId,
+      role: 'workflow_orchestrator',
+      contractVersion: action.contractVersion,
+      policyDigest: action.policyDigest,
+      operations: ['workspace.read', 'artifact.write'],
+      allowedPaths: envelope.task.allowedPaths,
+      expiresAtMs: execution.deadlineMs,
+      process: this.#process,
+    });
+    const heartbeat = setInterval(
+      () => {
+        try {
+          for (const [kind, id, epoch] of [
+            ['workspace', action.workspaceId, fences.workspace],
+            ['run', action.runId, fences.run],
+            ['task', action.taskId, fences.task],
+          ] as const)
+            this.#store.assertResourceLease(kind, id, this.#owner, epoch, Date.now());
+          this.#assertAdmission();
+          this.#fences(action);
+        } catch {
+          this.#coordinators?.cancelExecution();
+        }
+      },
+      Math.floor(this.#config.leaseTtlMs / 3),
+    );
+    try {
+      const inputDigest = digestGovernedValue(envelope);
+      const input = this.#store.getSecureEvidence(inputDigest, action.runId, action.taskId);
+      if (!input) throw new Error('repair planning original input evidence missing');
+      await this.#completeSpecialist({
+        job,
+        action,
+        packet: envelope.task,
+        fences,
+        executionId: execution.id,
+        terminal: handoff.terminal,
+        resultHead: action.headSha,
+        inputDigest,
+        evidenceCapability: { token: capability.token, observedProcess: this.#process },
+        inputProducer: input.producer,
+      });
+    } finally {
+      clearInterval(heartbeat);
+      this.#capabilities.revoke(capability.token);
+    }
+  }
+
+  async #recoverImport(job: PhaseJob): Promise<void> {
+    if (this.#cleanupOnly) throw new Error('cleanup_only_runtime');
+    if (this.#fatalAdmission) throw new Error('journal_unavailable');
+    await this.#admission();
+    this.#assertAdmission();
+    if (this.#closing) throw new Error('phase_runtime_closing');
+    // A recovery may observe a prepared or applied head; pin Git before any import mutation.
+    const recoveryGit = new TrustedSourceGit(
+      this.#store.getImplementationWorkspace(this.#config.runId, this.#config.sourceRoot),
+      this.#config.gitBinary,
+      this.#config.gitBinaryDigest,
+    );
+    recoveryGit.assertSafeIndex();
+    const action = this.#journal.action(job);
+    const fences = this.#fences(action);
+    const authority = {
+      id: job.execution_id!,
+      ownerId: this.#owner,
+      workspaceLeaseEpoch: fences.workspace,
+      runLeaseEpoch: fences.run,
+      taskLeaseEpoch: fences.task,
+    };
+    const execution = this.#store.adoptImplementationImport({
+      authority,
+      phaseLeaseEpoch: job.lease_epoch,
+      sourceRoot: this.#config.sourceRoot,
+    });
+    const packet = specialistInputEnvelopeSchema.parse(execution.packet);
+    const capability = this.#capabilities.issue({
+      workspaceId: action.workspaceId,
+      runId: action.runId,
+      role: 'workflow_orchestrator',
+      contractVersion: action.contractVersion,
+      policyDigest: action.policyDigest,
+      operations: ['workspace.read', 'artifact.write'],
+      allowedPaths: packet.task.allowedPaths,
+      expiresAtMs: execution.deadlineMs,
+      process: this.#process,
+    });
+    const evidenceCapability = { token: capability.token, observedProcess: this.#process };
+    try {
+      const intent = this.#store.getImplementationImport(execution.id)!;
+      const bytes = await this.#vault.read({
+        digest: intent.artifactDigest,
+        runId: action.runId,
+        taskId: action.taskId,
+        capability: evidenceCapability,
+      });
+      const output = implementationOutputSchema.parse(
+        JSON.parse(Buffer.from(bytes).toString('utf8')),
+      );
+      this.#assertAdmission();
+      const imported = this.#store.importImplementation({
+        authority,
+        sourceRoot: this.#config.sourceRoot,
+        gitBinary: this.#config.gitBinary,
+        gitBinaryDigest: this.#config.gitBinaryDigest,
+        artifact: bytes,
+        artifactDigest: intent.artifactDigest,
+        renewLeaseTtlMs: Math.min(this.#config.leaseTtlMs, 60000),
+      });
+      await this.#verifySource(
+        { ...action, headSha: imported.resultHead },
+        packet.task.allowedPaths,
+      );
+      const inputDigest = digestGovernedValue(packet);
+      const input = this.#store.getSecureEvidence(inputDigest, action.runId, action.taskId);
+      if (!input) throw new Error('implementation recovery input evidence missing');
+      await this.#completeSpecialist({
+        job: job,
+        action: action,
+        packet: packet.task,
+        fences: fences,
+        executionId: execution.id,
+        terminal: output.terminal,
+        resultHead: imported.resultHead,
+        inputDigest: inputDigest,
+        evidenceCapability: evidenceCapability,
+        inputProducer: input.producer,
+      });
+    } finally {
+      this.#capabilities.revoke(capability.token);
     }
   }
 }

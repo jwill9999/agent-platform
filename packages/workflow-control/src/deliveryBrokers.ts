@@ -441,6 +441,34 @@ function monotonicClock(clock: () => number): () => number {
   };
 }
 
+function pipelineCheckResult(
+  operation: DeliveryOperationRecord,
+  request: Extract<DeliveryRequest, { kind: 'github.checks' }>,
+) {
+  const result = operation.result as Record<string, unknown> | null;
+  const checks = result?.checks;
+  const eventIdentity = result?.eventIdentity;
+  if (
+    typeof checks !== 'object' ||
+    checks === null ||
+    Array.isArray(checks) ||
+    typeof eventIdentity !== 'string' ||
+    eventIdentity === ''
+  ) {
+    throw new Error('GitHub checks result has invalid durable wait evidence');
+  }
+  const checkRecord = checks as Record<string, unknown>;
+  if (
+    !sameOrderedSet(Object.keys(checkRecord), request.requiredChecks) ||
+    Object.values(checkRecord).some(
+      (value) => value !== 'pending' && value !== 'success' && value !== 'failure',
+    )
+  ) {
+    throw new Error('GitHub checks result changes the approved check set');
+  }
+  return { checkRecord, eventIdentity };
+}
+
 export class DurableDeliveryBroker {
   readonly #store: WorkflowStore;
   readonly #contract: ExecutionContract;
@@ -696,13 +724,8 @@ export class DurableDeliveryBroker {
     );
   }
 
-  recordPipelineObservation(input: {
-    operationId: string;
-    fence: DeliveryFence;
-    nextPollAtMs: number;
-    absoluteDeadlineMs: number;
-  }): PipelineObservationDecision {
-    const operation = this.#store.getDeliveryOperation(input.operationId);
+  #committedChecks(operationId: string) {
+    const operation = this.#store.getDeliveryOperation(operationId);
     if (
       operation === undefined ||
       operation.status !== 'committed' ||
@@ -710,6 +733,16 @@ export class DurableDeliveryBroker {
     ) {
       throw new Error('pipeline observation requires a committed GitHub checks operation');
     }
+    return operation;
+  }
+
+  recordPipelineObservation(input: {
+    operationId: string;
+    fence: DeliveryFence;
+    nextPollAtMs: number;
+    absoluteDeadlineMs: number;
+  }): PipelineObservationDecision {
+    const operation = this.#committedChecks(input.operationId);
     this.#store.assertRunUsesContract(operation.runId, this.#contract);
     const request = githubChecksRequestSchema.parse(operation.request);
     assertRequestWithinContract(
@@ -732,27 +765,7 @@ export class DurableDeliveryBroker {
       },
       workflowDeliveryMutationCapability,
     );
-    const result = operation.result as Record<string, unknown> | null;
-    const checks = result?.checks;
-    const eventIdentity = result?.eventIdentity;
-    if (
-      typeof checks !== 'object' ||
-      checks === null ||
-      Array.isArray(checks) ||
-      typeof eventIdentity !== 'string' ||
-      eventIdentity === ''
-    ) {
-      throw new Error('GitHub checks result has invalid durable wait evidence');
-    }
-    const checkRecord = checks as Record<string, unknown>;
-    if (
-      !sameOrderedSet(Object.keys(checkRecord), request.requiredChecks) ||
-      Object.values(checkRecord).some(
-        (value) => value !== 'pending' && value !== 'success' && value !== 'failure',
-      )
-    ) {
-      throw new Error('GitHub checks result changes the approved check set');
-    }
+    const { checkRecord, eventIdentity } = pipelineCheckResult(operation, request);
     const checkId = deriveDeliveryRequestDigest([
       request.repository,
       request.pullRequestNumber,
@@ -768,10 +781,23 @@ export class DurableDeliveryBroker {
     if (this.#store.getDeliveryWaitEscalation(request.runId, checkId) !== undefined) {
       throw new Error('pipeline wait is already terminally escalated');
     }
+    const qualification = this.#store.getPassedPipelineObservation(operation.id);
+    if (qualification && (qualification.checkId !== checkId || existing !== undefined))
+      throw new Error('pipeline qualification replay conflicts with durable wait');
+    if (qualification) return { kind: 'passed', checkId };
     const effectiveDeadline = Math.min(
       existing?.absoluteDeadlineMs ?? input.absoluteDeadlineMs,
       input.absoluteDeadlineMs,
     );
+    const observationTime = this.#clock();
+    const maximumDeadline =
+      operation.createdAtMs + this.#contract.retryPolicy.waitDeadlineSeconds * 1000;
+    if (
+      !Number.isFinite(effectiveDeadline) ||
+      effectiveDeadline > maximumDeadline ||
+      observationTime >= effectiveDeadline
+    )
+      throw new Error('pipeline observation deadline expired or exceeds immutable retry deadline');
     if (
       existing !== undefined &&
       existing.workspaceId === request.workspaceId &&
@@ -799,12 +825,14 @@ export class DurableDeliveryBroker {
       return { kind: 'failed', checkId, failedChecks };
     }
     if (request.requiredChecks.every((check) => checkRecord[check] === 'success')) {
-      if (existing !== undefined) this.#completeWait(request, checkId, input.fence);
+      this.#store.recordPassedPipelineObservation(
+        { operationId: operation.id, checkId, deadlineMs: effectiveDeadline, ...input.fence },
+        this.#clock,
+        workflowDeliveryMutationCapability,
+      );
       return { kind: 'passed', checkId };
     }
     const nowMs = this.#clock();
-    const maximumDeadline =
-      operation.createdAtMs + this.#contract.retryPolicy.waitDeadlineSeconds * 1000;
     if (
       input.nextPollAtMs <= nowMs ||
       input.nextPollAtMs >= input.absoluteDeadlineMs ||

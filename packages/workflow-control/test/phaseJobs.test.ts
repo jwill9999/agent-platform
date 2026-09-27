@@ -1,8 +1,10 @@
+import { verifyCoordinatorProof } from '../src/coordinatorReceipts.js';
+import { deriveTransitionIdempotencyKey } from '../src/lifecycle.js';
 import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import Database from 'better-sqlite3';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { executionContractSchema } from '../src/contracts.js';
 import { ContinuationJournal } from '../src/continuationJournal.js';
@@ -628,4 +630,269 @@ describe('approved documents at queue boundaries', () => {
       ).toEqual({ n: 0 });
     },
   );
+});
+
+// Broker effects are fixture records here; connected coordinator qualification is separate.
+it('finishes a coordinator from committed proof and atomically queues one typed successor', async () => {
+  const f = await fixture('feature_evaluation');
+  f.consume();
+  const claim = f.phases.claim('owner', 60000, f.now)!;
+  const job = f.phases.start(claim, f.now),
+    action = f.phases.action(job);
+  const request = {
+    headSha: action.headSha,
+    contractVersion: action.contractVersion,
+    policyDigest: action.policyDigest,
+    requiredChecks: ['fixture-check'],
+  };
+  f.db
+    .prepare(
+      `INSERT INTO delivery_operations
+    (id,workspace_id,run_id,task_id,kind,actor_role,request_digest,request_json,status,owner_id,
+    workspace_lease_epoch,run_lease_epoch,task_lease_epoch,result_json,created_at_ms,updated_at_ms)
+    VALUES (?,?,?,?,?,'workflow_orchestrator',?,?,'committed','owner',1,1,1,?,?,?)`,
+    )
+    .run(
+      'checks',
+      action.workspaceId,
+      action.runId,
+      action.taskId,
+      'github.checks',
+      digestGovernedValue(request),
+      JSON.stringify(request),
+      JSON.stringify({ headSha: action.headSha, checks: { 'fixture-check': 'success' } }),
+      f.now,
+      f.now,
+    );
+  const id = 'pipeline-transition',
+    operation = 'internal.pipeline_verified';
+  f.store.prepareTransition({
+    id,
+    runId: action.runId,
+    from: 'pipeline',
+    to: 'delivery',
+    operation,
+    expectedRunVersion: action.runVersion,
+    idempotencyKey: deriveTransitionIdempotencyKey({
+      runId: action.runId,
+      transitionId: id,
+      operation,
+      expectedVersion: action.runVersion,
+    }),
+    actorRole: 'workflow_orchestrator',
+    contractVersion: action.contractVersion,
+    policyDigest: action.policyDigest,
+    leaseOwnerId: 'owner',
+    leaseEpoch: 1,
+    transitionContext: { workspaceLeaseEpoch: 1, taskLeaseEpoch: 1 },
+    expectedExternalState: { checks: 'passed' },
+    externalArguments: { taskId: action.taskId, checksOperationId: 'checks' },
+    nowMs: f.now,
+  });
+  f.store.commitTransition(id, 'owner', 1, { headSha: action.headSha }, f.now);
+  const proof = { kind: 'pipeline', checksOperationId: 'checks', transitionId: id };
+  expect(() =>
+    f.phases.completeCoordinator(
+      job,
+      { ...proof, checksOperationId: 'forged' },
+      { workspace: 1, run: 1, task: 1 },
+      f.now,
+    ),
+  ).toThrow();
+  expect(f.phases.get(job.id)?.status).toBe('started');
+  expect(() =>
+    f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now),
+  ).toThrow('pipeline observation is unqualified');
+  f.db
+    .prepare('INSERT INTO passed_pipeline_observations VALUES(?,?,?,?)')
+    .run('checks', 'fixture-check-id', f.now + 1000, f.now);
+  const elapsed = vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(120000);
+  try {
+    expect(() =>
+      f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now),
+    ).toThrow('coordinator resource fence rejected');
+    expect(f.phases.get(job.id)?.status).toBe('started');
+    expect(f.db.prepare('SELECT COUNT(*) AS n FROM coordinator_receipts').get()).toEqual({ n: 0 });
+    expect(f.phases.list()).toHaveLength(1);
+  } finally {
+    elapsed.mockRestore();
+  }
+  f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now);
+  f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now);
+  const jobs = f.phases.list();
+  expect(jobs).toHaveLength(2);
+  const next = jobs.find((candidate) => candidate.id !== job.id)!;
+  expect(next.callback_id).toBeNull();
+  expect(next.coordinator_receipt_id).toMatch(/^sha256:/u);
+  expect(f.phases.action(next)).toMatchObject({
+    phase: 'delivery',
+    runVersion: action.runVersion + 2,
+    headSha: action.headSha,
+  });
+  expect(f.phases.claim('owner', 60000, f.now)?.id).toBe(next.id);
+});
+
+it.each(['runId', 'featureId', 'repository', 'childTaskIds'])(
+  'rejects a finalization report bound to another %s even with a matching digest',
+  async (field) => {
+    const f = await fixture('finalizing', 'complete');
+    const contract = JSON.parse(
+      (f.db.prepare('SELECT body_json FROM contracts').get() as { body_json: string }).body_json,
+    );
+    const action = { ...phaseActionForCallback(f.callback), phase: 'finalizing' };
+    const report: Record<string, unknown> = {
+      version: 1,
+      featureId: contract.featureId,
+      runId: action.runId,
+      epicId: contract.featureId,
+      repository: contract.authority.github.repository,
+      destination: 'staging',
+      mergedHeadSha: action.headSha,
+      mergeSha: action.headSha,
+      mergeEventIdentity: 'fixture-event',
+      evaluationId: 'sha256:' + 'a'.repeat(64),
+      childTaskIds: [action.taskId],
+      acceptance: [
+        {
+          criterion: 'fixture',
+          implementation: ['fixture'],
+          taskId: action.taskId,
+          evidence: [
+            {
+              digest: 'sha256:' + 'b'.repeat(64),
+              mediaType: 'text/plain',
+              sizeBytes: 1,
+              kind: 'test',
+            },
+          ],
+        },
+      ],
+      generatedAtMs: f.now,
+    };
+    report[field] = field === 'childTaskIds' ? ['other-task'] : 'other-value';
+    const digest = digestGovernedValue(report);
+    f.db
+      .prepare(`INSERT INTO feature_finalizations VALUES(?,?,?,'closed',?,?,?,?)`)
+      .run(
+        action.runId,
+        contract.featureId,
+        contract.featureId,
+        digest,
+        JSON.stringify(report),
+        f.now,
+        f.now,
+      );
+    f.db.prepare("UPDATE runs SET state='closed'").run();
+    expect(() =>
+      verifyCoordinatorProof(f.db, action, { kind: 'finalization', reportDigest: digest }),
+    ).toThrow('coordinator finalization report binding rejected');
+  },
+);
+
+it('retains coordinator identity for bounded recovery and blocks after its fixed budget', async () => {
+  const f = await fixture('feature_evaluation');
+  f.consume();
+  const job = f.phases.start(f.phases.claim('owner', 60000, f.now)!, f.now);
+  f.phases.deferCoordinator(job, 1, f.now);
+  expect(f.phases.get(job.id)?.status).toBe('started');
+  expect(f.phases.claimRecovery('next-owner', 60000, f.now + 999)).toBeUndefined();
+  const recovered = f.phases.claimRecovery('next-owner', 60000, f.now + 1001)!;
+  expect(recovered.execution_id).toBe(job.execution_id);
+  expect(() => f.phases.deferCoordinator(job, 1, f.now + 1001)).toThrow();
+  expect(() => f.phases.deferCoordinator(recovered, 2, f.now + 1001)).toThrow('budget changed');
+  f.phases.deferCoordinator(recovered, 1, f.now + 1001);
+  expect(f.phases.get(job.id)).toMatchObject({
+    status: 'blocked',
+    failure_code: 'phase_coordinator_recovery_exhausted',
+  });
+  expect(f.phases.claimRecovery('next-owner', 60000, f.now + 100000)).toBeUndefined();
+});
+
+it('does not charge coordinator recovery while another owner retains resource leases', async () => {
+  const f = await fixture('feature_evaluation');
+  f.consume();
+  const job = f.phases.start(f.phases.claim('owner', 60000, f.now)!, f.now);
+  f.phases.deferCoordinator(job, 2, f.now);
+  const next = f.phases.claimRecovery('replacement', 60000, f.now + 1001)!;
+  f.phases.deferCoordinatorAdmission(next, f.now + 1001);
+  expect(
+    f.db.prepare('SELECT attempts FROM coordinator_recovery_attempts WHERE job_id=?').get(job.id),
+  ).toEqual({ attempts: 1 });
+  expect(f.phases.get(job.id)?.failure_code).toBe('phase_coordinator_waiting_for_owner');
+  expect(f.phases.claimRecovery('replacement', 60000, f.now + 2001)).toBeUndefined();
+});
+
+it('reserves the initial implementation exactly once and leaves no free repair attempt', async () => {
+  const f = await fixture('repair_planning');
+  f.consume();
+  const job = f.phases.start(f.phases.claim('owner', 60000, f.now)!, f.now);
+  expect(f.phases.reserveImplementationAttempt(job, f.now)).toBe(1);
+  expect(f.phases.reserveImplementationAttempt(job, f.now)).toBe(1);
+  expect(f.db.prepare("SELECT COUNT(*) AS n FROM attempts WHERE scope='task'").get()).toEqual({
+    n: 1,
+  });
+  const contract = JSON.parse(
+    (f.db.prepare('SELECT body_json FROM contracts').get() as { body_json: string }).body_json,
+  );
+  expect(f.db.prepare("SELECT max_attempts FROM attempts WHERE scope='task'").get()).toEqual({
+    max_attempts: contract.retryPolicy.implementationAttempts,
+  });
+});
+
+it('routes exhausted planner handoff recovery into durable cleanup before releasing capacity', async () => {
+  const f = await fixture('feature_evaluation', 'repair');
+  f.consume();
+  const job = f.phases.start(f.phases.claim('owner', 60000, f.now)!, f.now);
+  const action = f.phases.action(job);
+  f.store.seedDelegateCallbackAuthorizationForTest({
+    workspaceId: action.workspaceId,
+    runId: action.runId,
+    taskId: action.taskId,
+    delegationId: job.execution_id!,
+    delegateAgentId: 'planner-process',
+    delegateRole: 'feature_planner',
+    ownerId: 'owner',
+    workspaceLeaseEpoch: f.callback.workspaceLeaseEpoch,
+    runLeaseEpoch: f.callback.parentRunLeaseEpoch,
+    taskLeaseEpoch: f.callback.taskLeaseEpoch,
+    materialDigest: action.materialDigest,
+    headSha: action.headSha,
+    inputProducerIdentity: 'orchestrator',
+    input: { phaseJob: job.id },
+    result: terminalResult,
+    nowMs: f.now,
+  });
+  f.db
+    .prepare("UPDATE scheduler_executions SET status='active',deadline_ms=? WHERE id=?")
+    .run(f.now - 1, job.execution_id);
+  // Retained handoff bytes must survive failure; this test exercises the cleanup journal,
+  // not proposal validation (covered by repairPlanning.test.ts).
+  f.db
+    .prepare('INSERT INTO repair_planning_handoffs VALUES(?,?,?,?,?,1)')
+    .run(job.execution_id, 'retained-child', '{"retained":true}', '{}', 'retained-result');
+  f.phases.deferCoordinator(job, 0, f.now);
+  expect(f.phases.get(job.id)).toMatchObject({ status: 'started', lease_until_ms: 0 });
+  expect(f.phases.interruptions().list('run')[0]).toMatchObject({
+    state: 'pending',
+    reason: 'phase_coordinator_recovery_exhausted',
+  });
+  const reopened = new PhaseJobJournal(f.database);
+  try {
+    const recovery = reopened.claimRecovery('replacement', 60000, f.now + 1)!;
+    expect(recovery.execution_id).toBe(job.execution_id);
+    const cleanup = reopened.interruptions();
+    const lease = cleanup.claim('run', 'replacement', f.now + 1, 30000, job.execution_id!)!;
+    const attempt = cleanup.begin(lease, f.now + 1);
+    for (const operation of ['cancel', 'revoke', 'settle'] as const)
+      cleanup.confirm(attempt, operation, f.now + 2);
+    expect(cleanup.finishAttempt(attempt, f.now + 3).state).toBe('settled');
+    reopened.finalizeInterrupted(recovery, f.now + 4);
+    expect(f.store.getSchedulerExecution(job.execution_id!)?.status).toBe('escalated');
+    expect(reopened.get(job.id)?.status).toBe('blocked');
+    expect(f.db.prepare('SELECT request_json FROM repair_planning_handoffs').get()).toEqual({
+      request_json: '{"retained":true}',
+    });
+  } finally {
+    reopened.close();
+  }
 });

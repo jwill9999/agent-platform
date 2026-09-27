@@ -17,6 +17,13 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { promisify, isDeepStrictEqual } from 'node:util';
 
 import type { TaskPacket } from './contracts.js';
+import { implementationOutputSchema, type ImplementationOutput } from './implementationOutput.js';
+import { specialistTerminalResult } from './specialistTerminalResult.js';
+import {
+  captureSpecialistOutputBaseline,
+  observeSpecialistOutput,
+  collectSpecialistReturnedFiles,
+} from './specialistOutputManifest.js';
 import {
   specialistInputEnvelopeSchema,
   specialistExecutionDigest,
@@ -60,6 +67,7 @@ export interface SpecialistExecutionResult {
   events: unknown[];
   stderr: string;
   retainedWorkspaceRoot?: string;
+  implementationOutput?: ImplementationOutput;
 }
 
 export type SpecialistProcessExecutor = (
@@ -135,19 +143,15 @@ async function populateSpecialistWorkspace(
     ) {
       throw new Error(`specialist source path is forbidden: ${allowedPath}`);
     }
-    let selected = canonicalSource;
-    for (const part of allowedPath.split('/')) {
-      selected = join(selected, part);
-      if ((await lstat(selected)).isSymbolicLink())
-        throw new Error('specialist source symlinks are forbidden');
-    }
-    const source = await realpath(resolve(canonicalSource, allowedPath));
+    const absent = await sourcePathAbsent(canonicalSource, allowedPath);
+    const requested = resolve(canonicalSource, allowedPath);
+    const source = absent ? requested : await realpath(requested);
     if (!isInside(source, canonicalSource)) {
       throw new Error(`specialist source path escapes the repository: ${allowedPath}`);
     }
     const destination = allowedPath === '.' ? root : join(root, allowedPath);
     await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
-    await cp(source, destination, { recursive: true, dereference: false, filter });
+    if (!absent) await cp(source, destination, { recursive: true, dereference: false, filter });
   }
   await writeFile(
     join(codexHome, 'config.toml'),
@@ -725,6 +729,7 @@ export interface DockerSpecialistLauncherOptions {
   store: WorkflowStore;
   ownerId: string;
   sourceRoot: string;
+  executionSourceRoot?: (runId: string) => string;
   image: string;
   credentialBroker: RevocableSpecialistCredentialBroker;
   egressNetwork: string;
@@ -880,11 +885,19 @@ export class DockerIsolatedSpecialistLauncher {
       this.#assertCanStart(reservation);
       const credentialBrokerGeneration = await this.#options.credentialBroker.assertConformant();
       const workspace = await prepareSpecialistWorkspace(
-        this.#options.sourceRoot,
+        this.#options.executionSourceRoot?.(packet.runId) ?? this.#options.sourceRoot,
         packet.allowedPaths,
       );
       stagingRoot = resolve(workspace.root, '..');
       homeForCleanup = workspace.codexHome;
+      const captured = captureImplementationOutput({
+        packet,
+        reservation,
+        envelope,
+        workspace,
+        patch: roleProfile.patch,
+        execution: this.#options.store.getSchedulerExecution(reservation.id)!,
+      });
       this.#options.store.bindSchedulerStaging(
         authority,
         stagingRoot,
@@ -1011,6 +1024,7 @@ export class DockerIsolatedSpecialistLauncher {
       ]);
       retainWorkspace = true;
       output = { ...parsed, retainedWorkspaceRoot: workspace.root };
+      if (captured) output.implementationOutput = collectImplementationOutput(captured, parsed);
     } catch (error) {
       launchError = error;
       // A managed phase persists its interruption before any failure cleanup.
@@ -1408,4 +1422,72 @@ export class DockerIsolatedSpecialistLauncher {
       if (this.#containerLocks.get(id) === queued) this.#containerLocks.delete(id);
     }
   }
+}
+
+async function sourcePathAbsent(canonicalSource: string, allowedPath: string): Promise<boolean> {
+  let selected = canonicalSource;
+  for (const part of allowedPath.split('/')) {
+    selected = join(selected, part);
+    try {
+      if ((await lstat(selected)).isSymbolicLink())
+        throw new Error('specialist source symlinks are forbidden');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function captureImplementationOutput(input: {
+  packet: TaskPacket;
+  reservation: DockerSpecialistReservation;
+  envelope: SpecialistInputEnvelope | undefined;
+  workspace: SpecialistWorkspace;
+  patch: boolean;
+  execution: NonNullable<ReturnType<WorkflowStore['getSchedulerExecution']>>;
+}) {
+  const { packet, reservation, envelope, workspace, patch, execution } = input;
+  if (!envelope || !patch) return undefined;
+  const outputBinding = {
+    workspaceId: execution.workspaceId,
+    runId: packet.runId,
+    taskId: packet.taskId,
+    executionId: reservation.id,
+    role: packet.assignedRole,
+    contractVersion: packet.contractVersion,
+    policyDigest: packet.policyDigest,
+    inputMaterialDigest: packet.documentBinding!.materialDigest,
+    baselineHeadSha: envelope.binding.headSha,
+  };
+  const baseline = captureSpecialistOutputBaseline({
+    workspaceRoot: workspace.root,
+    expectedBinding: outputBinding,
+    writablePaths: packet.allowedPaths.map((path) => ({ kind: 'subtree' as const, path })),
+  });
+  return { baseline, outputBinding, envelope, execution };
+}
+function collectImplementationOutput(
+  captured: NonNullable<ReturnType<typeof captureImplementationOutput>>,
+  parsed: SpecialistExecutionResult,
+): ImplementationOutput {
+  const { baseline, outputBinding, envelope, execution } = captured;
+  const expected = {
+    baseline,
+    expectedBinding: outputBinding,
+    expectedBaselineDigest: baseline.baselineDigest,
+  };
+  const candidate = observeSpecialistOutput(expected);
+  return implementationOutputSchema.parse({
+    kind: 'implementation_output',
+    version: 1,
+    executionId: execution.id,
+    attempt: execution.attemptNumber,
+    input: envelope,
+    baselineDigest: baseline.baselineDigest,
+    outputTreeDigest: candidate.outputTreeDigest,
+    files: collectSpecialistReturnedFiles({ ...expected, candidate }),
+    terminal: specialistTerminalResult(parsed),
+  });
 }

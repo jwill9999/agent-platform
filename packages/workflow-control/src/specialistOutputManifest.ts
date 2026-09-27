@@ -367,3 +367,77 @@ export function verifySpecialistOutput(input: {
     throw new Error('specialist output verification failed');
   }
 }
+
+export interface SpecialistReturnedFile {
+  readonly path: string;
+  readonly beforeDigest: string | null;
+  readonly afterDigest: string | null;
+  readonly content: string | null;
+}
+
+/** Export actual bytes from a settled worker, never from its reported changedFiles list.
+ * The launcher must stop the worker before calling this function. This is observation,
+ * not permission to mutate a repository; the importer independently checks authority.
+ */
+export function collectSpecialistReturnedFiles(input: {
+  baseline: SpecialistOutputBaseline;
+  expectedBinding: SpecialistOutputBinding;
+  expectedBaselineDigest: string;
+  candidate: SpecialistOutputCandidate;
+}): readonly SpecialistReturnedFile[] {
+  verifySpecialistOutput(input);
+  const state = expectedBaseline(input);
+  if (input.expectedBinding.role !== 'implementation_worker')
+    throw new Error('only implementation workers may return source changes');
+  const changes = input.candidate.changes.filter((change) => {
+    if (change.before?.kind !== 'directory' && change.after?.kind !== 'directory') return true;
+    if (change.before && change.after)
+      throw new Error('returned directory mode or type change rejected');
+    if (
+      !input.candidate.changes.some(
+        (child) =>
+          child.path.startsWith(`${change.path}/`) &&
+          (child.before?.kind === 'file' || child.after?.kind === 'file'),
+      )
+    )
+      throw new Error('standalone directory changes are not supported');
+    return false;
+  });
+  if (changes.length > 256) throw new Error('returned file count exceeded');
+  let remaining = maxBytes;
+  const files = changes.map((change): SpecialistReturnedFile => {
+    const { before, after } = change;
+    if (before?.kind === 'directory' || after?.kind === 'directory')
+      throw new Error('returned entry type changed');
+    if (before && after && before.mode !== after.mode)
+      throw new Error('returned mode change rejected');
+    if (!before && after && (after.mode & 0o111) !== 0)
+      throw new Error('executable additions are not supported');
+    let content: string | null = null;
+    if (after) {
+      const path = join(state.root, change.path);
+      const bytes = readCheckedFile(
+        path,
+        lstatSync(path, { bigint: true }),
+        Math.min(remaining, 1024 * 1024),
+      );
+      remaining -= bytes.length;
+      if (hash(bytes) !== after.digest) throw new Error('returned content changed');
+      content = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+      if (content.includes('\0')) throw new Error('binary returned content rejected');
+    }
+    return Object.freeze({
+      path: change.path,
+      beforeDigest: before?.digest ?? null,
+      afterDigest: after?.digest ?? null,
+      content,
+    });
+  });
+  const deletedDigests = new Set(
+    files.filter((file) => file.content === null).map((file) => file.beforeDigest),
+  );
+  if (files.some((file) => file.beforeDigest === null && deletedDigests.has(file.afterDigest)))
+    throw new Error('rename-shaped output rejected');
+  verifySpecialistOutput(input);
+  return Object.freeze(files);
+}

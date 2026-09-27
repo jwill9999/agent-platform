@@ -4,7 +4,7 @@ import {
 } from '../src/cancellation.js';
 import { digestGovernedValue } from '../src/governedOperations.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile, chmod } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile, chmod, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -1547,3 +1547,29 @@ it('upgrades a historical journal through WorkflowStore without rewriting contra
     observed.prepare('SELECT count(*) n FROM schema_migrations WHERE version=17').get(),
   ).toEqual({ n: 1 });
 });
+
+it.each(['source', 'private'])(
+  'checks approved document bytes in the %s workspace after private import',
+  async (location) => {
+    const f = await setup();
+    const owned = join(f.sourceRoot, '..', 'owned');
+    execFileSync('git', ['clone', '--quiet', '--no-local', f.sourceRoot, owned]);
+    const identity = await stat(owned);
+    f.database
+      .prepare('INSERT INTO implementation_workspaces VALUES(?,?,?,?,?,?)')
+      .run(
+        'run',
+        f.sourceRoot,
+        owned,
+        String(identity.dev),
+        String(identity.ino),
+        f.contract.planningDocuments!.sourceRevision,
+      );
+    expect(f.store.verifyPlanningDocuments(f.boundary).approvalId).toBe('approval');
+    await writeFile(join(location === 'source' ? f.sourceRoot : owned, 'spec.md'), 'edit\n');
+    expect(() => f.store.verifyPlanningDocuments(f.boundary)).toThrow('planning_documents_changed');
+    expect(
+      f.database.prepare("SELECT status FROM plan_approvals WHERE id='approval'").get(),
+    ).toEqual({ status: 'invalidated' });
+  },
+);

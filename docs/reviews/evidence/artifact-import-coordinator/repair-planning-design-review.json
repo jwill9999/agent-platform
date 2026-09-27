@@ -1,0 +1,65 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "149d26d9-0623-4191-b5dd-57373bbbb85e",
+  "materialDigest": "67d37bedffb6bf570fc4e6304267266b87b49a468056988bc454e169a90d0e2f",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "docs/testing/standalone-pilot-prerequisites.md",
+      "digest": "1e8994a0e0b73d3845218804e5deb388388bf1b900a19c71d0b5c34747dcaa18"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "857a74db3766861208935b584d10e3c6a28eb0c6f5fad1506940436d9c5764d5"
+    },
+    {
+      "path": "packages/workflow-control/src/coordinatorReceipts.ts",
+      "digest": "54bd590e7ac7f649c26a2d0c47c50d64995ff03535700ba33930ca4ec498efdf"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "digest": "5506e93362f1413d26be6d1dbb76344972f666f824dbb45af81869057c5c1634"
+    },
+    {
+      "path": "packages/workflow-control/src/featureEvaluation.ts",
+      "digest": "de38328c817380c36372a310a584bff0076a8c805d458e72f34c0f6aee973d63"
+    },
+    {
+      "path": "packages/workflow-control/src/governedOperations.ts",
+      "digest": "754650b394e7b64a70c37a50dc53aaa5456948043a16e73de97b3ae56240beff"
+    },
+    {
+      "path": "packages/workflow-control/src/orchestrator.ts",
+      "digest": "9941c960a629546c61a4d985bb73d193ebdfc1fc70dc3c3afa06cfe8dd9af336"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "0614a94f3263a0c5267b2a31a33e8559954b0d67822dd981233f21ea83962610"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "9cf7ccc09343c09a01de47d5258dc199845e00be06c4036caaa30a9945abb521"
+    },
+    {
+      "path": "packages/workflow-control/src/repairLoops.ts",
+      "digest": "16b14a2b3ae75bafbd0eaffdc40bc4d0b62cc6cdd0c5e3cbc3a2215b5801f1eb"
+    },
+    {
+      "path": "packages/workflow-control/src/standaloneCoordinators.ts",
+      "digest": "d5d90826e0bdb1bdbb72dbea57eb9583683f258b6281c6065b7179c554e180c3"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "d5fa38d0e1a2f76792e547ba75214d5c8571763635a8531392e0d45cda386d0a"
+    }
+  ],
+  "result": {
+    "messages": [
+      "- **High \u2014 `repair_planning` is advertised but cannot execute.**  \n  **Evidence:** `phaseJobs.ts` (`PHASE_JOB_DISPATCH`), `phaseRuntime.ts` (`#packet`, `phaseTerminalStatus`).  \n  **Reason:** Dispatch selects `feature_planner`, but packet construction rejects this phase. Simply admitting it is insufficient: the generic terminal rule treats unmet feature acceptance criteria as `repair`, which has no `repair_planning` callback target. A planner completes a repair plan; it cannot certify that implementation already passed.  \n  **Correction:** Add explicitly authorized planner packets and a bounded, validated planning output referencing the failed evaluation, affected criterion, finding evidence and repair hypothesis. Define planner success as a valid plan eligible for trusted child preparation. Missing role authority or invalid output must block.\n\n- **High \u2014 The repair child needs an authoritative task handoff, not a renamed callback.**  \n  **Evidence:** `featureEvaluation.ts` (`DurableRepairChildBroker`), `phaseJobs.ts` (`phaseActionForCallback`, `assertPhaseJobAuthority`), `storage.ts` (`#recordDelegateCallbackAndTransition`).  \n  **Reason:** The planner executes for the failed task. Its callback must retain that task identity to match scheduler authorization. Current successor construction copies that identity, so it would dispatch implementation for the already-closed task. Substituting the child ID would invalidate callback binding.  \n  **Correction:** Use this sequence:\n  \n  1. Persist the exact-head failed feature evaluation and commit its existing `repair` callback into `repair_planning`.\n  2. Launch the explicitly approved `feature_planner` for that failed task, with the persisted evaluation and evidence.\n  3. Validate and durably retain its plan.\n  4. While still in `repair_planning`, use `DurableRepairChildBroker` to create and reconcile the bounded child and its branch.\n  5. Commit the planner\u2019s genuine `continue` callback, retaining the parent task identity, through the existing transition to `implementing`.\n  6. Derive the implementation action for the child from an authoritative handoff binding the planner execution/callback, committed child intent and child base head.\n\n  Extend successor derivation and authority validation to verify that handoff. Do not manufacture a coordinator receipt or change the planner\u2019s execution identity. Persist enough linkage before callback completion to recover crashes between child creation, callback commitment and successor enqueueing.\n\n- **High \u2014 Child authorization must propagate through the whole lifecycle.**  \n  **Evidence:** `storage.ts` (`getAuthorizedRunTask`), `contracts.ts` (`assertTaskPacketWithinContract`), `phaseRuntime.ts` (`#packet`), `phaseJobs.ts` (`assertPhaseJobAuthority`), `orchestrator.ts` (`acquireTask`, `acceptAndCloseTask`), `standaloneCoordinators.ts` (`#closeTask`).  \n  **Reason:** Document inheritance already exists, but these execution and acceptance paths still require membership in `contract.tasks`. `getAuthorizedRunTask` exposes committed child authority without phase roles or remaining budget. Fixing packet construction alone would leave later phases blocked.  \n  **Correction:** Centralize effective task resolution using the immutable contract and committed child intent. Resolve ancestor phase roles explicitly, intersect child permissions with existing authority, and apply durable remaining budgets. Use that resolver consistently for packets, callbacks, phase admission, imports, acceptance and integration. Close the child through the existing Beads closer; preserve the original task\u2019s closed state.\n\n- **High \u2014 Attempt identity and budget accounting need one consistent source.**  \n  **Evidence:** `phaseJobs.ts` (`reserveImplementationAttempt`), `phaseRuntime.ts` (`#reserveAttempt`, `#runSpecialist`), `storage.ts` (`remainingRepairBudgetForChild`, `createSchedulerExecution`).  \n  **Reason:** Child creation reserves budget separately from phase implementation attempts. The runtime also discards the reserved attempt number and creates scheduler executions with the default attempt number `1`. Child remaining budgets can contain zero, whereas ordinary packet retry budgets require positive values.  \n  **Correction:** Specify how the child reservation funds its first implementation and how subsequent retries consume the remaining feature/finding budget. Carry the authoritative attempt number into scheduler execution, output validation and callback identity. Block exhausted work before launch; do not reset child budgets to the original contract or double-charge the reservation.\n\n- **Medium \u2014 Failed evaluation details are currently flattened.**  \n  **Evidence:** `phaseRuntime.ts` (`#completeSpecialist`), `featureEvaluation.ts` (`assertExactCriteria`, `DurableRepairChildBroker.#assertRequest`).  \n  **Reason:** Any repair verdict marks every criterion failed, including criteria the evaluator reported as passed. Child authorization then relies on this inflated failed-criterion set.  \n  **Correction:** Validate an exact, noncontradictory criterion partition and preserve individual outcomes. Bind the planner\u2019s finding to an actually failed criterion and its evaluation evidence. Treat malformed evaluation output as blocked.\n\n- **Medium \u2014 Production child provisioning and recovery remain unproven.**  \n  **Evidence:** `standaloneCoordinators.ts` (`execute`), `featureEvaluation.ts` (`OfficialRepairChildPort.create`, `DurableRepairChildBroker.execute`).  \n  **Reason:** The supplied production composition does not wire the repair-child client operations. Child creation can leave partial Beads/ref effects that must reconcile before implementation admission.  \n  **Correction:** Wire the existing production child broker through scoped transport operations. Test crashes after child creation, after ref creation, before planner callback commitment and before successor enqueueing; also test stale-owner takeover, cancellation, changed documents, exhausted budgets and duplicate handoff consumption.\n\n**Required validation:** SP-08/SP-13 should prove explicit planner authority, immutable parent/child identity, correct budget consumption, child implementation \u2192 verification \u2192 review \u2192 acceptance \u2192 integration \u2192 reevaluation, and eventual delivery/finalization. Include a second evaluator failure to exercise linear child ancestry.\n\n**Missing evidence:** The supplied material excludes `stateMachine.ts`, role-operation policy, specialist input/output schemas, continuation consumption, child transport implementation and connected test results. Those are needed to verify transition gates, planner permissions, handoff atomicity and production feasibility. The reported successful journeys do not establish this remaining route.\n\n**Owner decisions:** This route is routine implementation within the stated R3 child mechanism. Owner action is needed only if the actual approved contract lacks planner, child-creation or required operation authority, or if implementation would require expanding approved limits. No approval is given here."
+    ]
+  },
+  "formalApproval": false
+}

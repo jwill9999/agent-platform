@@ -1,0 +1,127 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/phaseRuntime.test.ts (58 tests) 125607ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > reconciles a verified import under a new owner without relaunching the worker 3602ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: admission 2725ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: sync-admission 2662ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: cleanup-only 2613ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > renews live import fences across synchronous work longer than the initial lease without extending execution deadline 2671ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rechecks production import authority at mutation boundaries: before-files 2280ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rechecks production import authority at mutation boundaries: before-ref 2432ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > retains ordinary long code identifiers and string literals without entropy false positives 2858ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rejects source containing a secret assignment before importing 1679ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > imports actual worker bytes and commits a changed-head callback before verification 2685ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with failed criterion 1709ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with omitted criterion 1662ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with unapproved criterion 1665ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with unresolved finding 1687ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with remaining risk 1667ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with repair status with integrate intent 1986ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with blocked status with integrate intent 1890ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with continue review intent 1717ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with repair intent 1708ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with escalation intent 1755ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head without reusing evidence 3302ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to replacement owner without reusing evidence 3330ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head and replacement owner without reusing evidence 3383ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > executes verification then independent review through durable callbacks and exact evidence 3107ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > renews phase and resource leases across a specialist exceeding the initial TTL 8300ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > fails missing role or source authority before launch: {"roles":false} 406ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > fails missing role or source authority before launch: {"sourceFailure":true} 454ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > persists repair callback and queues no fake passing result 1903ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > persists broker interruption even while credential revocation is unavailable 5911ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rejects invalid structured output and settles/revokes before marking blocked 1954ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never dispatches started work again after a restart without an execution record 503ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > recovers an interrupted scheduler by removing, observing, and revoking before terminal bookkeeping 552ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > cannot add phase role authority through an automatic contract revision 348ms
+   ✓ rechecks admission after source preparation before credential issuance and dispatch 872ms
+   ✓ reconciles a crash before atomic interrupted finalization without acquiring execution leases 1774ms
+   ✓ contains the worker and latches admission when interruption persistence fails 4209ms
+   ✓ bounds shutdown when container removal fails while attach remains outstanding 1779ms
+   ✓ records ambiguous issuance before compensating revocation within the cleanup budget 1014ms
+   ✓ seals the credential pathname before a delayed issuance reply can recreate token bytes 3543ms
+   ✓ rejects a late credential acknowledgement after cleanup ownership changes 3050ms
+   ✓ finishes pending cleanup after the run becomes terminal without advancing it 1563ms
+   ✓ preserves committed success when interruption loses the completion race 1762ms
+   ✓ reports pending recovery for an orphan whose phase lease has not expired 452ms
+   ✓ rejects late success and callback commitment when interruption wins the transaction race 1707ms
+   ✓ recovers a crash after the cancel effect before its durable acknowledgement 1469ms
+   ✓ recovers a crash after the revoke effect before its durable acknowledgement 1510ms
+   ✓ recovers a crash after the settle effect before its durable acknowledgement 1514ms
+   ✓ recovers a persisted pre-reservation interruption without stranding cleanup 450ms
+   ✓ keeps a delayed create isolated until acknowledgement, then attaches before start 1977ms
+   ✓ redacts source verification exceptions before persisting a blocked phase 429ms
+   ✓ bounds credential filesystem settlement and rejects a late completion 6591ms
+   ✓ bounds waiting for a held container lock and prevents a late start 6227ms
+   ✓ redacts sensitive exceptions from both background runtime rejection paths 1426ms
+   ✓ rechecks service admission after synchronous document verification: topology_stale 1464ms
+   ✓ rechecks service admission after synchronous document verification: control_unavailable 1547ms
+   ✓ settles a create rejected at admission before Docker was invoked 1069ms
+   ✓ settles a create rejected at preflight before Docker was invoked 940ms
+ ✓ test/phaseJobs.test.ts (45 tests) 18065ms
+   ✓ standalone durable phase jobs > maps implementing/continue to task_verification without inventing a transition 334ms
+   ✓ standalone durable phase jobs > maps implementing/repair to task_verification without inventing a transition 312ms
+   ✓ standalone durable phase jobs > maps task_verification/continue to task_review without inventing a transition 323ms
+   ✓ standalone durable phase jobs > maps task_verification/repair to repair without inventing a transition 313ms
+   ✓ standalone durable phase jobs > maps task_review/continue to task_accepted without inventing a transition 311ms
+   ✓ standalone durable phase jobs > maps task_review/repair to repair without inventing a transition 308ms
+   ✓ standalone durable phase jobs > maps feature_evaluation/repair to repair_planning without inventing a transition 309ms
+   ✓ standalone durable phase jobs > maps repair_planning/continue to implementing without inventing a transition 301ms
+   ✓ standalone durable phase jobs > maps pipeline/continue to delivery without inventing a transition 305ms
+   ✓ standalone durable phase jobs > maps delivery/continue to finalizing without inventing a transition 303ms
+   ✓ standalone durable phase jobs > maps finalizing/complete to finalizing without inventing a transition 302ms
+   ✓ standalone durable phase jobs > atomically consumes a callback into exactly one job across duplicate consumption and restart 303ms
+   ✓ standalone durable phase jobs > rejects substituted callback identity and phase 372ms
+   ✓ standalone durable phase jobs > allows only one claimer and fences stale workers after a pre-start crash 556ms
+   ✓ standalone durable phase jobs > revalidates authority at claim and start with a visible blocker for stale queued work 366ms
+   ✓ standalone durable phase jobs > rejects a head change between claim and start without a false phase-start event 427ms
+   ✓ standalone durable phase jobs > does not infer a head ledger or active callback authority when either is absent 542ms
+   ✓ standalone durable phase jobs > keeps started work beyond five seconds and requires recovery instead of duplicate launch 504ms
+   ✓ standalone durable phase jobs > requires execution-bound durable completion and fences late completion 488ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted head_sha without completing 489ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted producer without completing 496ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted producer_role without completing 532ms
+   ✓ standalone durable phase jobs > rejects a previous implementation result even when it has valid generic evidence scope 633ms
+   ✓ standalone durable phase jobs > does not invent coordinator completion authority from a generic transition receipt 515ms
+   ✓ standalone durable phase jobs > production continuation queues runnable work and reports missing authority visibly 631ms
+   ✓ standalone durable phase jobs > preserves approval and blocked outcomes without enqueueing specialist work 545ms
+   ✓ cancellation queue fencing > keeps phase launch fenced after an incomplete cancellation deadline while allowing observation recovery 582ms
+   ✓ cancellation queue fencing > atomically fences pending phase work and rejects cancellation-time enqueues/claims 379ms
+   ✓ cancellation queue fencing > atomically fences claimed phase work and rejects cancellation-time enqueues/claims 392ms
+   ✓ cancellation queue fencing > does not declare started phase execution stopped from a cleanup boolean alone 434ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'enqueue' without starting work 307ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'enqueue' without starting work 316ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'claim' without starting work 414ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'claim' without starting work 369ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'claim' without starting work 365ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'start' without starting work 426ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'start' without starting work 424ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'start' without starting work 434ms
+   ✓ finishes a coordinator from committed proof and atomically queues one typed successor 765ms
+ ✓ test/specialistOutputManifest.test.ts (66 tests) 201ms
+ ✓ test/implementationImport.test.ts (27 tests) 14414ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects a concurrent destination symlink replacement without modifying its outside target 624ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects a concurrent ancestor symlink replacement without modifying its outside target 578ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > imports verified bytes, advances the exact base and replays without another commit 1127ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_prepare without duplicate effects 1033ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_head_apply without duplicate effects 1124ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_apply without duplicate effects 1026ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_prepare 1015ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_head_apply 1102ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_apply 1071ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > retains prepared evidence and refuses uncertain partial application 757ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects concurrent source drift and revoked authority before any writes 415ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rechecks authority when reconciling an already verified import 993ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > imports a new regular file under newly created parent directories 1085ms
+ ✓ test/specialistLauncher.test.ts (8 tests) 20ms
+ ✓ test/sourceGit.test.ts (7 tests) 4239ms
+   ✓ publishes an exact-head transaction only after preparing its ref locks 427ms
+   ✓ does not send commit when a started transaction cannot prepare before the deadline 1510ms
+   ✓ reports uncertain publication when the commit acknowledgement is lost 1509ms
+ ✓ test/coordinatorTransport.test.ts (4 tests) 314ms
+
+ Test Files  7 passed (7)
+      Tests  215 passed (215)
+   Start at  18:57:33
+   Duration  164.36s (transform 358ms, setup 0ms, collect 707ms, tests 162.86s, environment 1ms, prepare 206ms)

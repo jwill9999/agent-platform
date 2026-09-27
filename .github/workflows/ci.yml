@@ -49,6 +49,15 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Prepare private interpreter for pinned execution tests
+        shell: bash
+        run: |
+          # Keep the shared toolcache untouched; production pin checks reject group-writable binaries.
+          workflow_test_bin=$(mktemp -d "$RUNNER_TEMP/workflow-test-bin.XXXXXX")
+          install -m 700 "$(readlink -f "$(command -v node)")" "$workflow_test_bin/node"
+          "$workflow_test_bin/node" --version
+          echo "$workflow_test_bin" >> "$GITHUB_PATH"
+
       - name: Test
         run: pnpm run test
 

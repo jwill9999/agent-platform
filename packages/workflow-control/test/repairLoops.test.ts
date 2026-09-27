@@ -1132,3 +1132,41 @@ describe('DurableRepairCoordinator', () => {
     recoveredStore.close();
   });
 });
+
+it('retains the original finding budget while binding a subsequent failure to newer evidence', async () => {
+  const { store, coordinator } = await setup();
+  const first = evidence('a', 'review'),
+    next = evidence('b', 'review');
+  recordEvidence(store, first, 'code_reviewer', { createdAtMs: 1000, headSha: failureHead });
+  recordEvidence(store, next, 'code_reviewer', { createdAtMs: 1100, headSha: repairedHead });
+  const original = finding('review', 'code_reviewer', first, 'repeated-finding');
+  coordinator.dispatch({
+    dispatchId: 'first-attempt',
+    finding: original,
+    hypothesis: 'first fix',
+    change: { kind: 'hypothesis', value: 'first fix' },
+  });
+  coordinator.cancel('first-attempt', 'later verification failed');
+  expect(() =>
+    coordinator.dispatch({
+      dispatchId: 'bad-attempt',
+      finding: original,
+      observation: { ...original, evidence: [next], producerRole: 'test_runner' },
+      hypothesis: 'second fix',
+      change: { kind: 'hypothesis', value: 'second fix' },
+    }),
+  ).toThrow('observation changes finding identity');
+  const retry = coordinator.dispatch({
+    dispatchId: 'second-attempt',
+    finding: original,
+    observation: { ...original, evidence: [next], summary: 'still failing after first repair' },
+    hypothesis: 'second fix',
+    change: { kind: 'hypothesis', value: 'second fix' },
+  });
+  expect(retry).toMatchObject({
+    kind: 'dispatch',
+    dispatch: { findingAttempt: 2, failureHeadSha: repairedHead },
+    packet: { canonicalFinding: original, evidence: [next], remainingBudget: { finding: 0 } },
+  });
+  store.close();
+});

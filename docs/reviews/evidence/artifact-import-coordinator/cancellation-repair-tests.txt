@@ -1,0 +1,36 @@
+
+ RUN  v2.1.9 <checkout>/packages/workflow-control
+
+ ✓ test/evaluationCriteria.test.ts (13 tests) 2ms
+ ✓ test/repairPlanning.test.ts (11 tests) 639ms
+   ✓ derives child identity and permission intersection from approved material 342ms
+ ✓ test/featureEvaluation.test.ts (29 tests) 12631ms
+   ✓ ContractEvaluator > maps every criterion to secure exact-head evidence and freezes accepted evidence 351ms
+   ✓ DurableRepairChildBroker > creates an in-envelope append-only repair child idempotently 571ms
+   ✓ DurableRepairChildBroker > does not let an execution identity overwrite the child identity through an extended fence 525ms
+   ✓ DurableRepairChildBroker > carries approved-head lineage and decremented retry authority into a second repair 1270ms
+   ✓ DurableRepairChildBroker > rejects a second child until its predecessor advances and is accepted and closed 819ms
+   ✓ DurableRepairChildBroker > derives child authority from durable attempts and rejects an exhausted aggregate budget 608ms
+   ✓ DurableRepairChildBroker > rejects repair count expansion before mutation 321ms
+   ✓ DurableRepairChildBroker > rejects repair path expansion before mutation 355ms
+   ✓ DurableRepairChildBroker > rejects repair role expansion before mutation 335ms
+   ✓ DurableRepairChildBroker > rejects repair authority expansion before mutation 324ms
+   ✓ DurableRepairChildBroker > rejects repair dependency expansion before mutation 327ms
+   ✓ DurableRepairChildBroker > rejects repair retry budget expansion before mutation 337ms
+   ✓ DurableRepairChildBroker > durably escalates conflicting external state without mutation 467ms
+   ✓ DurableRepairChildBroker > rechecks changed planning documents immediately before repair child mutation 481ms
+   ✓ DurableRepairChildBroker > rechecks 'invalidate' authority after suspended 'child' observation in the official repair port 514ms
+   ✓ DurableRepairChildBroker > rechecks 'takeover' authority after suspended 'child' observation in the official repair port 547ms
+   ✓ DurableRepairChildBroker > rechecks 'invalidate' authority after suspended 'ref' observation in the official repair port 667ms
+   ✓ DurableRepairChildBroker > rechecks 'takeover' authority after suspended 'ref' observation in the official repair port 565ms
+   ✓ DurableRepairChildBroker > reconciles a crash after external mutation without duplicating the effect 567ms
+   ✓ DurableRepairChildBroker > adopts a prepared intent after lease-owner rollover without duplicating the effect 586ms
+   ✓ DurableRepairChildBroker > rejects a fabricated evaluation and a run outside repair_planning 428ms
+   ✓ charges child verifier retries with new finding IDs against the feature reservation budget 682ms
+   ✓ retains uncertain child effects when cancellation wins during final observation 519ms
+
+ Test Files  3 passed (3)
+      Tests  53 passed (53)
+   Start at  21:55:22
+   Duration  13.30s (transform 397ms, setup 0ms, collect 782ms, tests 13.27s, environment 0ms, prepare 132ms)
+

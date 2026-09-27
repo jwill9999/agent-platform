@@ -1,5 +1,7 @@
+import { LocalGitDeliveryPort } from '../src/gitDeliveryPort.js';
+import { TrustedSourceGit } from '../src/sourceGit.js';
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -8,6 +10,7 @@ import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { InterruptionCleanupJournal } from '../src/executionInterruptions.js';
+import { SecureEvidenceVault } from '../src/secureEvidence.js';
 import { ContinuationJournal } from '../src/continuationJournal.js';
 import { runParentContinuation } from '../src/continuationProcess.js';
 import { executionContractSchema, type ExecutionContract } from '../src/contracts.js';
@@ -41,6 +44,8 @@ afterEach(async () => {
 async function setup(
   options: {
     roles?: boolean;
+    implementation?: boolean;
+    implementationContent?: string;
     delayMs?: number;
     result?: unknown;
     sourceFailure?: boolean;
@@ -58,12 +63,22 @@ async function setup(
     verifySource?: () => Promise<void>;
   } = {},
 ) {
-  const f = await continuationFixture(Date.now(), 'implementation_worker');
+  const f = await continuationFixture(
+    Date.now(),
+    options.implementation ? 'feature_planner' : 'implementation_worker',
+    terminalResult,
+    options.implementation,
+  );
   const db = new Database(f.database);
   const row = db.prepare('SELECT body_json FROM contracts').get() as { body_json: string };
   const contract: ExecutionContract = executionContractSchema.parse(JSON.parse(row.body_json));
   contract.authority.allowedActions.push('artifact.write', 'workspace.read', 'process.test');
   contract.tasks[0]!.allowedOperations.push('artifact.write', 'workspace.read', 'process.test');
+  if (options.implementation) {
+    contract.tasks[0]!.assignedRole = 'implementation_worker';
+    contract.authority.allowedActions.push('workspace.patch', 'git.commit');
+    contract.tasks[0]!.allowedOperations.push('workspace.patch', 'git.commit');
+  }
   if (options.roles !== false)
     contract.tasks[0]!.phaseRoles = {
       task_verification: 'test_runner',
@@ -74,7 +89,11 @@ async function setup(
   );
   const materialDigest = deriveContractMaterialDigest(contract);
   db.prepare('UPDATE plan_approvals SET material_digest = ?').run(materialDigest);
-  const initialState = options.review ? 'task_verification' : 'implementing';
+  const initialState = options.implementation
+    ? 'repair_planning'
+    : options.review
+      ? 'task_verification'
+      : 'implementing';
   db.prepare('UPDATE runs SET state = ?').run(initialState);
   const { callbackId, approvalIntent, ...original } = f.callback;
   void callbackId;
@@ -113,10 +132,10 @@ async function setup(
     Date.now(),
   );
   const journal = new PhaseJobJournal(f.database);
-  const sourceRoot = join(f.root, 'source');
+  const sourceRoot = await realpath(join(f.root, 'source'));
   const sourceFile = join(sourceRoot, 'packages/workflow-control/example.txt');
   await mkdir(dirname(sourceFile), { recursive: true });
-  await writeFile(sourceFile, 'source');
+  if (!options.implementation) await writeFile(sourceFile, 'source');
   const credentials = new Map<string, 'active' | 'revoked'>();
   const revocationSawInterruption: boolean[] = [];
   const brokerState = {
@@ -164,6 +183,7 @@ async function setup(
       store,
       ownerId,
       sourceRoot,
+      executionSourceRoot: (runId) => store.getImplementationWorkspace(runId, sourceRoot),
       image: 'fixture@sha256:' + 'a'.repeat(64),
       credentialBroker: credentialBroker(store),
       egressNetwork: 'fixture-egress',
@@ -193,6 +213,11 @@ async function setup(
             return { stdout: 'fixture-container', stderr: '' };
           }
           if (args[0] === 'start') {
+            if (options.implementation)
+              await writeFile(
+                join(staging.at(-1)!, 'workspace/packages/workflow-control/example.txt'),
+                options.implementationContent ?? 'verified worker change',
+              );
             // Real child transport, with fixture terminal data; this is NOT real Docker/Codex conformance.
             return execute(
               process.execPath,
@@ -206,6 +231,9 @@ async function setup(
                     text: JSON.stringify(
                       options.result ?? {
                         ...terminalResult,
+                        changedFiles: options.implementation
+                          ? ['packages/workflow-control/example.txt']
+                          : [],
                         recommendedTransition:
                           prompts.at(-1)?.task.assignedRole === 'code_reviewer'
                             ? 'integrate'
@@ -229,11 +257,12 @@ async function setup(
   const config = readPhaseRuntimeConfig({
     runId: 'run',
     sourceRoot,
+    gitBinary: process.env.WORKFLOW_GIT_BINARY ?? '/usr/bin/git',
     image: 'fixture@sha256:' + 'a'.repeat(64),
     credentialBrokerBinary: '/fixture/credentials',
     egressNetwork: 'fixture-egress',
     containerUser: `${process.getuid!()}:${process.getgid!()}`,
-    leaseTtlMs: 5000,
+    leaseTtlMs: options.implementation ? 60000 : 5000,
   });
   const runtime = StandalonePhaseRuntime.createForTest({
     store: f.store,
@@ -257,6 +286,10 @@ async function setup(
   cleanups.push(async () => {
     await runtime.close();
     continuation.close();
+    for (const row of db.prepare('SELECT workspace_root FROM implementation_workspaces').all() as {
+      workspace_root: string;
+    }[])
+      await rm(dirname(row.workspace_root), { recursive: true, force: true });
     db.close();
     await Promise.all(staging.map((root) => rm(root, { recursive: true, force: true })));
     await rm(f.root, { recursive: true, force: true });
@@ -281,17 +314,441 @@ async function setup(
 }
 
 describe('standalone phase runtime production orchestration with fixture launcher transport', () => {
+  it.each(['resume', 'expired'] as const)(
+    'reconciles retained import %s under a new owner without relaunching the worker',
+    async (mode) => {
+      const f = await setup({ implementation: true });
+      const original = SecureEvidenceVault.prototype.recordSpecialistResult;
+      let held = false;
+      let release!: () => void;
+      let reached!: () => void;
+      const barrier = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const ready = new Promise<void>((resolve) => {
+        reached = resolve;
+      });
+      const spy = vi
+        .spyOn(SecureEvidenceVault.prototype, 'recordSpecialistResult')
+        .mockImplementation(async function (this: SecureEvidenceVault, input) {
+          const parsed = JSON.parse(Buffer.from(input.content).toString('utf8'));
+          if (parsed.terminal && !parsed.kind && !held) {
+            held = true;
+            reached();
+            await barrier;
+          }
+          return original.call(this, input);
+        });
+      const running = f.runtime.runOnce();
+      await ready;
+      f.db.prepare("UPDATE phase_jobs SET lease_until_ms=0 WHERE status='started'").run();
+      const replacement = StandalonePhaseRuntime.createForTest({
+        store: f.store,
+        journal: f.journal,
+        launcher: f.makeLauncher(f.store, 'replacement'),
+        config: f.config,
+        owner: 'replacement',
+        process: {
+          pid: process.pid,
+          startTimeMs: 2,
+          executableDigest: digestGovernedValue('replacement'),
+        },
+        verifySource: async (action) => {
+          const head = await execute(f.config.gitBinary, [
+            '-C',
+            f.store.getImplementationWorkspace('run', f.config.sourceRoot),
+            'rev-parse',
+            'HEAD',
+          ]);
+          expect(head.stdout.trim()).toBe(action.headSha);
+        },
+      });
+      try {
+        await replacement.runOnce();
+        expect(f.journal.list()[0]).toMatchObject({
+          status: 'started',
+          failure_code: 'phase_coordinator_waiting_for_owner',
+        });
+        expect(
+          f.db.prepare('SELECT COUNT(*) AS n FROM coordinator_recovery_attempts').get(),
+        ).toEqual({ n: 0 });
+        expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+        f.db.prepare('UPDATE leases SET expires_at_ms=0').run();
+        f.db.prepare("UPDATE phase_jobs SET lease_until_ms=0 WHERE status='started'").run();
+        if (mode === 'expired')
+          f.db
+            .prepare(
+              "UPDATE scheduler_executions SET deadline_ms=0 WHERE role='implementation_worker'",
+            )
+            .run();
+        await replacement.runOnce();
+        if (mode === 'expired') {
+          expect(f.journal.list()[0]?.status).toBe('blocked');
+          expect(
+            f.db
+              .prepare("SELECT COUNT(*) AS n FROM scheduler_executions WHERE status='active'")
+              .get(),
+          ).toEqual({ n: 0 });
+          expect(f.db.prepare('SELECT status FROM implementation_imports').get()).toEqual({
+            status: 'verified',
+          });
+          expect(f.db.prepare('SELECT state FROM execution_interruptions').get()).toEqual({
+            state: 'settled',
+          });
+          expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+          return;
+        }
+        expect(f.store.getRun('run')?.state).toBe('task_verification');
+        expect(f.journal.list()[0]?.status).toBe('completed');
+        expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+        expect(f.db.prepare('SELECT owner_id FROM implementation_import_recoveries').get()).toEqual(
+          {
+            owner_id: 'replacement',
+          },
+        );
+      } finally {
+        release();
+        await running;
+        spy.mockRestore();
+        await replacement.close();
+      }
+    },
+    15000,
+  );
+  it.each(['admission', 'sync-admission', 'cleanup-only'])(
+    'does not resume import or commit callbacks when recovery is denied: %s',
+    async (denial) => {
+      const f = await setup({ implementation: true });
+      const original = SecureEvidenceVault.prototype.recordSpecialistResult;
+      let held = false;
+      let release!: () => void;
+      let reached!: () => void;
+      const barrier = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const ready = new Promise<void>((resolve) => {
+        reached = resolve;
+      });
+      const spy = vi
+        .spyOn(SecureEvidenceVault.prototype, 'recordSpecialistResult')
+        .mockImplementation(async function (this: SecureEvidenceVault, input) {
+          const parsed = JSON.parse(Buffer.from(input.content).toString('utf8'));
+          if (parsed.terminal && !parsed.kind && !held) {
+            held = true;
+            reached();
+            await barrier;
+          }
+          return original.call(this, input);
+        });
+      const running = f.runtime.runOnce();
+      await ready;
+      f.db.prepare('UPDATE leases SET expires_at_ms=0').run();
+      f.db.prepare("UPDATE phase_jobs SET lease_until_ms=0 WHERE status='started'").run();
+      const replacement = StandalonePhaseRuntime.createForTest({
+        store: f.store,
+        journal: f.journal,
+        launcher: f.makeLauncher(f.store, 'replacement'),
+        config: f.config,
+        owner: 'replacement',
+        cleanupOnly: denial === 'cleanup-only',
+        admission: async () => {
+          if (denial === 'admission') throw new Error('not_ready');
+        },
+        assertAdmission: () => {
+          if (denial === 'sync-admission') throw new Error('not_ready');
+        },
+        process: {
+          pid: process.pid,
+          startTimeMs: 2,
+          executableDigest: digestGovernedValue('replacement'),
+        },
+        verifySource: async (action) => {
+          const head = await execute(f.config.gitBinary, [
+            '-C',
+            f.config.sourceRoot,
+            'rev-parse',
+            'HEAD',
+          ]);
+          expect(head.stdout.trim()).toBe(action.headSha);
+        },
+      });
+      try {
+        await replacement.runOnce();
+        expect(f.store.getRun('run')?.state).toBe('implementing');
+        expect(f.journal.list()[0]?.status).toBe('blocked');
+        expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+        expect(
+          f.db.prepare('SELECT COUNT(*) AS n FROM implementation_import_recoveries').get(),
+        ).toEqual({ n: 0 });
+        expect(f.db.prepare('SELECT COUNT(*) AS n FROM delegate_callbacks').get()).toEqual({
+          n: 1,
+        });
+      } finally {
+        release();
+        await running;
+        spy.mockRestore();
+        await replacement.close();
+      }
+    },
+  );
+  it('renews live import fences across synchronous work longer than the initial lease without extending execution deadline', async () => {
+    const f = await setup({ implementation: true });
+    const originalImport = WorkflowStore.prototype.importImplementation;
+    const originalGit = TrustedSourceGit.prototype.run;
+    let elapsed = 0;
+    const spy = vi
+      .spyOn(WorkflowStore.prototype, 'importImplementation')
+      .mockImplementation(function (this: WorkflowStore, input) {
+        const began = Date.now();
+        const deadline = this.getSchedulerExecution(input.authority.id)!.deadlineMs;
+        f.db.prepare('UPDATE leases SET expires_at_ms=?').run(began + 1000);
+        f.db
+          .prepare("UPDATE phase_jobs SET lease_until_ms=? WHERE status='started'")
+          .run(began + 1000);
+        const now = vi.spyOn(Date, 'now').mockImplementation(() => began + elapsed);
+        const git = vi.spyOn(TrustedSourceGit.prototype, 'run').mockImplementation(function (
+          this: TrustedSourceGit,
+          args,
+          bytes,
+          index,
+        ) {
+          elapsed += 80;
+          return originalGit.call(this, args, bytes, index);
+        });
+        try {
+          const receipt = originalImport.call(this, { ...input, renewLeaseTtlMs: 1000 });
+          expect(elapsed).toBeGreaterThan(1000);
+          expect(this.getSchedulerExecution(input.authority.id)!.deadlineMs).toBe(deadline);
+          return receipt;
+        } finally {
+          now.mockRestore();
+          git.mockRestore();
+        }
+      });
+    try {
+      const progressed = await f.runtime.runOnce();
+      expect(progressed, JSON.stringify(f.journal.list())).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  it.each(['before-files', 'before-ref'])(
+    'rechecks production import authority at mutation boundaries: %s',
+    async (boundary) => {
+      const f = await setup({ implementation: true });
+      const base = (
+        await execute(f.config.gitBinary, ['-C', f.config.sourceRoot, 'rev-parse', 'HEAD'])
+      ).stdout.trim();
+      const originalImport = WorkflowStore.prototype.importImplementation;
+      const originalGit = TrustedSourceGit.prototype.run;
+      const originalClean = TrustedSourceGit.prototype.assertClean;
+      let cleanCount = 0;
+      const importSpy = vi
+        .spyOn(WorkflowStore.prototype, 'importImplementation')
+        .mockImplementation(function (this: WorkflowStore, input) {
+          const deadline = this.getSchedulerExecution(input.authority.id)!.deadlineMs;
+          let expired = false;
+          const realNow = Date.now.bind(Date);
+          const now = vi
+            .spyOn(Date, 'now')
+            .mockImplementation(() => (expired ? deadline + 1 : realNow()));
+          const clean = vi
+            .spyOn(TrustedSourceGit.prototype, 'assertClean')
+            .mockImplementation(function (this: TrustedSourceGit, paths) {
+              originalClean.call(this, paths);
+              if (
+                boundary === 'before-files' &&
+                this.root !== input.sourceRoot &&
+                ++cleanCount === 2
+              )
+                expired = true;
+            });
+          const git = vi.spyOn(TrustedSourceGit.prototype, 'run').mockImplementation(function (
+            this: TrustedSourceGit,
+            args,
+            bytes,
+            index,
+          ) {
+            const result = originalGit.call(this, args, bytes, index);
+            if (boundary === 'before-ref' && args[0] === 'read-tree' && index === undefined)
+              expired = true;
+            return result;
+          });
+          try {
+            return originalImport.call(this, input);
+          } finally {
+            now.mockRestore();
+            git.mockRestore();
+            clean.mockRestore();
+          }
+        });
+      try {
+        expect(await f.runtime.runOnce()).toBe(false);
+        expect(
+          (
+            await execute(f.config.gitBinary, ['-C', f.config.sourceRoot, 'rev-parse', 'HEAD'])
+          ).stdout.trim(),
+        ).toBe(base);
+        expect(f.db.prepare('SELECT current_sha FROM delivery_approved_heads').get()).toEqual({
+          current_sha: base,
+        });
+        expect(f.db.prepare('SELECT COUNT(*) AS n FROM delegate_callbacks').get()).toEqual({
+          n: 1,
+        });
+        expect(f.db.prepare('SELECT status FROM implementation_imports').get()).toEqual({
+          status: 'prepared',
+        });
+        if (boundary === 'before-files')
+          expect(
+            await readFile(
+              join(f.config.sourceRoot, 'packages/workflow-control/example.txt'),
+              'utf8',
+            ),
+          ).not.toBe('verified worker change');
+      } finally {
+        importSpy.mockRestore();
+      }
+    },
+  );
+  it('retains ordinary long code identifiers and string literals without entropy false positives', async () => {
+    const content =
+      'export const abcdefghijklmnopqrstuvwxyz = "https://example.test/abcdefghijklmnopqrstuvwxyz";';
+    const f = await setup({ implementation: true, implementationContent: content });
+    expect(await f.runtime.runOnce()).toBe(true);
+    expect(
+      await readFile(
+        join(
+          f.store.getImplementationWorkspace('run', f.config.sourceRoot),
+          'packages/workflow-control/example.txt',
+        ),
+        'utf8',
+      ),
+    ).toBe(content);
+  }, 15000);
+  it('rejects source containing a secret assignment before importing', async () => {
+    const f = await setup({
+      implementation: true,
+      implementationContent: 'const api_key = "abcdef1234567890secretvalue";',
+    });
+    expect(await f.runtime.runOnce()).toBe(false);
+    expect(
+      await readFile(join(f.config.sourceRoot, 'packages/workflow-control/example.txt'), 'utf8'),
+    ).toBe('fixture source');
+    expect(f.db.prepare('SELECT COUNT(*) AS count FROM implementation_imports').get()).toEqual({
+      count: 0,
+    });
+  }, 15000);
+  it('imports actual worker bytes and commits a changed-head callback before verification', async () => {
+    const f = await setup({ implementation: true });
+    const previous = f.db.prepare('SELECT current_sha FROM delivery_approved_heads').get() as {
+      current_sha: string;
+    };
+    f.db.prepare('UPDATE delivery_approved_heads SET published_sha=current_sha').run();
+    expect(await f.runtime.runOnce()).toBe(true);
+    expect(f.store.getRun('run')?.state).toBe('task_verification');
+    expect(
+      await readFile(
+        join(
+          f.store.getImplementationWorkspace('run', f.config.sourceRoot),
+          'packages/workflow-control/example.txt',
+        ),
+        'utf8',
+      ),
+    ).toBe('verified worker change');
+    expect(
+      await readFile(join(f.config.sourceRoot, 'packages/workflow-control/example.txt'), 'utf8'),
+    ).toBe('fixture source');
+    const imported = f.db
+      .prepare('SELECT base_head,result_head,status FROM implementation_imports')
+      .get() as { base_head: string; result_head: string; status: string };
+    expect(imported.status).toBe('verified');
+    expect(f.db.prepare('SELECT published_sha FROM delivery_approved_heads').get()).toEqual({
+      published_sha: previous.current_sha,
+    });
+    expect(imported.result_head).not.toBe(imported.base_head);
+    expect(
+      f.db.prepare('SELECT current_sha,import_execution_id FROM delivery_approved_heads').get(),
+    ).toEqual({ current_sha: imported.result_head, import_execution_id: expect.any(String) });
+  });
+  it('publishes private-only objects with remote CAS and reconciles a lost acknowledgement', async () => {
+    const f = await setup({ implementation: true });
+    expect(await f.runtime.runOnce()).toBe(true);
+    const owned = f.store.getImplementationWorkspace('run', f.config.sourceRoot);
+    const local = new TrustedSourceGit(owned, f.config.gitBinary);
+    const source = new TrustedSourceGit(f.config.sourceRoot, f.config.gitBinary);
+    const base = source.run(['rev-parse', 'HEAD']).toString().trim();
+    const head = local.run(['rev-parse', 'HEAD']).toString().trim();
+    expect(() => source.run(['cat-file', '-e', head])).toThrow();
+    const remote = join(f.root, 'disposable-remote.git');
+    source.run(['init', '--bare', '--quiet', remote]);
+    source.run(['push', '--quiet', remote, `HEAD:refs/heads/task/task`]);
+    const remoteGit = new TrustedSourceGit(await realpath(remote), f.config.gitBinary);
+    let pushes = 0;
+    const port = LocalGitDeliveryPort.createForWorkflow({
+      store: f.store,
+      runId: 'run',
+      workspaceRoot: f.config.sourceRoot,
+      gitPin: local.pin,
+      remoteName: 'origin',
+      remote: {
+        observeRef: async (input) => remoteGit.run(['rev-parse', input.ref]).toString().trim(),
+        pushCas: async (input) => {
+          expect(input.objectSourceRoot).toBe(owned);
+          local.run([
+            'push',
+            '--quiet',
+            `--force-with-lease=${input.ref}:${input.expectedOldSha ?? ''}`,
+            remote,
+            `${input.newSha}:${input.ref}`,
+          ]);
+          if (++pushes === 1) throw new Error('lost acknowledgement');
+        },
+      },
+    });
+    const request = {
+      kind: 'git.push' as const,
+      workspaceId: f.callback.workspaceId,
+      runId: 'run',
+      taskId: 'task',
+      repository: 'o/r',
+      actorRole: 'workflow_orchestrator' as const,
+      contractVersion: 1 as const,
+      policyDigest: f.callback.policyDigest,
+      ref: 'refs/heads/task/task',
+      expectedRemoteSha: base,
+      newSha: head,
+    };
+    await expect(port.mutate(request)).rejects.toThrow('lost acknowledgement');
+    expect(await port.observe(request)).toMatchObject({ kind: 'expected', result: { sha: head } });
+    expect(pushes).toBe(1);
+    expect(source.run(['rev-parse', 'HEAD']).toString().trim()).toBe(base);
+    expect(
+      await readFile(join(f.config.sourceRoot, 'packages/workflow-control/example.txt'), 'utf8'),
+    ).toBe('fixture source');
+    const tree = local
+      .run(['rev-parse', `${base}^{tree}`])
+      .toString()
+      .trim();
+    const competing = local
+      .run(['commit-tree', tree, '-p', base, '-m', 'competing remote change'])
+      .toString()
+      .trim();
+    local.run(['push', '--quiet', remote, `${competing}:refs/heads/task/other`]);
+    remoteGit.run(['update-ref', request.ref, competing, head]);
+    await expect(port.mutate(request)).rejects.toThrow();
+    expect(remoteGit.run(['rev-parse', request.ref]).toString().trim()).toBe(competing);
+  }, 15000);
   it.each([
     [
       'failed criterion',
       { acceptanceCriteria: { passed: ['durable'], failed: ['durable'] } },
-      'repair',
+      'escalated',
     ],
-    ['omitted criterion', { acceptanceCriteria: { passed: [], failed: [] } }, 'repair'],
+    ['omitted criterion', { acceptanceCriteria: { passed: [], failed: [] } }, 'escalated'],
     [
       'unapproved criterion',
       { acceptanceCriteria: { passed: ['durable', 'extra'], failed: [] } },
-      'repair',
+      'escalated',
     ],
     [
       'unresolved finding',
@@ -312,13 +769,17 @@ describe('standalone phase runtime production orchestration with fixture launche
           },
         ],
       },
-      'repair',
+      'escalated',
     ],
     ['remaining risk', { remainingRisks: ['unresolved risk'] }, 'escalated'],
-    ['repair status with integrate intent', { status: 'needs_repair' }, 'repair'],
+    ['repair status with integrate intent', { status: 'needs_repair' }, 'escalated'],
     ['blocked status with integrate intent', { status: 'blocked' }, 'escalated'],
-    ['passed status with continue review intent', { recommendedTransition: 'continue' }, 'repair'],
-    ['passed status with repair intent', { recommendedTransition: 'repair' }, 'repair'],
+    [
+      'passed status with continue review intent',
+      { recommendedTransition: 'continue' },
+      'escalated',
+    ],
+    ['passed status with repair intent', { recommendedTransition: 'repair' }, 'escalated'],
     ['passed status with escalation intent', { recommendedTransition: 'escalate' }, 'escalated'],
   ] as const)('never accepts review with %s', async (_name, override, expected) => {
     const f = await setup({
@@ -519,10 +980,39 @@ describe('standalone phase runtime production orchestration with fixture launche
 
   it('persists repair callback and queues no fake passing result', async () => {
     const f = await setup({
-      result: { ...terminalResult, status: 'needs_repair', recommendedTransition: 'repair' },
+      result: {
+        ...terminalResult,
+        status: 'needs_repair',
+        recommendedTransition: 'repair',
+        findings: [
+          {
+            id: 'fixture-repair',
+            severity: 'high',
+            summary: 'verification failed',
+            evidence: [
+              {
+                digest: 'sha256:' + 'a'.repeat(64),
+                mediaType: 'text/plain',
+                sizeBytes: 1,
+                kind: 'test',
+              },
+            ],
+            repairHypothesis: 'Correct the failing bounded implementation',
+          },
+        ],
+      },
     });
     expect(await f.runtime.runOnce()).toBe(true);
     expect(f.store.getRun('run')?.state).toBe('repair');
+  });
+
+  it('blocks a non-actionable repair result before queuing an infrastructure retry', async () => {
+    const f = await setup({
+      result: { ...terminalResult, status: 'needs_repair', recommendedTransition: 'repair' },
+    });
+    expect(await f.runtime.runOnce()).toBe(true);
+    expect(f.store.getRun('run')?.state).toBe('escalated');
+    expect(f.db.prepare('SELECT COUNT(*) AS n FROM repair_dispatches').get()).toEqual({ n: 0 });
   });
 
   it('persists broker interruption even while credential revocation is unavailable', async () => {
@@ -921,15 +1411,16 @@ it('redacts source verification exceptions before persisting a blocked phase', a
 it('bounds credential filesystem settlement and rejects a late completion', async () => {
   const f = await setup({ result: { invalid: true } });
   let release!: () => void;
+  let settlementStarted = 0;
   const blocked = vi.spyOn(f.launcher, 'removeInterruptedCredentials').mockImplementation(
     () =>
       new Promise<void>((resolve) => {
+        settlementStarted = Date.now();
         release = resolve;
       }),
   );
-  const start = Date.now();
   expect(await f.runtime.runOnce()).toBe(false);
-  expect(Date.now() - start).toBeLessThan(6500);
+  expect(Date.now() - settlementStarted).toBeLessThan(6000);
   expect(f.journal.interruptions().list('run')[0]).toMatchObject({ state: 'pending', settle: 0 });
   release();
   await Promise.resolve();
@@ -1072,3 +1563,36 @@ it.each(['admission', 'preflight'])(
     }
   },
 );
+
+it('waits for live predecessor leases without charging retained-handoff recovery or launching a worker', async () => {
+  const f = await setup();
+  const prior = f.journal.start(f.journal.claim('owner', 60000, Date.now())!, Date.now());
+  // A retained handoff selects the planner recovery path. Keep a real scheduler record
+  // but deliberately hold resource authority elsewhere; admission must stop before use.
+  f.db
+    .prepare("UPDATE phase_jobs SET execution_id='child',lease_until_ms=0 WHERE id=?")
+    .run(prior.id);
+  f.db
+    .prepare(
+      "UPDATE scheduler_executions SET status='active',role='feature_planner' WHERE id='child'",
+    )
+    .run();
+  f.db
+    .prepare(
+      "INSERT INTO repair_planning_handoffs VALUES('child','retained-child','{}','{}','retained-result',0)",
+    )
+    .run();
+  const until = Date.now() + 30000;
+  f.db.prepare("UPDATE leases SET owner_id='previous-runtime',expires_at_ms=?").run(until);
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.journal.get(prior.id)).toMatchObject({
+    status: 'started',
+    failure_code: 'phase_coordinator_waiting_for_owner',
+  });
+  expect(f.journal.get(prior.id)!.lease_until_ms).toBeGreaterThanOrEqual(until);
+  expect(f.db.prepare('SELECT COUNT(*) AS n FROM coordinator_recovery_attempts').get()).toEqual({
+    n: 0,
+  });
+  expect(f.journal.interruptions().list('run')).toEqual([]);
+  expect(f.launches).toEqual([]);
+});

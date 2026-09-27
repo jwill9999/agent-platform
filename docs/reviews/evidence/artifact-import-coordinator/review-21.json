@@ -1,0 +1,92 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "a8af4ef1-bec3-4ccd-9466-2581fedcc6b8",
+  "materialDigest": "6ec0e415d15a092a5aa89333cbdfdfed2a20e0eb95ff6740746a5560de02a331",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "docs/workflow-control-evidence-evaluation.md",
+      "digest": "048905692a7bb1c78693edefc2d86406922da300e3551758bc364e9efaa83974"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "aaded6911e918fb68af54ececcc41a1aa5b9c59a60bf073443af3969aaac0ed5"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "digest": "23e53b93abf0bf0103ee9464860a92418970f779d3831d5e2c55872cfbbd4caa"
+    },
+    {
+      "path": "packages/workflow-control/src/effectiveTaskAuthority.ts",
+      "digest": "db1363ec26939bb2e2b1bf2f49a02e540692f23e2b575eef7f46beab17867ad4"
+    },
+    {
+      "path": "packages/workflow-control/src/featureEvaluation.ts",
+      "digest": "e7b49c80bea4b55a6f40e81be9a3c804e65c97f2fffd0c3ebfae143ce86f7092"
+    },
+    {
+      "path": "packages/workflow-control/src/integrationGate.ts",
+      "digest": "9e45c3d12452be2cb9aaec9eba377aacfdb3ac8ba11aa0b54d7f3cf3cb1475bd"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "015778ef080523286677eb7462ecfb3c57fea3787e06d38ed644af01e1581c07"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "f91658d8d7d8deddab38206c82295c39d739874e571594bd26e2cb3ef6ffaa09"
+    },
+    {
+      "path": "packages/workflow-control/src/repairChildContract.ts",
+      "digest": "a6f481333c920e08d4b29eea24cc3981689ef0673b336f8dcf269b348c56e637"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanning.ts",
+      "digest": "0f016d39515255b5d302a4feb88c9e308f6873adecae860920d9055d9a47e9b0"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanningJournal.ts",
+      "digest": "4297d40a531435d82b9095f9894f04f6b7df41cd264c06009af1f85f1f3d7ff9"
+    },
+    {
+      "path": "packages/workflow-control/src/standaloneCoordinators.ts",
+      "digest": "8733428908ab8f700d299edf1997d3f033074ae045ad069450d7f16702671661"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "35487fd7faaad086dcbce48107b07b4521e306ee02e2e42ef43918381b52afec"
+    },
+    {
+      "path": "packages/workflow-control/test/effectiveTaskAuthority.test.ts",
+      "digest": "6a0b5a2ff2307f4fc75e8978344438c0179e1746259b6db41fc3846953fd54d7"
+    },
+    {
+      "path": "packages/workflow-control/test/evaluationCriteria.test.ts",
+      "digest": "6a742863eab5105e1d619b0e5df1a9826d36f860cc85970dd73e20f2abe1d3a5"
+    },
+    {
+      "path": "packages/workflow-control/test/featureEvaluation.test.ts",
+      "digest": "89ca9f50e799d0bea20b6b63caad62e86308b51a84fbba030ee2d92c06785f93"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseJobs.test.ts",
+      "digest": "5c28dd8c2e00cd0c2cb29e50fd1a3cf5e82f1fc0920fe6f3aaee773c34ac70d9"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "d782eca7e07a7e42f2b00ec4718b62578baca6d0f0c6c2070da66a73bb6909a7"
+    },
+    {
+      "path": "packages/workflow-control/test/repairPlanning.test.ts",
+      "digest": "5a4643bc0af5cb0ff6bdf9a8ffdcadea4e75ba08ca0a0345502677af5f6aa2f6"
+    }
+  ],
+  "formalApproval": false,
+  "review": 21,
+  "messages": [
+    "No remaining concrete defect identified in the follow-up fixes from the supplied evidence.\n\n- **Resolved \u2014 cancellation during child finalization.** `packages/workflow-control/src/storage.ts`: `finalizeRepairChildIntent` now checks state and current fences inside the commit transaction, accounting for elapsed verification time. Cancellation prevents both commitment and approved-head insertion. The regression in `test/featureEvaluation.test.ts` asserts a retained prepared intent, no approved child head, and exactly one mutation.\n- **Resolved \u2014 QA-only predecessor support.** `src/repairPlanning.ts`: child paths derive from the feature/repair path intersection, and required operations are checked against feature authority. `test/repairPlanning.test.ts` explicitly covers a QA predecessor without patch authority and missing feature-level handoff authority.\n- **Previously addressed protections remain present.** Evaluator verdict/routing contradictions are rejected; import and planner recovery defer without consuming retries while another owner holds leases; exhausted planner recovery enters durable cleanup before terminal bookkeeping.\n\n**Optional recommendation:** Extend the cancellation regression to reopen the journal and verify that the retained prepared intent remains unavailable for execution. This would strengthen recovery coverage; it is not a demonstrated defect.\n\n**Missing evidence:** The supplied tests are source code, not execution results. No passing build/typecheck/lint logs, connected qualification through `StandalonePhaseRuntime.create`, real Docker/broker results, macOS executable qualification, or exact-head hosted checks were supplied. Supporting implementations\u2014including coordinator receipt verification and the importer\u2014are also outside this evidence bundle, limiting conclusions about the complete production route.\n\nThis is a static review of the supplied evidence, not human or pilot approval."
+  ]
+}
