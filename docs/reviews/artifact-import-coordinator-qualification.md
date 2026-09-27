@@ -2,6 +2,7 @@
 
 Status: incomplete; not merge-ready. Beads: `agent-platform-pilot-zero.17`.
 Branch: `task/artifact-import-coordinator`.
+[Draft PR278](https://github.com/jwill9999/agent-platform/pull/278) is preservation only.
 Baseline: PR277 merged to `feature/harness-backlog-review` at
 `b7be3d6fcbf62c257e68f24dc46eca397cd02ffb`.
 
@@ -58,15 +59,18 @@ No live operator adapter has been qualified. No full R3 independent review or en
 - The focused import/phase suite passed 73 tests, including one real Docker journey through the
   production CLI/runtime, credential broker, actual Codex tool execution, retained output, import,
   Git commit and callback. Its model Responses transport is controlled and its credentials are dummy;
-  this is not live model-service evidence or an orchestration pilot.
+  this is not live model-service evidence or an orchestration pilot. The same real-container
+  journey passed again after the Git deadline correction.
 - A later focused Git/import suite passed 32 tests, including real ref-lock contention, expired
   authority, exact-head publication and stale compare-and-swap rejection.
 - Four coordinator transport tests pass: structured invocation without host credential inheritance,
   changed executable/revoked admission, revocation before reply acceptance and direct process stop.
   macOS may inject its locale environment value; no host credential is permitted by the test.
 - Earlier full sequential results were 1,035 passed, two failed and 64 skipped. The two launcher
-  failures were retested successfully after the absent-path fix. A fresh full run is pending;
-  the earlier run is not reported as green. Required skipped scenarios remain unqualified.
+  failures were retested successfully after the absent-path fix. The fresh full sequential run
+  passes: **1,054 passed, 64 skipped**, 57 test files passed and nine skipped. Required skipped
+  scenarios remain unqualified. The final type-only receipt dependency cleanup also passes build
+  and the dependency-cycle check; the initial hosted cycle failure is fixed locally.
 - Independent isolated reviews found and drove corrections for source identity, callback head
   binding, Git configuration, recovery admission, absent new paths, symlink races and lease timing.
   Focused review 7 found no concrete defect under commit-dispatch deadline semantics, but noted
@@ -76,7 +80,9 @@ No live operator adapter has been qualified. No full R3 independent review or en
   Review evidence is advisory,
   not execution approval. R3 has not received final independent review.
 
-Retained evidence snapshots live in `docs/reviews/evidence/artifact-import-coordinator/`.
+Retained evidence snapshots live in the [evidence directory](evidence/artifact-import-coordinator/).
+Task-owned isolated-review gateway and its two networks were removed after review; other services
+were left untouched. Current-head hosted checks remain pending.
 Tests do not qualify staging, paid service latency, host editing races or unattended final delivery.
 The Sonar/Problems completion gate remains **blocked** by the unresolved import finding and missing
 required connected coordinator coverage, even where individual build/lint/type/test checks pass.

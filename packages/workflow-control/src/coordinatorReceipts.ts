@@ -1,7 +1,17 @@
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import { digestGovernedValue } from './governedOperations.js';
-import type { ExecutePhaseAction } from './phaseJobs.js';
+/** Minimal proof context; receipt verification does not depend on the phase queue implementation. */
+export interface CoordinatorProofContext {
+  workspaceId: string;
+  runId: string;
+  taskId: string;
+  phase: string;
+  runVersion: number;
+  headSha: string;
+  contractVersion: number;
+  policyDigest: string;
+}
 
 const id = z.string().min(1).max(500);
 const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
@@ -45,7 +55,7 @@ interface Transition {
 }
 function transition(
   db: Database.Database,
-  action: ExecutePhaseAction,
+  action: CoordinatorProofContext,
   key: string,
   from: string,
   to: string,
@@ -71,7 +81,12 @@ function transition(
     throw new Error('coordinator transition proof rejected');
   return row;
 }
-function operation(db: Database.Database, action: ExecutePhaseAction, key: string, kind: string) {
+function operation(
+  db: Database.Database,
+  action: CoordinatorProofContext,
+  key: string,
+  kind: string,
+) {
   const row = db.prepare('SELECT * FROM delivery_operations WHERE id=?').get(key) as
     | {
         workspace_id: string;
@@ -107,7 +122,7 @@ function operation(db: Database.Database, action: ExecutePhaseAction, key: strin
 /** Must run in the phase completion transaction. This observes effects; it performs none. */
 export function verifyCoordinatorProof(
   db: Database.Database,
-  action: ExecutePhaseAction,
+  action: CoordinatorProofContext,
   raw: unknown,
 ): CoordinatorOutcome {
   const proof = coordinatorProofSchema.parse(raw);

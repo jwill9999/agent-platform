@@ -5,6 +5,7 @@ The owner authorized completing R2 governed import and R3 coordinator completion
 `agent-platform-pilot-zero.17`. Active checkout is
 `/Users/letuscode/projects/agent-platform-workflow-evaluation`, branch
 `task/artifact-import-coordinator`; delivery remains a reviewable PR to the feature branch.
+[Draft PR278](https://github.com/jwill9999/agent-platform/pull/278) preserves the work.
 Supervised prerequisite mode applies. No pilot, merge or staging promotion is authorized here.
 
 The [draft qualification report](docs/reviews/artifact-import-coordinator-qualification.md)
@@ -14,7 +15,10 @@ isolated import workspace is recommended; the owner decision is pending. Git dea
 repairs passed focused tests and narrow independent review, with commit-dispatch versus publication
 deadline semantics explicitly retained as a limitation. R3 receipt/dispatch composition is a
 compiling draft, not a completed coordinator journey. Repair, feature evaluation, delivery/finalization
-and recovery coverage remain outstanding. Build/lint/type checks pass; the fresh full suite is running.
+and recovery coverage remain outstanding. Build/lint/type checks pass; the full suite passed
+1,054 tests with 64 skipped. Real-container import passed again after the deadline fix. The initial
+hosted dependency-cycle failure was fixed locally; new-head hosted checks remain pending.
+Task-owned reviewer gateway/networks are cleaned up. The workspace decision was sent by iMessage.
 Do not mark either requirement complete or the branch merge-ready. Beads `.17` stays in progress;
 `.13` and the live pilot remain blocked. The earlier pilot-delivery question does not block current
 fixture qualification. Notion alignment is still separately deferred.
