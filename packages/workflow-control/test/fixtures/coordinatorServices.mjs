@@ -63,11 +63,7 @@ export async function serve(config) {
       ]);
       break;
     case 'github.findPullRequest':
-      if (state.pr && args.number && config.delayFirstChecksMs && !state.delayedChecks) {
-        state.delayedChecks = true;
-        await wait(config.delayFirstChecksMs);
-      }
-      result = state.pr;
+      result = await findPullRequest(state, args, config);
       break;
     case 'github.createPullRequest':
       state.pr = {
@@ -143,4 +139,12 @@ function claimIssue(state, taskId) {
   if (state.children?.[taskId]?.status !== 'open') return;
   state.children[taskId].status = 'in_progress';
   state.claimMutations = (state.claimMutations ?? 0) + 1;
+}
+
+async function findPullRequest(state, args, config) {
+  if (state.pr && args.number && config.delayFirstChecksMs && !state.delayedChecks) {
+    state.delayedChecks = true;
+    await wait(config.delayFirstChecksMs);
+  }
+  return state.pr;
 }

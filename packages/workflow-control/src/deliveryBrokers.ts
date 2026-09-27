@@ -724,13 +724,8 @@ export class DurableDeliveryBroker {
     );
   }
 
-  recordPipelineObservation(input: {
-    operationId: string;
-    fence: DeliveryFence;
-    nextPollAtMs: number;
-    absoluteDeadlineMs: number;
-  }): PipelineObservationDecision {
-    const operation = this.#store.getDeliveryOperation(input.operationId);
+  #committedChecks(operationId: string) {
+    const operation = this.#store.getDeliveryOperation(operationId);
     if (
       operation === undefined ||
       operation.status !== 'committed' ||
@@ -738,6 +733,16 @@ export class DurableDeliveryBroker {
     ) {
       throw new Error('pipeline observation requires a committed GitHub checks operation');
     }
+    return operation;
+  }
+
+  recordPipelineObservation(input: {
+    operationId: string;
+    fence: DeliveryFence;
+    nextPollAtMs: number;
+    absoluteDeadlineMs: number;
+  }): PipelineObservationDecision {
+    const operation = this.#committedChecks(input.operationId);
     this.#store.assertRunUsesContract(operation.runId, this.#contract);
     const request = githubChecksRequestSchema.parse(operation.request);
     assertRequestWithinContract(

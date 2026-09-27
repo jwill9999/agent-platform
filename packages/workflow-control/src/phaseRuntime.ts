@@ -787,43 +787,14 @@ export class StandalonePhaseRuntime {
       await this.#verifySource(action, packet.allowedPaths);
       let resultHead = action.headSha;
       if (action.phase === 'implementing') {
-        const output = implementationOutputSchema.parse(
-          typeof raw === 'object' && raw !== null && 'implementationOutput' in raw
-            ? raw.implementationOutput
-            : undefined,
+        resultHead = await this.#importSpecialistOutput(
+          raw,
+          action,
+          packet,
+          reservation.id,
+          fences,
+          evidenceCapability,
         );
-        const artifactBytes = Buffer.from(JSON.stringify(output));
-        const artifact = await this.#vault.recordSpecialistResult({
-          executionId: reservation.id,
-          content: artifactBytes,
-          headSha: action.headSha,
-          capability: evidenceCapability,
-        });
-        if (artifact.reference.digest !== digestGovernedValue(output))
-          throw new Error('phase_implementation_evidence_redacted');
-        const persisted = await this.#vault.read({
-          digest: artifact.reference.digest,
-          runId: action.runId,
-          taskId: action.taskId,
-          capability: evidenceCapability,
-        });
-        const imported = this.#store.importImplementation({
-          authority: {
-            id: reservation.id,
-            ownerId: this.#owner,
-            workspaceLeaseEpoch: fences.workspace,
-            runLeaseEpoch: fences.run,
-            taskLeaseEpoch: fences.task,
-          },
-          sourceRoot: this.#config.sourceRoot,
-          gitBinary: this.#config.gitBinary,
-          gitBinaryDigest: this.#config.gitBinaryDigest,
-          artifact: persisted,
-          artifactDigest: artifact.reference.digest,
-          renewLeaseTtlMs: Math.min(this.#config.leaseTtlMs, 60000),
-        });
-        resultHead = imported.resultHead;
-        await this.#verifySource({ ...action, headSha: resultHead }, packet.allowedPaths);
       }
       await this.#completeSpecialist({
         job: job,
@@ -855,6 +826,54 @@ export class StandalonePhaseRuntime {
       this.#reservation = undefined;
       if (token !== undefined) this.#capabilities.revoke(token);
     }
+  }
+
+  async #importSpecialistOutput(
+    raw: unknown,
+    action: ExecutePhaseAction,
+    packet: TaskPacket,
+    executionId: string,
+    fences: ResourceFences,
+    evidenceCapability: EvidenceCapability,
+  ): Promise<string> {
+    const output = implementationOutputSchema.parse(
+      typeof raw === 'object' && raw !== null && 'implementationOutput' in raw
+        ? raw.implementationOutput
+        : undefined,
+    );
+    const artifactBytes = Buffer.from(JSON.stringify(output));
+    const artifact = await this.#vault.recordSpecialistResult({
+      executionId: executionId,
+      content: artifactBytes,
+      headSha: action.headSha,
+      capability: evidenceCapability,
+    });
+    if (artifact.reference.digest !== digestGovernedValue(output))
+      throw new Error('phase_implementation_evidence_redacted');
+    const persisted = await this.#vault.read({
+      digest: artifact.reference.digest,
+      runId: action.runId,
+      taskId: action.taskId,
+      capability: evidenceCapability,
+    });
+    const imported = this.#store.importImplementation({
+      authority: {
+        id: executionId,
+        ownerId: this.#owner,
+        workspaceLeaseEpoch: fences.workspace,
+        runLeaseEpoch: fences.run,
+        taskLeaseEpoch: fences.task,
+      },
+      sourceRoot: this.#config.sourceRoot,
+      gitBinary: this.#config.gitBinary,
+      gitBinaryDigest: this.#config.gitBinaryDigest,
+      artifact: persisted,
+      artifactDigest: artifact.reference.digest,
+      renewLeaseTtlMs: Math.min(this.#config.leaseTtlMs, 60000),
+    });
+    const resultHead = imported.resultHead;
+    await this.#verifySource({ ...action, headSha: resultHead }, packet.allowedPaths);
+    return resultHead;
   }
 
   #canDeferPlanner(
@@ -1234,25 +1253,7 @@ export class StandalonePhaseRuntime {
         );
         return;
       }
-      if (execution && this.#store.getRepairPlanningHandoff(execution.id)) {
-        try {
-          await this.#recoverRepairPlanning(job);
-        } catch (error) {
-          this.#deferCoordinatorRecovery(job, error);
-        }
-        return;
-      }
-      if (execution && this.#store.getImplementationImport(execution.id)) {
-        try {
-          await this.#recoverImport(job);
-        } catch (error) {
-          if (error instanceof Error && error.message === 'resource lease is held by another owner')
-            this.#journal.deferCoordinatorAdmission(job, Date.now());
-          else
-            this.#journal.block(job, 'implementation_import_reconciliation_required', Date.now());
-        }
-        return;
-      }
+      if (execution && (await this.#recoverRetained(job, execution.id))) return;
       if (execution) {
         await this.#failExecution(
           job,
@@ -1283,6 +1284,28 @@ export class StandalonePhaseRuntime {
     } finally {
       clearInterval(heartbeat);
     }
+  }
+
+  async #recoverRetained(job: PhaseJob, executionId: string): Promise<boolean> {
+    if (this.#store.getRepairPlanningHandoff(executionId)) {
+      try {
+        await this.#recoverRepairPlanning(job);
+      } catch (error) {
+        this.#deferCoordinatorRecovery(job, error);
+      }
+      return true;
+    }
+    if (this.#store.getImplementationImport(executionId)) {
+      try {
+        await this.#recoverImport(job);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'resource lease is held by another owner')
+          this.#journal.deferCoordinatorAdmission(job, Date.now());
+        else this.#journal.block(job, 'implementation_import_reconciliation_required', Date.now());
+      }
+      return true;
+    }
+    return false;
   }
 
   async #recoverRepairPlanning(job: PhaseJob): Promise<void> {

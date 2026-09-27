@@ -41,7 +41,7 @@ export function assertRepairPlanningResult(
   return result;
 }
 
-/** Scope comes from approved policy and the predecessor, never a model-selected permission. */
+/** Scope comes from the approved feature repair envelope, never a model-selected permission. */
 export function buildRepairChildRequest(input: {
   contract: ExecutionContract;
   parent: ExecutionContract['tasks'][number];
@@ -58,7 +58,7 @@ export function buildRepairChildRequest(input: {
   const within = (path: string, root: string) => path === root || path.startsWith(`${root}/`);
   const allowedPaths = [
     ...new Set(
-      parent.allowedPaths.flatMap((parentPath) =>
+      contract.constraints.allowedPaths.flatMap((parentPath) =>
         contract.repairTaskPolicy.allowedPaths.flatMap((repairPath) => {
           if (within(parentPath, repairPath)) return [parentPath];
           if (within(repairPath, parentPath)) return [repairPath];
@@ -76,8 +76,8 @@ export function buildRepairChildRequest(input: {
     'beads.mutate',
     'git.commit',
   ] as const;
-  if (required.some((operation) => !parent.allowedOperations.includes(operation)))
-    throw new Error('repair predecessor lacks required implementation and handoff authority');
+  if (required.some((operation) => !contract.authority.allowedActions.includes(operation)))
+    throw new Error('repair feature lacks required implementation and handoff authority');
   return {
     workspaceId: contract.workspaceId,
     runId,
@@ -95,7 +95,7 @@ export function buildRepairChildRequest(input: {
     remainingRetryBudget: input.remainingRetryBudget,
     assignedRole: 'implementation_worker',
     allowedPaths,
-    allowedOperations: parent.allowedOperations,
+    allowedOperations: contract.authority.allowedActions,
     authorityExpanded: false,
     actorRole: 'workflow_orchestrator',
     contractVersion: contract.contractVersion,

@@ -93,16 +93,31 @@ it('derives child identity and permission intersection from approved material', 
       authorityExpanded: false,
       assignedRole: 'implementation_worker',
       allowedPaths: ['packages/workflow-control'],
-      allowedOperations: parent.allowedOperations,
+      allowedOperations: contract.authority.allowedActions,
     });
+    // A QA predecessor does not need implementation permissions itself.
+    expect(
+      buildRepairChildRequest({
+        contract,
+        parent: { ...parent, assignedRole: 'qa_evaluator', allowedOperations: ['artifact.write'] },
+        runId: 'run',
+        sequence: 1,
+        context,
+        terminal,
+        remainingRetryBudget: request.remainingRetryBudget,
+      }).allowedOperations,
+    ).toContain('workspace.patch');
     const unauthorized = {
-      ...parent,
-      allowedOperations: parent.allowedOperations.filter((op) => op !== 'beads.mutate'),
+      ...contract,
+      authority: {
+        ...contract.authority,
+        allowedActions: contract.authority.allowedActions.filter((op) => op !== 'beads.mutate'),
+      },
     };
     expect(() =>
       buildRepairChildRequest({
-        contract,
-        parent: unauthorized,
+        contract: unauthorized,
+        parent,
         runId: 'run',
         sequence: 1,
         context,

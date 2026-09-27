@@ -1001,3 +1001,31 @@ it('charges child verifier retries with new finding IDs against the feature rese
     store.close();
   }
 });
+
+it('retains uncertain child effects when cancellation wins during final observation', async () => {
+  const { store, broker, request, fence, root, port } = await repairSetup();
+  const original = port.observe.bind(port);
+  port.observe = async (value) => {
+    const observed = await original(value);
+    if (port.created.has(value.id)) {
+      const peer = new Database(join(root, 'workflow.sqlite'));
+      peer.prepare("UPDATE runs SET state='cancelling' WHERE id=?").run(value.runId);
+      peer.close();
+    }
+    return observed;
+  };
+  await expect(broker.execute(request, fence)).rejects.toThrow('repair_planning state');
+  expect(store.getRepairChildIntent(request.id)?.status).toBe('prepared');
+  const peer = new Database(join(root, 'workflow.sqlite'));
+  try {
+    expect(
+      peer
+        .prepare('SELECT COUNT(*) AS n FROM repair_approved_heads WHERE task_id=?')
+        .get(request.id),
+    ).toEqual({ n: 0 });
+  } finally {
+    peer.close();
+    store.close();
+  }
+  expect(port.mutate).toHaveBeenCalledTimes(1);
+});

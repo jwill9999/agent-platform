@@ -4888,6 +4888,42 @@ export class WorkflowStore {
     return undefined;
   }
 
+  #assertChangedRepairCondition(input: Parameters<WorkflowStore['planRepairDispatch']>[0]): void {
+    const lastDispatch = this.#database
+      .prepare(
+        `SELECT * FROM repair_dispatches WHERE run_id = ? AND finding_id = ?
+           ORDER BY finding_attempt DESC LIMIT 1`,
+      )
+      .get(input.runId, input.findingId) as RepairDispatchRow | undefined;
+    if (lastDispatch?.change_digest === input.changeDigest) {
+      throw new Error('identical repair retry is forbidden');
+    }
+    if (
+      input.changeEvidenceMinAtMs !== null &&
+      input.changeEvidenceMinAtMs <=
+        (lastDispatch?.change_evidence_at_ms ?? input.failureEvidenceAtMs)
+    ) {
+      throw new Error('repair evidence does not prove a newer changed condition');
+    }
+    if (
+      lastDispatch?.finding_digest !== undefined &&
+      lastDispatch.finding_digest !== input.findingDigest
+    ) {
+      throw new Error('repair finding id is already bound to different immutable input');
+    }
+    if (input.requiresHypothesisChange && lastDispatch === undefined) {
+      const previousTaskAttempt = this.#database
+        .prepare(
+          `SELECT hypothesis FROM attempts WHERE run_id = ? AND scope = 'task' AND scope_id = ?
+             ORDER BY attempt DESC LIMIT 1`,
+        )
+        .get(input.runId, input.taskId) as { hypothesis: string } | undefined;
+      if (previousTaskAttempt?.hypothesis.trim() === input.hypothesis.trim()) {
+        throw new Error('repair retry requires a changed hypothesis');
+      }
+    }
+  }
+
   planRepairDispatch(
     input: {
       id: string;
@@ -4953,39 +4989,7 @@ export class WorkflowStore {
       const retained = this.#retainedRepairPlan(input);
       if (retained) return retained;
       if (input.hypothesis.trim() === '') throw new Error('repair hypothesis is required');
-      const lastDispatch = this.#database
-        .prepare(
-          `SELECT * FROM repair_dispatches WHERE run_id = ? AND finding_id = ?
-           ORDER BY finding_attempt DESC LIMIT 1`,
-        )
-        .get(input.runId, input.findingId) as RepairDispatchRow | undefined;
-      if (lastDispatch?.change_digest === input.changeDigest) {
-        throw new Error('identical repair retry is forbidden');
-      }
-      if (
-        input.changeEvidenceMinAtMs !== null &&
-        input.changeEvidenceMinAtMs <=
-          (lastDispatch?.change_evidence_at_ms ?? input.failureEvidenceAtMs)
-      ) {
-        throw new Error('repair evidence does not prove a newer changed condition');
-      }
-      if (
-        lastDispatch?.finding_digest !== undefined &&
-        lastDispatch.finding_digest !== input.findingDigest
-      ) {
-        throw new Error('repair finding id is already bound to different immutable input');
-      }
-      if (input.requiresHypothesisChange && lastDispatch === undefined) {
-        const previousTaskAttempt = this.#database
-          .prepare(
-            `SELECT hypothesis FROM attempts WHERE run_id = ? AND scope = 'task' AND scope_id = ?
-             ORDER BY attempt DESC LIMIT 1`,
-          )
-          .get(input.runId, input.taskId) as { hypothesis: string } | undefined;
-        if (previousTaskAttempt?.hypothesis.trim() === input.hypothesis.trim()) {
-          throw new Error('repair retry requires a changed hypothesis');
-        }
-      }
+      this.#assertChangedRepairCondition(input);
       const attemptCount = (
         scope: 'task' | 'finding',
         scopeId: string,
@@ -8252,6 +8256,7 @@ export class WorkflowStore {
     if (capability !== workflowEvaluationMutationCapability) {
       throw new Error('repair-child intent requires the internal evaluator capability');
     }
+    const started = performance.now();
     const before = this.getRepairChildIntent(input.id);
     if (before === undefined) throw new Error('repair-child intent not found');
     let assertDocuments: (() => void) | undefined;
@@ -8304,6 +8309,11 @@ export class WorkflowStore {
     }
     return this.#database.transaction(() => {
       assertDocuments?.();
+      if (input.status === 'committed')
+        this.#assertRepairChildFence({
+          ...input,
+          nowMs: input.updatedAtMs + Math.max(0, Math.floor(performance.now() - started)),
+        });
       this.#database
         .prepare(
           `UPDATE repair_child_intents SET status = ?, result_json = ?, updated_at_ms = ?
@@ -8417,6 +8427,19 @@ export class WorkflowStore {
       runLeaseEpoch: input.runLeaseEpoch,
       nowMs: input.nowMs,
     });
+    return this.#assertRepairChildFence(input);
+  }
+
+  #assertRepairChildFence(input: {
+    id: string;
+    ownerId: string;
+    workspaceLeaseEpoch: number;
+    runLeaseEpoch: number;
+    taskLeaseEpoch: number;
+    nowMs: number;
+  }): RepairChildIntentRecord {
+    const intent = this.getRepairChildIntent(input.id);
+    if (!intent) throw new Error('repair-child intent not found');
     if (this.getRun(intent.runId)?.state !== 'repair_planning') {
       throw new Error('repair children require the repair_planning state');
     }
