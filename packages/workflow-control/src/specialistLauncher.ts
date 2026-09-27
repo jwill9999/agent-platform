@@ -743,6 +743,7 @@ export interface DockerSpecialistReservation {
 
 export interface SpecialistLifecycleHooks {
   admission: () => Promise<void>;
+  assertAdmission?: () => void;
   interrupted: (error: unknown) => Promise<void>;
 }
 export class DockerIsolatedSpecialistLauncher {
@@ -947,7 +948,10 @@ export class DockerIsolatedSpecialistLauncher {
       const created = await this.#options.store.dispatchSchedulerContainer(
         authority,
         this.#options.sourceRoot,
-        () => this.#docker(createArgs, Math.min(60_000, reservation.deadlineMs - this.#clock())),
+        () => {
+          lifecycle?.assertAdmission?.();
+          return this.#docker(createArgs, Math.min(60_000, reservation.deadlineMs - this.#clock()));
+        },
         workflowContainerJournalCapability,
         this.#clock,
       );
@@ -981,13 +985,15 @@ export class DockerIsolatedSpecialistLauncher {
         started = this.#options.store.dispatchSchedulerContainer(
           authority,
           this.#options.sourceRoot,
-          () =>
-            this.#docker(
+          () => {
+            lifecycle?.assertAdmission?.();
+            return this.#docker(
               ['start', '--attach', containerId],
               reservation.deadlineMs - this.#clock(),
               this.#options.maxOutputBytes ?? 4 * 1024 * 1024,
               transportController.signal,
-            ),
+            );
+          },
           workflowContainerJournalCapability,
           this.#clock,
         );
@@ -1070,7 +1076,10 @@ export class DockerIsolatedSpecialistLauncher {
       await this.#options.store.dispatchSchedulerContainer(
         authority,
         this.#options.sourceRoot,
-        () => this.#docker(args, 5000),
+        () => {
+          lifecycle?.assertAdmission?.();
+          return this.#docker(args, 5000);
+        },
         workflowContainerJournalCapability,
         this.#clock,
       );

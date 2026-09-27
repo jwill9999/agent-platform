@@ -113,6 +113,7 @@ export class StandalonePhaseRuntime {
   readonly #process: ProcessIdentity;
   readonly #verifySource: (action: ExecutePhaseAction, paths: string[]) => Promise<void>;
   readonly #admission: () => Promise<void>;
+  readonly #assertAdmission: () => void;
   #active: Promise<boolean> | undefined;
   #timer: ReturnType<typeof setInterval> | undefined;
   #closing: Promise<void> | undefined;
@@ -130,6 +131,7 @@ export class StandalonePhaseRuntime {
     process: ProcessIdentity;
     verifySource: (action: ExecutePhaseAction, paths: string[]) => Promise<void>;
     admission?: () => Promise<void>;
+    assertAdmission?: () => void;
     onFatal?: () => void;
   }) {
     if (!(input.launcher instanceof DockerIsolatedSpecialistLauncher))
@@ -143,6 +145,7 @@ export class StandalonePhaseRuntime {
     this.#process = input.process;
     this.#verifySource = input.verifySource;
     this.#admission = input.admission ?? (async () => undefined);
+    this.#assertAdmission = input.assertAdmission ?? (() => undefined);
     this.#contract = input.store.getExecutionContract(input.config.runId);
     this.#vault = new SecureEvidenceVault({
       store: input.store,
@@ -157,6 +160,7 @@ export class StandalonePhaseRuntime {
     admission?: () => Promise<void>,
     cleanupOnly = false,
     onFatal?: () => void,
+    assertAdmission?: () => void,
   ): Promise<StandalonePhaseRuntime> {
     const config = readPhaseRuntimeConfig(configInput);
     if (!(await stat(config.credentialBrokerBinary).catch(() => undefined))?.isFile())
@@ -198,6 +202,7 @@ export class StandalonePhaseRuntime {
         process: processIdentity,
         admission,
         onFatal,
+        assertAdmission,
         launcher: DockerIsolatedSpecialistLauncher.create({
           store,
           ownerId: owner,
@@ -239,6 +244,7 @@ export class StandalonePhaseRuntime {
     process: ProcessIdentity;
     verifySource: (action: ExecutePhaseAction, paths: string[]) => Promise<void>;
     admission?: () => Promise<void>;
+    assertAdmission?: () => void;
     onFatal?: () => void;
   }): StandalonePhaseRuntime {
     if (process.env.NODE_ENV !== 'test') throw new Error('test phase runtime unavailable');
@@ -592,6 +598,10 @@ export class StandalonePhaseRuntime {
       if (inputEvidence.reference.digest !== digestGovernedValue(inputEnvelope))
         throw new Error('phase_packet_evidence_redacted');
       const raw = await this.#launcher.launchBound(inputEnvelope, reservation, {
+        assertAdmission: () => {
+          if (this.#fatalAdmission) throw new Error('journal_unavailable');
+          this.#assertAdmission();
+        },
         admission: async () => {
           if (this.#fatalAdmission) throw new Error('journal_unavailable');
           await this.#admission();

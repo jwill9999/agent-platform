@@ -53,6 +53,7 @@ async function setup(
     createDelayMs?: number;
     revokeDelayMs?: number;
     admission?: () => Promise<void>;
+    assertAdmission?: () => void;
     onFatal?: () => void;
     verifySource?: () => Promise<void>;
   } = {},
@@ -246,6 +247,7 @@ async function setup(
       executableDigest: digestGovernedValue('fixture-process'),
     },
     admission: options.admission,
+    assertAdmission: options.assertAdmission,
     onFatal: options.onFatal,
     verifySource: async () => {
       await options.verifySource?.();
@@ -991,3 +993,30 @@ it('redacts sensitive exceptions from both background runtime rejection paths', 
     write.mockRestore();
   }
 });
+
+it.each(['topology_stale', 'control_unavailable'])(
+  'rechecks service admission after synchronous document verification: %s',
+  async (code) => {
+    let failure: string | undefined;
+    const f = await setup({
+      assertAdmission: () => {
+        if (failure) throw new Error(failure);
+      },
+    });
+    const verify = f.store.verifyApprovedDocumentSnapshot.bind(f.store);
+    const spy = vi.spyOn(f.store, 'verifyApprovedDocumentSnapshot').mockImplementation((input) => {
+      const result = verify(input);
+      if (input.boundary === 'specialist.snapshot_start') failure = code;
+      return result;
+    });
+    try {
+      await f.runtime.runOnce();
+      expect(failure).toBe(code);
+      expect(f.launches.some((args) => args[0] === 'create')).toBe(true);
+      expect(f.launches.some((args) => args[0] === 'start')).toBe(false);
+      expect(f.journal.interruptions().list('run')).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
+  },
+);

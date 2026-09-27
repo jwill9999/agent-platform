@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import {
   mkdtempSync,
@@ -299,3 +301,35 @@ it('bounds the entire topology check rather than each individual inspection', as
     'topology_stale',
   );
 });
+
+it.each(['permissions', 'uid'])(
+  'reports invalid private configuration through the CLI: %s',
+  (kind) => {
+    const root = mkdtempSync(join(tmpdir(), 'lifecycle-invalid-'));
+    cleanup.push(() => rmSync(root, { recursive: true, force: true }));
+    const accountFile = join(root, 'account.json');
+    writeFileSync(accountFile, '{}', { mode: 0o600 });
+    const config = join(root, 'config.json');
+    writeFileSync(
+      config,
+      JSON.stringify({
+        stateDirectory: join(root, 'state'),
+        accountFile,
+        brokerImage: 'sha256:' + 'a'.repeat(64),
+        workerImage: 'sha256:' + 'b'.repeat(64),
+        containerUser: `${(process.getuid?.() ?? 501) + 1}:20`,
+        controlPort: 19341,
+        clientVersion: 'fixture',
+      }),
+      { mode: kind === 'permissions' ? 0o644 : 0o600 },
+    );
+    const result = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL('../dist/cli.js', import.meta.url)), 'development-host', config],
+      { env: {}, encoding: 'utf8', timeout: 10000 },
+    );
+    expect(result.status).toBe(2);
+    expect(result.stdout + result.stderr).toContain('invalid_configuration');
+    expect(result.stdout + result.stderr).not.toContain('cleanup_pending');
+  },
+);

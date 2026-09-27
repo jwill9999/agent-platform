@@ -63,6 +63,16 @@ const codes = new Set([
 ]);
 export function classifyDevelopmentError(error: unknown): string {
   if (error instanceof z.ZodError) return 'invalid_configuration';
+  if (
+    error instanceof Error &&
+    [
+      'private_configuration_required',
+      'private_state_directory_required',
+      'container_user_mismatch',
+      'private_control_key_required',
+    ].includes(error.message)
+  )
+    return 'invalid_configuration';
   if (error instanceof Error && codes.has(error.message)) return error.message;
   return 'cleanup_pending';
 }
@@ -834,15 +844,7 @@ export class DevelopmentHost {
         this.#guard();
         if ((await this.#health()) !== this.#generation)
           throw new Error('broker_generation_changed');
-        const state = this.#journal.state()!;
-        assertDevelopmentAdmission(
-          state,
-          this.#stopping,
-          this.#serviceQualified,
-          this.#runtime?.cleanupStatus() ?? 'pending',
-          Date.now(),
-          this.#topologyObservedAt,
-        );
+        this.#assertAdmission();
       },
       true,
       () => {
@@ -853,8 +855,20 @@ export class DevelopmentHost {
           this.#fatal = true;
         }
       },
+      () => this.#assertAdmission(),
     );
     this.#runtime.start();
+  }
+  #assertAdmission(): void {
+    this.#guard();
+    assertDevelopmentAdmission(
+      this.#journal.state()!,
+      this.#stopping,
+      this.#serviceQualified,
+      this.#runtime?.cleanupStatus() ?? 'pending',
+      Date.now(),
+      this.#topologyObservedAt,
+    );
   }
   async #monitor(topology: () => Promise<void> | undefined): Promise<void> {
     while (!this.#stopping && !this.#fatal) {
