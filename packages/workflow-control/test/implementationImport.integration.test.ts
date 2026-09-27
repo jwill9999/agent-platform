@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { createServer } from 'node:net';
 import Database from 'better-sqlite3';
 import { expect, it } from 'vitest';
-import { workflowCancellationMutationCapability, type WorkflowStore } from '../src/storage.js';
+import { workflowCancellationMutationCapability, WorkflowStore } from '../src/storage.js';
 import { developmentWorkflowFixture } from './developmentWorkflowFixture.js';
 
 const execute = promisify(execFile);
@@ -263,6 +263,7 @@ it
           expect(
             await readFile(join(f.root, 'source/packages/workflow-control/example.txt'), 'utf8'),
           ).not.toBe('verified fixture change\n');
+          recordConnectedEvidence(db, mode, image!);
           return;
         }
         if (mode === 'late-first-checks') {
@@ -282,6 +283,7 @@ it
               .prepare("SELECT COUNT(*) AS n FROM delivery_operations WHERE kind='github.merge'")
               .get(),
           ).toEqual({ n: 0 });
+          recordConnectedEvidence(db, mode, image!);
           return;
         }
         expect(db.prepare('SELECT state FROM runs WHERE id=?').get('run')).toEqual({
@@ -290,7 +292,7 @@ it
         for (const child of supervisors) child.kill('SIGTERM');
         await Promise.all(
           supervisors.map((child) =>
-            child.exitCode !== null
+            child.exitCode !== null || child.signalCode !== null
               ? Promise.resolve()
               : new Promise<void>((resolve) => child.once('exit', () => resolve())),
           ),
@@ -416,6 +418,7 @@ it
           )
           .get(),
       ).toEqual({ n: 0 });
+      recordConnectedEvidence(db, mode, image!);
     } catch (error) {
       throw new Error(
         JSON.stringify({
@@ -522,23 +525,56 @@ async function injectConnectedFailure(
       "SELECT id FROM scheduler_executions WHERE status='active' AND role='implementation_worker'",
     )
     .get() as { id: string };
-  const active = fixture.store.getSchedulerExecution(execution.id)!;
+  const store = new WorkflowStore(fixture.database);
+  const active = store.getSchedulerExecution(execution.id)!;
   const now = Date.now();
   // Exercise the production durable cancellation request, not a direct runs-table mutation.
-  fixture.store.requestWorkflowCancellation(
-    {
-      id: 'connected-cancel',
-      runId: 'run',
-      requestedBy: 'fixture-owner',
-      reason: 'controlled cancellation',
-      requestedAtMs: now,
-      nowMs: now,
-      stopDeadlineMs: now + 30000,
-      retainedEvidence: [],
-      ownerId: active.ownerId,
-      workspaceLeaseEpoch: active.workspaceLeaseEpoch,
-      runLeaseEpoch: active.runLeaseEpoch,
-    },
-    workflowCancellationMutationCapability,
+  try {
+    store.requestWorkflowCancellation(
+      {
+        id: 'connected-cancel',
+        runId: 'run',
+        requestedBy: 'fixture-owner',
+        reason: 'controlled cancellation',
+        requestedAtMs: now,
+        nowMs: now,
+        stopDeadlineMs: now + 30000,
+        retainedEvidence: [],
+        ownerId: active.ownerId,
+        workspaceLeaseEpoch: active.workspaceLeaseEpoch,
+        runLeaseEpoch: active.runLeaseEpoch,
+      },
+      workflowCancellationMutationCapability,
+    );
+  } finally {
+    store.close();
+  }
+}
+
+function recordConnectedEvidence(db: Database.Database, mode: string, image: string): void {
+  const handoffs = db
+    .prepare(
+      `SELECT json_extract(p.action_json,'$.phase') AS phase,
+    p.created_at_ms-c.created_at_ms AS callbackToQueueMs,
+    p.started_at_ms-c.created_at_ms AS callbackToPhaseStartMs,
+    s.created_at_ms-c.created_at_ms AS callbackToSpecialistReservationMs
+    FROM phase_jobs p JOIN delegate_callbacks c ON c.callback_id=p.callback_id
+    LEFT JOIN scheduler_executions s ON s.id=p.execution_id ORDER BY p.created_at_ms`,
+    )
+    .all();
+  process.stdout.write(
+    JSON.stringify({
+      qualification: mode,
+      image,
+      handoffs,
+      run: db.prepare('SELECT state FROM runs').get(),
+      phases: db.prepare('SELECT status,COUNT(*) AS count FROM phase_jobs GROUP BY status').all(),
+      executions: db
+        .prepare(
+          "SELECT status,credential_status,COUNT(*) AS count FROM scheduler_executions WHERE id!='child' GROUP BY status,credential_status",
+        )
+        .all(),
+      interruptions: db.prepare('SELECT reason,state FROM execution_interruptions').all(),
+    }) + '\n',
   );
 }
