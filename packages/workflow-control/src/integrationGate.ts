@@ -132,15 +132,16 @@ export class LocalExactHeadIntegrationGate {
       timeout: 10_000,
       maxBuffer: 64 * 1024,
     });
-    const diff = await this.#executor('git', ['diff', '--name-only', `${baseSha}...${headSha}`], {
-      cwd: workspaceRoot,
-      timeout: 10_000,
-      maxBuffer: 1024 * 1024,
-    });
-    const changedFiles = diff.stdout
-      .split('\n')
-      .map((path) => path.trim())
-      .filter((path) => path !== '');
+    const diff = await this.#executor(
+      'git',
+      ['diff', '--name-only', '-z', `${baseSha}...${headSha}`],
+      {
+        cwd: workspaceRoot,
+        timeout: 10_000,
+        maxBuffer: 1024 * 1024,
+      },
+    );
+    const changedFiles = diff.stdout.split('\0').filter((path) => path !== '');
     const requiredChecks = [
       ...new Set([
         ...input.contract.qualityGates,

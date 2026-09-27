@@ -1133,6 +1133,37 @@ describe('DurableDeliveryBroker', () => {
     });
   });
 
+  it('rejects a first successful check observation arriving at its deadline without creating a wait', async () => {
+    let nowMs = 1000;
+    const f = await setup({ clock: () => nowMs });
+    await f.broker.execute(createRefRequest(), f.fence);
+    await f.broker.execute(commitRequest(), f.fence);
+    await f.broker.execute(pushRequest(), f.fence);
+    const db = new Database(f.database);
+    db.prepare("UPDATE runs SET state='pipeline' WHERE id=?").run(f.run.id);
+    db.close();
+    f.port.forcedObservation = {
+      kind: 'expected',
+      result: {
+        checks: { test: 'success', review: 'success' },
+        eventIdentity: 'late-first-success',
+      },
+    };
+    const observed = await f.broker.execute(checksRequest(0), f.fence);
+    nowMs = 1200;
+    expect(() =>
+      f.broker.recordPipelineObservation({
+        operationId: observed.id,
+        fence: f.fence,
+        nextPollAtMs: 1250,
+        absoluteDeadlineMs: 1200,
+      }),
+    ).toThrow('deadline expired');
+    expect(f.store.listDueWaits(2000)).toEqual([]);
+    expect(f.store.getRun(f.run.id)?.state).toBe('pipeline');
+    f.store.close();
+  });
+
   it('persists pipeline backoff, completes on success, and escalates an expired wait once', async () => {
     let nowMs = 1000;
     const pending = await setup({ clock: () => nowMs });

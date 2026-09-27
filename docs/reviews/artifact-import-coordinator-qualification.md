@@ -158,3 +158,39 @@ Finish the independent workspace re-review, then finish
 coordinator composition and connected recovery/repair/finalization tests, rerun the exact changed
 source checks and independent review, then present a ready PR only when all required gates pass.
 Keep `.17` open and `.13` blocked. A draft checkpoint is preservation, not completion or approval.
+
+## Connected coordinator qualification checkpoint
+
+The latest real-container controlled-response run passed five journeys in 234.31 seconds: import,
+verification/review, full coordinator closeout, verifier repair and reviewer repair. A sixth separate
+lost-close-acknowledgement journey passed in 51.60 seconds. Both repair journeys prove two distinct
+implementation attempts and a single accepted repair dispatch. The uncertain-close case records one
+recovery and exactly two close mutations (task and epic), without duplicating the uncertain task close.
+These tests run production CLI/runtime/supervisors, real Docker/Codex tools and private Git workspaces;
+model Responses, credentials and external Beads/GitHub are controlled disposable services. They do
+not establish live model quality, real external delivery, staging or the later paid pilot.
+
+Composition defects discovered and corrected: acceptance now uses approved task authority plus
+completed reviewer evidence; transport checks avoid nested document-verification transactions while
+brokers retain their approval checks; same-owner uncertain recovery verifies existing fences rather
+than attempting takeover; and PR results use the production snapshot's `number` field.
+
+Review 13 identified four additional defects, now repaired pending final independent re-review:
+execution-bound repair identifiers must survive evidence redaction; successful pipeline observations
+must obey the immutable deadline; coordinator cancellation must allow newly admitted recovery while
+permanent shutdown stays closed; and NUL-delimited Git paths must preserve whitespace and Unicode.
+The focused deadline/path suite passes 42 tests. The storage suite passes 29 tests. The latest full
+regression is still running; earlier failed runs remain historical evidence.
+
+The design critique confirms feature-evaluation repair remains unimplemented as a composed route.
+It needs an explicitly authorized planner, a durable bounded child, an authoritative parent-to-child
+handoff, inherited document and role checks, remaining-budget accounting, and connected recovery
+coverage. Neither successful verifier/reviewer repair nor happy-path closeout proves that route.
+
+Correction to earlier wording: the feature-delivery contract is mandatory when feature-to-staging
+intent/contract/approval exists; missing or invalid authority then fails closed. When no such intent
+exists, the approved feature-branch-only route may finalize after its task delivery. The disposable
+happy-path test uses that narrower route; it does not bypass an existing staging requirement.
+
+PR278 remains draft; final qualification, current-head detailed Sonar checks and independent review
+are outstanding. No live pilot or production delivery has been launched.

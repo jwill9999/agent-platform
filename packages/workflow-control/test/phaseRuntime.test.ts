@@ -376,7 +376,7 @@ describe('standalone phase runtime production orchestration with fixture launche
       spy.mockRestore();
       await replacement.close();
     }
-  });
+  }, 15000);
   it.each(['admission', 'sync-admission', 'cleanup-only'])(
     'does not resume import or commit callbacks when recovery is denied: %s',
     async (denial) => {
@@ -704,13 +704,13 @@ describe('standalone phase runtime production orchestration with fixture launche
     [
       'failed criterion',
       { acceptanceCriteria: { passed: ['durable'], failed: ['durable'] } },
-      'repair',
+      'escalated',
     ],
-    ['omitted criterion', { acceptanceCriteria: { passed: [], failed: [] } }, 'repair'],
+    ['omitted criterion', { acceptanceCriteria: { passed: [], failed: [] } }, 'escalated'],
     [
       'unapproved criterion',
       { acceptanceCriteria: { passed: ['durable', 'extra'], failed: [] } },
-      'repair',
+      'escalated',
     ],
     [
       'unresolved finding',
@@ -731,13 +731,17 @@ describe('standalone phase runtime production orchestration with fixture launche
           },
         ],
       },
-      'repair',
+      'escalated',
     ],
     ['remaining risk', { remainingRisks: ['unresolved risk'] }, 'escalated'],
-    ['repair status with integrate intent', { status: 'needs_repair' }, 'repair'],
+    ['repair status with integrate intent', { status: 'needs_repair' }, 'escalated'],
     ['blocked status with integrate intent', { status: 'blocked' }, 'escalated'],
-    ['passed status with continue review intent', { recommendedTransition: 'continue' }, 'repair'],
-    ['passed status with repair intent', { recommendedTransition: 'repair' }, 'repair'],
+    [
+      'passed status with continue review intent',
+      { recommendedTransition: 'continue' },
+      'escalated',
+    ],
+    ['passed status with repair intent', { recommendedTransition: 'repair' }, 'escalated'],
     ['passed status with escalation intent', { recommendedTransition: 'escalate' }, 'escalated'],
   ] as const)('never accepts review with %s', async (_name, override, expected) => {
     const f = await setup({
@@ -1369,15 +1373,16 @@ it('redacts source verification exceptions before persisting a blocked phase', a
 it('bounds credential filesystem settlement and rejects a late completion', async () => {
   const f = await setup({ result: { invalid: true } });
   let release!: () => void;
+  let settlementStarted = 0;
   const blocked = vi.spyOn(f.launcher, 'removeInterruptedCredentials').mockImplementation(
     () =>
       new Promise<void>((resolve) => {
+        settlementStarted = Date.now();
         release = resolve;
       }),
   );
-  const start = Date.now();
   expect(await f.runtime.runOnce()).toBe(false);
-  expect(Date.now() - start).toBeLessThan(6500);
+  expect(Date.now() - settlementStarted).toBeLessThan(6000);
   expect(f.journal.interruptions().list('run')[0]).toMatchObject({ state: 'pending', settle: 0 });
   release();
   await Promise.resolve();

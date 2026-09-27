@@ -772,6 +772,15 @@ export class DurableDeliveryBroker {
       existing?.absoluteDeadlineMs ?? input.absoluteDeadlineMs,
       input.absoluteDeadlineMs,
     );
+    const observationTime = this.#clock();
+    const maximumDeadline =
+      operation.createdAtMs + this.#contract.retryPolicy.waitDeadlineSeconds * 1000;
+    if (
+      !Number.isFinite(effectiveDeadline) ||
+      effectiveDeadline > maximumDeadline ||
+      observationTime >= effectiveDeadline
+    )
+      throw new Error('pipeline observation deadline expired or exceeds immutable retry deadline');
     if (
       existing !== undefined &&
       existing.workspaceId === request.workspaceId &&
@@ -803,8 +812,6 @@ export class DurableDeliveryBroker {
       return { kind: 'passed', checkId };
     }
     const nowMs = this.#clock();
-    const maximumDeadline =
-      operation.createdAtMs + this.#contract.retryPolicy.waitDeadlineSeconds * 1000;
     if (
       input.nextPollAtMs <= nowMs ||
       input.nextPollAtMs >= input.absoluteDeadlineMs ||

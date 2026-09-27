@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
+import { specialistInputEnvelopeSchema } from './specialistInput.js';
+import { repairDispatchPacketSchema } from './repairLoops.js';
 import { implementationOutputSchema } from './implementationOutput.js';
 import { specialistTerminalResult } from './specialistTerminalResult.js';
 
@@ -301,6 +303,59 @@ export class SecureEvidenceVault {
   /** Trusted launcher ingestion: the specialist never receives a write capability.
    * The caller authenticates as orchestrator; producer and role come from its scheduler record.
    */
+  #repairIdentifiers(executionId: string): string[] {
+    const execution = this.#store.getSchedulerExecution(executionId);
+    const parsed = specialistInputEnvelopeSchema.safeParse(execution?.packet);
+    if (!parsed.success) return [];
+    const context = parsed.data.task.repairContext;
+    if (!context) return [];
+    const dispatch = this.#store.getRepairDispatch(context.dispatchId);
+    if (
+      !execution ||
+      dispatch?.status !== 'dispatched' ||
+      dispatch.runId !== execution.runId ||
+      dispatch.taskId !== execution.taskId ||
+      dispatch.failureHeadSha !== context.failureHeadSha
+    )
+      throw new Error('repair input dispatch binding rejected');
+    const packet = repairDispatchPacketSchema.parse(dispatch.packet);
+    if (
+      context.summary !== packet.summary ||
+      context.hypothesis !== packet.hypothesis ||
+      !isDeepStrictEqual(parsed.data.task.evidence, packet.evidence)
+    )
+      throw new Error('repair input context changed');
+    // Entropy scanner splits on colons; exempt only segments of this verified journal ID.
+    return context.dispatchId.split(':');
+  }
+
+  async recordSpecialistInput(input: {
+    executionId: string;
+    capability: EvidenceCapability;
+  }): Promise<SecureEvidenceResult> {
+    const execution = this.#store.getSchedulerExecution(input.executionId);
+    if (execution?.status !== 'active') throw new Error('specialist input execution unavailable');
+    const envelope = specialistInputEnvelopeSchema.parse(execution.packet);
+    return this.#record(
+      {
+        content: Buffer.from(JSON.stringify(envelope)),
+        mediaType: 'application/json',
+        kind: 'artifact',
+        producer: execution.ownerId,
+        producerRole: 'workflow_orchestrator',
+        workspaceId: execution.workspaceId,
+        runId: execution.runId,
+        taskId: execution.taskId,
+        contractVersion: envelope.task.contractVersion,
+        policyDigest: envelope.task.policyDigest,
+        headSha: envelope.binding.headSha,
+        capability: input.capability,
+      },
+      'workflow_orchestrator',
+      this.#repairIdentifiers(execution.id),
+    );
+  }
+
   async recordSpecialistResult(input: {
     executionId: string;
     content: Uint8Array;
@@ -314,7 +369,7 @@ export class SecureEvidenceVault {
     const output = implementationOutputSchema.safeParse(
       JSON.parse(Buffer.from(input.content).toString('utf8')),
     );
-    const identifiers = [execution.id];
+    const identifiers = [execution.id, ...this.#repairIdentifiers(execution.id)];
     if (output.success) {
       if (
         output.data.executionId !== execution.id ||

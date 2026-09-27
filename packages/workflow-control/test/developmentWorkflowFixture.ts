@@ -6,7 +6,11 @@ import { digestGovernedValue } from '../src/governedOperations.js';
 import { ContinuationJournal } from '../src/continuationJournal.js';
 import { phaseActionForCallback } from '../src/phaseJobs.js';
 /** Disposable approved verification fixture, never a user task or live pilot. */
-export async function developmentWorkflowFixture(implementation = false, review = false) {
+export async function developmentWorkflowFixture(
+  implementation = false,
+  review = false,
+  coordinators = false,
+) {
   const f = await continuationFixture(
     Date.now(),
     implementation ? 'feature_planner' : 'implementation_worker',
@@ -27,6 +31,22 @@ export async function developmentWorkflowFixture(implementation = false, review 
     task_verification: 'test_runner',
     ...(review ? { task_review: 'code_reviewer' as const } : {}),
   };
+  if (coordinators) {
+    contract.retryPolicy.implementationAttempts = 3;
+    contract.tasks[0]!.phaseRoles!.feature_evaluation = 'feature_evaluator';
+    for (const operation of [
+      'beads.mutate',
+      'git.read',
+      'git.push',
+      'github.read',
+      'github.deliver',
+    ] as const) {
+      contract.authority.allowedActions.push(operation);
+      contract.tasks[0]!.allowedOperations.push(operation);
+    }
+    contract.authority.github.requiredChecks = ['connected-check'];
+    contract.qualityGates = ['connected-check'];
+  }
   const materialDigest = deriveContractMaterialDigest(contract);
   db.prepare('UPDATE contracts SET body_json=?').run(JSON.stringify(contract));
   db.prepare('UPDATE plan_approvals SET material_digest=?').run(materialDigest);

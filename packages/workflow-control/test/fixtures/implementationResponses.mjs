@@ -1,8 +1,25 @@
 // Offline Responses transport only. Never logs request headers or credentials.
+import process from 'node:process';
 import { Buffer } from 'node:buffer';
 import { createServer } from 'node:http';
 import { zstdDecompressSync } from 'node:zlib';
-let step = 0;
+function findPrompt(value) {
+  if (typeof value === 'string') {
+    try {
+      return findPrompt(JSON.parse(value));
+    } catch {
+      return undefined;
+    }
+  }
+  if (!value || typeof value !== 'object') return undefined;
+  if (value.input?.task?.assignedRole) return value;
+  for (const entry of Object.values(value)) {
+    const found = findPrompt(entry);
+    if (found) return found;
+  }
+}
+const implementations = new Set();
+let injected = false;
 createServer(async (req, res) => {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -20,44 +37,55 @@ createServer(async (req, res) => {
     res.end('{"models":[]}');
     return;
   }
-  const role = step < 2 ? 'implementation_worker' : step < 4 ? 'test_runner' : 'code_reviewer';
+  const prompt = findPrompt(body.input);
+  if (!prompt) throw new Error('fixture input envelope missing');
+  const role = prompt.input.task.assignedRole;
   const implementation = role === 'implementation_worker';
-  const toolTurn = step++ % 2 === 0 && role !== 'code_reviewer';
-  function hasReviewSource(value) {
-    if (typeof value === 'string') {
-      try {
-        const prompt = JSON.parse(value);
-        return (
-          prompt.sourceEvidence?.some(
-            (file) =>
-              file.path === 'packages/workflow-control/example.txt' &&
-              file.content === 'verified fixture change\n',
-          ) === true
-        );
-      } catch {
-        return false;
-      }
-    }
-    if (Array.isArray(value)) return value.some(hasReviewSource);
-    return value && typeof value === 'object' ? Object.values(value).some(hasReviewSource) : false;
-  }
+  if (implementation) implementations.add(prompt.input.binding.executionDigest);
+  const content =
+    implementations.size > 1 ? 'verified repaired change\n' : 'verified fixture change\n';
+  const hasToolResult = body.input.some((item) => item.type === 'custom_tool_call_output');
+  const toolTurn = !hasToolResult && ['implementation_worker', 'test_runner'].includes(role);
   const observed =
     implementation ||
-    (role === 'code_reviewer' && hasReviewSource(body.input)) ||
+    prompt.sourceEvidence?.some(
+      (file) => file.path === 'packages/workflow-control/example.txt' && file.content === content,
+    ) ||
     body.input.some(
       (item) =>
         item.type === 'custom_tool_call_output' &&
-        JSON.stringify(item.output).includes('verified fixture change'),
+        JSON.stringify(item.output).includes(content.trim()),
     );
+  const fail = !toolTurn && !injected && process.env.WORKFLOW_FIXTURE_REPAIR === role;
+  if (fail) injected = true;
   const terminal = {
-    status: observed ? 'passed' : 'blocked',
+    status: fail ? 'needs_repair' : observed ? 'passed' : 'blocked',
     summary: 'Offline implementation complete',
     changedFiles: implementation ? ['packages/workflow-control/example.txt'] : [],
-    acceptanceCriteria: { passed: ['durable'], failed: [] },
+    acceptanceCriteria: fail
+      ? { passed: [], failed: ['durable'] }
+      : { passed: ['durable'], failed: [] },
     evidence: [],
-    findings: [],
+    findings: fail
+      ? [
+          {
+            id: 'fixture-repair',
+            severity: 'high',
+            summary: 'Controlled failure requires a new implementation',
+            repairHypothesis: 'Write the corrected fixture content and verify it',
+            evidence: [
+              {
+                digest: 'sha256:' + 'a'.repeat(64),
+                mediaType: 'text/plain',
+                sizeBytes: 1,
+                kind: 'test',
+              },
+            ],
+          },
+        ]
+      : [],
     remainingRisks: [],
-    recommendedTransition: role === 'code_reviewer' ? 'integrate' : 'continue',
+    recommendedTransition: fail ? 'repair' : role === 'code_reviewer' ? 'integrate' : 'continue',
   };
   const item = toolTurn
     ? {
@@ -70,7 +98,7 @@ createServer(async (req, res) => {
           'text(await tools.exec_command({cmd:' +
           JSON.stringify(
             implementation
-              ? String.raw`printf 'verified fixture change\n' > /workspace/packages/workflow-control/example.txt`
+              ? `printf '%s' '${content}' > /workspace/packages/workflow-control/example.txt`
               : 'cat /workspace/packages/workflow-control/example.txt',
           ) +
           '}));',

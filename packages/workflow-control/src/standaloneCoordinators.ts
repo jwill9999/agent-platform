@@ -56,8 +56,9 @@ export class StandaloneCoordinators {
   readonly #store: WorkflowStore;
   readonly #contract: ExecutionContract;
   readonly #config: StandaloneCoordinatorConfig;
-  readonly #transport: CoordinatorTransport;
-  readonly #abort = new AbortController();
+  #transport: CoordinatorTransport;
+  #abort = new AbortController();
+  #closed = false;
   readonly #root: string;
   readonly #gitPin: { path: string; digest: string };
   readonly #launcher: DockerIsolatedSpecialistLauncher;
@@ -82,9 +83,13 @@ export class StandaloneCoordinators {
     this.#launcher = input.launcher;
     this.#owner = input.owner;
   }
-  abort(): void {
+  cancelExecution(): void {
     this.#abort.abort();
     this.#transport.abort();
+  }
+  abort(): void {
+    this.#closed = true;
+    this.cancelExecution();
   }
   close(): void {
     this.abort();
@@ -95,8 +100,16 @@ export class StandaloneCoordinators {
     action: ExecutePhaseAction,
     fence: DeliveryFence,
     assertAuthority: () => void,
+    assertDispatchAuthority: () => void,
   ): Promise<CoordinatorProof> {
+    if (this.#closed) throw new Error('coordinator_service_stopped');
     assertAuthority();
+    // Runtime serializes execution. Renewed admission gets fresh cancellation state, while
+    // permanent service shutdown can never be reset by a queued recovery attempt.
+    if (this.#abort.signal.aborted) {
+      this.#abort = new AbortController();
+      this.#transport = new CoordinatorTransport(this.#config.transport);
+    }
     if (action.phase === 'repair') return this.#repair(job, action, fence, assertAuthority);
     if (action.phase === 'pipeline') {
       const transitionId = `${job.execution_id}:pipeline`;
@@ -120,8 +133,11 @@ export class StandaloneCoordinators {
         return { kind: 'pipeline', checksOperationId, transitionId };
       }
     }
+    // Brokers verify source documents before entering their mutation transaction and recheck
+    // durable approval inside it. Transport checks live fences only: starting another document
+    // verification transaction here would invalidate the broker's atomic dispatch boundary.
     const call = <T>(method: string, args: unknown) =>
-      this.#transport.call<T>(method, args, assertAuthority);
+      this.#transport.call<T>(method, args, assertDispatchAuthority);
     const beads = createProductionBeadsDoltPort(this.#root, {
       readIssue: (workspaceRoot, taskId) => call('beads.readIssue', { workspaceRoot, taskId }),
       claimIssue: (workspaceRoot, taskId, idempotencyKey) =>
@@ -212,12 +228,7 @@ export class StandaloneCoordinators {
       action.runId,
       action.taskId,
     );
-    if (
-      !terminal ||
-      !evidence ||
-      evidence.deletedAtMs !== null ||
-      evidence.headSha !== action.headSha
-    )
+    if (!terminal || evidence?.deletedAtMs !== null || evidence.headSha !== action.headSha)
       throw new Error('repair_failure_evidence_missing');
     const coordinator = DurableRepairCoordinator.createForWorkflow({
       store: this.#store,
@@ -434,11 +445,32 @@ export class StandaloneCoordinators {
       sizeBytes: evidence.sizeBytes,
       kind: evidence.kind,
     });
-    const packet: TaskPacket = orchestrator.createTaskPacket({
+    // createTaskPacket is the planning handoff and requires planner-produced evidence.
+    // Acceptance instead binds the approved task to this completed review; acceptAndCloseTask
+    // independently validates packet containment, current documents, exact-head evidence and gates.
+    const task = this.#contract.tasks.find((candidate) => candidate.id === action.taskId);
+    if (!task) throw new Error('coordinator_task_outside_contract');
+    const packet: TaskPacket = {
+      documentBinding: this.#store.verifyPlanningDocuments({
+        runId: action.runId,
+        taskId: action.taskId,
+        boundary: 'task.handoff',
+        ownerId: this.#owner,
+        runLeaseEpoch: fence.runLeaseEpoch,
+        expectedSourceRoot: this.#root,
+      }),
       runId: action.runId,
       taskId: action.taskId,
+      contractVersion: action.contractVersion,
+      policyDigest: action.policyDigest,
+      assignedRole: task.assignedRole,
+      objective: this.#contract.objective,
+      acceptanceCriteria: this.#contract.acceptanceCriteria,
+      allowedPaths: task.allowedPaths,
+      allowedOperations: task.allowedOperations,
+      retryBudget: this.#contract.retryPolicy,
       evidence: [reference],
-    });
+    };
     await orchestrator.acceptAndCloseTask({
       packet,
       result: { ...terminal, changedFiles: verified.changedFiles, evidence: [reference] },
@@ -476,7 +508,7 @@ export class StandaloneCoordinators {
       ? (JSON.parse(previousPush.request_json) as { expectedRemoteSha: string | null })
           .expectedRemoteSha
       : pushed.published_sha;
-    await delivery.execute(
+    const publication = await delivery.execute(
       {
         ...binding,
         kind: 'git.push',
@@ -486,6 +518,7 @@ export class StandaloneCoordinators {
       },
       fence,
     );
+    if (publication.status !== 'committed') throw new Error('coordinator_publication_unconfirmed');
     const body = `Verified workflow task ${action.taskId}. Head: ${action.headSha}.`;
     const pr = await delivery.execute(
       {
@@ -500,7 +533,8 @@ export class StandaloneCoordinators {
       },
       fence,
     );
-    const number = (pr.result as { pullRequestNumber: number }).pullRequestNumber;
+    if (pr.status !== 'committed') throw new Error('coordinator_pr_unconfirmed');
+    const number = z.object({ number: z.number().int().positive() }).parse(pr.result).number;
     const checks = await this.#awaitChecks(action, fence, delivery, binding, number);
     const transitionId = `${job.execution_id}:pipeline`;
     this.#transition(
@@ -518,20 +552,42 @@ export class StandaloneCoordinators {
     return { kind: 'pipeline', checksOperationId: checks.id, transitionId };
   }
 
-  async #awaitChecks(
+  #settleOutstandingWait(
     action: ExecutePhaseAction,
     fence: DeliveryFence,
     delivery: DurableDeliveryBroker,
-    binding: ReturnType<typeof coordinatorBinding>,
+    checkId: string,
+    operationId: string,
+  ): void {
+    const outstanding = this.#store.getWait(action.runId, checkId);
+    if (outstanding) {
+      if (Date.now() >= outstanding.absoluteDeadlineMs) {
+        delivery.expirePipelineWait({
+          runId: action.runId,
+          taskId: action.taskId,
+          checkId,
+          eventIdentity: outstanding.eventIdentity,
+          fence,
+        });
+        throw new Error('coordinator_pipeline_deadline_exhausted');
+      }
+      const settled = delivery.recordPipelineObservation({
+        operationId: operationId,
+        fence,
+        nextPollAtMs: outstanding.nextPollAtMs,
+        absoluteDeadlineMs: outstanding.absoluteDeadlineMs,
+      });
+      if (settled.kind !== 'passed') throw new Error('coordinator_pipeline_replay_conflict');
+    }
+  }
+
+  #settleRetainedChecks(
+    action: ExecutePhaseAction,
+    fence: DeliveryFence,
+    delivery: DurableDeliveryBroker,
     pullRequestNumber: number,
+    checkId: string,
   ) {
-    const checkId = deriveDeliveryRequestDigest([
-      binding.repository,
-      pullRequestNumber,
-      action.headSha,
-      this.#contract.authority.github.base,
-      this.#config.protectionDigest,
-    ]);
     // A passed observation removes its wait; retain the terminal operation as the replay anchor.
     const passed = this.#db
       .prepare(
@@ -556,29 +612,34 @@ export class StandaloneCoordinators {
         isDeepStrictEqual(request.requiredChecks, this.#contract.authority.github.requiredChecks) &&
         request.requiredChecks.every((name) => result.checks[name] === 'success')
       ) {
-        const outstanding = this.#store.getWait(action.runId, checkId);
-        if (outstanding) {
-          if (Date.now() >= outstanding.absoluteDeadlineMs) {
-            delivery.expirePipelineWait({
-              runId: action.runId,
-              taskId: action.taskId,
-              checkId,
-              eventIdentity: outstanding.eventIdentity,
-              fence,
-            });
-            throw new Error('coordinator_pipeline_deadline_exhausted');
-          }
-          const settled = delivery.recordPipelineObservation({
-            operationId: operation.id,
-            fence,
-            nextPollAtMs: outstanding.nextPollAtMs,
-            absoluteDeadlineMs: outstanding.absoluteDeadlineMs,
-          });
-          if (settled.kind !== 'passed') throw new Error('coordinator_pipeline_replay_conflict');
-        }
+        this.#settleOutstandingWait(action, fence, delivery, checkId, operation.id);
         return operation;
       }
     }
+  }
+
+  async #awaitChecks(
+    action: ExecutePhaseAction,
+    fence: DeliveryFence,
+    delivery: DurableDeliveryBroker,
+    binding: ReturnType<typeof coordinatorBinding>,
+    pullRequestNumber: number,
+  ) {
+    const checkId = deriveDeliveryRequestDigest([
+      binding.repository,
+      pullRequestNumber,
+      action.headSha,
+      this.#contract.authority.github.base,
+      this.#config.protectionDigest,
+    ]);
+    const retained = this.#settleRetainedChecks(
+      action,
+      fence,
+      delivery,
+      pullRequestNumber,
+      checkId,
+    );
+    if (retained) return retained;
     for (;;) {
       const persisted = this.#store.getWait(action.runId, checkId);
       if (persisted && Date.now() >= persisted.absoluteDeadlineMs) {
@@ -645,7 +706,8 @@ export class StandaloneCoordinators {
       {
         ...binding,
         kind: 'github.merge',
-        pullRequestNumber: (pr.result as { pullRequestNumber: number }).pullRequestNumber,
+        pullRequestNumber: z.object({ number: z.number().int().positive() }).parse(pr.result)
+          .number,
         headSha: action.headSha,
         base: this.#contract.authority.github.base,
         requiredChecks: this.#contract.authority.github.requiredChecks,
@@ -681,7 +743,7 @@ export class StandaloneCoordinators {
         );
         this.#store.acquireLease('closeout', action.runId, this.#owner, 30000);
       } catch {
-        this.abort();
+        this.cancelExecution();
       }
     }, 5000);
     try {

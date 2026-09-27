@@ -501,22 +501,7 @@ export class StandalonePhaseRuntime {
       retryBudget: this.#contract.retryPolicy,
       evidence: [],
     };
-    if (action.phase === 'implementing') {
-      const active = this.#store.listActiveRepairDispatches(action.runId, action.taskId);
-      if (active.length > 1) throw new Error('ambiguous_active_repair');
-      if (active[0]) {
-        const repair = repairDispatchPacketSchema.parse(active[0].packet);
-        if (repair.failureHeadSha !== action.headSha)
-          throw new Error('repair_context_head_mismatch');
-        packet.repairContext = {
-          dispatchId: repair.dispatchId,
-          failureHeadSha: repair.failureHeadSha,
-          summary: repair.summary,
-          hypothesis: repair.hypothesis,
-        };
-        packet.evidence = repair.evidence;
-      }
-    }
+    this.#addRepairContext(action, packet);
     if (
       !packet.allowedOperations.includes('workspace.read') ||
       (role === 'test_runner' && !packet.allowedOperations.includes('process.test'))
@@ -533,6 +518,25 @@ export class StandalonePhaseRuntime {
       action.phase === 'implementing' ? undefined : action.phase,
     );
     return packet;
+  }
+
+  #addRepairContext(action: ExecutePhaseAction, packet: TaskPacket): void {
+    if (action.phase === 'implementing') {
+      const active = this.#store.listActiveRepairDispatches(action.runId, action.taskId);
+      if (active.length > 1) throw new Error('ambiguous_active_repair');
+      if (active[0]) {
+        const repair = repairDispatchPacketSchema.parse(active[0].packet);
+        if (repair.failureHeadSha !== action.headSha)
+          throw new Error('repair_context_head_mismatch');
+        packet.repairContext = {
+          dispatchId: repair.dispatchId,
+          failureHeadSha: repair.failureHeadSha,
+          summary: repair.summary,
+          hypothesis: repair.hypothesis,
+        };
+        packet.evidence = repair.evidence;
+      }
+    }
   }
 
   async #runOnce(): Promise<boolean> {
@@ -594,6 +598,17 @@ export class StandalonePhaseRuntime {
     }
   }
 
+  #reserveAttempt(job: PhaseJob, action: ExecutePhaseAction): boolean {
+    if (action.phase !== 'implementing') return true;
+    try {
+      this.#journal.reserveImplementationAttempt(job, Date.now());
+      return true;
+    } catch {
+      this.#journal.block(job, 'phase_implementation_attempt_rejected', Date.now());
+      return false;
+    }
+  }
+
   async #runSpecialist(
     claim: PhaseJob,
     action: ExecutePhaseAction,
@@ -612,14 +627,7 @@ export class StandalonePhaseRuntime {
       return false;
     }
     const job = this.#journal.start(claim, Date.now());
-    if (action.phase === 'implementing') {
-      try {
-        this.#journal.reserveImplementationAttempt(job, Date.now());
-      } catch {
-        this.#journal.block(job, 'phase_implementation_attempt_rejected', Date.now());
-        return false;
-      }
-    }
+    if (!this.#reserveAttempt(job, action)) return false;
     let heartbeatError: unknown;
     let cancellation: Promise<void> | undefined;
     const heartbeat = setInterval(
@@ -721,18 +729,8 @@ export class StandalonePhaseRuntime {
         packet: inputEnvelope,
       });
       this.#reservation = reservation;
-      const inputEvidence = await this.#vault.record({
-        content: Buffer.from(JSON.stringify(inputEnvelope)),
-        mediaType: 'application/json',
-        kind: 'artifact',
-        producer: this.#owner,
-        producerRole: 'workflow_orchestrator',
-        workspaceId: action.workspaceId,
-        runId: action.runId,
-        taskId: action.taskId,
-        contractVersion: action.contractVersion,
-        policyDigest: action.policyDigest,
-        headSha: action.headSha,
+      const inputEvidence = await this.#vault.recordSpecialistInput({
+        executionId: reservation.id,
         capability: evidenceCapability,
       });
       if (inputEvidence.reference.digest !== digestGovernedValue(inputEnvelope))
@@ -830,7 +828,7 @@ export class StandalonePhaseRuntime {
     if (this.#cleanupOnly || this.#fatalAdmission || !this.#coordinators)
       throw new Error('coordinator_admission_unavailable');
     await this.#admission();
-    const assertAuthority = () => {
+    const assertDispatchAuthority = () => {
       this.#assertAdmission();
       if (this.#closing || this.#fatalAdmission)
         throw new Error('coordinator_admission_unavailable');
@@ -848,6 +846,9 @@ export class StandalonePhaseRuntime {
         current.lease_until_ms <= Date.now()
       )
         throw new Error('coordinator_phase_lease_stale');
+    };
+    const assertAuthority = () => {
+      assertDispatchAuthority();
       this.#store.verifyPlanningDocuments({
         runId: action.runId,
         taskId: action.taskId,
@@ -865,8 +866,8 @@ export class StandalonePhaseRuntime {
           this.#journal.renew(job, this.#config.leaseTtlMs, Date.now());
           this.#fences(action);
         } catch {
-          // Stop in-flight adapter/check processes when their authority expires.
-          this.#coordinators?.abort();
+          // Cancel this attempt; a freshly admitted recovery can reconcile the same intent.
+          this.#coordinators?.cancelExecution();
         }
       },
       Math.floor(this.#config.leaseTtlMs / 3),
@@ -882,6 +883,7 @@ export class StandalonePhaseRuntime {
           taskLeaseEpoch: fences.task,
         },
         assertAuthority,
+        assertDispatchAuthority,
       );
       this.#journal.completeCoordinator(job, proof, fences, Date.now());
       return true;
@@ -1109,6 +1111,21 @@ export class StandalonePhaseRuntime {
       }
     }
   }
+  async #recoverCoordinator(job: PhaseJob, action: ExecutePhaseAction): Promise<void> {
+    try {
+      await this.#runCoordinator(job, action, this.#fences(action));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'resource lease is held by another owner')
+        this.#journal.deferCoordinatorAdmission(job, Date.now());
+      else
+        this.#journal.deferCoordinator(
+          job,
+          this.#contract.retryPolicy.infrastructureAttempts,
+          Date.now(),
+        );
+    }
+  }
+
   async #recover(job: PhaseJob): Promise<void> {
     // Cleanup has its own narrow lease and cannot dispatch or advance the workflow.
     const heartbeat = setInterval(
@@ -1124,18 +1141,7 @@ export class StandalonePhaseRuntime {
     try {
       const action = this.#journal.action(job);
       if (PHASE_JOB_DISPATCH[action.phase].endsWith('_coordinator')) {
-        try {
-          await this.#runCoordinator(job, action, this.#fences(action));
-        } catch (error) {
-          if (error instanceof Error && error.message === 'resource lease is held by another owner')
-            this.#journal.deferCoordinatorAdmission(job, Date.now());
-          else
-            this.#journal.deferCoordinator(
-              job,
-              this.#contract.retryPolicy.infrastructureAttempts,
-              Date.now(),
-            );
-        }
+        await this.#recoverCoordinator(job, action);
         return;
       }
       const execution = this.#store.getSchedulerExecution(job.execution_id!);

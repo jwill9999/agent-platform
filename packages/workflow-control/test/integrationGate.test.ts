@@ -82,13 +82,29 @@ async function setup(executor: GateCommandExecutor, approvedParentShas?: Record<
 }
 
 describe('LocalExactHeadIntegrationGate', () => {
+  it('preserves Unicode and whitespace in NUL-delimited Git paths', async () => {
+    const paths = ['packages/workflow-control/café.ts', 'packages/workflow-control/ leading.ts'];
+    const executor: GateCommandExecutor = async (_executable, args) => {
+      if (args[0] === 'diff') {
+        expect(args).toContain('-z');
+        return { stdout: paths.join('\0') + '\0', stderr: '' };
+      }
+      return { stdout: args[0] === 'rev-parse' ? 'a'.repeat(40) : '', stderr: '' };
+    };
+    const { gate, store } = await setup(executor);
+    expect(
+      (await gate.verify({ contract, runId: 'gate-run', taskId: 'gate-feature.1' })).changedFiles,
+    ).toEqual(paths);
+    store.close();
+  });
+
   it('derives the real diff and stores retrievable check evidence at a stable head', async () => {
     const head = 'a'.repeat(40);
     const { artifacts, gate, store } = await setup(async (executable, args) => {
       if (executable === 'git' && args[0] === 'rev-parse')
         return { stdout: `${head}\n`, stderr: '' };
       if (executable === 'git' && args[0] === 'diff') {
-        return { stdout: 'packages/workflow-control/src/orchestrator.ts\n', stderr: '' };
+        return { stdout: 'packages/workflow-control/src/orchestrator.ts\0', stderr: '' };
       }
       if (executable === 'git' && args[0] === 'status') return { stdout: '', stderr: '' };
       return { stdout: 'passed\n', stderr: '' };
@@ -153,7 +169,7 @@ describe('LocalExactHeadIntegrationGate', () => {
         return { stdout: `${args[1] === 'HEAD' ? head : base}\n`, stderr: '' };
       }
       if (executable === 'git' && args[0] === 'diff') {
-        diffRange = args[2]!;
+        diffRange = args[3]!;
         return { stdout: '', stderr: '' };
       }
       return { stdout: 'passed\n', stderr: '' };
