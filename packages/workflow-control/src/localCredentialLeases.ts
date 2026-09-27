@@ -64,6 +64,36 @@ export class LocalCredentialLeases {
     if (owner?.value !== this.generation) throw new Error('credential gateway superseded');
   }
 
+  health() {
+    this.#assertOwner();
+    return { protocol: 'broker-health-v1', generation: this.generation };
+  }
+
+  issueProbe(requestId: string, generation: string) {
+    z.string().uuid().parse(requestId);
+    return this.issue(
+      `probe:${requestId}`,
+      generation,
+      `probe:${requestId}`,
+      Math.min(30_000, this.#ttlMs),
+    );
+  }
+
+  probeStatus(requestId: string, generation: string) {
+    z.string().uuid().parse(requestId);
+    this.#assertOwner();
+    const leaseId = `probe:${requestId}`;
+    const row = this.#db.prepare('SELECT * FROM credential_leases WHERE id=?').get(leaseId) as
+      | Lease
+      | undefined;
+    return {
+      leaseId,
+      generation,
+      status: row ? this.status(leaseId, generation) : 'never_issued',
+      expiresAtMs: row?.expires_ms ?? null,
+    };
+  }
+
   issue(id: string, generation: string, executionId: string, ttlMs = this.#ttlMs) {
     identity.parse(id);
     identity.parse(generation);

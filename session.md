@@ -1,4 +1,32 @@
-# Current session: role enforcement repair — 26 September 2026
+# Current session: development lifecycle implementation — 27 September 2026
+
+PR275 was merged into `feature/harness-backlog-review` at
+`b53fdbb9cd3f184fc430d244df94c20dce48e7ff`. The active worktree is
+`/Users/letuscode/projects/agent-platform-workflow-evaluation`, branch
+`task/development-lifecycle-plan`; it incorporated that feature baseline at
+`fc65cc83c68149c7f262d8856e016871c8a11a52`.
+
+Owner explicitly authorized completing the bounded startup/recovery work and said **resume** after
+Codex restarted. Continue without repeating that approval. Execution is supervised prerequisite
+implementation, not a managed pilot. No merge, staging or live pilot is authorized by this slice.
+
+Beads `agent-platform-pilot-zero.17` remains in progress; `.13` remains blocked. Requirements and
+current evidence are in [the lifecycle report](docs/reviews/development-lifecycle-qualification.md),
+which links the design, verification matrix and isolated reviews. Two implementation reviews found
+concrete blockers; repairs include independent fenced cleanup, atomic interrupted finalization,
+transport cancellation and explicit readiness. Final review and tests remain outstanding.
+
+Intermediate evidence: real service startup/recovery test passed; connected deterministic worker
+interruption/recovery preserved a single marker; thirteen existing real-container role checks passed.
+Do not treat these intermediate revisions as final qualification or autonomous task success. Next:
+finish fault tests, rerun the full Linux package and connected container checks, obtain isolated
+re-review, publish for feature-branch review and sync Beads. Preserve the broader R1–R3 prerequisites.
+Use the Git fallback in `/tmp/agent-platform-git-bin`; do not accept the Apple licence. Beads operations
+use `/Users/letuscode/projects/agent-platform`, not this worktree. Historical checkpoints follow.
+
+---
+
+## Historical session: role enforcement repair — 26 September 2026
 
 Owner authorized auditing and technically enforcing every specialist role, separately from broker
 model access. Work is supervised under `.17` on `task/standalone-pilot-plan`, PR275 into

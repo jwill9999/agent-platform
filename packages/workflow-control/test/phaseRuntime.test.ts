@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import Database from 'better-sqlite3';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ContinuationJournal } from '../src/continuationJournal.js';
 import { runParentContinuation } from '../src/continuationProcess.js';
@@ -40,6 +40,12 @@ async function setup(
     result?: unknown;
     sourceFailure?: boolean;
     review?: boolean;
+    healthFailure?: boolean;
+    revokeFailure?: boolean;
+    removeFailure?: boolean;
+    issueFailure?: boolean;
+    admission?: () => Promise<void>;
+    verifySource?: () => Promise<void>;
   } = {},
 ) {
   const f = await continuationFixture(Date.now(), 'implementation_worker');
@@ -102,17 +108,29 @@ async function setup(
   await mkdir(dirname(sourceFile), { recursive: true });
   await writeFile(sourceFile, 'source');
   const credentials = new Map<string, 'active' | 'revoked'>();
+  const revocationSawInterruption: boolean[] = [];
+  const brokerState = {
+    healthFailure: options.healthFailure ?? false,
+    revokeFailure: options.revokeFailure ?? false,
+  };
   const credentialBroker = (store: WorkflowStore) =>
     RevocableSpecialistCredentialBroker.createForTest({
       store,
       conformance: async () => 'generation-one',
+      health: async () => {
+        if (brokerState.healthFailure) throw new Error('offline');
+        return 'generation-one';
+      },
       issue: async (root, _executionId, leaseId, generation) => {
         const authFile = join(root, 'auth.json');
         await writeFile(authFile, '{}');
         credentials.set(leaseId, 'active');
+        if (options.issueFailure) throw new Error('lost_issuance_reply');
         return { authFile, leaseId, generation };
       },
       revoke: async (leaseId) => {
+        revocationSawInterruption.push((db.prepare("SELECT COUNT(*) AS n FROM execution_interruptions WHERE run_id='run'").get() as {n:number}).n>0);
+        if (brokerState.revokeFailure) throw new Error('offline');
         credentials.set(leaseId, 'revoked');
       },
       observe: async (leaseId) => credentials.get(leaseId) ?? 'revoked',
@@ -134,6 +152,8 @@ async function setup(
         const transport = schedulerDockerFixture(async (_binary, args, settings) => {
           expect(settings.env).toEqual({});
           launches.push([...args]);
+          if (args[0] === 'rm' && options.removeFailure)
+            throw new Error('fixture_removal_unavailable');
           if (args[0] === 'create') {
             const mount = args.find((arg) => /:\/workspace:(?:ro|rw)$/u.test(arg))!;
             staging.push(dirname(mount.slice(0, -':/workspace:rw'.length)));
@@ -174,7 +194,7 @@ async function setup(
                 }),
                 String(options.delayMs ?? 0),
               ],
-              { env: {}, timeout: 15000 },
+              { env: {}, timeout: 15000, signal: settings.signal },
             );
           }
           return { stdout: 'false', stderr: '' };
@@ -204,7 +224,9 @@ async function setup(
       startTimeMs: 1,
       executableDigest: digestGovernedValue('fixture-process'),
     },
+    admission: options.admission,
     verifySource: async () => {
+      await options.verifySource?.();
       if (options.sourceFailure) throw new Error('source changed');
     },
   });
@@ -224,6 +246,8 @@ async function setup(
     runtime,
     launches,
     credentials,
+    revocationSawInterruption,
+    brokerState,
     config,
     launcher,
     prompts,
@@ -477,6 +501,37 @@ describe('standalone phase runtime production orchestration with fixture launche
     expect(f.store.getRun('run')?.state).toBe('repair');
   });
 
+  it('persists broker interruption even while credential revocation is unavailable', async () => {
+    const f = await setup({ delayMs: 2500 });
+    const work = f.runtime.runOnce();
+    while (!f.launches.some((args) => args[0] === 'start'))
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    f.brokerState.healthFailure = true;
+    f.brokerState.revokeFailure = true;
+    await new Promise((resolve) => setTimeout(resolve, 2200));
+    expect(f.journal.interruptions().list('run')[0]).toMatchObject({
+      reason: 'control_unavailable',
+      state: 'pending',
+      revoke: 0,
+    });
+    expect(await work).toBe(false);
+    expect(f.journal.list()[0]?.status).toBe('started');
+    expect(f.store.getRun('run')?.state).toBe('task_verification');
+    f.brokerState.healthFailure = false;
+    f.brokerState.revokeFailure = false;
+    f.db
+      .prepare("UPDATE leases SET owner_id='competing-owner',expires_at_ms=?")
+      .run(Date.now() + 60000);
+    await new Promise((resolve) => setTimeout(resolve, 2100));
+    expect(await f.runtime.runOnce()).toBe(false);
+    expect(f.journal.list()[0]?.status).toBe('blocked');
+    expect(f.journal.interruptions().list('run')[0]).toMatchObject({
+      state: 'settled',
+      reason: 'control_unavailable',
+    });
+    expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+  }, 15000);
+
   it('rejects invalid structured output and settles/revokes before marking blocked', async () => {
     const f = await setup({ result: { summary: 'not a valid result' } });
     expect(await f.runtime.runOnce()).toBe(false);
@@ -568,4 +623,75 @@ describe('standalone phase runtime production orchestration with fixture launche
       await readFile(fileURLToPath(new URL('../src/cli.ts', import.meta.url)), 'utf8'),
     ).toContain('StandalonePhaseRuntime.create');
   });
+});
+
+it('rechecks admission after source preparation before credential issuance and dispatch', async () => {
+  let available = true;
+  const f = await setup({
+    admission: async () => {
+      if (!available) throw new Error('control_unavailable');
+    },
+    verifySource: async () => {
+      available = false;
+    },
+  });
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.launches.some((args) => args[0] === 'start' || args[0] === 'create')).toBe(false);
+  expect(f.credentials.size).toBe(0);
+});
+
+it('reconciles a crash before atomic interrupted finalization without acquiring execution leases', async () => {
+  const f = await setup({ result: { invalid: true } });
+  vi.spyOn(f.journal, 'finalizeInterrupted').mockImplementationOnce(() => {
+    throw new Error('injected_crash');
+  });
+  await expect(f.runtime.runOnce()).rejects.toThrow('injected_crash');
+  expect(f.journal.interruptions().list('run')[0]?.state).toBe('settled');
+  f.db.prepare('UPDATE phase_jobs SET lease_until_ms=0').run();
+  f.db
+    .prepare("UPDATE leases SET owner_id='competing-owner',expires_at_ms=?")
+    .run(Date.now() + 60000);
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.journal.list()[0]?.status).toBe('blocked');
+  expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+});
+it('contains the worker and latches admission when interruption persistence fails', async () => {
+  const f = await setup({ delayMs: 2500 });
+  const failure = vi.spyOn(f.journal, 'interrupt').mockImplementation(() => {
+    throw new Error('journal_unavailable');
+  });
+  const work = f.runtime.runOnce();
+  const rejected = expect(work).rejects.toThrow('journal_unavailable');
+  while (!f.launches.some((args) => args[0] === 'start'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  f.brokerState.healthFailure = true;
+  await rejected;
+  expect(f.launches.some((args) => args[0] === 'rm')).toBe(true);
+  expect([...f.credentials.values()]).toEqual(['revoked']);
+  expect(f.journal.interruptions().list('run')).toEqual([]);
+  failure.mockRestore();
+  await expect(f.runtime.runOnce()).rejects.toThrow('journal_unavailable');
+  expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+}, 10000);
+
+it('bounds shutdown when container removal fails while attach remains outstanding', async () => {
+  const f = await setup({ delayMs: 60000, removeFailure: true });
+  const work = f.runtime.runOnce();
+  while (!f.launches.some((args) => args[0] === 'start'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  const start = Date.now();
+  await f.runtime.close();
+  expect(Date.now() - start).toBeLessThan(7000);
+  expect(await work).toBe(false);
+  expect(
+    f.db.prepare('SELECT state,cancel,revoke FROM execution_interruptions').get(),
+  ).toMatchObject({ state: 'pending', cancel: 0, revoke: 1 });
+}, 10000);
+
+it('records ambiguous issuance before compensating revocation within the cleanup budget', async () => {
+  const f = await setup({ issueFailure: true });
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.revocationSawInterruption).toEqual([true]);
+  expect(f.journal.interruptions().list('run')[0]).toMatchObject({ state: 'settled', attempt: 1 });
+  expect(f.launches.some((args) => args[0] === 'create')).toBe(false);
 });

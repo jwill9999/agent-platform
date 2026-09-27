@@ -165,6 +165,21 @@ const commandSchema = z.discriminatedUnion('operation', [
     .object({ operation: z.literal('status'), leaseId: z.string(), generation: z.string() })
     .strict(),
   z.object({ operation: z.literal('conformance') }).strict(),
+  z.object({ operation: z.literal('health') }).strict(),
+  z
+    .object({
+      operation: z.literal('probe-issue'),
+      requestId: z.string().uuid(),
+      generation: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('probe-status'),
+      requestId: z.string().uuid(),
+      generation: z.string(),
+    })
+    .strict(),
 ]);
 const equal = (a: string, b: string) => {
   const left = Buffer.from(a),
@@ -215,6 +230,16 @@ export function createCredentialControlServer(
           generation: command.generation,
           status: leases.status(command.leaseId, command.generation),
         };
+        break;
+      case 'probe-issue':
+        result = leases.issueProbe(command.requestId, command.generation);
+        break;
+      case 'probe-status':
+        result = leases.probeStatus(command.requestId, command.generation);
+        break;
+      case 'health':
+        if (!gateway.gateway.listening) throw new Error('gateway_not_listening');
+        result = leases.health();
         break;
       case 'conformance':
         result = leases.conformance();

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { runDevelopmentCommand, classifyDevelopmentError } from './developmentHost.js';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
@@ -177,6 +178,13 @@ if (
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
   try {
+    if (process.argv[2]?.startsWith('development-')) {
+      if (process.argv.length !== 4 || !process.argv[3]) usage();
+      process.stdout.write(
+        JSON.stringify(await runDevelopmentCommand(process.argv[2], process.argv[3])) + '\n',
+      );
+      process.exit(0);
+    }
     if (process.argv[2] === 'bootstrap-preflight') {
       const [database, runId, policyPath] = process.argv.slice(3);
       if (!database || !runId || !policyPath) usage();
@@ -196,7 +204,24 @@ if (
         process.exitCode = 1;
     }
   } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exitCode = 1;
+    if (process.argv[2]?.startsWith('development-')) {
+      process.stderr.write(
+        JSON.stringify({
+          code: classifyDevelopmentError(error),
+          recoveryAction:
+            'inspect development-status and the private configuration; retry development-recover after resolving the cause',
+        }) + '\n',
+      );
+      const code = classifyDevelopmentError(error);
+      process.exitCode =
+        code === 'invalid_configuration'
+          ? 2
+          : ['cleanup_pending', 'cleanup_exhausted', 'journal_unavailable'].includes(code)
+            ? 4
+            : 3;
+    } else {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      process.exitCode = 1;
+    }
   }
 }

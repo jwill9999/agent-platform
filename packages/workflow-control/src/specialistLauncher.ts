@@ -1,3 +1,4 @@
+import type { ExecutionInterruption } from './executionInterruptions.js';
 import { SPECIALIST_SECCOMP } from './specialistSeccomp.js';
 import {
   specialistRoleProfile,
@@ -62,7 +63,12 @@ export interface SpecialistExecutionResult {
 export type SpecialistProcessExecutor = (
   executable: string,
   args: readonly string[],
-  options: { env: Record<string, string>; timeout: number; maxBuffer: number },
+  options: {
+    env: Record<string, string>;
+    timeout: number;
+    maxBuffer: number;
+    signal?: AbortSignal;
+  },
 ) => Promise<{ stdout: string; stderr: string }>;
 
 export interface SpecialistLaunchRequest {
@@ -342,6 +348,7 @@ const defaultExecutor: SpecialistProcessExecutor = async (executable, args, opti
     env: options.env,
     timeout: options.timeout,
     maxBuffer: options.maxBuffer,
+    signal: options.signal,
   });
   return { stdout: result.stdout, stderr: result.stderr };
 };
@@ -391,9 +398,14 @@ export class RevocableSpecialistCredentialBroker {
     leaseId: string,
     generation: string,
   ) => Promise<SpecialistCredentialLease>;
-  readonly #revoke: (leaseId: string, generation: string) => Promise<void>;
-  readonly #observe: (leaseId: string, generation: string) => Promise<'active' | 'revoked'>;
+  readonly #revoke: (leaseId: string, generation: string, deadlineMs?: number) => Promise<void>;
+  readonly #observe: (
+    leaseId: string,
+    generation: string,
+    deadlineMs?: number,
+  ) => Promise<'active' | 'revoked'>;
   readonly #conformance: () => Promise<string>;
+  readonly #health: () => Promise<string>;
 
   private constructor(input: {
     store: WorkflowStore;
@@ -403,9 +415,14 @@ export class RevocableSpecialistCredentialBroker {
       leaseId: string,
       generation: string,
     ) => Promise<SpecialistCredentialLease>;
-    revoke: (leaseId: string, generation: string) => Promise<void>;
-    observe: (leaseId: string, generation: string) => Promise<'active' | 'revoked'>;
+    revoke: (leaseId: string, generation: string, deadlineMs?: number) => Promise<void>;
+    observe: (
+      leaseId: string,
+      generation: string,
+      deadlineMs?: number,
+    ) => Promise<'active' | 'revoked'>;
     conformance: () => Promise<string>;
+    health?: () => Promise<string>;
   }) {
     if (!(input.store instanceof WorkflowStore)) {
       throw new Error('credential broker requires the durable workflow store');
@@ -415,6 +432,7 @@ export class RevocableSpecialistCredentialBroker {
     this.#revoke = input.revoke;
     this.#observe = input.observe;
     this.#conformance = input.conformance;
+    this.#health = input.health ?? input.conformance;
   }
 
   static create(input: {
@@ -424,6 +442,21 @@ export class RevocableSpecialistCredentialBroker {
     if (!isAbsolute(input.binary)) throw new Error('credential broker binary must be absolute');
     return new RevocableSpecialistCredentialBroker({
       store: input.store,
+      health: async () => {
+        const result = await defaultExecutor(input.binary, ['health'], {
+          env: {},
+          timeout: 3000,
+          maxBuffer: 4096,
+        });
+        const status = JSON.parse(result.stdout) as Record<string, unknown>;
+        if (
+          status.protocol !== 'broker-health-v1' ||
+          typeof status.generation !== 'string' ||
+          !status.generation
+        )
+          throw new Error('broker_health_invalid');
+        return status.generation;
+      },
       issue: async (stagingRoot, executionId, leaseId, generation) => {
         const authFile = join(stagingRoot, 'codex-auth.json');
         const result = await defaultExecutor(
@@ -447,13 +480,13 @@ export class RevocableSpecialistCredentialBroker {
         }
         return { authFile, leaseId, generation };
       },
-      revoke: async (leaseId, generation) => {
+      revoke: async (leaseId, generation, deadlineMs = Date.now() + 5000) => {
         const result = await defaultExecutor(
           input.binary,
           ['revoke', '--lease-id', leaseId, '--generation', generation],
           {
             env: {},
-            timeout: 30_000,
+            timeout: Math.max(1, deadlineMs - Date.now()),
             maxBuffer: 64 * 1024,
           },
         );
@@ -466,13 +499,13 @@ export class RevocableSpecialistCredentialBroker {
           throw new Error('credential broker did not confirm generation-pinned revocation');
         }
       },
-      observe: async (leaseId, generation) => {
+      observe: async (leaseId, generation, deadlineMs = Date.now() + 5000) => {
         const result = await defaultExecutor(
           input.binary,
           ['status', '--lease-id', leaseId, '--generation', generation],
           {
             env: {},
-            timeout: 30_000,
+            timeout: Math.max(1, deadlineMs - Date.now()),
             maxBuffer: 64 * 1024,
           },
         );
@@ -528,9 +561,14 @@ export class RevocableSpecialistCredentialBroker {
       leaseId: string,
       generation: string,
     ) => Promise<SpecialistCredentialLease>;
-    revoke: (leaseId: string, generation: string) => Promise<void>;
-    observe: (leaseId: string, generation: string) => Promise<'active' | 'revoked'>;
+    revoke: (leaseId: string, generation: string, deadlineMs?: number) => Promise<void>;
+    observe: (
+      leaseId: string,
+      generation: string,
+      deadlineMs?: number,
+    ) => Promise<'active' | 'revoked'>;
     conformance: () => Promise<string>;
+    health?: () => Promise<string>;
   }): RevocableSpecialistCredentialBroker {
     if (process.env.NODE_ENV !== 'test') {
       throw new Error('test credential broker is unavailable outside the test runtime');
@@ -543,6 +581,7 @@ export class RevocableSpecialistCredentialBroker {
     executionId: string,
     generation: string,
     nowMs = Date.now(),
+    onFailure?: (error: unknown) => Promise<void>,
   ): Promise<SpecialistCredentialLease> {
     const leaseId = this.leaseId(executionId);
     this.#store.bindSchedulerCredentialGeneration(
@@ -575,6 +614,10 @@ export class RevocableSpecialistCredentialBroker {
       );
       return { ...lease, authFile: canonicalAuth };
     } catch (issueError) {
+      if (onFailure) {
+        await onFailure(issueError);
+        throw issueError;
+      }
       try {
         await this.#revokeAndConfirm(leaseId, generation);
         const execution = this.#store.getSchedulerExecution(executionId);
@@ -606,6 +649,10 @@ export class RevocableSpecialistCredentialBroker {
   leaseId(executionId: string): string {
     if (!/^[a-f0-9-]{36}$/u.test(executionId)) throw new Error('execution id must be a UUID');
     return `specialist:${executionId}`;
+  }
+
+  assertHealthy(): Promise<string> {
+    return this.#health();
   }
 
   assertConformant(): Promise<string> {
@@ -654,8 +701,10 @@ export class RevocableSpecialistCredentialBroker {
   }
 
   async #revokeAndConfirm(leaseId: string, generation: string): Promise<void> {
-    await this.#revoke(leaseId, generation);
-    if ((await this.#observe(leaseId, generation)) !== 'revoked') {
+    const deadlineMs = Date.now() + 5000;
+    await this.#revoke(leaseId, generation, deadlineMs);
+    if (Date.now() >= deadlineMs) throw new Error('credential_cleanup_timed_out');
+    if ((await this.#observe(leaseId, generation, deadlineMs)) !== 'revoked') {
       throw new Error('credential broker did not confirm lease revocation');
     }
   }
@@ -682,11 +731,17 @@ export interface DockerSpecialistReservation {
   deadlineMs: number;
 }
 
+export interface SpecialistLifecycleHooks {
+  admission: () => Promise<void>;
+  interrupted: (error: unknown) => Promise<void>;
+}
 export class DockerIsolatedSpecialistLauncher {
   readonly #options: DockerSpecialistLauncherOptions;
   readonly #clock: () => number;
   readonly #cancelled = new Set<string>();
   readonly #settlements = new Map<string, Promise<void>>();
+  readonly #cleanupAuthorities = new Map<string, ExecutionInterruption>();
+  readonly #attachedTransports = new Map<string, AbortController>();
   readonly #containerLocks = new Map<string, Promise<void>>();
 
   private constructor(options: DockerSpecialistLauncherOptions) {
@@ -721,6 +776,16 @@ export class DockerIsolatedSpecialistLauncher {
     return this.#options.credentialBroker.leaseId(reservation.id);
   }
 
+  async assertCredentialHealthy(executionId: string): Promise<void> {
+    const generation = await this.#options.credentialBroker.assertHealthy();
+    const execution = this.#options.store.getSchedulerExecution(executionId);
+    if (
+      execution?.credentialBrokerGeneration &&
+      execution.credentialBrokerGeneration !== generation
+    )
+      throw new Error('broker_generation_changed');
+  }
+
   revokeCredential(executionId: string): Promise<void> {
     return this.#options.credentialBroker.revoke(executionId);
   }
@@ -732,6 +797,7 @@ export class DockerIsolatedSpecialistLauncher {
   launchBound(
     input: SpecialistInputEnvelope,
     reservation: DockerSpecialistReservation,
+    lifecycle?: SpecialistLifecycleHooks,
   ): Promise<unknown> {
     const envelope = specialistInputEnvelopeSchema.parse(input);
     if (
@@ -739,19 +805,21 @@ export class DockerIsolatedSpecialistLauncher {
       envelope.task.assignedRole !== reservation.role
     )
       throw new Error('specialist input envelope execution binding mismatch');
-    return this.#trackLaunch(envelope.task, reservation, envelope);
+    return this.#trackLaunch(envelope.task, reservation, envelope, lifecycle);
   }
 
   #trackLaunch(
     packet: TaskPacket,
     reservation: DockerSpecialistReservation,
     envelope?: SpecialistInputEnvelope,
+    lifecycle?: SpecialistLifecycleHooks,
   ): Promise<unknown> {
     const copiedEnvelope = envelope === undefined ? undefined : structuredClone(envelope);
     const launched = this.#launch(
       copiedEnvelope?.task ?? structuredClone(packet),
       { ...reservation },
       copiedEnvelope,
+      lifecycle,
     );
     const settlement = launched.then(
       () => undefined,
@@ -766,9 +834,12 @@ export class DockerIsolatedSpecialistLauncher {
     packet: TaskPacket,
     reservation: DockerSpecialistReservation,
     envelope?: SpecialistInputEnvelope,
+    lifecycle?: SpecialistLifecycleHooks,
   ): Promise<SpecialistExecutionResult> {
     const authority = this.#authority(reservation.id);
     let stagingRoot: string | undefined;
+    let authFileForCleanup: string | undefined;
+    let homeForCleanup: string | undefined;
     let retainWorkspace = false;
     let output: SpecialistExecutionResult | undefined;
     let launchError: unknown;
@@ -791,6 +862,13 @@ export class DockerIsolatedSpecialistLauncher {
         packet.allowedPaths,
       );
       stagingRoot = resolve(workspace.root, '..');
+      homeForCleanup = workspace.codexHome;
+      this.#options.store.bindSchedulerStaging(
+        authority,
+        stagingRoot,
+        workflowContainerJournalCapability,
+        this.#clock(),
+      );
       const promptFile = join(stagingRoot, 'task-packet.json');
       const approvedDocumentsRoot = join(stagingRoot, 'approved-documents');
       this.#options.store.stageApprovedDocuments({
@@ -804,12 +882,15 @@ export class DockerIsolatedSpecialistLauncher {
         destination: approvedDocumentsRoot,
         nowMs: this.#clock(),
       });
+      await lifecycle?.admission();
       const credentialLease = await this.#options.credentialBroker.issue(
         stagingRoot,
         reservation.id,
         credentialBrokerGeneration,
         this.#clock(),
+        lifecycle?.interrupted,
       );
+      authFileForCleanup = credentialLease.authFile;
       const sourceEvidence = await specialistSourceEvidence(roleProfile, workspace.root);
       await writeFile(
         promptFile,
@@ -838,6 +919,7 @@ export class DockerIsolatedSpecialistLauncher {
         `io.agent-platform.specialist-execution=${reservation.id}`,
         ...launch.args.slice(2),
       ];
+      await lifecycle?.admission();
       this.#advance(authority, 'not_dispatched', 'create_pending');
       this.#assertCanStart(reservation);
       const created = await this.#options.store.dispatchSchedulerContainer(
@@ -853,8 +935,11 @@ export class DockerIsolatedSpecialistLauncher {
       this.#advance(authority, 'create_pending', 'acknowledged', containerId);
       if ((await this.#inspectOwned(this.#state(reservation.id), containerId)) === undefined)
         throw new Error('specialist acknowledged container is absent before start');
+      const transportController = new AbortController();
+      this.#attachedTransports.set(reservation.id, transportController);
       let started: Promise<{ stdout: string; stderr: string }> | undefined;
-      await this.#withContainerLock(reservation.id, () => {
+      await this.#withContainerLock(reservation.id, async () => {
+        await lifecycle?.admission();
         this.#assertCanStart(reservation);
         this.#options.store.verifyApprovedDocumentSnapshot({
           runId: packet.runId,
@@ -877,12 +962,13 @@ export class DockerIsolatedSpecialistLauncher {
               ['start', '--attach', containerId],
               reservation.deadlineMs - this.#clock(),
               this.#options.maxOutputBytes ?? 4 * 1024 * 1024,
+              transportController.signal,
             ),
           workflowContainerJournalCapability,
           this.#clock,
         );
       });
-      const result = await started!;
+      const result = await started!.finally(() => this.#attachedTransports.delete(reservation.id));
       this.#assertCanStart(reservation);
       const observed = await this.#inspectOwned(this.#state(reservation.id), containerId);
       if (
@@ -907,6 +993,12 @@ export class DockerIsolatedSpecialistLauncher {
       output = { ...parsed, retainedWorkspaceRoot: workspace.root };
     } catch (error) {
       launchError = error;
+      // A managed phase persists its interruption before any failure cleanup.
+      // Its coordinator owns the durable retry budget. Successful teardown above is separate.
+      if (lifecycle) {
+        await lifecycle.interrupted(error);
+        throw error;
+      }
     }
     // Cleanup and revocation are independent security operations, even when one fails.
     const cleanup = await Promise.allSettled([
@@ -924,8 +1016,12 @@ export class DockerIsolatedSpecialistLauncher {
       }
     }
     this.#cancelled.delete(reservation.id);
-    if (!retainWorkspace && stagingRoot !== undefined && this.#settled(reservation.id))
-      await rm(stagingRoot, { recursive: true, force: true });
+    if (!retainWorkspace && stagingRoot !== undefined && this.#settled(reservation.id)) {
+      // Source/evidence remain bound to the execution for interruption reconciliation.
+      // Model credentials and generated runtime configuration are never retained as evidence.
+      await rm(authFileForCleanup ?? join(stagingRoot, 'codex-auth.json'), { force: true });
+      if (homeForCleanup) await rm(homeForCleanup, { recursive: true, force: true });
+    }
     if (cleanup.some((result) => result.status === 'rejected') || !this.#settled(reservation.id))
       throw new Error(
         `specialist settlement unconfirmed; retain staging for docker:workflow-specialist-${reservation.id}`,
@@ -933,6 +1029,43 @@ export class DockerIsolatedSpecialistLauncher {
       );
     if (output === undefined) throw launchError;
     return output;
+  }
+
+  abortTransport(executionId: string): void {
+    this.#attachedTransports.get(executionId)?.abort();
+  }
+
+  beginInterruptionCleanup(row: ExecutionInterruption): void {
+    if (row.owner !== this.#options.ownerId) throw new Error('cleanup_owner_changed');
+    this.#options.store.assertInterruptionCleanup(row);
+    this.#cleanupAuthorities.set(row.execution_id, row);
+  }
+  endInterruptionCleanup(id: string): void {
+    this.#cleanupAuthorities.delete(id);
+  }
+
+  async removeInterruptedCredentials(executionId: string): Promise<void> {
+    this.#authority(executionId);
+    if (!this.#settled(executionId)) throw new Error('container_cleanup_unconfirmed');
+    const staging = this.#options.store.getSchedulerStaging(executionId);
+    if (!staging) return;
+    const stat = await lstat(staging.root).catch(() => undefined);
+    if (!stat) return;
+    if (!stat.isDirectory() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0)
+      throw new Error('staging_identity_changed');
+    await Promise.all([
+      rm(join(staging.root, 'codex-auth.json'), { force: true }),
+      rm(join(staging.root, 'codex-home'), { force: true, recursive: true }),
+    ]);
+  }
+
+  isContainerSettled(executionId: string): boolean {
+    return this.#settled(executionId);
+  }
+
+  async stopContainer(reservation: DockerSpecialistReservation): Promise<void> {
+    this.#cancelled.add(reservation.id);
+    await this.#settle(this.#authority(reservation.id));
   }
 
   async cancel(reservation: DockerSpecialistReservation): Promise<void> {
@@ -956,24 +1089,31 @@ export class DockerIsolatedSpecialistLauncher {
     const settled = await Promise.race([
       settlement.then(() => this.#settled(reservation.id)),
       new Promise<false>((resolve) => {
-        timeout = setTimeout(() => resolve(false), this.#options.cancellationSettleMs ?? 15_000);
+        timeout = setTimeout(() => resolve(false), this.#options.cancellationSettleMs ?? 5000);
       }),
     ]);
     if (timeout !== undefined) clearTimeout(timeout);
     return settled;
   }
 
-  #docker(args: string[], timeout = 10_000, maxBuffer = 64 * 1024) {
+  #docker(args: string[], timeout = 10_000, maxBuffer = 64 * 1024, signal?: AbortSignal) {
     const executor = this.#options.executor ?? defaultExecutor;
     return executor('/usr/local/bin/docker', args, {
       env: {},
       timeout: Math.max(1, timeout),
       maxBuffer,
+      signal,
     });
   }
 
-  #authority(id: string): SchedulerContainerAuthority {
+  #authority(id: string): SchedulerContainerAuthority & { cleanup?: ExecutionInterruption } {
     const execution = this.#options.store.getSchedulerExecution(id);
+    const cleanup = this.#cleanupAuthorities.get(id);
+    if (cleanup) {
+      this.#options.store.assertInterruptionCleanup(cleanup);
+      if (!execution) throw new Error('cleanup_execution_missing');
+      return { ...execution, cleanup };
+    }
     if (execution === undefined || execution.ownerId !== this.#options.ownerId)
       throw new Error('specialist execution owner changed');
     return execution;
@@ -1003,11 +1143,20 @@ export class DockerIsolatedSpecialistLauncher {
   }
 
   #advance(
-    authority: SchedulerContainerAuthority,
+    authority: SchedulerContainerAuthority & { cleanup?: ExecutionInterruption },
     from: SchedulerContainerRecord['status'],
     to: SchedulerContainerRecord['status'],
     containerId?: string,
   ) {
+    const cleanup = authority.cleanup;
+    if (cleanup)
+      return this.#options.store.advanceInterruptedContainer(
+        cleanup,
+        from,
+        to,
+        containerId,
+        workflowContainerJournalCapability,
+      );
     return this.#options.store.advanceSchedulerContainer(
       { execution: authority, from, to, containerId },
       workflowContainerJournalCapability,
@@ -1046,12 +1195,19 @@ export class DockerIsolatedSpecialistLauncher {
   async #inspectOwned(
     state: SchedulerContainerRecord,
     identity: string,
+    deadlineMs = Date.now() + 5000,
   ): Promise<{ id: string; running: boolean; status: string; exitCode: number } | undefined> {
     let stdout: string;
     try {
       const format =
         '{"id":{{json .Id}},"name":{{json .Name}},"owner":{{json (index .Config.Labels "io.agent-platform.specialist-execution")}},"status":{{json .State.Status}},"running":{{json .State.Running}},"exitCode":{{json .State.ExitCode}}}';
-      stdout = (await this.#docker(['inspect', '--format', format, identity], 5000)).stdout;
+      if (Date.now() >= deadlineMs) throw new Error('container_cleanup_timed_out');
+      stdout = (
+        await this.#docker(
+          ['inspect', '--format', format, identity],
+          Math.max(1, deadlineMs - Date.now()),
+        )
+      ).stdout;
     } catch (error) {
       const failure = error as { code?: unknown; stderr?: unknown };
       if (
@@ -1082,11 +1238,16 @@ export class DockerIsolatedSpecialistLauncher {
     return observed as { id: string; running: boolean; status: string; exitCode: number };
   }
 
-  async #settle(authority: SchedulerContainerAuthority): Promise<void> {
-    return this.#withContainerLock(authority.id, () => this.#settleOwned(authority));
+  async #settle(
+    authority: SchedulerContainerAuthority & { cleanup?: ExecutionInterruption },
+  ): Promise<void> {
+    const deadlineMs = Date.now() + 5000;
+    return this.#withContainerLock(authority.id, () => this.#settleOwned(authority, deadlineMs));
   }
 
-  async #boundedSettlement(authority: SchedulerContainerAuthority): Promise<void> {
+  async #boundedSettlement(
+    authority: SchedulerContainerAuthority & { cleanup?: ExecutionInterruption },
+  ): Promise<void> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
@@ -1100,7 +1261,7 @@ export class DockerIsolatedSpecialistLauncher {
         new Promise<never>((_resolve, reject) => {
           timer = setTimeout(
             () => reject(new Error('specialist settlement wait timed out')),
-            this.#options.cancellationSettleMs ?? 15_000,
+            this.#options.cancellationSettleMs ?? 5000,
           );
         }),
       ]);
@@ -1109,11 +1270,12 @@ export class DockerIsolatedSpecialistLauncher {
     }
   }
 
-  async #settleOwned(authority: SchedulerContainerAuthority): Promise<void> {
+  async #settleOwned(authority: SchedulerContainerAuthority, deadlineMs: number): Promise<void> {
+    if (Date.now() >= deadlineMs) throw new Error('container_cleanup_timed_out');
     let state = this.#state(authority.id);
     if (state.status === 'not_dispatched' || state.status === 'removal_confirmed') return;
     const identity = state.containerId ?? state.name;
-    const observed = await this.#inspectOwned(state, identity);
+    const observed = await this.#inspectOwned(state, identity, deadlineMs);
     if (state.status === 'create_pending') {
       if (observed === undefined) throw new Error('specialist create remains ambiguous');
       // Positive owned observation reconciles the lost acknowledgement; absence never does.
@@ -1121,8 +1283,12 @@ export class DockerIsolatedSpecialistLauncher {
     }
     if (observed !== undefined) {
       // Security cleanup may proceed with pinned ownership even after a lease expires.
-      await this.#docker(['rm', '--force', state.containerId!]).catch(() => undefined);
-      if ((await this.#inspectOwned(state, state.containerId!)) !== undefined)
+      if (Date.now() >= deadlineMs) throw new Error('container_cleanup_timed_out');
+      await this.#docker(
+        ['rm', '--force', state.containerId!],
+        Math.max(1, deadlineMs - Date.now()),
+      ).catch(() => undefined);
+      if ((await this.#inspectOwned(state, state.containerId!, deadlineMs)) !== undefined)
         throw new Error('specialist container removal is unconfirmed');
     }
     this.#advance(authority, 'acknowledged', 'removal_confirmed', state.containerId!);

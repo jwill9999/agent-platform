@@ -1,3 +1,8 @@
+import {
+  InterruptionCleanupJournal,
+  type ExecutionInterruption,
+} from './executionInterruptions.js';
+import { assertExecutionNotInterrupted } from './executionInterruptions.js';
 import { isDeepStrictEqual } from 'node:util';
 import {
   assertDocumentAuthority,
@@ -16,7 +21,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { fenceRunWork, runAcceptsWork } from './workCancellation.js';
 import { assertBootstrapDeliveryPolicy, initializeBootstrapSchema } from './bootstrapJournal.js';
 import { mkdir, realpath } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 
 import Database from 'better-sqlite3';
 import { enqueueContinuation, initializeContinuationSchema } from './continuationJournal.js';
@@ -1272,6 +1277,7 @@ export class WorkflowStore {
         version: number;
         needsWake: boolean;
       } => {
+        assertExecutionNotInterrupted(this.#database, callback.delegationId);
         const prior = this.#database
           .prepare(
             'SELECT callback_json, target_state, parent_version, wake_status FROM delegate_callbacks WHERE callback_id = ?',
@@ -3735,6 +3741,7 @@ export class WorkflowStore {
   }
 
   assertSchedulerAcceptsWork(id: string): void {
+    assertExecutionNotInterrupted(this.#database, id);
     const execution = this.getSchedulerExecution(id);
     if (!execution || !runAcceptsWork(this.#database, execution.runId))
       throw new Error('specialist run is cancelled or closed');
@@ -3862,6 +3869,7 @@ export class WorkflowStore {
     }
     return this.#database
       .transaction(() => {
+        if (input.status === 'completed') assertExecutionNotInterrupted(this.#database, input.id);
         assertDocuments?.();
         const nowMs = input.nowMs ?? Date.now();
         const execution = this.getSchedulerExecution(input.id);
@@ -3930,6 +3938,96 @@ export class WorkflowStore {
         return this.getSchedulerExecution(input.id)!;
       })
       .immediate();
+  }
+
+  assertInterruptionCleanup(row: ExecutionInterruption, nowMs = Date.now()): void {
+    new InterruptionCleanupJournal(this.#database).assertOwner(row, nowMs);
+    const current = this.#database
+      .prepare(
+        'SELECT attempt,attempt_deadline_ms FROM execution_interruptions WHERE execution_id=?',
+      )
+      .get(row.execution_id) as { attempt: number; attempt_deadline_ms: number };
+    if (current.attempt !== row.attempt || current.attempt_deadline_ms <= nowMs)
+      throw new Error('cleanup_attempt_expired');
+  }
+  advanceInterruptedContainer(
+    row: ExecutionInterruption,
+    from: SchedulerContainerRecord['status'],
+    to: SchedulerContainerRecord['status'],
+    containerId: string | undefined,
+    capability: typeof workflowContainerJournalCapability,
+  ): SchedulerContainerRecord {
+    if (capability !== workflowContainerJournalCapability)
+      throw new Error('cleanup_capability_required');
+    return this.#database
+      .transaction(() => {
+        this.assertInterruptionCleanup(row);
+        const execution = this.getSchedulerExecution(row.execution_id);
+        const state = this.getSchedulerContainer(row.execution_id);
+        if (
+          !execution ||
+          execution.runId !== row.run_id ||
+          !state ||
+          execution.processIdentity !== `docker:${state.name}`
+        )
+          throw new Error('cleanup_identity_changed');
+        if (
+          !(
+            (from === 'create_pending' && to === 'acknowledged') ||
+            (from === 'acknowledged' && to === 'removal_confirmed')
+          )
+        )
+          throw new Error('cleanup_transition_forbidden');
+        if (
+          state.status !== from ||
+          !containerId ||
+          !/^[a-f0-9]{64}$/u.test(containerId) ||
+          (state.containerId !== null && state.containerId !== containerId)
+        )
+          throw new Error('cleanup_container_changed');
+        this.#database
+          .prepare('UPDATE scheduler_containers SET status=?,container_id=? WHERE execution_id=?')
+          .run(to, containerId, row.execution_id);
+        return this.getSchedulerContainer(row.execution_id)!;
+      })
+      .immediate();
+  }
+
+  bindSchedulerStaging(
+    authority: SchedulerContainerAuthority,
+    root: string,
+    capability: typeof workflowContainerJournalCapability,
+    nowMs = Date.now(),
+  ): void {
+    if (capability !== workflowContainerJournalCapability || !isAbsolute(root))
+      throw new Error('invalid_staging_authority');
+    this.#database
+      .transaction(() => {
+        const execution = this.getSchedulerExecution(authority.id);
+        if (!execution || execution.ownerId !== authority.ownerId || execution.status !== 'active')
+          throw new Error('staging_owner_changed');
+        this.#assertResourceLease(
+          'run',
+          execution.runId,
+          authority.ownerId,
+          authority.runLeaseEpoch,
+          nowMs,
+        );
+        const existing = this.#database
+          .prepare('SELECT root FROM scheduler_staging WHERE execution_id=?')
+          .get(authority.id) as { root: string } | undefined;
+        if (existing && existing.root !== root) throw new Error('staging_identity_changed');
+        this.#database
+          .prepare('INSERT OR IGNORE INTO scheduler_staging VALUES (?,?,?)')
+          .run(authority.id, root, nowMs);
+      })
+      .immediate();
+  }
+
+  getSchedulerStaging(id: string): { root: string; created_at_ms: number } | undefined {
+    return this.#database
+      .prepare('SELECT root,created_at_ms FROM scheduler_staging WHERE execution_id=?')
+      .get(id) as { root: string; created_at_ms: number } | undefined;
   }
 
   getSchedulerExecution(id: string): SchedulerExecutionRecord | undefined {
