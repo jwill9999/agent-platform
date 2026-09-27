@@ -777,11 +777,9 @@ export class DurableDeliveryBroker {
       throw new Error('pipeline wait is already terminally escalated');
     }
     const qualification = this.#store.getPassedPipelineObservation(operation.id);
-    if (qualification) {
-      if (qualification.checkId !== checkId || existing !== undefined)
-        throw new Error('pipeline qualification replay conflicts with durable wait');
-      return { kind: 'passed', checkId };
-    }
+    if (qualification && (qualification.checkId !== checkId || existing !== undefined))
+      throw new Error('pipeline qualification replay conflicts with durable wait');
+    if (qualification) return { kind: 'passed', checkId };
     const effectiveDeadline = Math.min(
       existing?.absoluteDeadlineMs ?? input.absoluteDeadlineMs,
       input.absoluteDeadlineMs,

@@ -339,7 +339,6 @@ describe('standalone phase runtime production orchestration with fixture launche
       });
     const running = f.runtime.runOnce();
     await ready;
-    f.db.prepare('UPDATE leases SET expires_at_ms=0').run();
     f.db.prepare("UPDATE phase_jobs SET lease_until_ms=0 WHERE status='started'").run();
     const replacement = StandalonePhaseRuntime.createForTest({
       store: f.store,
@@ -363,6 +362,17 @@ describe('standalone phase runtime production orchestration with fixture launche
       },
     });
     try {
+      await replacement.runOnce();
+      expect(f.journal.list()[0]).toMatchObject({
+        status: 'started',
+        failure_code: 'phase_coordinator_waiting_for_owner',
+      });
+      expect(f.db.prepare('SELECT COUNT(*) AS n FROM coordinator_recovery_attempts').get()).toEqual(
+        { n: 0 },
+      );
+      expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+      f.db.prepare('UPDATE leases SET expires_at_ms=0').run();
+      f.db.prepare("UPDATE phase_jobs SET lease_until_ms=0 WHERE status='started'").run();
       await replacement.runOnce();
       expect(f.store.getRun('run')?.state).toBe('task_verification');
       expect(f.journal.list()[0]?.status).toBe('completed');

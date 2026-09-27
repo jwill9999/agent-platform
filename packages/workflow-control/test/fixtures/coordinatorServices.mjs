@@ -28,30 +28,11 @@ export async function serve(config) {
     case 'beads.readRepairChild':
       result = state.children?.[args.childId] ?? null;
       break;
-    case 'beads.createRepairChild': {
-      const request = args.request;
-      state.children ??= {};
-      if (!state.children[request.id])
-        state.children[request.id] = {
-          id: request.id,
-          issueType: 'task',
-          status: 'open',
-          specId: `docs/tasks/${request.id}.md`,
-          parentEpicId: request.parentEpicId,
-          blockingDependencies: [request.dependsOn],
-          assignedRole: request.assignedRole,
-          allowedPaths: request.allowedPaths,
-          allowedOperations: request.allowedOperations,
-          findingDigest: request.findingDigest,
-          remainingRetryBudget: request.remainingRetryBudget,
-        };
+    case 'beads.createRepairChild':
+      createRepairChild(state, args.request);
       break;
-    }
     case 'beads.claimIssue':
-      if (state.children?.[args.taskId]?.status === 'open') {
-        state.children[args.taskId].status = 'in_progress';
-        state.claimMutations = (state.claimMutations ?? 0) + 1;
-      }
+      claimIssue(state, args.taskId);
       break;
     case 'beads.closeIssue':
       if (!state.closed.includes(args.taskId)) {
@@ -139,4 +120,27 @@ export async function serve(config) {
   }
   writeFileSync(config.state, JSON.stringify(state));
   process.stdout.write(JSON.stringify(result));
+}
+
+function createRepairChild(state, request) {
+  state.children ??= {};
+  if (state.children[request.id]) return;
+  state.children[request.id] = {
+    id: request.id,
+    issueType: 'task',
+    status: 'open',
+    specId: `docs/tasks/${request.id}.md`,
+    parentEpicId: request.parentEpicId,
+    blockingDependencies: [request.dependsOn],
+    assignedRole: request.assignedRole,
+    allowedPaths: request.allowedPaths,
+    allowedOperations: request.allowedOperations,
+    findingDigest: request.findingDigest,
+    remainingRetryBudget: request.remainingRetryBudget,
+  };
+}
+function claimIssue(state, taskId) {
+  if (state.children?.[taskId]?.status !== 'open') return;
+  state.children[taskId].status = 'in_progress';
+  state.claimMutations = (state.claimMutations ?? 0) + 1;
 }

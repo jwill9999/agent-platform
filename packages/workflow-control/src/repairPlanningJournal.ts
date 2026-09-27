@@ -1,7 +1,7 @@
 import { specialistInputEnvelopeSchema } from './specialistInput.js';
 import type Database from 'better-sqlite3';
 import { digestGovernedValue, type DelegateCallback } from './governedOperations.js';
-import type { RepairChildRequest } from './featureEvaluation.js';
+import type { RepairChildRequest } from './repairChildContract.js';
 import type { AgentResult } from './contracts.js';
 
 export const repairPlanningCapability = Symbol('repairPlanningCapability');

@@ -97,6 +97,9 @@ function assertChildBinding(
     throw new Error('repair task immutable binding rejected');
 }
 
+// Repair authority is the frozen feature contract plus its explicit repair policy.
+// A QA-only predecessor may legitimately lead to an approved implementation child;
+// authorityExpanded=false forbids expansion beyond that envelope, not a change of role.
 function assertChildPermissions(
   child: z.infer<typeof childAuthority>,
   contract: ExecutionContract,

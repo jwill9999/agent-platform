@@ -14,7 +14,6 @@ import {
   importImplementationOutput,
   implementationWorkspace,
 } from './implementationImport.js';
-import { assertTaskPacketWithinTaskAuthority, type TaskPacket } from './contracts.js';
 import { resolveEffectiveTask } from './effectiveTaskAuthority.js';
 import { specialistInputEnvelopeSchema } from './specialistInput.js';
 import { lstatSync } from 'node:fs';
@@ -49,6 +48,8 @@ import { specialistTerminalResult } from './specialistTerminalResult.js';
 
 import {
   executionContractSchema,
+  assertTaskPacketWithinTaskAuthority,
+  type TaskPacket,
   type EvidenceReference,
   type ExecutionContract,
 } from './contracts.js';
@@ -2795,7 +2796,7 @@ export class WorkflowStore {
         JSON.stringify(packet.repairChildContext) !==
           JSON.stringify(
             repairChildContext(
-              child.request as import('./featureEvaluation.js').RepairChildRequest,
+              child.request as import('./repairChildContract.js').RepairChildRequest,
             ),
           )
       )
@@ -4844,6 +4845,49 @@ export class WorkflowStore {
     })();
   }
 
+  #retainedRepairPlan(
+    input: Parameters<WorkflowStore['planRepairDispatch']>[0],
+  ): RepairPlanResult | undefined {
+    const existing = this.getRepairDispatch(input.id);
+    if (existing !== undefined) {
+      if (
+        existing.runId !== input.runId ||
+        existing.taskId !== input.taskId ||
+        existing.findingId !== input.findingId ||
+        existing.ownerRole !== input.ownerRole ||
+        existing.findingDigest !== input.findingDigest ||
+        existing.failureHeadSha !== input.failureHeadSha ||
+        existing.changeDigest !== input.changeDigest ||
+        existing.changeEvidenceMinAtMs !== input.changeEvidenceMinAtMs ||
+        existing.changeEvidenceAtMs !== input.changeEvidenceAtMs ||
+        existing.changeHeadSha !== input.changeHeadSha ||
+        JSON.stringify(existing.packet) !==
+          JSON.stringify(input.packet(existing.taskAttempt, existing.findingAttempt))
+      ) {
+        throw new Error('repair dispatch id is already bound to different immutable input');
+      }
+      return { kind: 'dispatch', dispatch: existing };
+    }
+    const taskEscalation = this.getRepairEscalation(input.runId, 'task', input.taskId);
+    if (taskEscalation !== undefined) {
+      if (
+        taskEscalation.findingId === input.findingId &&
+        taskEscalation.findingDigest !== input.findingDigest
+      ) {
+        throw new Error('repair finding id is already bound to different immutable input');
+      }
+      return { kind: 'escalated', escalation: taskEscalation };
+    }
+    const findingEscalation = this.getRepairEscalation(input.runId, 'finding', input.findingId);
+    if (findingEscalation !== undefined) {
+      if (findingEscalation.findingDigest !== input.findingDigest) {
+        throw new Error('repair finding id is already bound to different immutable input');
+      }
+      return { kind: 'escalated', escalation: findingEscalation };
+    }
+    return undefined;
+  }
+
   planRepairDispatch(
     input: {
       id: string;
@@ -4906,43 +4950,8 @@ export class WorkflowStore {
       if (run?.state !== 'repair' && run?.state !== 'repair_planning') {
         throw new Error('run is not in a repair state');
       }
-      const existing = this.getRepairDispatch(input.id);
-      if (existing !== undefined) {
-        if (
-          existing.runId !== input.runId ||
-          existing.taskId !== input.taskId ||
-          existing.findingId !== input.findingId ||
-          existing.ownerRole !== input.ownerRole ||
-          existing.findingDigest !== input.findingDigest ||
-          existing.failureHeadSha !== input.failureHeadSha ||
-          existing.changeDigest !== input.changeDigest ||
-          existing.changeEvidenceMinAtMs !== input.changeEvidenceMinAtMs ||
-          existing.changeEvidenceAtMs !== input.changeEvidenceAtMs ||
-          existing.changeHeadSha !== input.changeHeadSha ||
-          JSON.stringify(existing.packet) !==
-            JSON.stringify(input.packet(existing.taskAttempt, existing.findingAttempt))
-        ) {
-          throw new Error('repair dispatch id is already bound to different immutable input');
-        }
-        return { kind: 'dispatch', dispatch: existing };
-      }
-      const taskEscalation = this.getRepairEscalation(input.runId, 'task', input.taskId);
-      if (taskEscalation !== undefined) {
-        if (
-          taskEscalation.findingId === input.findingId &&
-          taskEscalation.findingDigest !== input.findingDigest
-        ) {
-          throw new Error('repair finding id is already bound to different immutable input');
-        }
-        return { kind: 'escalated', escalation: taskEscalation };
-      }
-      const findingEscalation = this.getRepairEscalation(input.runId, 'finding', input.findingId);
-      if (findingEscalation !== undefined) {
-        if (findingEscalation.findingDigest !== input.findingDigest) {
-          throw new Error('repair finding id is already bound to different immutable input');
-        }
-        return { kind: 'escalated', escalation: findingEscalation };
-      }
+      const retained = this.#retainedRepairPlan(input);
+      if (retained) return retained;
       if (input.hypothesis.trim() === '') throw new Error('repair hypothesis is required');
       const lastDispatch = this.#database
         .prepare(
@@ -5017,12 +5026,14 @@ export class WorkflowStore {
               workflowEvaluationMutationCapability,
             )
           : undefined;
-      const exhausted =
-        taskAttempts >= input.maxTaskAttempts || featureRemaining?.implementationAttempts === 0
-          ? ({ scope: 'task', scopeId: input.taskId, attempts: taskAttempts } as const)
-          : findingAttempts >= input.maxFindingAttempts || featureRemaining?.findingAttempts === 0
-            ? ({ scope: 'finding', scopeId: input.findingId, attempts: findingAttempts } as const)
-            : undefined;
+      let exhausted: { scope: 'task' | 'finding'; scopeId: string; attempts: number } | undefined;
+      if (taskAttempts >= input.maxTaskAttempts || featureRemaining?.implementationAttempts === 0)
+        exhausted = { scope: 'task', scopeId: input.taskId, attempts: taskAttempts };
+      else if (
+        findingAttempts >= input.maxFindingAttempts ||
+        featureRemaining?.findingAttempts === 0
+      )
+        exhausted = { scope: 'finding', scopeId: input.findingId, attempts: findingAttempts };
       if (exhausted !== undefined) {
         const id = `repair-escalation:${input.runId}:${exhausted.scope}:${exhausted.scopeId}`;
         this.#database
@@ -6629,7 +6640,7 @@ export class WorkflowStore {
     this.#database
       .transaction(() => {
         const operation = this.getDeliveryOperation(input.operationId);
-        if (!operation || operation.status !== 'committed' || operation.kind !== 'github.checks')
+        if (operation?.status !== 'committed' || operation.kind !== 'github.checks')
           throw new Error('pipeline qualification requires committed checks');
         const nowMs = clock();
         const identity = {

@@ -389,6 +389,10 @@ async function repairSetup(port = new MemoryRepairPort()) {
 describe('DurableRepairChildBroker', () => {
   it('creates an in-envelope append-only repair child idempotently', async () => {
     const { broker, port, fence, request } = await repairSetup();
+    // Explicit feature repair policy permits implementation after a read-only QA task.
+    expect(contract.tasks[0]!.assignedRole).toBe('qa_evaluator');
+    expect(contract.tasks[0]!.allowedOperations).not.toContain('workspace.patch');
+    expect(request.allowedOperations).toContain('workspace.patch');
     await expect(broker.execute(request, fence)).resolves.toMatchObject({
       id: 'feature-evaluation.repair.1',
       status: 'committed',

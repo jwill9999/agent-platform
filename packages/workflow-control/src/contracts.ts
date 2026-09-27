@@ -354,6 +354,32 @@ export function assertExactCriterionPartition(
     throw new Error('evaluation must classify each approved criterion exactly once');
 }
 
+/** Evaluation verdict and callback intent must describe the same criterion outcome. */
+export function assertFeatureEvaluationResult(
+  result: AgentResult,
+  approved: readonly string[],
+): void {
+  assertExactCriterionPartition(result, approved);
+  const failed = result.acceptanceCriteria.failed;
+  if (failed.length === 0) {
+    if (
+      result.status !== 'passed' ||
+      result.recommendedTransition !== 'continue' ||
+      result.findings.length
+    )
+      throw new Error('evaluation terminal contradicts its criterion outcomes');
+  } else if (
+    result.status !== 'needs_repair' ||
+    result.recommendedTransition !== 'repair' ||
+    result.findings.some(
+      (finding) =>
+        finding.acceptanceCriterion !== undefined && !failed.includes(finding.acceptanceCriterion),
+    )
+  ) {
+    throw new Error('evaluation terminal contradicts its criterion outcomes');
+  }
+}
+
 /** Shared acceptance semantics for phase results and final brokered task acceptance. */
 export function assertAgentResultAccepted(
   resultInput: unknown,

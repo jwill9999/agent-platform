@@ -23,7 +23,7 @@ import {
 } from './authorization.js';
 import {
   assertAgentResultAccepted,
-  assertExactCriterionPartition,
+  assertFeatureEvaluationResult,
   type AgentResult,
   type ExecutionContract,
   type TaskPacket,
@@ -117,7 +117,7 @@ function phaseTerminalStatus(
   }
   if (phase === 'feature_evaluation') {
     try {
-      assertExactCriterionPartition(terminal, packet.acceptanceCriteria);
+      assertFeatureEvaluationResult(terminal, packet.acceptanceCriteria);
     } catch {
       return 'blocked';
     }
@@ -839,12 +839,7 @@ export class StandalonePhaseRuntime {
       });
       return true;
     } catch (error) {
-      if (
-        action.phase === 'repair_planning' &&
-        this.#store.getRepairPlanningHandoff(reservation.id) &&
-        !this.#closing &&
-        heartbeatError === undefined
-      ) {
+      if (this.#canDeferPlanner(action, reservation.id, heartbeatError)) {
         this.#journal.deferCoordinator(
           job,
           this.#contract.retryPolicy.infrastructureAttempts,
@@ -860,6 +855,19 @@ export class StandalonePhaseRuntime {
       this.#reservation = undefined;
       if (token !== undefined) this.#capabilities.revoke(token);
     }
+  }
+
+  #canDeferPlanner(
+    action: ExecutePhaseAction,
+    executionId: string,
+    heartbeatError: unknown,
+  ): boolean {
+    return (
+      action.phase === 'repair_planning' &&
+      !!this.#store.getRepairPlanningHandoff(executionId) &&
+      !this.#closing &&
+      heartbeatError === undefined
+    );
   }
 
   async #runCoordinator(
@@ -1237,8 +1245,11 @@ export class StandalonePhaseRuntime {
       if (execution && this.#store.getImplementationImport(execution.id)) {
         try {
           await this.#recoverImport(job);
-        } catch {
-          this.#journal.block(job, 'implementation_import_reconciliation_required', Date.now());
+        } catch (error) {
+          if (error instanceof Error && error.message === 'resource lease is held by another owner')
+            this.#journal.deferCoordinatorAdmission(job, Date.now());
+          else
+            this.#journal.block(job, 'implementation_import_reconciliation_required', Date.now());
         }
         return;
       }

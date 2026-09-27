@@ -5,7 +5,8 @@ import {
   type AgentResult,
   type ExecutionContract,
 } from './contracts.js';
-import { deriveEvaluationDigest, type RepairChildRequest } from './featureEvaluation.js';
+import { digestGovernedValue } from './governedOperations.js';
+import type { RepairChildRequest } from './repairChildContract.js';
 
 export type RepairPlanningContext = z.infer<typeof repairPlanningContextSchema>;
 
@@ -90,7 +91,7 @@ export function buildRepairChildRequest(input: {
     branchParentSha: context.headSha,
     evaluationId: context.evaluationId,
     finding: result.findings[0]!,
-    findingDigest: deriveEvaluationDigest(result.findings[0]),
+    findingDigest: digestGovernedValue(result.findings[0]),
     remainingRetryBudget: input.remainingRetryBudget,
     assignedRole: 'implementation_worker',
     allowedPaths,
