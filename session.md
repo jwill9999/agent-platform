@@ -1,3 +1,15 @@
+# Session update: owner iMessage notifications — 27 September 2026
+
+Owner authorized brief iMessage alerts for verified completion, actionable blockers and significant
+failures. AGENTS.md points to the exact recipient and delivery rules in shared instructions. Beads:
+`agent-platform-imessage-policy`. Host MCP access is available; isolated workers still do not inherit
+it. Proposed orchestration integration belongs in the trusted notification dispatcher, with recipient
+scoping, deduplication and delivery evidence; no runtime adaptation was made. Documentation amendment
+uses the existing task/development-lifecycle-plan branch/PR276. Recheck hosted gates on the amended
+head before merge. Prior lifecycle evidence remains valid for its unchanged source.
+
+---
+
 # Current session: development lifecycle implementation — 27 September 2026
 
 PR275 was merged into `feature/harness-backlog-review` at
