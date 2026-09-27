@@ -682,6 +682,8 @@ export class RevocableSpecialistCredentialBroker {
       }
     }
     if (generation === null) {
+      // Generation is persisted before issuing. A null generation proves no external issue
+      // could start, including recovery after pending -> revoking committed before a crash.
       this.#store.advanceSchedulerCredential(
         { id: executionId, leaseId, from: ['revoking'], to: 'revoked', cleanup },
         workflowCredentialJournalCapability,
@@ -703,7 +705,7 @@ export class RevocableSpecialistCredentialBroker {
     if (
       execution.credentialStatus !== 'revoked' &&
       execution.credentialBrokerGeneration === null &&
-      execution.credentialStatus !== 'pending'
+      !['pending', 'revoking'].includes(execution.credentialStatus)
     )
       throw new Error('issued credential is missing its broker generation');
     return execution;

@@ -184,6 +184,11 @@ it
       );
       const before = await readFile(marker, 'utf8');
       expect(before.trim().split('\n')).toHaveLength(1);
+      // Exercise the production persisted envelope across multiple topology checks before failure.
+      await new Promise((resolve) => setTimeout(resolve, 6500));
+      const healthy = await status();
+      expect(healthy.effectiveCode).toBe('ready');
+      expect(healthy.interruptions).toHaveLength(0);
       if (mode === 'replaced-staging') {
         await rename(staging, staging + '-retained');
         await mkdir(staging, { mode: 0o700 });

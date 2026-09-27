@@ -12,6 +12,7 @@ import {
   assertDevelopmentAdmission,
   developmentOwnerAlive,
 } from './developmentHostJournal.js';
+import { specialistInputEnvelopeSchema } from './specialistInput.js';
 import { specialistRoleProfile } from './specialistRoleProfile.js';
 import { SPECIALIST_SECCOMP } from './specialistSeccomp.js';
 import { runLocalBrokerCli } from './localCredentialBrokerCli.js';
@@ -649,9 +650,7 @@ export class DevelopmentHost {
       throw new Error('topology_invalid');
   }
   async #workerDefinition(member: DockerInspection, root: string, packet: string): Promise<void> {
-    const input = z
-      .object({ assignedRole: z.string(), allowedOperations: z.array(z.string()) })
-      .parse(JSON.parse(packet));
+    const input = specialistInputEnvelopeSchema.parse(JSON.parse(packet)).task;
     assertDevelopmentWorkerPolicy(member, root, input);
     if (
       Object.keys(member.NetworkSettings?.Networks ?? {}).length !== 1 ||

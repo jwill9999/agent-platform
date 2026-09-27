@@ -1,8 +1,7 @@
 import Database from 'better-sqlite3';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, chmodSync, lstatSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
-import { chmodSync, lstatSync } from 'node:fs';
 
 export interface DevelopmentHostState {
   service_id: string;
