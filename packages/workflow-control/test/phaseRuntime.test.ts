@@ -50,8 +50,10 @@ async function setup(
     removeFailure?: boolean;
     issueFailure?: boolean;
     issueDelayMs?: number;
+    createDelayMs?: number;
     revokeDelayMs?: number;
     admission?: () => Promise<void>;
+    onFatal?: () => void;
     verifySource?: () => Promise<void>;
   } = {},
 ) {
@@ -172,6 +174,8 @@ async function setup(
           if (args[0] === 'rm' && options.removeFailure)
             throw new Error('fixture_removal_unavailable');
           if (args[0] === 'create') {
+            if (options.createDelayMs)
+              await new Promise((resolve) => setTimeout(resolve, options.createDelayMs));
             const mount = args.find((arg) => /:\/workspace:(?:ro|rw)$/u.test(arg))!;
             staging.push(dirname(mount.slice(0, -':/workspace:rw'.length)));
             const promptMount = args.find((arg) => arg.endsWith(':/run/specialist/prompt.txt:ro'))!;
@@ -242,6 +246,7 @@ async function setup(
       executableDigest: digestGovernedValue('fixture-process'),
     },
     admission: options.admission,
+    onFatal: options.onFatal,
     verifySource: async () => {
       await options.verifySource?.();
       if (options.sourceFailure) throw new Error('source changed');
@@ -673,7 +678,8 @@ it('reconciles a crash before atomic interrupted finalization without acquiring 
   expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
 });
 it('contains the worker and latches admission when interruption persistence fails', async () => {
-  const f = await setup({ delayMs: 2500 });
+  const report = vi.fn();
+  const f = await setup({ delayMs: 2500, onFatal: report });
   const failure = vi.spyOn(f.journal, 'interrupt').mockImplementation(() => {
     throw new Error('journal_unavailable');
   });
@@ -681,7 +687,10 @@ it('contains the worker and latches admission when interruption persistence fail
   const rejected = expect(work).rejects.toThrow('journal_unavailable');
   while (!f.launches.some((args) => args[0] === 'start'))
     await new Promise((resolve) => setTimeout(resolve, 10));
-  f.brokerState.healthFailure = true;
+  await expect(f.runtime.interruptActive('service_stopped')).rejects.toThrow('journal_unavailable');
+  expect(report).toHaveBeenCalled();
+  expect(f.runtime.cleanupStatus()).toBe('journal_unavailable');
+  expect(f.brokerState.healthFailure).toBe(false);
   await rejected;
   expect(f.launches.some((args) => args[0] === 'rm')).toBe(true);
   expect([...f.credentials.values()]).toEqual(['revoked']);
@@ -862,3 +871,99 @@ it.each(['cancel', 'revoke', 'settle'] as const)(
     expect(f.store.getRun('run')?.state).toBe('task_verification');
   },
 );
+
+it('recovers a persisted pre-reservation interruption without stranding cleanup', async () => {
+  const f = await setup();
+  const past = Date.now() - 1000;
+  const claim = f.journal.claim('lost', 500, past)!;
+  const job = f.journal.start(claim, past);
+  f.journal.interrupt(job, 'service_stopped', past + 1);
+  const reopened = new PhaseJobJournal(f.database);
+  try {
+    expect(reopened.interruptions().list('run')).toHaveLength(1);
+  } finally {
+    reopened.close();
+  }
+  expect(f.store.getSchedulerExecution(job.execution_id!)).toBeUndefined();
+  await f.runtime.runOnce();
+  expect(f.journal.interruptions().list('run')[0]?.state).toBe('settled');
+  expect(f.journal.get(job.id)?.status).toBe('blocked');
+  expect(f.launches).toEqual([]);
+});
+
+it('keeps a delayed create isolated until acknowledgement, then attaches before start', async () => {
+  const f = await setup({ createDelayMs: 300 });
+  const work = f.runtime.runOnce();
+  while (!f.launches.some((args) => args[0] === 'create'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  const create = f.launches.find((args) => args[0] === 'create')!;
+  expect(create[create.indexOf('--network') + 1]).toBe('none');
+  expect(f.launches.some((args) => args[0] === 'network' || args[0] === 'start')).toBe(false);
+  expect(await work).toBe(true);
+  const connect = f.launches.findIndex((args) => args[0] === 'network' && args[1] === 'connect');
+  expect(connect).toBeGreaterThan(0);
+  expect(f.launches.findIndex((args) => args[0] === 'start')).toBeGreaterThan(connect);
+});
+
+it('redacts source verification exceptions before persisting a blocked phase', async () => {
+  const f = await setup({
+    verifySource: async () => {
+      throw new Error('secret-sentinel subprocess stderr');
+    },
+  });
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.journal.list()[0]?.failure_code).toBe('phase_source_or_packet_invalid');
+  expect(JSON.stringify(f.journal.list())).not.toContain('secret-sentinel');
+});
+
+it('bounds credential filesystem settlement and rejects a late completion', async () => {
+  const f = await setup({ result: { invalid: true } });
+  let release!: () => void;
+  const blocked = vi.spyOn(f.launcher, 'removeInterruptedCredentials').mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
+  const start = Date.now();
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(Date.now() - start).toBeLessThan(6500);
+  expect(f.journal.interruptions().list('run')[0]).toMatchObject({ state: 'pending', settle: 0 });
+  release();
+  await Promise.resolve();
+  blocked.mockRestore();
+  expect(f.journal.interruptions().list('run')[0]?.settle).toBe(0);
+}, 10000);
+
+it('bounds waiting for a held container lock and prevents a late start', async () => {
+  let release!: () => void;
+  let waiting = false;
+  let released = false;
+  const f = await setup({
+    admission: async () => {
+      if (!released && f?.launches.some((args) => args[0] === 'network' && args[1] === 'connect')) {
+        waiting = true;
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+    },
+  });
+  const work = f.runtime.runOnce();
+  while (!waiting) await new Promise((resolve) => setTimeout(resolve, 10));
+  const job = f.journal.list().find((job) => job.status === 'started')!;
+  const execution = f.store.getSchedulerExecution(job.execution_id!)!;
+  const started = Date.now();
+  await expect(
+    f.launcher.stopContainer({
+      id: execution.id,
+      role: execution.role,
+      deadlineMs: execution.deadlineMs,
+    }),
+  ).rejects.toThrow('cleanup_operation_timed_out');
+  expect(Date.now() - started).toBeLessThan(6000);
+  released = true;
+  release();
+  expect(await work).toBe(false);
+  expect(f.launches.some((args) => args[0] === 'start')).toBe(false);
+}, 12000);

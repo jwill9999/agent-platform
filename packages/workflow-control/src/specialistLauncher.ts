@@ -1,3 +1,4 @@
+import { withinCleanupDeadline } from './executionInterruptions.js';
 import type { ExecutionInterruption } from './executionInterruptions.js';
 import { SPECIALIST_SECCOMP } from './specialistSeccomp.js';
 import {
@@ -937,6 +938,7 @@ export class DockerIsolatedSpecialistLauncher {
         `io.agent-platform.specialist-execution=${reservation.id}`,
         ...launch.args.slice(2),
       ];
+      createArgs[createArgs.indexOf('--network') + 1] = 'none';
       await lifecycle?.admission();
       this.#advance(authority, 'not_dispatched', 'create_pending');
       this.#assertCanStart(reservation);
@@ -953,6 +955,8 @@ export class DockerIsolatedSpecialistLauncher {
       this.#advance(authority, 'create_pending', 'acknowledged', containerId);
       if ((await this.#inspectOwned(this.#state(reservation.id), containerId)) === undefined)
         throw new Error('specialist acknowledged container is absent before start');
+      this.#assertCanStart(reservation);
+      await this.#attachAcknowledgedNetwork(authority, containerId, lifecycle);
       const transportController = new AbortController();
       this.#attachedTransports.set(reservation.id, transportController);
       let started: Promise<{ stdout: string; stderr: string }> | undefined;
@@ -1048,6 +1052,27 @@ export class DockerIsolatedSpecialistLauncher {
       );
     if (output === undefined) throw launchError;
     return output;
+  }
+
+  async #attachAcknowledgedNetwork(
+    authority: SchedulerContainerAuthority,
+    containerId: string,
+    lifecycle?: SpecialistLifecycleHooks,
+  ): Promise<void> {
+    for (const args of [
+      ['network', 'disconnect', 'none', containerId],
+      ['network', 'connect', this.#options.egressNetwork, containerId],
+    ]) {
+      await lifecycle?.admission();
+      this.#assertAuthority(authority);
+      await this.#options.store.dispatchSchedulerContainer(
+        authority,
+        this.#options.sourceRoot,
+        () => this.#docker(args, 5000),
+        workflowContainerJournalCapability,
+        this.#clock,
+      );
+    }
   }
 
   async #sanitizeFailedWorkspace(
@@ -1281,7 +1306,10 @@ export class DockerIsolatedSpecialistLauncher {
     authority: SchedulerContainerAuthority & { cleanup?: ExecutionInterruption },
   ): Promise<void> {
     const deadlineMs = Date.now() + 5000;
-    return this.#withContainerLock(authority.id, () => this.#settleOwned(authority, deadlineMs));
+    return withinCleanupDeadline(
+      this.#withContainerLock(authority.id, () => this.#settleOwned(authority, deadlineMs)),
+      deadlineMs,
+    );
   }
 
   async #boundedSettlement(

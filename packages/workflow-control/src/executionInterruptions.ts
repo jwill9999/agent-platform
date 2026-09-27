@@ -203,3 +203,23 @@ export class InterruptionCleanupJournal {
       .immediate();
   }
 }
+
+export async function withinCleanupDeadline<T>(
+  operation: Promise<T>,
+  deadlineMs: number,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('cleanup_operation_timed_out')),
+          Math.max(0, deadlineMs - Date.now()),
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}

@@ -1,3 +1,4 @@
+import { withinCleanupDeadline } from './executionInterruptions.js';
 import { modelGatewayConfigSchema } from './modelGatewayConfig.js';
 import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
@@ -117,6 +118,7 @@ export class StandalonePhaseRuntime {
   #closing: Promise<void> | undefined;
   #reservation: DockerSpecialistReservation | undefined;
   #fatalAdmission = false;
+  readonly #onFatal?: () => void;
   readonly #cleanup = new Map<string, Promise<void>>();
 
   private constructor(input: {
@@ -128,6 +130,7 @@ export class StandalonePhaseRuntime {
     process: ProcessIdentity;
     verifySource: (action: ExecutePhaseAction, paths: string[]) => Promise<void>;
     admission?: () => Promise<void>;
+    onFatal?: () => void;
   }) {
     if (!(input.launcher instanceof DockerIsolatedSpecialistLauncher))
       throw new Error('isolated specialist launcher required');
@@ -136,6 +139,7 @@ export class StandalonePhaseRuntime {
     this.#launcher = input.launcher;
     this.#config = input.config;
     this.#owner = input.owner;
+    this.#onFatal = input.onFatal;
     this.#process = input.process;
     this.#verifySource = input.verifySource;
     this.#admission = input.admission ?? (async () => undefined);
@@ -152,6 +156,7 @@ export class StandalonePhaseRuntime {
     configInput: unknown,
     admission?: () => Promise<void>,
     cleanupOnly = false,
+    onFatal?: () => void,
   ): Promise<StandalonePhaseRuntime> {
     const config = readPhaseRuntimeConfig(configInput);
     if (!(await stat(config.credentialBrokerBinary).catch(() => undefined))?.isFile())
@@ -192,6 +197,7 @@ export class StandalonePhaseRuntime {
         owner,
         process: processIdentity,
         admission,
+        onFatal,
         launcher: DockerIsolatedSpecialistLauncher.create({
           store,
           ownerId: owner,
@@ -233,12 +239,19 @@ export class StandalonePhaseRuntime {
     process: ProcessIdentity;
     verifySource: (action: ExecutePhaseAction, paths: string[]) => Promise<void>;
     admission?: () => Promise<void>;
+    onFatal?: () => void;
   }): StandalonePhaseRuntime {
     if (process.env.NODE_ENV !== 'test') throw new Error('test phase runtime unavailable');
     return new StandalonePhaseRuntime(input);
   }
 
-  cleanupStatus(): 'settled' | 'pending' | 'exhausted' | 'reconciliation_required' {
+  cleanupStatus():
+    | 'settled'
+    | 'pending'
+    | 'exhausted'
+    | 'reconciliation_required'
+    | 'journal_unavailable' {
+    if (this.#fatalAdmission) return 'journal_unavailable';
     const rows = this.#journal.interruptions().list(this.#config.runId);
     if (rows.some((row) => row.state === 'exhausted')) return 'exhausted';
     if (rows.some((row) => row.state === 'pending')) return 'pending';
@@ -278,6 +291,11 @@ export class StandalonePhaseRuntime {
       return this.#journal.interrupt(job, reason, Date.now());
     } catch (error) {
       this.#fatalAdmission = true;
+      try {
+        this.#onFatal?.();
+      } catch {
+        /* Admission remains blocked even if reporting is unavailable. */
+      }
       // Emergency containment is intentionally independent of durable retry accounting:
       // persistence is unavailable, so do not claim a recorded/settled outcome.
       await Promise.allSettled([
@@ -447,8 +465,8 @@ export class StandalonePhaseRuntime {
     try {
       packet = this.#packet(action);
       await this.#verifySource(action, packet.allowedPaths);
-    } catch (error) {
-      this.#journal.block(claim, String(error), Date.now());
+    } catch {
+      this.#journal.block(claim, 'phase_source_or_packet_invalid', Date.now());
       return false;
     }
     if (this.#closing !== undefined) {
@@ -664,12 +682,12 @@ export class StandalonePhaseRuntime {
   async #failExecution(
     job: PhaseJob,
     reservation: DockerSpecialistReservation,
-    fences: ResourceFences,
+    _fences: ResourceFences,
     error: unknown,
   ): Promise<void> {
     const existing = this.#cleanup.get(reservation.id);
     if (existing) return existing;
-    const operation = this.#cleanupExecution(job, reservation, fences, error);
+    const operation = this.#cleanupExecution(job, reservation, error);
     this.#cleanup.set(reservation.id, operation);
     try {
       await operation;
@@ -680,7 +698,6 @@ export class StandalonePhaseRuntime {
   async #cleanupExecution(
     job: PhaseJob,
     reservation: DockerSpecialistReservation,
-    _fences: ResourceFences,
     error: unknown,
   ): Promise<void> {
     const current = this.#journal.get(job.id);
@@ -729,7 +746,10 @@ export class StandalonePhaseRuntime {
         exists ? this.#launcher.stopContainer(reservation) : Promise.resolve(),
         exists ? this.#launcher.revokeCredential(reservation.id) : Promise.resolve(),
       ]);
-      await this.#confirmCleanup(attempt, results, exists, reservation);
+      await withinCleanupDeadline(
+        this.#confirmCleanup(attempt, results, exists, reservation),
+        attempt.attempt_deadline_ms,
+      );
     } finally {
       this.#launcher.endInterruptionCleanup(reservation.id);
     }
@@ -747,7 +767,11 @@ export class StandalonePhaseRuntime {
     }
     if (!exists || this.#launcher.isContainerSettled(reservation.id)) {
       try {
-        if (exists) await this.#launcher.removeInterruptedCredentials(reservation.id);
+        if (exists)
+          await withinCleanupDeadline(
+            this.#launcher.removeInterruptedCredentials(reservation.id),
+            Math.min(attempt.attempt_deadline_ms, Date.now() + 5000),
+          );
         cleanup.confirm(attempt, 'settle', Date.now());
       } catch {
         /* Leave durable settlement pending if credential material could not be removed. */
@@ -784,6 +808,21 @@ export class StandalonePhaseRuntime {
             workspace: execution.workspaceLeaseEpoch,
             run: execution.runLeaseEpoch,
             task: execution.taskLeaseEpoch,
+          },
+          new Error('phase_restart_requires_new_authorized_attempt'),
+        );
+      } else if (
+        this.#journal
+          .interruptions()
+          .list(job.run_id)
+          .some((row) => row.execution_id === job.execution_id)
+      ) {
+        await this.#cleanupExecution(
+          job,
+          {
+            id: job.execution_id!,
+            role: 'test_runner',
+            deadlineMs: Date.now() + 15000,
           },
           new Error('phase_restart_requires_new_authorized_attempt'),
         );

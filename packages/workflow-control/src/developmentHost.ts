@@ -272,7 +272,7 @@ export class DevelopmentHost {
       this.#observe('cleanup_exhausted');
       return;
     }
-    if (cleanup === 'reconciliation_required') {
+    if (cleanup === 'reconciliation_required' || cleanup === 'journal_unavailable') {
       this.#observe(cleanup);
       return;
     }
@@ -519,9 +519,8 @@ export class DevelopmentHost {
           | undefined;
         if (!record || member.Name !== `/workflow-specialist-${id}`)
           throw new Error('topology_invalid');
-        if (record.status === 'acknowledged') {
-          if (record.container_id !== member.Id) throw new Error('topology_invalid');
-        } else if (record.status !== 'create_pending') throw new Error('topology_invalid');
+        if (record.status !== 'acknowledged' || record.container_id !== member.Id)
+          throw new Error('topology_invalid');
         await this.#workerDefinition(member, record.root);
       } finally {
         db.close();
@@ -741,6 +740,14 @@ export class DevelopmentHost {
         );
       },
       true,
+      () => {
+        this.#serviceQualified = false;
+        try {
+          this.#observe('journal_unavailable');
+        } catch {
+          this.#fatal = true;
+        }
+      },
     );
     this.#runtime.start();
   }
