@@ -314,79 +314,107 @@ async function setup(
 }
 
 describe('standalone phase runtime production orchestration with fixture launcher transport', () => {
-  it('reconciles a verified import under a new owner without relaunching the worker', async () => {
-    const f = await setup({ implementation: true });
-    const original = SecureEvidenceVault.prototype.recordSpecialistResult;
-    let held = false;
-    let release!: () => void;
-    let reached!: () => void;
-    const barrier = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const ready = new Promise<void>((resolve) => {
-      reached = resolve;
-    });
-    const spy = vi
-      .spyOn(SecureEvidenceVault.prototype, 'recordSpecialistResult')
-      .mockImplementation(async function (this: SecureEvidenceVault, input) {
-        const parsed = JSON.parse(Buffer.from(input.content).toString('utf8'));
-        if (parsed.terminal && !parsed.kind && !held) {
-          held = true;
-          reached();
-          await barrier;
-        }
-        return original.call(this, input);
+  it.each(['resume', 'expired'] as const)(
+    'reconciles retained import %s under a new owner without relaunching the worker',
+    async (mode) => {
+      const f = await setup({ implementation: true });
+      const original = SecureEvidenceVault.prototype.recordSpecialistResult;
+      let held = false;
+      let release!: () => void;
+      let reached!: () => void;
+      const barrier = new Promise<void>((resolve) => {
+        release = resolve;
       });
-    const running = f.runtime.runOnce();
-    await ready;
-    f.db.prepare("UPDATE phase_jobs SET lease_until_ms=0 WHERE status='started'").run();
-    const replacement = StandalonePhaseRuntime.createForTest({
-      store: f.store,
-      journal: f.journal,
-      launcher: f.makeLauncher(f.store, 'replacement'),
-      config: f.config,
-      owner: 'replacement',
-      process: {
-        pid: process.pid,
-        startTimeMs: 2,
-        executableDigest: digestGovernedValue('replacement'),
-      },
-      verifySource: async (action) => {
-        const head = await execute(f.config.gitBinary, [
-          '-C',
-          f.store.getImplementationWorkspace('run', f.config.sourceRoot),
-          'rev-parse',
-          'HEAD',
-        ]);
-        expect(head.stdout.trim()).toBe(action.headSha);
-      },
-    });
-    try {
-      await replacement.runOnce();
-      expect(f.journal.list()[0]).toMatchObject({
-        status: 'started',
-        failure_code: 'phase_coordinator_waiting_for_owner',
+      const ready = new Promise<void>((resolve) => {
+        reached = resolve;
       });
-      expect(f.db.prepare('SELECT COUNT(*) AS n FROM coordinator_recovery_attempts').get()).toEqual(
-        { n: 0 },
-      );
-      expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
-      f.db.prepare('UPDATE leases SET expires_at_ms=0').run();
+      const spy = vi
+        .spyOn(SecureEvidenceVault.prototype, 'recordSpecialistResult')
+        .mockImplementation(async function (this: SecureEvidenceVault, input) {
+          const parsed = JSON.parse(Buffer.from(input.content).toString('utf8'));
+          if (parsed.terminal && !parsed.kind && !held) {
+            held = true;
+            reached();
+            await barrier;
+          }
+          return original.call(this, input);
+        });
+      const running = f.runtime.runOnce();
+      await ready;
       f.db.prepare("UPDATE phase_jobs SET lease_until_ms=0 WHERE status='started'").run();
-      await replacement.runOnce();
-      expect(f.store.getRun('run')?.state).toBe('task_verification');
-      expect(f.journal.list()[0]?.status).toBe('completed');
-      expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
-      expect(f.db.prepare('SELECT owner_id FROM implementation_import_recoveries').get()).toEqual({
-        owner_id: 'replacement',
+      const replacement = StandalonePhaseRuntime.createForTest({
+        store: f.store,
+        journal: f.journal,
+        launcher: f.makeLauncher(f.store, 'replacement'),
+        config: f.config,
+        owner: 'replacement',
+        process: {
+          pid: process.pid,
+          startTimeMs: 2,
+          executableDigest: digestGovernedValue('replacement'),
+        },
+        verifySource: async (action) => {
+          const head = await execute(f.config.gitBinary, [
+            '-C',
+            f.store.getImplementationWorkspace('run', f.config.sourceRoot),
+            'rev-parse',
+            'HEAD',
+          ]);
+          expect(head.stdout.trim()).toBe(action.headSha);
+        },
       });
-    } finally {
-      release();
-      await running;
-      spy.mockRestore();
-      await replacement.close();
-    }
-  }, 15000);
+      try {
+        await replacement.runOnce();
+        expect(f.journal.list()[0]).toMatchObject({
+          status: 'started',
+          failure_code: 'phase_coordinator_waiting_for_owner',
+        });
+        expect(
+          f.db.prepare('SELECT COUNT(*) AS n FROM coordinator_recovery_attempts').get(),
+        ).toEqual({ n: 0 });
+        expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+        f.db.prepare('UPDATE leases SET expires_at_ms=0').run();
+        f.db.prepare("UPDATE phase_jobs SET lease_until_ms=0 WHERE status='started'").run();
+        if (mode === 'expired')
+          f.db
+            .prepare(
+              "UPDATE scheduler_executions SET deadline_ms=0 WHERE role='implementation_worker'",
+            )
+            .run();
+        await replacement.runOnce();
+        if (mode === 'expired') {
+          expect(f.journal.list()[0]?.status).toBe('blocked');
+          expect(
+            f.db
+              .prepare("SELECT COUNT(*) AS n FROM scheduler_executions WHERE status='active'")
+              .get(),
+          ).toEqual({ n: 0 });
+          expect(f.db.prepare('SELECT status FROM implementation_imports').get()).toEqual({
+            status: 'verified',
+          });
+          expect(f.db.prepare('SELECT state FROM execution_interruptions').get()).toEqual({
+            state: 'settled',
+          });
+          expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+          return;
+        }
+        expect(f.store.getRun('run')?.state).toBe('task_verification');
+        expect(f.journal.list()[0]?.status).toBe('completed');
+        expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+        expect(f.db.prepare('SELECT owner_id FROM implementation_import_recoveries').get()).toEqual(
+          {
+            owner_id: 'replacement',
+          },
+        );
+      } finally {
+        release();
+        await running;
+        spy.mockRestore();
+        await replacement.close();
+      }
+    },
+    15000,
+  );
   it.each(['admission', 'sync-admission', 'cleanup-only'])(
     'does not resume import or commit callbacks when recovery is denied: %s',
     async (denial) => {

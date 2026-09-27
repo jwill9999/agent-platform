@@ -4,7 +4,7 @@ import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import Database from 'better-sqlite3';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { executionContractSchema } from '../src/contracts.js';
 import { ContinuationJournal } from '../src/continuationJournal.js';
@@ -706,6 +706,17 @@ it('finishes a coordinator from committed proof and atomically queues one typed 
   f.db
     .prepare('INSERT INTO passed_pipeline_observations VALUES(?,?,?,?)')
     .run('checks', 'fixture-check-id', f.now + 1000, f.now);
+  const elapsed = vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(120000);
+  try {
+    expect(() =>
+      f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now),
+    ).toThrow('coordinator resource fence rejected');
+    expect(f.phases.get(job.id)?.status).toBe('started');
+    expect(f.db.prepare('SELECT COUNT(*) AS n FROM coordinator_receipts').get()).toEqual({ n: 0 });
+    expect(f.phases.list()).toHaveLength(1);
+  } finally {
+    elapsed.mockRestore();
+  }
   f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now);
   f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now);
   const jobs = f.phases.list();

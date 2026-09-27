@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import { createServer } from 'node:net';
 import Database from 'better-sqlite3';
 import { expect, it } from 'vitest';
+import { workflowCancellationMutationCapability, type WorkflowStore } from '../src/storage.js';
 import { developmentWorkflowFixture } from './developmentWorkflowFixture.js';
 
 const execute = promisify(execFile);
@@ -38,10 +39,15 @@ it
     'lost-close-ack',
     'no-hosted-checks',
     'late-first-checks',
+    'cancel-active',
+    'alter-documents',
+    'restart-active',
+    'lost-notification',
   ] as const)(
   'qualifies %s through production runtime, Docker, credential broker and retained evidence',
   async (mode) => {
-    const complete = !['import', 'verify-review'].includes(mode);
+    const negative = ['cancel-active', 'alter-documents', 'restart-active'].includes(mode);
+    const complete = !['import', 'verify-review'].includes(mode) && !negative;
     const repair = mode.startsWith('repair-');
     const f = await developmentWorkflowFixture(true, mode !== 'import', complete, {
       noHostedChecks: mode === 'no-hosted-checks',
@@ -225,6 +231,7 @@ it
           child.stderr!.on('data', (chunk: Buffer) => supervisorErrors.push(chunk.toString()));
           supervisors.push(child);
         }
+        await injectConnectedFailure(mode, f, db, supervisors, supervisorErrors, runtime);
         const deadline = Date.now() + (mode === 'repair-feature' ? 180000 : 90000);
         while (Date.now() < deadline) {
           const run = db.prepare('SELECT state FROM runs WHERE id=?').get('run') as {
@@ -234,6 +241,29 @@ it
             break;
           if (db.prepare("SELECT 1 FROM phase_jobs WHERE status='blocked'").get()) break;
           await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if (negative) {
+          expect(
+            db.prepare("SELECT COUNT(*) AS n FROM phase_jobs WHERE status='blocked'").get(),
+          ).toEqual({ n: 1 });
+          expect(
+            db
+              .prepare("SELECT COUNT(*) AS n FROM scheduler_executions WHERE status='active'")
+              .get(),
+          ).toEqual({ n: 0 });
+          expect(db.prepare('SELECT COUNT(*) AS n FROM implementation_imports').get()).toEqual({
+            n: 0,
+          });
+          expect(db.prepare('SELECT COUNT(*) AS n FROM delegate_callbacks').get()).toEqual({
+            n: 1,
+          });
+          expect(db.prepare('SELECT state FROM execution_interruptions').all()).toEqual([
+            { state: 'settled' },
+          ]);
+          expect(
+            await readFile(join(f.root, 'source/packages/workflow-control/example.txt'), 'utf8'),
+          ).not.toBe('verified fixture change\n');
+          return;
         }
         if (mode === 'late-first-checks') {
           expect(db.prepare('SELECT state FROM runs').get()).toEqual({ state: 'pipeline' });
@@ -426,3 +456,89 @@ it
   },
   210000,
 );
+
+async function untilConnected(predicate: () => boolean, timeout = 45000): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (!predicate()) {
+    if (Date.now() >= deadline) throw new Error('connected injection boundary unavailable');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+async function stopProcess(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const stopped = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  child.kill('SIGKILL');
+  await stopped;
+}
+async function injectConnectedFailure(
+  mode: string,
+  fixture: { database: string; root: string; store: WorkflowStore },
+  db: Database.Database,
+  supervisors: ChildProcess[],
+  errors: string[],
+  runtime: string,
+): Promise<void> {
+  const restart = (args: string[]) => {
+    const child = spawn(process.execPath, [cli, ...args], {
+      env: {},
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    child.stderr!.on('data', (chunk: Buffer) => errors.push(chunk.toString()));
+    supervisors.push(child);
+  };
+  if (mode === 'lost-notification') {
+    await stopProcess(supervisors[0]!);
+    await untilConnected(
+      () =>
+        (db.prepare('SELECT COUNT(*) AS n FROM delegate_callbacks').get() as { n: number }).n > 1,
+    );
+    restart(['coordinator', fixture.database]);
+    return;
+  }
+  if (!['cancel-active', 'alter-documents', 'restart-active'].includes(mode)) return;
+  await untilConnected(() =>
+    Boolean(
+      db
+        .prepare(
+          "SELECT 1 FROM scheduler_executions WHERE status='active' AND role='implementation_worker'",
+        )
+        .get(),
+    ),
+  );
+  if (mode === 'restart-active') {
+    await stopProcess(supervisors[1]!);
+    restart(['phase-runtime', fixture.database, runtime]);
+    return;
+  }
+  if (mode === 'alter-documents') {
+    await writeFile(
+      join(fixture.root, 'source/fixture-tests.md'),
+      'Changed after execution admission\n',
+    );
+    return;
+  }
+  const execution = db
+    .prepare(
+      "SELECT id FROM scheduler_executions WHERE status='active' AND role='implementation_worker'",
+    )
+    .get() as { id: string };
+  const active = fixture.store.getSchedulerExecution(execution.id)!;
+  const now = Date.now();
+  // Exercise the production durable cancellation request, not a direct runs-table mutation.
+  fixture.store.requestWorkflowCancellation(
+    {
+      id: 'connected-cancel',
+      runId: 'run',
+      requestedBy: 'fixture-owner',
+      reason: 'controlled cancellation',
+      requestedAtMs: now,
+      nowMs: now,
+      stopDeadlineMs: now + 30000,
+      retainedEvidence: [],
+      ownerId: active.ownerId,
+      workspaceLeaseEpoch: active.workspaceLeaseEpoch,
+      runLeaseEpoch: active.runLeaseEpoch,
+    },
+    workflowCancellationMutationCapability,
+  );
+}

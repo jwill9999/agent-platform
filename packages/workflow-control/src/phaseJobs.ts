@@ -790,6 +790,7 @@ export class PhaseJobJournal {
     fences: { workspace: number; run: number; task: number },
     nowMs = Date.now(),
   ): void {
+    const verificationStarted = performance.now();
     const action = this.action(job);
     const previous = this.get(job.id);
     if (
@@ -814,6 +815,7 @@ export class PhaseJobJournal {
     });
     this.#database
       .transaction(() => {
+        const completedAt = nowMs + Math.ceil(performance.now() - verificationStarted);
         assertDocumentAuthority(this.#database, action.runId, documents.approvalId);
         const current = this.get(job.id);
         if (current?.status !== 'started' || current.execution_id !== job.execution_id)
@@ -829,7 +831,7 @@ export class PhaseJobJournal {
                 `SELECT 1 FROM leases WHERE resource_type=? AND resource_id=?
           AND owner_id=? AND epoch=? AND expires_at_ms>?`,
               )
-              .get(kind, resource, job.lease_owner, epoch, nowMs)
+              .get(kind, resource, job.lease_owner, epoch, completedAt)
           )
             throw new Error('coordinator resource fence rejected');
         }
@@ -867,12 +869,12 @@ export class PhaseJobJournal {
             `INSERT INTO coordinator_receipts (id,phase_job_id,run_id,receipt_json,created_at_ms)
         VALUES (?,?,?,?,?)`,
           )
-          .run(id, job.id, action.runId, JSON.stringify(receipt), nowMs);
+          .run(id, job.id, action.runId, JSON.stringify(receipt), completedAt);
         this.#update(
           job,
           "status='completed',result_json=?,completed_at_ms=?,lease_until_ms=0",
-          [JSON.stringify(receipt), nowMs],
-          nowMs,
+          [JSON.stringify(receipt), completedAt],
+          completedAt,
         );
         if (outcome.state !== 'closed') {
           const next = actionForCoordinatorReceipt(receipt);
@@ -882,7 +884,14 @@ export class PhaseJobJournal {
               `INSERT INTO phase_jobs (id,continuation_id,coordinator_receipt_id,run_id,action_json,created_at_ms)
           VALUES (?,?,?,?,?,?)`,
             )
-            .run(`phase:${id}`, job.continuation_id, id, action.runId, JSON.stringify(next), nowMs);
+            .run(
+              `phase:${id}`,
+              job.continuation_id,
+              id,
+              action.runId,
+              JSON.stringify(next),
+              completedAt,
+            );
           this.#event(
             job,
             'phase_queued',
@@ -892,7 +901,7 @@ export class PhaseJobJournal {
               phase: next.phase,
               dispatch: PHASE_JOB_DISPATCH[next.phase],
             },
-            nowMs,
+            completedAt,
           );
         }
         this.#event(
@@ -900,7 +909,7 @@ export class PhaseJobJournal {
           'phase_completed',
           id,
           { receiptId: id, executionId: job.execution_id },
-          nowMs,
+          completedAt,
         );
       })
       .immediate();

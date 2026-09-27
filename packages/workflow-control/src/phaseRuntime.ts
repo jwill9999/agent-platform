@@ -1301,7 +1301,14 @@ export class StandalonePhaseRuntime {
       } catch (error) {
         if (error instanceof Error && error.message === 'resource lease is held by another owner')
           this.#journal.deferCoordinatorAdmission(job, Date.now());
-        else this.#journal.block(job, 'implementation_import_reconciliation_required', Date.now());
+        else {
+          const execution = this.#store.getSchedulerExecution(executionId)!;
+          await this.#cleanupExecution(
+            job,
+            { id: execution.id, role: execution.role, deadlineMs: execution.deadlineMs },
+            new Error('implementation_import_reconciliation_required'),
+          );
+        }
       }
       return true;
     }
