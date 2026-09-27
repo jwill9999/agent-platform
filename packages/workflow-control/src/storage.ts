@@ -3979,8 +3979,7 @@ export class WorkflowStore {
         const execution = this.getSchedulerExecution(row.execution_id);
         const state = this.getSchedulerContainer(row.execution_id);
         if (
-          !execution ||
-          execution.runId !== row.run_id ||
+          execution?.runId !== row.run_id ||
           !state ||
           execution.processIdentity !== `docker:${state.name}`
         )
@@ -4025,7 +4024,7 @@ export class WorkflowStore {
     this.#database
       .transaction(() => {
         const execution = this.getSchedulerExecution(authority.id);
-        if (!execution || execution.ownerId !== authority.ownerId || execution.status !== 'active')
+        if (execution?.ownerId !== authority.ownerId || execution.status !== 'active')
           throw new Error('staging_owner_changed');
         this.#assertResourceLease(
           'run',

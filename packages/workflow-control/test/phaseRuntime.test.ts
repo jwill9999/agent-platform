@@ -716,8 +716,10 @@ it('seals the credential pathname before a delayed issuance reply can recreate t
   expect(await work).toBe(false);
   const interrupted = f.journal.interruptions().list('run')[0]!;
   expect(interrupted.state).toBe('settled');
+  expect(interrupted.effects).toBe('uncertain');
+  expect(f.runtime.cleanupStatus()).toBe('reconciliation_required');
   const staging = f.store.getSchedulerStaging(interrupted.execution_id)!;
-  expect((await readFile(join(staging.root, 'codex-auth.json'))).length).toBe(0);
+  expect(await readFile(join(staging.root, 'codex-auth.json'))).toHaveLength(0);
   expect(f.launches.some((args) => args[0] === 'create')).toBe(false);
 }, 10000);
 

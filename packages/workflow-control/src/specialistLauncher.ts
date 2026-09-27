@@ -664,16 +664,9 @@ export class RevocableSpecialistCredentialBroker {
     const leaseId = this.leaseId(executionId);
     let generation: string | null = null;
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      const execution = this.#store.getSchedulerExecution(executionId);
-      if (execution === undefined) throw new Error('scheduler execution not found for revocation');
+      const execution = this.#revocationExecution(executionId);
       if (execution.credentialStatus === 'revoked') return;
-      if (execution.credentialStatus === 'legacy_quarantined') {
-        throw new Error('legacy credential remains quarantined');
-      }
       generation = execution.credentialBrokerGeneration;
-      if (generation === null && execution.credentialStatus !== 'pending') {
-        throw new Error('issued credential is missing its broker generation');
-      }
       if (execution.credentialStatus === 'revoking') break;
       try {
         this.#store.advanceSchedulerCredential(
@@ -701,6 +694,19 @@ export class RevocableSpecialistCredentialBroker {
     );
   }
 
+  #revocationExecution(executionId: string) {
+    const execution = this.#store.getSchedulerExecution(executionId);
+    if (!execution) throw new Error('scheduler execution not found for revocation');
+    if (execution.credentialStatus === 'legacy_quarantined')
+      throw new Error('legacy credential remains quarantined');
+    if (
+      execution.credentialStatus !== 'revoked' &&
+      execution.credentialBrokerGeneration === null &&
+      execution.credentialStatus !== 'pending'
+    )
+      throw new Error('issued credential is missing its broker generation');
+    return execution;
+  }
   async #revokeAndConfirm(leaseId: string, generation: string): Promise<void> {
     const deadlineMs = Date.now() + 5000;
     await this.#revoke(leaseId, generation, deadlineMs);
@@ -1028,12 +1034,13 @@ export class DockerIsolatedSpecialistLauncher {
       }
     }
     this.#cancelled.delete(reservation.id);
-    if (!retainWorkspace && stagingRoot !== undefined && this.#settled(reservation.id)) {
-      // Source/evidence remain bound to the execution for interruption reconciliation.
-      // Model credentials and generated runtime configuration are never retained as evidence.
-      await rm(authFileForCleanup ?? join(stagingRoot, 'codex-auth.json'), { force: true });
-      if (homeForCleanup) await rm(homeForCleanup, { recursive: true, force: true });
-    }
+    await this.#sanitizeFailedWorkspace(
+      reservation.id,
+      retainWorkspace,
+      stagingRoot,
+      authFileForCleanup,
+      homeForCleanup,
+    );
     if (cleanup.some((result) => result.status === 'rejected') || !this.#settled(reservation.id))
       throw new Error(
         `specialist settlement unconfirmed; retain staging for docker:workflow-specialist-${reservation.id}`,
@@ -1041,6 +1048,18 @@ export class DockerIsolatedSpecialistLauncher {
       );
     if (output === undefined) throw launchError;
     return output;
+  }
+
+  async #sanitizeFailedWorkspace(
+    id: string,
+    retain: boolean,
+    staging?: string,
+    auth?: string,
+    home?: string,
+  ): Promise<void> {
+    if (retain || staging === undefined || !this.#settled(id)) return;
+    await rm(auth ?? join(staging, 'codex-auth.json'), { force: true });
+    if (home) await rm(home, { recursive: true, force: true });
   }
 
   abortTransport(executionId: string): void {

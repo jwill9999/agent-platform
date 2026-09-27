@@ -20,7 +20,7 @@ export class DevelopmentHostJournal {
   constructor(path: string, readonly = false) {
     try {
       const file = lstatSync(path);
-      if (!file.isFile() || file.isSymbolicLink() || (file.mode & 0o077) !== 0)
+      if (!file.isFile() || file.isSymbolicLink() || (file.mode & 0o077) !== 0 || file.nlink !== 1)
         throw new Error('private_lifecycle_journal_required');
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || readonly) throw error;
@@ -45,6 +45,8 @@ export class DevelopmentHostJournal {
       const columns = this.#db.prepare('PRAGMA table_info(development_probes)').all() as Array<{
         name: string;
       }>;
+      if (!columns.some((item) => item.name === 'container_id'))
+        this.#db.exec('ALTER TABLE development_probes ADD COLUMN container_id TEXT');
       for (const column of ['cancel', 'revoke'])
         if (!columns.some((item) => item.name === column))
           this.#db.exec(
@@ -167,6 +169,22 @@ export class DevelopmentHostJournal {
       .prepare("SELECT id,generation FROM development_probes WHERE state='pending'")
       .all() as Array<{ id: string; generation: string }>;
   }
+  bindProbeContainer(owner: DevelopmentHostState, id: string, containerId: string): void {
+    this.#db
+      .transaction(() => {
+        this.assertOwner(owner);
+        if (!/^[a-f0-9]{64}$/u.test(containerId)) throw new Error('invalid_container_id');
+        this.#db
+          .prepare("UPDATE development_probes SET container_id=? WHERE id=? AND state='pending'")
+          .run(containerId, id);
+      })
+      .immediate();
+  }
+  hasProbeContainer(id: string): boolean {
+    return !!this.#db
+      .prepare("SELECT 1 FROM development_probes WHERE container_id=? AND state='pending'")
+      .get(id);
+  }
   confirmProbe(owner: DevelopmentHostState, id: string, step: 'cancel' | 'revoke'): void {
     this.#db
       .transaction(() => {
@@ -189,4 +207,38 @@ export class DevelopmentHostJournal {
       })
       .immediate();
   }
+}
+
+/** Both effects must be attempted even when the other fails; acknowledgements are owner fenced. */
+export async function reconcileDevelopmentProbe(
+  journal: DevelopmentHostJournal,
+  owner: DevelopmentHostState,
+  id: string,
+  cancel: () => Promise<void>,
+  revoke: () => Promise<void>,
+): Promise<void> {
+  const results = await Promise.allSettled([
+    cancel().then(() => journal.confirmProbe(owner, id, 'cancel')),
+    revoke().then(() => journal.confirmProbe(owner, id, 'revoke')),
+  ]);
+  if (results.some((result) => result.status === 'rejected')) throw new Error('cleanup_pending');
+  journal.settleProbe(owner, id);
+}
+
+export function assertDevelopmentAdmission(
+  state: DevelopmentHostState,
+  stopping: boolean,
+  qualified: boolean,
+  cleanup: string,
+  now = Date.now(),
+): void {
+  if (
+    stopping ||
+    state.stop_requested ||
+    !qualified ||
+    cleanup !== 'settled' ||
+    state.code !== 'ready' ||
+    now - state.observed_at_ms > 5000
+  )
+    throw new Error('control_unavailable');
 }

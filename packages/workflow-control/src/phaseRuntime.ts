@@ -156,7 +156,7 @@ export class StandalonePhaseRuntime {
     const config = readPhaseRuntimeConfig(configInput);
     if (!(await stat(config.credentialBrokerBinary).catch(() => undefined))?.isFile())
       throw new Error('standalone_credential_broker_unavailable');
-    const sourceRoot = await realpath(config.sourceRoot);
+    const sourceRoot = cleanupOnly ? config.sourceRoot : await realpath(config.sourceRoot);
     const store = new WorkflowStore(database);
     const journal = new PhaseJobJournal(database);
     try {
@@ -203,6 +203,7 @@ export class StandalonePhaseRuntime {
           modelGateway: config.modelGateway,
         }),
         verifySource: async (action, paths) => {
+          await realpath(sourceRoot);
           const head = await execute(config.gitBinary, ['-C', sourceRoot, 'rev-parse', 'HEAD'], {
             env: {},
             timeout: 10_000,
@@ -237,7 +238,7 @@ export class StandalonePhaseRuntime {
     return new StandalonePhaseRuntime(input);
   }
 
-  cleanupStatus(): 'settled' | 'pending' | 'exhausted' {
+  cleanupStatus(): 'settled' | 'pending' | 'exhausted' | 'reconciliation_required' {
     const rows = this.#journal.interruptions().list(this.#config.runId);
     if (rows.some((row) => row.state === 'exhausted')) return 'exhausted';
     if (rows.some((row) => row.state === 'pending')) return 'pending';
@@ -252,6 +253,7 @@ export class StandalonePhaseRuntime {
         )
     )
       return 'pending';
+    if (rows.some((row) => row.effects === 'uncertain')) return 'reconciliation_required';
     return 'settled';
   }
 

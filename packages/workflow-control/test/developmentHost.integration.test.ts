@@ -120,7 +120,7 @@ it.skipIf(!supplied)(
 
 it
   .skipIf(!supplied || !process.env.WORKFLOW_DEVELOPMENT_WORKER_IMAGE)
-  .each(['live', 'restart', 'replaced-staging'])(
+  .each(['live', 'restart', 'restart-missing-source', 'replaced-staging'])(
   'interrupts a real fixture worker and reconciles without repeating its recorded effect (%s)',
   async (mode) => {
     const { developmentWorkflowFixture } = await import('./developmentWorkflowFixture.js');
@@ -201,8 +201,10 @@ it
       );
       expect(Date.now() - failedAt).toBeLessThan(6000);
       expect(interrupted.interruptions[0]).toMatchObject({ state: 'pending', revoke: 0 });
-      if (mode === 'restart') {
+      if (mode.startsWith('restart')) {
         child.kill('SIGKILL');
+        if (mode === 'restart-missing-source')
+          await rename(join(f.root, 'source'), join(f.root, 'source-retained'));
         await until(status, (s) => s.service.lease_until_ms <= Date.now(), 20000);
         child = spawn(process.execPath, [cli, 'development-recover', path], {
           env: { WORKFLOW_GIT_BINARY: process.env.WORKFLOW_GIT_BINARY },
@@ -219,9 +221,11 @@ it
         await rename(staging + '-retained', staging);
         await command('development-recover');
       }
-      await until(status, (s) => s.interruptions?.[0]?.state === 'settled');
+      const contained = await until(status, (s) => s.interruptions?.[0]?.state === 'settled');
+      expect(contained.interruptions[0].effects).toBe('uncertain');
+      await until(status, (s) => s.effectiveCode === 'reconciliation_required');
       expect(await readFile(marker, 'utf8')).toBe(before);
-      expect((await readFile(join(staging, 'codex-auth.json'))).length).toBe(0);
+      expect(await readFile(join(staging, 'codex-auth.json'))).toHaveLength(0);
       await expect(readFile(join(staging, 'codex-home/config.toml'))).rejects.toMatchObject({
         code: 'ENOENT',
       });
@@ -328,6 +332,98 @@ it.skipIf(!supplied)(
           ])
         ).stdout.trim(),
       ).toBe('true');
+    } finally {
+      await execute('/usr/local/bin/docker', ['rm', '--force', name]).catch(() => undefined);
+      for (const suffix of ['internal', 'outbound'])
+        await execute('/usr/local/bin/docker', ['network', 'rm', `${name}-${suffix}`]).catch(
+          () => undefined,
+        );
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+  30000,
+);
+
+it.skipIf(!supplied)(
+  'rejects an otherwise matching broker with only its command changed',
+  async () => {
+    const { DevelopmentHost } = await import('../src/developmentHost.js');
+    const root = await mkdtemp(join(homedir(), '.codex/lifecycle-command-'));
+    const config = {
+      ...JSON.parse(await readFile(supplied!, 'utf8')),
+      stateDirectory: join(root, 'state'),
+    };
+    delete config.workflow;
+    const host = await DevelopmentHost.create(config);
+    const db = new Database(join(root, 'state/lifecycle.sqlite'), { readonly: true });
+    const owner = db.prepare('SELECT service_id,config_digest FROM development_host').get() as {
+      service_id: string;
+      config_digest: string;
+    };
+    db.close();
+    const name = `ap-dev-${owner.service_id}`;
+    const labels = [
+      '--label',
+      `io.agent-platform.development=${owner.service_id}`,
+      '--label',
+      `io.agent-platform.development-config=${owner.config_digest}`,
+    ];
+    try {
+      await mkdir(join(root, 'state/broker'), { mode: 0o700 });
+      await writeFile(join(root, 'state/server.json'), '{}', { mode: 0o600 });
+      for (const suffix of ['internal', 'outbound'])
+        await execute('/usr/local/bin/docker', [
+          'network',
+          'create',
+          ...labels,
+          ...(suffix === 'internal' ? ['--internal'] : []),
+          `${name}-${suffix}`,
+        ]);
+      const mounts = [
+        ['/state', join(root, 'state/broker'), false],
+        ['/run/account.json', config.accountFile, true],
+        ['/run/control.key', join(root, 'state/control.key'), true],
+        ['/run/server.json', join(root, 'state/server.json'), true],
+      ] as const;
+      await execute('/usr/local/bin/docker', [
+        'create',
+        '--name',
+        name,
+        ...labels,
+        '--network',
+        `${name}-outbound`,
+        '--read-only',
+        '--cap-drop',
+        'ALL',
+        '--security-opt',
+        'no-new-privileges',
+        '--user',
+        config.containerUser,
+        '--publish',
+        `127.0.0.1:${config.controlPort}:18101`,
+        ...mounts.flatMap(([dst, src, ro]) => [
+          '--mount',
+          `type=bind,src=${src},dst=${dst}${ro ? ',readonly' : ''}`,
+        ]),
+        config.brokerImage,
+        '/run/server.json',
+        'serve',
+        'unapproved-command-argument',
+      ]);
+      await execute('/usr/local/bin/docker', [
+        'network',
+        'connect',
+        '--alias',
+        'development-gateway',
+        `${name}-internal`,
+        name,
+      ]);
+      await expect(host.run()).rejects.toThrow('service_identity_mismatch');
+      expect(
+        (
+          await execute('/usr/local/bin/docker', ['inspect', '--format', '{{.State.Status}}', name])
+        ).stdout.trim(),
+      ).toBe('created');
     } finally {
       await execute('/usr/local/bin/docker', ['rm', '--force', name]).catch(() => undefined);
       for (const suffix of ['internal', 'outbound'])

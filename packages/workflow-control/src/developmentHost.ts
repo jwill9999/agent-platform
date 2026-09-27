@@ -1,11 +1,16 @@
 import { execFile } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { lstat, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
+import { lstat, mkdir, readFile, realpath, rm, writeFile, rename } from 'node:fs/promises';
+import { isAbsolute, join, relative, dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import Database from 'better-sqlite3';
-import { DevelopmentHostJournal, type DevelopmentHostState } from './developmentHostJournal.js';
+import {
+  DevelopmentHostJournal,
+  type DevelopmentHostState,
+  reconcileDevelopmentProbe,
+  assertDevelopmentAdmission,
+} from './developmentHostJournal.js';
 import { runLocalBrokerCli } from './localCredentialBrokerCli.js';
 import { StandalonePhaseRuntime, readPhaseRuntimeConfig } from './phaseRuntime.js';
 
@@ -45,6 +50,7 @@ const codes = new Set([
   'journal_unavailable',
   'cleanup_pending',
   'cleanup_exhausted',
+  'reconciliation_required',
   'probe_issue_failed',
   'probe_mount_unavailable',
   'invalid_configuration',
@@ -70,6 +76,37 @@ async function privateFile(path: string): Promise<string> {
     throw new Error('private_configuration_required');
   return readFile(path, 'utf8');
 }
+async function assertInputOutsideState(stateDirectory: string, file: string): Promise<void> {
+  const state = await realpath(stateDirectory).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== 'ENOENT') throw error;
+    return resolve(stateDirectory);
+  });
+  const input = await realpath(file);
+  const path = relative(state, input);
+  if (!path.startsWith('../') && path !== '..' && !isAbsolute(path))
+    throw new Error('invalid_configuration');
+}
+export async function writeDevelopmentFile(path: string, data: string): Promise<void> {
+  try {
+    const existing = await lstat(path);
+    if (
+      !existing.isFile() ||
+      existing.isSymbolicLink() ||
+      existing.nlink !== 1 ||
+      existing.uid !== process.getuid?.()
+    )
+      throw new Error('invalid_configuration');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  const temporary = join(dirname(path), `.new-${randomBytes(16).toString('hex')}`);
+  try {
+    await writeFile(temporary, data, { mode: 0o600, flag: 'wx' });
+    await rename(temporary, path);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
 async function docker(args: string[], timeout = 5000): Promise<string> {
   return (
     await execute('/usr/local/bin/docker', args, { env: {}, timeout, maxBuffer: 1024 * 1024 })
@@ -82,7 +119,13 @@ interface DockerInspection {
   Internal?: boolean;
   Labels?: Record<string, string>;
   Containers?: Record<string, unknown>;
-  Config?: { Labels?: Record<string, string>; User?: string };
+  Config?: {
+    Labels?: Record<string, string>;
+    User?: string;
+    Entrypoint?: string[];
+    Cmd?: string[];
+    Env?: string[];
+  };
   State?: { Running?: boolean };
   HostConfig?: {
     Privileged?: boolean;
@@ -166,6 +209,9 @@ export class DevelopmentHost {
       throw new Error('private_state_directory_required');
     config.stateDirectory = await realpath(config.stateDirectory);
     config.accountFile = await realpath(config.accountFile);
+    await assertInputOutsideState(config.stateDirectory, config.accountFile);
+    if (config.workflow)
+      await assertInputOutsideState(config.stateDirectory, config.workflow.runtimeConfig);
     if (Number(config.containerUser.split(':')[0]) !== process.getuid?.())
       throw new Error('container_user_mismatch');
     const digest = createHash('sha256').update(JSON.stringify(config)).digest('hex');
@@ -222,6 +268,10 @@ export class DevelopmentHost {
     }
     if (cleanup === 'exhausted') {
       this.#observe('cleanup_exhausted');
+      return;
+    }
+    if (cleanup === 'reconciliation_required') {
+      this.#observe(cleanup);
       return;
     }
     this.#observe('ready');
@@ -307,7 +357,7 @@ export class DevelopmentHost {
       gatewayPort: 18102,
       listenHost: '0.0.0.0',
     };
-    await writeFile(join(this.#directory, 'server.json'), JSON.stringify(server), { mode: 0o600 });
+    await writeDevelopmentFile(join(this.#directory, 'server.json'), JSON.stringify(server));
     let container = await inspect('container', this.#prefix);
     if (!container) {
       this.#guard();
@@ -381,6 +431,10 @@ export class DevelopmentHost {
   async #definition(container: DockerInspection): Promise<void> {
     const expectedImage = await inspect('image', this.#config.brokerImage);
     if (
+      JSON.stringify(container.Config?.Entrypoint) !==
+        JSON.stringify(expectedImage?.Config?.Entrypoint) ||
+      JSON.stringify(container.Config?.Cmd) !== JSON.stringify(['/run/server.json', 'serve']) ||
+      JSON.stringify(container.Config?.Env) !== JSON.stringify(expectedImage?.Config?.Env) ||
       container.Image !== expectedImage?.Id ||
       container.Config?.User !== this.#config.containerUser ||
       container.HostConfig?.Privileged ||
@@ -408,7 +462,7 @@ export class DevelopmentHost {
       throw new Error('service_identity_mismatch');
     for (const mount of container.Mounts) {
       const expected = expectedMounts.get(mount.Destination);
-      if (!expected || expected.Source !== mount.Source || expected.RW !== mount.RW)
+      if (expected?.Source !== mount.Source || expected.RW !== mount.RW)
         throw new Error('service_identity_mismatch');
     }
   }
@@ -457,9 +511,9 @@ export class DevelopmentHost {
         if (
           !db
             .prepare(
-              "SELECT 1 FROM scheduler_executions WHERE id=? AND status='active' AND process_identity=?",
+              "SELECT 1 FROM scheduler_executions e JOIN scheduler_containers c ON c.execution_id=e.id WHERE e.id=? AND e.status='active' AND e.process_identity=? AND c.container_id=? AND c.status='acknowledged'",
             )
-            .get(id, `docker:workflow-specialist-${id}`)
+            .get(id, `docker:workflow-specialist-${id}`, member.Id)
         )
           throw new Error('topology_invalid');
       } finally {
@@ -470,7 +524,20 @@ export class DevelopmentHost {
       return;
     }
     this.#assertLabels(member?.Config?.Labels);
-    if (!member?.Name?.startsWith(`/${this.#prefix}-probe-`)) throw new Error('topology_invalid');
+    if (
+      suffix !== 'internal' ||
+      Object.keys(member?.NetworkSettings?.Networks ?? {}).length !== 1 ||
+      !this.#journal.hasProbeContainer(member?.Id ?? '')
+    )
+      throw new Error('topology_invalid');
+    if (
+      !member?.Name?.startsWith(`/${this.#prefix}-probe-`) ||
+      member.Image !== (await inspect('image', this.#config.brokerImage))?.Id ||
+      member.Config?.User !== this.#config.containerUser ||
+      member.HostConfig?.Privileged ||
+      !member.HostConfig?.ReadonlyRootfs
+    )
+      throw new Error('topology_invalid');
   }
   async #removeProbe(id: string, removeToken = true): Promise<void> {
     const name = `${this.#prefix}-probe-${id}`;
@@ -487,16 +554,17 @@ export class DevelopmentHost {
   async #reconcileProbes(): Promise<void> {
     let failed = false;
     for (const probe of this.#journal.pendingProbes()) {
-      const results = await Promise.allSettled([
-        this.#removeProbe(probe.id).then(() =>
-          this.#journal.confirmProbe(this.#owner, probe.id, 'cancel'),
-        ),
-        this.#revokeProbe(probe).then(() =>
-          this.#journal.confirmProbe(this.#owner, probe.id, 'revoke'),
-        ),
-      ]);
-      if (results.some((result) => result.status === 'rejected')) failed = true;
-      else this.#journal.settleProbe(this.#owner, probe.id);
+      try {
+        await reconcileDevelopmentProbe(
+          this.#journal,
+          this.#owner,
+          probe.id,
+          () => this.#removeProbe(probe.id),
+          () => this.#revokeProbe(probe),
+        );
+      } catch {
+        failed = true;
+      }
     }
     if (failed) throw new Error('cleanup_pending');
   }
@@ -528,9 +596,9 @@ export class DevelopmentHost {
     }
     this.#guard();
     try {
-      const result = await docker(
+      await docker(
         [
-          'run',
+          'create',
           '--name',
           `${this.#prefix}-probe-${id}`,
           ...this.#labels(),
@@ -554,6 +622,10 @@ export class DevelopmentHost {
         ],
         7000,
       );
+      const container = await inspect('container', `${this.#prefix}-probe-${id}`);
+      if (!container) throw new Error('cleanup_pending');
+      this.#journal.bindProbeContainer(this.#owner, id, container.Id);
+      const result = await docker(['start', '--attach', container.Id], 7000);
       return z
         .object({ status: z.number().int(), valid: z.boolean() })
         .strict()
@@ -598,7 +670,7 @@ export class DevelopmentHost {
   async #attachRuntime(): Promise<void> {
     if (!this.#config.workflow || this.#runtime) return;
     const adapterConfig = join(this.#directory, 'adapter.json');
-    await writeFile(
+    await writeDevelopmentFile(
       adapterConfig,
       JSON.stringify({
         database: join(this.#directory, 'broker', 'broker.sqlite'),
@@ -607,7 +679,6 @@ export class DevelopmentHost {
         controlPort: this.#config.controlPort,
         gatewayPort: 18102,
       }),
-      { mode: 0o600 },
     );
     const adapter = join(this.#directory, `broker-adapter-${this.#owner.epoch}.mjs`);
     await runLocalBrokerCli([adapterConfig, 'create-adapter', '--output', adapter]);
@@ -642,15 +713,12 @@ export class DevelopmentHost {
         if ((await this.#health()) !== this.#generation)
           throw new Error('broker_generation_changed');
         const state = this.#journal.state()!;
-        if (
-          this.#stopping ||
-          state.stop_requested ||
-          !this.#serviceQualified ||
-          this.#runtime?.cleanupStatus() !== 'settled' ||
-          state.code !== 'ready' ||
-          Date.now() - state.observed_at_ms > 5000
-        )
-          throw new Error('control_unavailable');
+        assertDevelopmentAdmission(
+          state,
+          this.#stopping,
+          this.#serviceQualified,
+          this.#runtime?.cleanupStatus() ?? 'pending',
+        );
       },
       true,
     );
@@ -705,20 +773,21 @@ export class DevelopmentHost {
         this.#assertLabels(owned.Config?.Labels);
         await docker(['stop', '--time', '2', owned.Id]);
       }
-      if (this.#config.workflow) {
-        const status = developmentStatus(this.#config, this.#journal.state()) as {
-          interruptions: Array<{ state: string }>;
-        };
-        if (status.interruptions.some((row) => row.state === 'exhausted'))
-          outcome = 'cleanup_exhausted';
-        else if (status.interruptions.some((row) => row.state === 'pending'))
-          outcome = 'cleanup_pending';
-      }
+      outcome = this.#cleanupOutcome() ?? outcome;
       outcome ??= this.#journal.state()?.code;
       if (outcome === 'cleanup_pending' || outcome === 'cleanup_exhausted') this.#observe(outcome);
       this.#journal.release(this.#owner);
       if (outcome === 'cleanup_pending' || outcome === 'cleanup_exhausted') return outcome;
     }
+    return undefined;
+  }
+  #cleanupOutcome(): string | undefined {
+    if (!this.#config.workflow) return undefined;
+    const status = developmentStatus(this.#config, this.#journal.state()) as {
+      interruptions: Array<{ state: string }>;
+    };
+    if (status.interruptions.some((row) => row.state === 'exhausted')) return 'cleanup_exhausted';
+    if (status.interruptions.some((row) => row.state === 'pending')) return 'cleanup_pending';
     return undefined;
   }
   #startRenewal(): void {
@@ -806,7 +875,7 @@ function developmentStatus(config: Config, state: DevelopmentHostState | undefin
     try {
       interruptions = db
         .prepare(
-          'SELECT execution_id,run_id,reason,state,cancel,revoke,settle,attempt,batch FROM execution_interruptions',
+          'SELECT execution_id,run_id,reason,state,cancel,revoke,settle,effects,attempt,batch FROM execution_interruptions',
         )
         .all();
     } finally {
@@ -836,6 +905,7 @@ function processAlive(pid: number | null | undefined): boolean {
 
 export async function runDevelopmentCommand(command: string, path: string): Promise<unknown> {
   const config = developmentHostConfigSchema.parse(JSON.parse(await privateFile(path)));
+  await assertInputOutsideState(config.stateDirectory, path);
   if (command === 'development-host') {
     await (await DevelopmentHost.create(config)).run();
     return { code: 'stopped' };

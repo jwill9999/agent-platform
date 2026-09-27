@@ -20,6 +20,7 @@ export interface ExecutionInterruption {
   cancel: number;
   revoke: number;
   settle: number;
+  effects: 'uncertain' | 'none_verified' | 'recorded_effects';
 }
 
 /** Shared workflow schema: interruption and terminal commitment use the same SQLite writer lock. */
@@ -35,6 +36,13 @@ export function initializeInterruptionSchema(db: Database.Database): void {
     cancel INTEGER NOT NULL DEFAULT 0, revoke INTEGER NOT NULL DEFAULT 0,
     settle INTEGER NOT NULL DEFAULT 0
   );`);
+  const interruptionFields = db
+    .prepare('PRAGMA table_info(execution_interruptions)')
+    .all() as Array<{ name: string }>;
+  if (!interruptionFields.some((field) => field.name === 'effects'))
+    db.exec(
+      "ALTER TABLE execution_interruptions ADD COLUMN effects TEXT NOT NULL DEFAULT 'uncertain'",
+    );
   const fields = new Set(
     (db.prepare('PRAGMA table_info(scheduler_staging)').all() as Array<{ name: string }>).map(
       (row) => row.name,
@@ -150,8 +158,7 @@ export class InterruptionCleanupJournal {
   assertOwner(row: ExecutionInterruption, now: number): void {
     const current = getInterruption(this.db, row.execution_id);
     if (
-      !current ||
-      current.owner !== row.owner ||
+      current?.owner !== row.owner ||
       current.epoch !== row.epoch ||
       current.batch !== row.batch ||
       current.lease_until_ms <= now ||

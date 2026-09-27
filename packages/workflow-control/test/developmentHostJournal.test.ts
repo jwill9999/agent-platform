@@ -1,9 +1,28 @@
-import { mkdtempSync, rmSync, chmodSync } from 'node:fs';
+import Database from 'better-sqlite3';
+import {
+  mkdtempSync,
+  rmSync,
+  chmodSync,
+  writeFileSync,
+  symlinkSync,
+  linkSync,
+  readFileSync,
+  mkdirSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { DevelopmentHostJournal } from '../src/developmentHostJournal.js';
-import { classifyDevelopmentError, developmentHostConfigSchema } from '../src/developmentHost.js';
+import {
+  DevelopmentHostJournal,
+  assertDevelopmentAdmission,
+  reconcileDevelopmentProbe,
+} from '../src/developmentHostJournal.js';
+import {
+  classifyDevelopmentError,
+  developmentHostConfigSchema,
+  writeDevelopmentFile,
+  DevelopmentHost,
+} from '../src/developmentHost.js';
 const cleanup: Array<() => void> = [];
 afterEach(() => {
   for (const dispose of cleanup.splice(0).reverse()) dispose();
@@ -72,4 +91,92 @@ it('redacts arbitrary transport exceptions and rejects inherited settings', () =
   expect(developmentHostConfigSchema.safeParse({ mcpServers: { host: 'inherited' } }).success).toBe(
     false,
   );
+});
+
+it.each(['cancel', 'revoke'] as const)(
+  'attempts both probe cleanup obligations when %s fails and preserves partial progress',
+  async (failure) => {
+    const { journal, path } = fixture();
+    const owner = journal.claim('one');
+    const id = journal.probeIntent(owner, 'generation');
+    const calls: string[] = [];
+    const effect = (step: string) => async () => {
+      calls.push(step);
+      if (step === failure) throw new Error('injected_failure');
+    };
+    await expect(
+      reconcileDevelopmentProbe(journal, owner, id, effect('cancel'), effect('revoke')),
+    ).rejects.toThrow('cleanup_pending');
+    expect(calls.sort()).toEqual(['cancel', 'revoke']);
+    expect(journal.pendingProbes()).toHaveLength(1);
+    const db = new Database(path, { readonly: true });
+    try {
+      expect(db.prepare('SELECT cancel,revoke FROM development_probes').get()).toEqual({
+        cancel: failure === 'cancel' ? 0 : 1,
+        revoke: failure === 'revoke' ? 0 : 1,
+      });
+    } finally {
+      db.close();
+    }
+    await reconcileDevelopmentProbe(
+      journal,
+      owner,
+      id,
+      async () => undefined,
+      async () => undefined,
+    );
+    expect(journal.pendingProbes()).toEqual([]);
+  },
+);
+
+it('denies admission immediately for either signal or durable stop, even with fresh readiness', () => {
+  const { journal } = fixture();
+  const owner = journal.claim('one');
+  journal.observe(owner, 'ready');
+  expect(() => assertDevelopmentAdmission(journal.state()!, false, true, 'settled')).not.toThrow();
+  expect(() => assertDevelopmentAdmission(journal.state()!, true, true, 'settled')).toThrow(
+    'control_unavailable',
+  );
+  journal.request('stop');
+  expect(() => assertDevelopmentAdmission(journal.state()!, false, true, 'settled')).toThrow(
+    'control_unavailable',
+  );
+});
+
+it.each(['symlink', 'hardlink'] as const)(
+  'preserves an account behind a generated %s alias',
+  async (kind) => {
+    const root = mkdtempSync(join(tmpdir(), 'lifecycle-alias-'));
+    cleanup.push(() => rmSync(root, { recursive: true, force: true }));
+    const account = join(root, 'account.json'),
+      generated = join(root, 'server.json');
+    writeFileSync(account, 'preserve-account', { mode: 0o600 });
+    if (kind === 'symlink') symlinkSync(account, generated);
+    else linkSync(account, generated);
+    await expect(writeDevelopmentFile(generated, 'replacement')).rejects.toThrow(
+      'invalid_configuration',
+    );
+    expect(readFileSync(account, 'utf8')).toBe('preserve-account');
+  },
+);
+
+it('rejects an account inside the generated state directory before opening its journal', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'lifecycle-account-'));
+  cleanup.push(() => rmSync(root, { recursive: true, force: true }));
+  const stateDirectory = join(root, 'state');
+  mkdirSync(stateDirectory, { mode: 0o700 });
+  const accountFile = join(stateDirectory, 'server.json');
+  writeFileSync(accountFile, 'preserve', { mode: 0o600 });
+  await expect(
+    DevelopmentHost.create({
+      stateDirectory,
+      accountFile,
+      brokerImage: 'sha256:' + 'a'.repeat(64),
+      workerImage: 'sha256:' + 'b'.repeat(64),
+      containerUser: '501:20',
+      controlPort: 19341,
+      clientVersion: 'fixture',
+    }),
+  ).rejects.toThrow('invalid_configuration');
+  expect(readFileSync(accountFile, 'utf8')).toBe('preserve');
 });
