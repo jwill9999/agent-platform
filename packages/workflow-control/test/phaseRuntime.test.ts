@@ -1021,33 +1021,54 @@ it.each(['topology_stale', 'control_unavailable'])(
   },
 );
 
-it('settles a create rejected by service admission before Docker was invoked', async () => {
-  const current: { value?: Awaited<ReturnType<typeof setup>> } = {};
-  const f = await setup({
-    assertAdmission: () => {
-      const execution = current.value?.store.listActiveSchedulerExecutions(
-        current.value.contract.workspaceId,
-      )[0];
+it.each(['admission', 'preflight'])(
+  'settles a create rejected at %s before Docker was invoked',
+  async (boundary) => {
+    const current: { value?: Awaited<ReturnType<typeof setup>> } = {};
+    const f = await setup({
+      assertAdmission: () => {
+        const execution = current.value?.store.listActiveSchedulerExecutions(
+          current.value.contract.workspaceId,
+        )[0];
+        if (
+          boundary === 'admission' &&
+          execution &&
+          current.value?.store.getSchedulerContainer(execution.id)?.status === 'create_pending'
+        )
+          throw new Error('topology_stale');
+      },
+    });
+    current.value = f;
+    const verify = f.store.verifyPlanningDocuments.bind(f.store);
+    const spy = vi.spyOn(f.store, 'verifyPlanningDocuments').mockImplementation((input) => {
+      const execution = f.store.listActiveSchedulerExecutions(f.contract.workspaceId)[0];
       if (
+        boundary === 'preflight' &&
+        input.boundary === 'specialist.lifecycle' &&
         execution &&
-        current.value?.store.getSchedulerContainer(execution.id)?.status === 'create_pending'
+        f.store.getSchedulerContainer(execution.id)?.status === 'create_pending'
       )
-        throw new Error('topology_stale');
-    },
-  });
-  current.value = f;
-  await f.runtime.runOnce();
-  expect(f.launches.some((args) => args[0] === 'create')).toBe(false);
-  const interrupted = f.journal.interruptions().list('run')[0]!;
-  expect(interrupted).toMatchObject({ state: 'settled', cancel: 1, revoke: 1, settle: 1 });
-  const observer = new Database(f.database, { readonly: true });
-  try {
-    expect(
-      observer
-        .prepare('SELECT status FROM scheduler_containers WHERE execution_id=?')
-        .get(interrupted.execution_id),
-    ).toEqual({ status: 'not_dispatched' });
-  } finally {
-    observer.close();
-  }
-});
+        throw new Error('preflight_rejected');
+      return verify(input);
+    });
+    try {
+      await f.runtime.runOnce();
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(f.launches.some((args) => args[0] === 'create')).toBe(false);
+    const interrupted = f.journal.interruptions().list('run')[0]!;
+    expect(interrupted).toMatchObject({ state: 'settled', cancel: 1, revoke: 1, settle: 1 });
+    const observer = new Database(f.database, { readonly: true });
+    try {
+      expect(
+        observer
+          .prepare('SELECT status FROM scheduler_containers WHERE execution_id=?')
+          .get(interrupted.execution_id),
+      ).toEqual({ status: 'not_dispatched' });
+    } finally {
+      observer.close();
+    }
+  },
+);

@@ -3555,8 +3555,7 @@ export class WorkflowStore {
     this.#database
       .transaction(() => {
         const execution = this.getSchedulerExecution(authority.id);
-        if (!execution || execution.status !== 'active')
-          throw new Error('active scheduler execution required');
+        if (execution?.status !== 'active') throw new Error('active scheduler execution required');
         for (const key of [
           'ownerId',
           'workspaceLeaseEpoch',

@@ -53,6 +53,16 @@ export function developmentOwnerAlive(owner: DevelopmentHostState | undefined): 
   return identity === owner.process_identity;
 }
 
+function migrateHostColumns(db: Database.Database): void {
+  const hostColumns = db.prepare('PRAGMA table_info(development_host)').all() as Array<{
+    name: string;
+  }>;
+  if (!hostColumns.some((column) => column.name === 'ready_until_ms'))
+    db.exec('ALTER TABLE development_host ADD COLUMN ready_until_ms INTEGER NOT NULL DEFAULT 0');
+  if (!hostColumns.some((column) => column.name === 'process_identity'))
+    db.exec('ALTER TABLE development_host ADD COLUMN process_identity TEXT');
+}
+
 /** Private operator journal. Never mounted into a worker or used as workflow/task authority. */
 export class DevelopmentHostJournal {
   readonly #db: Database.Database;
@@ -81,15 +91,7 @@ export class DevelopmentHostJournal {
         CREATE TABLE IF NOT EXISTS development_events (
           sequence INTEGER PRIMARY KEY AUTOINCREMENT,code TEXT NOT NULL,observed_at_ms INTEGER NOT NULL);
       `);
-      const hostColumns = this.#db.prepare('PRAGMA table_info(development_host)').all() as Array<{
-        name: string;
-      }>;
-      if (!hostColumns.some((column) => column.name === 'ready_until_ms'))
-        this.#db.exec(
-          'ALTER TABLE development_host ADD COLUMN ready_until_ms INTEGER NOT NULL DEFAULT 0',
-        );
-      if (!hostColumns.some((column) => column.name === 'process_identity'))
-        this.#db.exec('ALTER TABLE development_host ADD COLUMN process_identity TEXT');
+      migrateHostColumns(this.#db);
       const columns = this.#db.prepare('PRAGMA table_info(development_probes)').all() as Array<{
         name: string;
       }>;

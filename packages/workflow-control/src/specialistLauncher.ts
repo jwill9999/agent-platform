@@ -944,32 +944,7 @@ export class DockerIsolatedSpecialistLauncher {
       createArgs[createArgs.indexOf('--network') + 1] = 'none';
       await lifecycle?.admission();
       this.#advance(authority, 'not_dispatched', 'create_pending');
-      this.#assertCanStart(reservation);
-      let createInvoked = false;
-      let created: { stdout: string; stderr: string };
-      try {
-        created = await this.#options.store.dispatchSchedulerContainer(
-          authority,
-          this.#options.sourceRoot,
-          () => {
-            lifecycle?.assertAdmission?.();
-            createInvoked = true;
-            return this.#docker(
-              createArgs,
-              Math.min(60_000, reservation.deadlineMs - this.#clock()),
-            );
-          },
-          workflowContainerJournalCapability,
-          this.#clock,
-        );
-      } catch (error) {
-        if (!createInvoked)
-          this.#options.store.recordRejectedSchedulerCreate(
-            authority,
-            workflowContainerJournalCapability,
-          );
-        throw error;
-      }
+      const created = await this.#createContainer(authority, reservation, createArgs, lifecycle);
       const containerId = created.stdout.trim();
       if (!/^[a-f0-9]{64}$/u.test(containerId))
         throw new Error('specialist create acknowledgement is invalid');
@@ -1075,6 +1050,36 @@ export class DockerIsolatedSpecialistLauncher {
       );
     if (output === undefined) throw launchError;
     return output;
+  }
+
+  async #createContainer(
+    authority: SchedulerContainerAuthority,
+    reservation: DockerSpecialistReservation,
+    createArgs: string[],
+    lifecycle?: SpecialistLifecycleHooks,
+  ): Promise<{ stdout: string; stderr: string }> {
+    let createInvoked = false;
+    try {
+      this.#assertCanStart(reservation);
+      return await this.#options.store.dispatchSchedulerContainer(
+        authority,
+        this.#options.sourceRoot,
+        () => {
+          lifecycle?.assertAdmission?.();
+          createInvoked = true;
+          return this.#docker(createArgs, Math.min(60_000, reservation.deadlineMs - this.#clock()));
+        },
+        workflowContainerJournalCapability,
+        this.#clock,
+      );
+    } catch (error) {
+      if (!createInvoked)
+        this.#options.store.recordRejectedSchedulerCreate(
+          authority,
+          workflowContainerJournalCapability,
+        );
+      throw error;
+    }
   }
 
   async #attachAcknowledgedNetwork(
