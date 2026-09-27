@@ -210,6 +210,7 @@ it
         }),
         { mode: 0o600 },
       );
+      await recordConnectedStartup(mode, runtime, config, name, healthy);
       if (mode === 'import') {
         const result = await execute(
           process.execPath,
@@ -575,6 +576,36 @@ function recordConnectedEvidence(db: Database.Database, mode: string, image: str
         )
         .all(),
       interruptions: db.prepare('SELECT reason,state FROM execution_interruptions').all(),
+    }) + '\n',
+  );
+}
+
+async function recordConnectedStartup(
+  mode: string,
+  runtimePath: string,
+  brokerPath: string,
+  container: string,
+  brokerHealthy: boolean,
+): Promise<void> {
+  const configurations = await Promise.all(
+    [runtimePath, brokerPath].map(async (path) => {
+      const bytes = await readFile(path);
+      // These fixture configs contain only settings and credential file paths, never file contents.
+      return {
+        path,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+        settings: JSON.parse(bytes.toString('utf8')) as unknown,
+      };
+    }),
+  );
+  const running = (
+    await docker(['inspect', '--format', '{{.State.Running}}', container])
+  ).stdout.trim();
+  expect(running).toBe('true');
+  process.stdout.write(
+    JSON.stringify({
+      qualification: mode,
+      startup: { brokerHealthy, modelContainerRunning: running === 'true', configurations },
     }) + '\n',
   );
 }
