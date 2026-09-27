@@ -97,6 +97,14 @@ export function initializePhaseJobSchema(database: Database.Database): void {
     run_id TEXT NOT NULL REFERENCES runs(id), receipt_json TEXT NOT NULL,
     created_at_ms INTEGER NOT NULL
   )`);
+  database.exec(`CREATE TABLE IF NOT EXISTS coordinator_recovery_attempts (
+    job_id TEXT PRIMARY KEY, attempts INTEGER NOT NULL CHECK(attempts > 0),
+    maximum INTEGER NOT NULL CHECK(maximum >= 0), updated_at_ms INTEGER NOT NULL
+  )`);
+  database.exec(`CREATE TABLE IF NOT EXISTS implementation_phase_attempts (
+    execution_id TEXT PRIMARY KEY,run_id TEXT NOT NULL,task_id TEXT NOT NULL,attempt INTEGER NOT NULL,
+    UNIQUE(run_id,task_id,attempt)
+  )`);
   const legacy = database.prepare('PRAGMA table_info(phase_jobs)').all() as Array<{ name: string }>;
   const migrate =
     legacy.length > 0 && !legacy.some((column) => column.name === 'coordinator_receipt_id');
@@ -428,6 +436,146 @@ export class PhaseJobJournal {
   renew(job: PhaseJob, ttlMs: number, nowMs: number): void {
     if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) throw new Error('invalid phase lease');
     this.#update(job, 'lease_until_ms = ?', [nowMs + ttlMs], nowMs);
+  }
+
+  reserveImplementationAttempt(job: PhaseJob, nowMs: number): number {
+    const action = this.action(job);
+    if (action.phase !== 'implementing') throw new Error('implementation attempt phase mismatch');
+    return this.#database
+      .transaction(() => {
+        this.#update(job, 'failure_code=NULL', [], nowMs);
+        const existing = this.#database
+          .prepare('SELECT * FROM implementation_phase_attempts WHERE execution_id=?')
+          .get(job.execution_id) as
+          | { run_id: string; task_id: string; attempt: number }
+          | undefined;
+        if (existing) {
+          if (existing.run_id !== action.runId || existing.task_id !== action.taskId)
+            throw new Error('implementation attempt identity mismatch');
+          return existing.attempt;
+        }
+        const row = this.#database
+          .prepare(
+            'SELECT c.body_json FROM runs r JOIN contracts c ON c.id=r.contract_id WHERE r.id=?',
+          )
+          .get(action.runId) as { body_json: string };
+        const contract = executionContractSchema.parse(JSON.parse(row.body_json));
+        const active = this.#database
+          .prepare(
+            "SELECT task_attempt,failure_head_sha FROM repair_dispatches WHERE run_id=? AND task_id=? AND status='dispatched'",
+          )
+          .all(action.runId, action.taskId) as Array<{
+          task_attempt: number;
+          failure_head_sha: string;
+        }>;
+        if (active.length > 1) throw new Error('ambiguous implementation repair reservation');
+        let attempt: number;
+        if (active[0]) {
+          attempt = active[0].task_attempt;
+          if (active[0].failure_head_sha !== action.headSha)
+            throw new Error('repair reservation head mismatch');
+          if (
+            !this.#database
+              .prepare(
+                "SELECT 1 FROM attempts WHERE run_id=? AND scope='task' AND scope_id=? AND attempt=? AND max_attempts=?",
+              )
+              .get(
+                action.runId,
+                action.taskId,
+                attempt,
+                contract.retryPolicy.implementationAttempts,
+              )
+          )
+            throw new Error('repair attempt reservation missing');
+        } else {
+          const used = this.#database
+            .prepare(
+              "SELECT COUNT(*) AS n FROM attempts WHERE run_id=? AND scope='task' AND scope_id=?",
+            )
+            .get(action.runId, action.taskId) as { n: number };
+          if (used.n !== 0) throw new Error('implementation retry requires repair reservation');
+          attempt = 1;
+          if (attempt > contract.retryPolicy.implementationAttempts)
+            throw new Error('implementation budget exhausted');
+          this.#database
+            .prepare(
+              "INSERT INTO attempts(run_id,scope,scope_id,attempt,max_attempts,hypothesis,created_at_ms) VALUES(?,'task',?,?,?,'initial approved implementation',?)",
+            )
+            .run(
+              action.runId,
+              action.taskId,
+              attempt,
+              contract.retryPolicy.implementationAttempts,
+              nowMs,
+            );
+        }
+        this.#database
+          .prepare('INSERT INTO implementation_phase_attempts VALUES(?,?,?,?)')
+          .run(job.execution_id, action.runId, action.taskId, attempt);
+        return attempt;
+      })
+      .immediate();
+  }
+
+  deferCoordinatorAdmission(job: PhaseJob, nowMs: number): void {
+    const action = this.action(job);
+    const held = this.#database
+      .prepare(
+        `SELECT MAX(expires_at_ms) AS until FROM leases WHERE
+      owner_id != ? AND ((resource_type='workspace' AND resource_id=?) OR
+      (resource_type='run' AND resource_id=?) OR (resource_type='task' AND resource_id=?))`,
+      )
+      .get(job.lease_owner, action.workspaceId, action.runId, action.taskId) as {
+      until: number | null;
+    };
+    this.#update(
+      job,
+      "lease_until_ms=?,failure_code='phase_coordinator_waiting_for_owner'",
+      [Math.max(nowMs + 1000, held.until ?? 0)],
+      nowMs,
+    );
+  }
+
+  deferCoordinator(job: PhaseJob, maximum: number, nowMs: number): void {
+    if (
+      !Number.isSafeInteger(maximum) ||
+      maximum < 0 ||
+      !PHASE_JOB_DISPATCH[this.action(job).phase].endsWith('_coordinator')
+    )
+      throw new Error('invalid coordinator recovery policy');
+    this.#database
+      .transaction(() => {
+        const previous = this.#database
+          .prepare('SELECT attempts,maximum FROM coordinator_recovery_attempts WHERE job_id=?')
+          .get(job.id) as { attempts: number; maximum: number } | undefined;
+        if (previous && previous.maximum !== maximum)
+          throw new Error('coordinator recovery budget changed');
+        const attempts = (previous?.attempts ?? 0) + 1;
+        if (attempts > maximum) {
+          this.block(job, 'phase_coordinator_recovery_exhausted', nowMs);
+        } else {
+          this.#update(
+            job,
+            "lease_until_ms=?,failure_code='phase_coordinator_recovery_pending'",
+            [nowMs + Math.min(60000, 1000 * 2 ** Math.min(attempts - 1, 6))],
+            nowMs,
+          );
+          this.#event(
+            job,
+            'phase_recovery_required',
+            `coordinator:${attempts}`,
+            { attempts, maximum },
+            nowMs,
+          );
+        }
+        this.#database
+          .prepare(
+            `INSERT INTO coordinator_recovery_attempts VALUES(?,?,?,?)
+        ON CONFLICT(job_id) DO UPDATE SET attempts=excluded.attempts,updated_at_ms=excluded.updated_at_ms`,
+          )
+          .run(job.id, attempts, maximum, nowMs);
+      })
+      .immediate();
   }
 
   releaseClaim(job: PhaseJob, nowMs: number): void {

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, realpathSync } from 'node:fs';
-import { dirname, isAbsolute } from 'node:path';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { dirname, isAbsolute, join } from 'node:path';
 import { assertBootstrapExecutablePin } from './bootstrapAdapterRuntime.js';
 
 /** Pinned local Git only. No inherited Git configuration, hooks, filters or shell commands. */
@@ -11,6 +11,7 @@ export class TrustedSourceGit {
     readonly root: string,
     binary: string,
     digest?: string,
+    private readonly beforeCommand?: () => void,
   ) {
     if (!isAbsolute(binary) || !isAbsolute(root) || realpathSync(root) !== root)
       throw new Error('source Git requires canonical root and absolute executable');
@@ -21,12 +22,14 @@ export class TrustedSourceGit {
     assertBootstrapExecutablePin(this.pin);
   }
   run(args: string[], input?: Uint8Array, index?: string, deadlineMs?: number | null): Buffer {
+    this.beforeCommand?.();
     assertBootstrapExecutablePin(this.pin);
     const remaining = deadlineMs == null ? 10000 : Math.min(10000, deadlineMs - Date.now());
     if (remaining <= 0) throw new Error('source Git authority expired');
     return execFileSync(
       this.pin.path,
       [
+        '--no-replace-objects',
         '-c',
         'core.hooksPath=/dev/null',
         '-c',
@@ -89,6 +92,14 @@ export class TrustedSourceGit {
     }
   }
   assertSafeIndex(): void {
+    if (this.run(['for-each-ref', '--format=%(refname)', 'refs/replace']).toString().trim())
+      throw new Error('source Git replacement refs are denied');
+    const common = this.run(['rev-parse', '--path-format=absolute', '--git-common-dir'])
+      .toString()
+      .trim();
+    const grafts = join(common, 'info', 'grafts');
+    if (existsSync(grafts) && readFileSync(grafts, 'utf8').trim())
+      throw new Error('source Git grafts are denied');
     const configuration = this.run(['config', '--null', '--list']).toString();
     if (configuration.split('\0').some((entry) => /^filter\./iu.test(entry)))
       throw new Error('import repository filters are unsupported');

@@ -113,7 +113,7 @@ async function setup() {
     contract,
     clock: () => 1000,
   });
-  return { store, vault };
+  return { store, vault, root };
 }
 
 async function evidence(
@@ -166,6 +166,34 @@ function evaluationRequest(references: Awaited<ReturnType<typeof evidence>>[]) {
 }
 
 describe('ContractEvaluator', () => {
+  it('separates initial task-head evaluation from unapproved integrated-head delivery', async () => {
+    const { store, vault, root } = await setup();
+    const db = new Database(join(root, 'workflow.sqlite'));
+    try {
+      db.prepare('INSERT INTO feature_delivery_required_intents VALUES(?,?,?,?)').run(
+        'run-evaluation',
+        'fixture-intent',
+        '{}',
+        100,
+      );
+      const refs = await Promise.all([
+        evidence(vault, 'initial behavior'),
+        evidence(vault, 'initial security'),
+      ]);
+      expect(
+        new ContractEvaluator({ store, contract }).evaluate(evaluationRequest(refs), 2000).record
+          .headSha,
+      ).toBe(headSha);
+      db.prepare("UPDATE runs SET state='finalizing'").run();
+      expect(() =>
+        new ContractEvaluator({ store, contract }).evaluate(evaluationRequest(refs), 3000),
+      ).toThrow('active exact approval');
+    } finally {
+      db.close();
+      store.close();
+    }
+  });
+
   it('maps every criterion to secure exact-head evidence and freezes accepted evidence', async () => {
     const { store, vault } = await setup();
     const references = await Promise.all([

@@ -1,0 +1,32 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/repairLoops.test.ts (29 tests) 10034ms
+   ✓ DurableRepairCoordinator > uses real Git ancestry and exact HEAD for trusted repair-head verification 425ms
+   ✓ DurableRepairCoordinator > routes seeded compile failures to the implementation owner 305ms
+   ✓ DurableRepairCoordinator > routes seeded test failures to the implementation owner 308ms
+   ✓ DurableRepairCoordinator > routes seeded review failures to the implementation owner 303ms
+   ✓ DurableRepairCoordinator > routes seeded security failures to the implementation owner 311ms
+   ✓ DurableRepairCoordinator > routes seeded sonar failures to the implementation owner 306ms
+   ✓ DurableRepairCoordinator > routes test-definition and environment failures to their non-code owners 372ms
+   ✓ DurableRepairCoordinator > uses one canonical hypothesis and compares the first repair with the failed attempt 303ms
+   ✓ DurableRepairCoordinator > requires evidence-based changes to advance monotonically beyond the failure baseline 456ms
+   ✓ DurableRepairCoordinator > rejects an unapproved acceptance criterion before consuming budget 309ms
+   ✓ DurableRepairCoordinator > rejects identical retries and escalates a finding exactly once after its budget 567ms
+   ✓ DurableRepairCoordinator > shares the task budget across findings and emits one task escalation 418ms
+   ✓ DurableRepairCoordinator > accepts only criterion-proving, in-scope results with task-bound verifier evidence 475ms
+   ✓ DurableRepairCoordinator > rejects a trusted Git diff with an 'omitted file' 351ms
+   ✓ DurableRepairCoordinator > rejects a trusted Git diff with an 'invented file' 371ms
+   ✓ DurableRepairCoordinator > rejects a trusted Git diff with an 'out-of-authority file' 368ms
+   ✓ DurableRepairCoordinator > fences dispatch, acceptance, and cancellation to the current orchestrator owner 307ms
+   ✓ DurableRepairCoordinator > rechecks lease expiry after exact-head verification and before acceptance 361ms
+   ✓ DurableRepairCoordinator > rejects a backward-moving injected test clock 313ms
+   ✓ DurableRepairCoordinator > rejects an unrelated workspace fence at every direct storage mutation boundary 445ms
+   ✓ DurableRepairCoordinator > preserves an accepted repair across cancellation and database recovery 411ms
+   ✓ retains the original finding budget while binding a subsequent failure to newer evidence 379ms
+
+ Test Files  1 passed (1)
+      Tests  29 passed (29)
+   Start at  20:03:25
+   Duration  10.61s (transform 320ms, setup 0ms, collect 443ms, tests 10.03s, environment 0ms, prepare 40ms)
+

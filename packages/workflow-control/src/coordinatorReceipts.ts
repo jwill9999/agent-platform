@@ -295,6 +295,39 @@ function verifyFinalization(
     .get(action.runId, proof.reportDigest) as { report_json: string } | undefined;
   if (!closed || digestGovernedValue(JSON.parse(closed.report_json)) !== proof.reportDigest)
     throw new Error('coordinator verified finalization missing');
+  const report = z
+    .object({
+      runId: z.string(),
+      featureId: z.string(),
+      repository: z.string(),
+      childTaskIds: z.array(z.string()).min(1),
+    })
+    .parse(JSON.parse(closed.report_json));
+  const contractRow = db
+    .prepare(
+      `SELECT c.feature_id,c.workspace_id,c.contract_version,c.policy_digest,c.body_json
+    FROM runs r JOIN contracts c ON c.id=r.contract_id WHERE r.id=?`,
+    )
+    .get(action.runId) as {
+    feature_id: string;
+    workspace_id: string;
+    contract_version: number;
+    policy_digest: string;
+    body_json: string;
+  };
+  const contract = JSON.parse(contractRow.body_json) as {
+    authority: { github: { repository: string } };
+  };
+  if (
+    report.runId !== action.runId ||
+    report.featureId !== contractRow.feature_id ||
+    report.repository !== contract.authority.github.repository ||
+    !report.childTaskIds?.includes(action.taskId) ||
+    contractRow.workspace_id !== action.workspaceId ||
+    contractRow.contract_version !== action.contractVersion ||
+    contractRow.policy_digest !== action.policyDigest
+  )
+    throw new Error('coordinator finalization report binding rejected');
   const run = db.prepare('SELECT state,version FROM runs WHERE id=?').get(action.runId) as {
     state: string;
     version: number;

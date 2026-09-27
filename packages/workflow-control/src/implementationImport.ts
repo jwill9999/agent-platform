@@ -37,12 +37,114 @@ export function initializeImplementationImports(database: Database.Database): vo
     created_at_ms INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL
   )`);
+  database.exec(`CREATE TABLE IF NOT EXISTS implementation_workspaces (
+    run_id TEXT PRIMARY KEY, source_root TEXT NOT NULL, workspace_root TEXT NOT NULL UNIQUE,
+    device TEXT NOT NULL, inode TEXT NOT NULL, base_head TEXT NOT NULL
+  )`);
   database.exec(`CREATE TABLE IF NOT EXISTS implementation_import_recoveries (
     execution_id TEXT PRIMARY KEY REFERENCES implementation_imports(execution_id),
     owner_id TEXT NOT NULL, phase_lease_epoch INTEGER NOT NULL,
     workspace_lease_epoch INTEGER NOT NULL, run_lease_epoch INTEGER NOT NULL,
     task_lease_epoch INTEGER NOT NULL, updated_at_ms INTEGER NOT NULL
   )`);
+}
+
+/** Broker-private checkout registry. Source identity remains the approved repository;
+ * this path is never mounted into a worker. Permissions are not a same-UID security boundary.
+ * Independent Git objects, index and source inodes prevent edits to the user's checkout from
+ * being overwritten by import. A changed/missing registered directory fails closed on recovery.
+ */
+export function implementationWorkspace(
+  database: Database.Database,
+  runId: string,
+  sourceRoot: string,
+): string {
+  const row = database
+    .prepare('SELECT * FROM implementation_workspaces WHERE run_id=?')
+    .get(runId) as
+    | { source_root: string; workspace_root: string; device: string; inode: string }
+    | undefined;
+  if (!row) return sourceRoot;
+  if (row.source_root !== sourceRoot) throw new Error('import workspace source identity conflict');
+  const stat = lstatSync(row.workspace_root);
+  if (
+    !stat.isDirectory() ||
+    realpathSync(row.workspace_root) !== row.workspace_root ||
+    String(stat.dev) !== row.device ||
+    String(stat.ino) !== row.inode
+  )
+    throw new Error('import workspace ownership identity changed');
+  return row.workspace_root;
+}
+
+function createImportWorkspace(
+  db: Database.Database,
+  source: ImportWorkspace,
+  output: ImplementationOutput,
+  assertAuthority: () => void,
+): string {
+  const existing = implementationWorkspace(db, output.input.task.runId, source.root);
+  if (existing !== source.root) return existing;
+  assertAuthority();
+  source.assertClean();
+  if (source.branch() !== `refs/heads/task/${output.input.task.taskId}`)
+    throw new Error('import branch is outside task authority');
+  if (source.head() !== output.input.binding.headSha) throw new Error('import base head mismatch');
+  source.assertBaseFiles(output);
+  source.assertFiles(output, 'before');
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), 'workflow-owned-import-')));
+  const root = join(parent, 'repository');
+  try {
+    // --no-local uses Git transport rather than copying/hardlinking object files. No alternates,
+    // hooks, ignored files, host index, credentials or source-local configuration are inherited.
+    source.git(['clone', '--quiet', '--no-local', '--no-checkout', '--', source.root, root]);
+    const repository = new TrustedSourceGit(
+      root,
+      source.repository.pin.path,
+      source.repository.pin.digest,
+      assertAuthority,
+    );
+    // Preserve local parent branch names used by exact-head integration without retaining
+    // any remote URL or credentials. Clone's remote refs are immutable object IDs here.
+    const branches = repository
+      .run([
+        'for-each-ref',
+        '--format=%(objectname) %(refname:lstrip=3) %(symref)',
+        'refs/remotes/origin',
+      ])
+      .toString()
+      .trim()
+      .split('\n');
+    for (const branch of branches) {
+      const [sha, name, symbolic] = branch.split(' ');
+      if (sha && name && !symbolic) repository.run(['update-ref', `refs/heads/${name}`, sha]);
+    }
+    repository.run(['remote', 'remove', 'origin']);
+    repository.run([
+      'checkout',
+      '--quiet',
+      '-B',
+      `task/${output.input.task.taskId}`,
+      output.input.binding.headSha,
+    ]);
+    assertAuthority();
+    source.assertClean();
+    if (source.head() !== output.input.binding.headSha)
+      throw new Error('import source changed during snapshot');
+    const stat = lstatSync(root);
+    db.prepare('INSERT INTO implementation_workspaces VALUES(?,?,?,?,?,?)').run(
+      output.input.task.runId,
+      source.root,
+      root,
+      String(stat.dev),
+      String(stat.ino),
+      output.input.binding.headSha,
+    );
+    return root;
+  } catch (error) {
+    rmSync(parent, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 /** Trusted synchronous repository adapter. All calls are made inside the store's fenced
@@ -55,8 +157,9 @@ class ImportWorkspace {
     readonly root: string,
     binary: string,
     expectedDigest?: string,
+    assertAuthority?: () => void,
   ) {
-    this.repository = new TrustedSourceGit(root, binary, expectedDigest);
+    this.repository = new TrustedSourceGit(root, binary, expectedDigest, assertAuthority);
     this.files = new AnchoredFileMutation(root);
     this.repository.assertSafeIndex();
     if (realpathSync(this.git(['rev-parse', '--show-toplevel']).toString().trim()) !== root)
@@ -235,9 +338,24 @@ export function importImplementationOutput(input: {
   );
   const db = input.database;
   const fault = input.fault ?? (() => undefined);
-  const workspace = new ImportWorkspace(input.sourceRoot, input.gitBinary, input.gitBinaryDigest);
-  if (workspace.branch() !== `refs/heads/task/${output.input.task.taskId}`)
-    throw new Error('import branch is outside task authority');
+  let workspace!: ImportWorkspace;
+  input.beforeTransaction?.();
+  db.transaction(() => {
+    input.assertAuthority(output);
+    const current = implementationWorkspace(db, output.input.task.runId, input.sourceRoot);
+    const source = new ImportWorkspace(current, input.gitBinary, input.gitBinaryDigest, () =>
+      input.assertAuthority(output),
+    );
+    const root =
+      current === input.sourceRoot
+        ? createImportWorkspace(db, source, output, () => input.assertAuthority(output))
+        : current;
+    workspace = new ImportWorkspace(root, input.gitBinary, input.gitBinaryDigest, () =>
+      input.assertAuthority(output),
+    );
+  }).immediate();
+  // Only the broker-private checkout may be mutated below.
+  if (workspace!.root === input.sourceRoot) throw new Error('shared-checkout import prohibited');
   const get = () =>
     db
       .prepare('SELECT * FROM implementation_imports WHERE execution_id=?')

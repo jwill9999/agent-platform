@@ -6,7 +6,7 @@ import { digestGovernedValue } from '../src/governedOperations.js';
 import { ContinuationJournal } from '../src/continuationJournal.js';
 import { phaseActionForCallback } from '../src/phaseJobs.js';
 /** Disposable approved verification fixture, never a user task or live pilot. */
-export async function developmentWorkflowFixture(implementation = false) {
+export async function developmentWorkflowFixture(implementation = false, review = false) {
   const f = await continuationFixture(
     Date.now(),
     implementation ? 'feature_planner' : 'implementation_worker',
@@ -23,7 +23,10 @@ export async function developmentWorkflowFixture(implementation = false) {
     contract.authority.allowedActions.push('workspace.patch', 'git.commit');
     contract.tasks[0]!.allowedOperations.push('workspace.patch', 'git.commit');
   }
-  contract.tasks[0]!.phaseRoles = { task_verification: 'test_runner' };
+  contract.tasks[0]!.phaseRoles = {
+    task_verification: 'test_runner',
+    ...(review ? { task_review: 'code_reviewer' as const } : {}),
+  };
   const materialDigest = deriveContractMaterialDigest(contract);
   db.prepare('UPDATE contracts SET body_json=?').run(JSON.stringify(contract));
   db.prepare('UPDATE plan_approvals SET material_digest=?').run(materialDigest);

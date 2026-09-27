@@ -13,12 +13,13 @@ import {
   linkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   importImplementationOutput,
   initializeImplementationImports,
+  implementationWorkspace,
 } from '../src/implementationImport.js';
 import { implementationOutputSchema } from '../src/implementationOutput.js';
 
@@ -56,9 +57,19 @@ beforeEach(() => {
   initializeImplementationImports(db);
 });
 afterEach(() => {
+  for (const row of db.prepare('SELECT workspace_root FROM implementation_workspaces').all() as {
+    workspace_root: string;
+  }[])
+    rmSync(dirname(row.workspace_root), { recursive: true, force: true });
   db?.close();
   rmSync(root, { recursive: true, force: true });
 });
+function ownedRoot() {
+  return implementationWorkspace(db, 'run', root);
+}
+function ownedGit(...args: string[]) {
+  return execFileSync(gitBinary, args, { cwd: ownedRoot() }).toString().trim();
+}
 function output() {
   return implementationOutputSchema.parse({
     kind: 'implementation_output',
@@ -140,7 +151,7 @@ function run(
 }
 describe('journaled implementation import repository adapter (unit authority fixture)', () => {
   it.each(['destination', 'ancestor'])(
-    'rejects a concurrent %s symlink replacement without modifying its outside target',
+    'preserves concurrent %s symlink replacement in the original checkout',
     (kind) => {
       const outside = realpathSync(mkdtempSync(join(tmpdir(), 'import-outside-')));
       writeFileSync(join(outside, 'source.txt'), 'before');
@@ -157,39 +168,96 @@ describe('journaled implementation import repository adapter (unit authority fix
         value.terminal.changedFiles = ['nested/source.txt'];
       }
       try {
-        expect(() =>
-          run({
-            value,
-            fault: (boundary) => {
-              if (boundary !== 'before_file_apply') return;
-              if (kind === 'destination') {
-                unlinkSync(join(root, 'source.txt'));
-                symlinkSync(join(outside, 'source.txt'), join(root, 'source.txt'));
-              } else {
-                renameSync(join(root, 'nested'), join(root, '.git/original-nested'));
-                symlinkSync(outside, join(root, 'nested'));
-              }
-            },
-          }),
-        ).toThrow('anchored');
+        const receipt = run({
+          value,
+          fault: (boundary) => {
+            if (boundary !== 'before_file_apply') return;
+            if (kind === 'destination') {
+              unlinkSync(join(root, 'source.txt'));
+              symlinkSync(join(outside, 'source.txt'), join(root, 'source.txt'));
+            } else {
+              renameSync(join(root, 'nested'), join(root, '.git/original-nested'));
+              symlinkSync(outside, join(root, 'nested'));
+            }
+          },
+        });
+        expect(receipt.status).toBe('verified');
         expect(readFileSync(join(outside, 'source.txt'), 'utf8')).toBe('before');
         expect(git('rev-parse', 'HEAD')).toBe(base);
         expect(db.prepare('SELECT status FROM implementation_imports').get()).toEqual({
-          status: 'prepared',
+          status: 'verified',
         });
       } finally {
         rmSync(outside, { recursive: true, force: true });
       }
     },
   );
+  it.each(['modify', 'delete'])(
+    'preserves a same-inode editor write during %s import',
+    (operation) => {
+      const value = output();
+      if (operation === 'delete') {
+        value.files[0]!.content = null;
+        value.files[0]!.afterDigest = null;
+      }
+      const receipt = run({
+        value,
+        fault: (boundary) => {
+          if (boundary === 'before_file_apply')
+            writeFileSync(join(root, 'source.txt'), 'unsaved editor work');
+        },
+      });
+      expect(receipt.status).toBe('verified');
+      expect(readFileSync(join(root, 'source.txt'), 'utf8')).toBe('unsaved editor work');
+      expect(git('rev-parse', 'HEAD')).toBe(base);
+      expect(ownedGit('rev-parse', 'HEAD')).toBe(receipt.resultHead);
+      expect(ownedGit('status', '--porcelain')).toBe('');
+    },
+  );
+  it.each(['missing', 'replaced', 'symlinked'])(
+    'fails closed after restart with a %s registered workspace',
+    (kind) => {
+      expect(() =>
+        run({
+          fault: (boundary) => {
+            if (boundary === 'after_prepare') throw new Error('crash');
+          },
+        }),
+      ).toThrow('crash');
+      const owned = ownedRoot();
+      const retained = owned + '-retained';
+      renameSync(owned, retained);
+      if (kind === 'replaced') mkdirSync(owned);
+      if (kind === 'symlinked') symlinkSync(retained, owned);
+      db.close();
+      db = new Database(join(root, '.git/import.sqlite'));
+      expect(() => run()).toThrow();
+      expect(readFileSync(join(root, 'source.txt'), 'utf8')).toBe('before');
+      expect(git('rev-parse', 'HEAD')).toBe(base);
+      expect(db.prepare('SELECT status FROM implementation_imports').get()).toEqual({
+        status: 'prepared',
+      });
+    },
+  );
+  it('does not inherit host hooks, credentials, ignored files or hardlinked source', () => {
+    writeFileSync(join(root, '.git/info/exclude'), 'ignored.txt\n');
+    writeFileSync(join(root, 'ignored.txt'), 'private');
+    git('config', 'remote.secret.url', 'https://example.invalid');
+    run();
+    expect(ownedGit('remote')).toBe('');
+    expect(() => readFileSync(join(ownedRoot(), 'ignored.txt'))).toThrow();
+    writeFileSync(join(root, 'source.txt'), 'editor');
+    expect(readFileSync(join(ownedRoot(), 'source.txt'), 'utf8')).toBe('after');
+  });
   it('imports verified bytes, advances the exact base and replays without another commit', () => {
     const receipt = run();
     expect(receipt.status).toBe('verified');
-    expect(readFileSync(join(root, 'source.txt'), 'utf8')).toBe('after');
-    expect(git('rev-parse', 'HEAD^')).toBe(base);
+    expect(readFileSync(join(ownedRoot(), 'source.txt'), 'utf8')).toBe('after');
+    expect(readFileSync(join(root, 'source.txt'), 'utf8')).toBe('before');
+    expect(ownedGit('rev-parse', 'HEAD^')).toBe(base);
     expect(git('status', '--porcelain')).toBe('');
     expect(run()).toEqual(receipt);
-    expect(git('rev-list', '--count', 'HEAD')).toBe('2');
+    expect(ownedGit('rev-list', '--count', 'HEAD')).toBe('2');
   });
   it.each(['after_prepare', 'after_head_apply', 'after_apply'])(
     'reconciles crash at %s without duplicate effects',
@@ -201,8 +269,8 @@ describe('journaled implementation import repository adapter (unit authority fix
           },
         }),
       ).toThrow('crash');
-      expect(run().resultHead).toBe(git('rev-parse', 'HEAD'));
-      expect(git('rev-list', '--count', 'HEAD')).toBe('2');
+      expect(run().resultHead).toBe(ownedGit('rev-parse', 'HEAD'));
+      expect(ownedGit('rev-list', '--count', 'HEAD')).toBe('2');
     },
   );
   it.each(['after_prepare', 'after_head_apply', 'after_apply'])(
@@ -235,8 +303,9 @@ describe('journaled implementation import repository adapter (unit authority fix
       expect(retained).toEqual({ status: boundary === 'after_apply' ? 'applied' : 'prepared' });
       const receipt = run();
       expect(receipt.status).toBe('verified');
-      expect(git('rev-list', '--count', 'HEAD')).toBe('2');
-      expect(readFileSync(join(root, 'source.txt'), 'utf8')).toBe('after');
+      expect(ownedGit('rev-list', '--count', 'HEAD')).toBe('2');
+      expect(readFileSync(join(ownedRoot(), 'source.txt'), 'utf8')).toBe('after');
+      expect(readFileSync(join(root, 'source.txt'), 'utf8')).toBe('before');
     },
   );
   it('retains prepared evidence and refuses uncertain partial application', () => {
@@ -342,8 +411,8 @@ describe('journaled implementation import repository adapter (unit authority fix
         },
       }),
     ).toThrow('approval revoked');
-    expect(git('rev-parse', 'HEAD')).toBe(receipt.resultHead);
-    expect(git('rev-list', '--count', 'HEAD')).toBe('2');
+    expect(ownedGit('rev-parse', 'HEAD')).toBe(receipt.resultHead);
+    expect(ownedGit('rev-list', '--count', 'HEAD')).toBe('2');
   });
   it('imports a new regular file under newly created parent directories', () => {
     const value = output();
@@ -358,7 +427,7 @@ describe('journaled implementation import repository adapter (unit authority fix
     ];
     value.terminal.changedFiles = ['nested/deeper/new.ts'];
     const receipt = run({ value });
-    expect(readFileSync(join(root, 'nested/deeper/new.ts'), 'utf8')).toBe(
+    expect(readFileSync(join(ownedRoot(), 'nested/deeper/new.ts'), 'utf8')).toBe(
       'export const value = 1;',
     );
     expect(git('status', '--porcelain')).toBe('');
@@ -370,6 +439,6 @@ describe('journaled implementation import repository adapter (unit authority fix
     expect(() => run({ value })).toThrow('digest mismatch');
     value.files[0]!.content = 'after';
     value.files[0]!.beforeDigest = null;
-    expect(() => run({ value })).toThrow('absent');
+    expect(() => run({ value })).toThrow('approved base');
   });
 });

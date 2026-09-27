@@ -264,6 +264,15 @@ export const taskPacketSchema = z
     allowedOperations: z.array(workflowOperationSchema),
     retryBudget: retryBudgetSchema,
     evidence: z.array(evidenceReferenceSchema),
+    repairContext: z
+      .object({
+        dispatchId: identifierSchema,
+        failureHeadSha: z.string().regex(/^[a-f0-9]{40}$/u),
+        summary: z.string().min(1),
+        hypothesis: z.string().min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

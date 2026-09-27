@@ -20,37 +20,67 @@ createServer(async (req, res) => {
     res.end('{"models":[]}');
     return;
   }
+  const role = step < 2 ? 'implementation_worker' : step < 4 ? 'test_runner' : 'code_reviewer';
+  const implementation = role === 'implementation_worker';
+  const toolTurn = step++ % 2 === 0 && role !== 'code_reviewer';
+  function hasReviewSource(value) {
+    if (typeof value === 'string') {
+      try {
+        const prompt = JSON.parse(value);
+        return (
+          prompt.sourceEvidence?.some(
+            (file) =>
+              file.path === 'packages/workflow-control/example.txt' &&
+              file.content === 'verified fixture change\n',
+          ) === true
+        );
+      } catch {
+        return false;
+      }
+    }
+    if (Array.isArray(value)) return value.some(hasReviewSource);
+    return value && typeof value === 'object' ? Object.values(value).some(hasReviewSource) : false;
+  }
+  const observed =
+    implementation ||
+    (role === 'code_reviewer' && hasReviewSource(body.input)) ||
+    body.input.some(
+      (item) =>
+        item.type === 'custom_tool_call_output' &&
+        JSON.stringify(item.output).includes('verified fixture change'),
+    );
   const terminal = {
-    status: 'passed',
+    status: observed ? 'passed' : 'blocked',
     summary: 'Offline implementation complete',
-    changedFiles: ['packages/workflow-control/example.txt'],
+    changedFiles: implementation ? ['packages/workflow-control/example.txt'] : [],
     acceptanceCriteria: { passed: ['durable'], failed: [] },
     evidence: [],
     findings: [],
     remainingRisks: [],
-    recommendedTransition: 'continue',
+    recommendedTransition: role === 'code_reviewer' ? 'integrate' : 'continue',
   };
-  const item =
-    step++ === 0
-      ? {
-          type: 'custom_tool_call',
-          id: 'ct_patch',
-          call_id: 'call_patch',
-          name: 'exec',
-          namespace: 'functions',
-          input:
-            'text(await tools.exec_command({cmd:' +
-            JSON.stringify(
-              String.raw`printf 'verified fixture change\n' > /workspace/packages/workflow-control/example.txt`,
-            ) +
-            '}));',
-        }
-      : {
-          type: 'message',
-          id: 'msg_done',
-          role: 'assistant',
-          content: [{ type: 'output_text', text: JSON.stringify(terminal) }],
-        };
+  const item = toolTurn
+    ? {
+        type: 'custom_tool_call',
+        id: 'ct_patch',
+        call_id: 'call_patch',
+        name: 'exec',
+        namespace: 'functions',
+        input:
+          'text(await tools.exec_command({cmd:' +
+          JSON.stringify(
+            implementation
+              ? String.raw`printf 'verified fixture change\n' > /workspace/packages/workflow-control/example.txt`
+              : 'cat /workspace/packages/workflow-control/example.txt',
+          ) +
+          '}));',
+      }
+    : {
+        type: 'message',
+        id: 'msg_done',
+        role: 'assistant',
+        content: [{ type: 'output_text', text: JSON.stringify(terminal) }],
+      };
   res.writeHead(200, { 'content-type': 'text/event-stream' });
   for (const event of [
     { type: 'response.created', response: { id: 'resp_fixture' } },

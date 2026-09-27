@@ -1,3 +1,4 @@
+import { executeCoordinatorProcess } from './coordinatorProcess.js';
 import { TrustedSourceGit } from './sourceGit.js';
 import { execFile } from 'node:child_process';
 import { realpath } from 'node:fs/promises';
@@ -30,18 +31,22 @@ export class LocalExactHeadIntegrationGate {
   readonly #artifacts: JournaledArtifactRecorder;
   readonly #checkCommands: Readonly<Record<string, readonly [string, ...string[]]>>;
   readonly #executor: GateCommandExecutor;
+  readonly #approvedParentShas?: Readonly<Record<string, string>>;
 
   private constructor(input: {
     workspaceRoot: string;
+    approvedParentShas?: Readonly<Record<string, string>>;
     artifacts: JournaledArtifactRecorder;
     checkCommands: Readonly<Record<string, readonly [string, ...string[]]>>;
     executor?: GateCommandExecutor;
     gitPin?: { path: string; digest: string };
+    admission?: { assertAuthority: () => void; signal: AbortSignal };
   }) {
     if (!(input.artifacts instanceof JournaledArtifactRecorder)) {
       throw new Error('exact-head gate requires the journaled artifact recorder');
     }
     this.#workspaceRoot = input.workspaceRoot;
+    this.#approvedParentShas = input.approvedParentShas;
     this.#artifacts = input.artifacts;
     this.#checkCommands = input.checkCommands;
     const trustedGit = input.gitPin
@@ -50,9 +55,22 @@ export class LocalExactHeadIntegrationGate {
     this.#executor =
       input.executor ??
       (async (executable, args, options) => {
+        input.admission?.assertAuthority();
+        if (input.admission?.signal.aborted) throw new Error('coordinator_service_stopped');
         if (executable === 'git' && trustedGit) {
           trustedGit.assertSafeIndex();
           return { stdout: trustedGit.run([...args]).toString('utf8'), stderr: '' };
+        }
+        if (input.admission) {
+          const result = await executeCoordinatorProcess({
+            executable,
+            args,
+            ...options,
+            env: { PATH: process.env.PATH },
+            signal: input.admission.signal,
+          });
+          input.admission.assertAuthority();
+          return result;
         }
         return defaultExecutor(executable, args, options);
       });
@@ -60,7 +78,9 @@ export class LocalExactHeadIntegrationGate {
 
   static create(input: {
     gitPin?: { path: string; digest: string };
+    admission?: { assertAuthority: () => void; signal: AbortSignal };
     workspaceRoot: string;
+    approvedParentShas?: Readonly<Record<string, string>>;
     artifacts: JournaledArtifactRecorder;
     checkCommands: Readonly<Record<string, readonly [string, ...string[]]>>;
   }): LocalExactHeadIntegrationGate {
@@ -69,6 +89,7 @@ export class LocalExactHeadIntegrationGate {
 
   static createForTest(input: {
     workspaceRoot: string;
+    approvedParentShas?: Readonly<Record<string, string>>;
     artifacts: JournaledArtifactRecorder;
     checkCommands: Readonly<Record<string, readonly [string, ...string[]]>>;
     executor: GateCommandExecutor;
@@ -101,6 +122,8 @@ export class LocalExactHeadIntegrationGate {
       maxBuffer: 64 * 1024,
     });
     const baseSha = parent.stdout.trim();
+    if (this.#approvedParentShas && this.#approvedParentShas[input.taskId] !== baseSha)
+      throw new Error('integration parent differs from approved SHA');
     if (!/^[a-f0-9]{40,64}$/u.test(baseSha)) {
       throw new Error('Git returned an invalid branch-parent SHA');
     }

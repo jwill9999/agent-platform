@@ -1,3 +1,4 @@
+import { LocalGitDeliveryPort } from '../src/gitDeliveryPort.js';
 import { TrustedSourceGit } from '../src/sourceGit.js';
 import { execFile } from 'node:child_process';
 import { mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
@@ -182,6 +183,7 @@ async function setup(
       store,
       ownerId,
       sourceRoot,
+      executionSourceRoot: (runId) => store.getImplementationWorkspace(runId, sourceRoot),
       image: 'fixture@sha256:' + 'a'.repeat(64),
       credentialBroker: credentialBroker(store),
       egressNetwork: 'fixture-egress',
@@ -284,6 +286,10 @@ async function setup(
   cleanups.push(async () => {
     await runtime.close();
     continuation.close();
+    for (const row of db.prepare('SELECT workspace_root FROM implementation_workspaces').all() as {
+      workspace_root: string;
+    }[])
+      await rm(dirname(row.workspace_root), { recursive: true, force: true });
     db.close();
     await Promise.all(staging.map((root) => rm(root, { recursive: true, force: true })));
     await rm(f.root, { recursive: true, force: true });
@@ -349,7 +355,7 @@ describe('standalone phase runtime production orchestration with fixture launche
       verifySource: async (action) => {
         const head = await execute(f.config.gitBinary, [
           '-C',
-          f.config.sourceRoot,
+          f.store.getImplementationWorkspace('run', f.config.sourceRoot),
           'rev-parse',
           'HEAD',
         ]);
@@ -482,7 +488,8 @@ describe('standalone phase runtime production orchestration with fixture launche
         }
       });
     try {
-      expect(await f.runtime.runOnce()).toBe(true);
+      const progressed = await f.runtime.runOnce();
+      expect(progressed, JSON.stringify(f.journal.list())).toBe(true);
     } finally {
       spy.mockRestore();
     }
@@ -511,7 +518,12 @@ describe('standalone phase runtime production orchestration with fixture launche
             .spyOn(TrustedSourceGit.prototype, 'assertClean')
             .mockImplementation(function (this: TrustedSourceGit, paths) {
               originalClean.call(this, paths);
-              if (boundary === 'before-files' && ++cleanCount === 2) expired = true;
+              if (
+                boundary === 'before-files' &&
+                this.root !== input.sourceRoot &&
+                ++cleanCount === 2
+              )
+                expired = true;
             });
           const git = vi.spyOn(TrustedSourceGit.prototype, 'run').mockImplementation(function (
             this: TrustedSourceGit,
@@ -566,7 +578,13 @@ describe('standalone phase runtime production orchestration with fixture launche
     const f = await setup({ implementation: true, implementationContent: content });
     expect(await f.runtime.runOnce()).toBe(true);
     expect(
-      await readFile(join(f.config.sourceRoot, 'packages/workflow-control/example.txt'), 'utf8'),
+      await readFile(
+        join(
+          f.store.getImplementationWorkspace('run', f.config.sourceRoot),
+          'packages/workflow-control/example.txt',
+        ),
+        'utf8',
+      ),
     ).toBe(content);
   }, 15000);
   it('rejects source containing a secret assignment before importing', async () => {
@@ -584,20 +602,104 @@ describe('standalone phase runtime production orchestration with fixture launche
   }, 15000);
   it('imports actual worker bytes and commits a changed-head callback before verification', async () => {
     const f = await setup({ implementation: true });
+    const previous = f.db.prepare('SELECT current_sha FROM delivery_approved_heads').get() as {
+      current_sha: string;
+    };
+    f.db.prepare('UPDATE delivery_approved_heads SET published_sha=current_sha').run();
     expect(await f.runtime.runOnce()).toBe(true);
     expect(f.store.getRun('run')?.state).toBe('task_verification');
     expect(
-      await readFile(join(f.config.sourceRoot, 'packages/workflow-control/example.txt'), 'utf8'),
+      await readFile(
+        join(
+          f.store.getImplementationWorkspace('run', f.config.sourceRoot),
+          'packages/workflow-control/example.txt',
+        ),
+        'utf8',
+      ),
     ).toBe('verified worker change');
+    expect(
+      await readFile(join(f.config.sourceRoot, 'packages/workflow-control/example.txt'), 'utf8'),
+    ).toBe('fixture source');
     const imported = f.db
       .prepare('SELECT base_head,result_head,status FROM implementation_imports')
       .get() as { base_head: string; result_head: string; status: string };
     expect(imported.status).toBe('verified');
+    expect(f.db.prepare('SELECT published_sha FROM delivery_approved_heads').get()).toEqual({
+      published_sha: previous.current_sha,
+    });
     expect(imported.result_head).not.toBe(imported.base_head);
     expect(
       f.db.prepare('SELECT current_sha,import_execution_id FROM delivery_approved_heads').get(),
     ).toEqual({ current_sha: imported.result_head, import_execution_id: expect.any(String) });
   });
+  it('publishes private-only objects with remote CAS and reconciles a lost acknowledgement', async () => {
+    const f = await setup({ implementation: true });
+    expect(await f.runtime.runOnce()).toBe(true);
+    const owned = f.store.getImplementationWorkspace('run', f.config.sourceRoot);
+    const local = new TrustedSourceGit(owned, f.config.gitBinary);
+    const source = new TrustedSourceGit(f.config.sourceRoot, f.config.gitBinary);
+    const base = source.run(['rev-parse', 'HEAD']).toString().trim();
+    const head = local.run(['rev-parse', 'HEAD']).toString().trim();
+    expect(() => source.run(['cat-file', '-e', head])).toThrow();
+    const remote = join(f.root, 'disposable-remote.git');
+    source.run(['init', '--bare', '--quiet', remote]);
+    source.run(['push', '--quiet', remote, `HEAD:refs/heads/task/task`]);
+    const remoteGit = new TrustedSourceGit(await realpath(remote), f.config.gitBinary);
+    let pushes = 0;
+    const port = LocalGitDeliveryPort.createForWorkflow({
+      store: f.store,
+      runId: 'run',
+      workspaceRoot: f.config.sourceRoot,
+      gitPin: local.pin,
+      remoteName: 'origin',
+      remote: {
+        observeRef: async (input) => remoteGit.run(['rev-parse', input.ref]).toString().trim(),
+        pushCas: async (input) => {
+          expect(input.objectSourceRoot).toBe(owned);
+          local.run([
+            'push',
+            '--quiet',
+            `--force-with-lease=${input.ref}:${input.expectedOldSha ?? ''}`,
+            remote,
+            `${input.newSha}:${input.ref}`,
+          ]);
+          if (++pushes === 1) throw new Error('lost acknowledgement');
+        },
+      },
+    });
+    const request = {
+      kind: 'git.push' as const,
+      workspaceId: f.callback.workspaceId,
+      runId: 'run',
+      taskId: 'task',
+      repository: 'o/r',
+      actorRole: 'workflow_orchestrator' as const,
+      contractVersion: 1 as const,
+      policyDigest: f.callback.policyDigest,
+      ref: 'refs/heads/task/task',
+      expectedRemoteSha: base,
+      newSha: head,
+    };
+    await expect(port.mutate(request)).rejects.toThrow('lost acknowledgement');
+    expect(await port.observe(request)).toMatchObject({ kind: 'expected', result: { sha: head } });
+    expect(pushes).toBe(1);
+    expect(source.run(['rev-parse', 'HEAD']).toString().trim()).toBe(base);
+    expect(
+      await readFile(join(f.config.sourceRoot, 'packages/workflow-control/example.txt'), 'utf8'),
+    ).toBe('fixture source');
+    const tree = local
+      .run(['rev-parse', `${base}^{tree}`])
+      .toString()
+      .trim();
+    const competing = local
+      .run(['commit-tree', tree, '-p', base, '-m', 'competing remote change'])
+      .toString()
+      .trim();
+    local.run(['push', '--quiet', remote, `${competing}:refs/heads/task/other`]);
+    remoteGit.run(['update-ref', request.ref, competing, head]);
+    await expect(port.mutate(request)).rejects.toThrow();
+    expect(remoteGit.run(['rev-parse', request.ref]).toString().trim()).toBe(competing);
+  }, 15000);
   it.each([
     [
       'failed criterion',
@@ -836,10 +938,39 @@ describe('standalone phase runtime production orchestration with fixture launche
 
   it('persists repair callback and queues no fake passing result', async () => {
     const f = await setup({
-      result: { ...terminalResult, status: 'needs_repair', recommendedTransition: 'repair' },
+      result: {
+        ...terminalResult,
+        status: 'needs_repair',
+        recommendedTransition: 'repair',
+        findings: [
+          {
+            id: 'fixture-repair',
+            severity: 'high',
+            summary: 'verification failed',
+            evidence: [
+              {
+                digest: 'sha256:' + 'a'.repeat(64),
+                mediaType: 'text/plain',
+                sizeBytes: 1,
+                kind: 'test',
+              },
+            ],
+            repairHypothesis: 'Correct the failing bounded implementation',
+          },
+        ],
+      },
     });
     expect(await f.runtime.runOnce()).toBe(true);
     expect(f.store.getRun('run')?.state).toBe('repair');
+  });
+
+  it('blocks a non-actionable repair result before queuing an infrastructure retry', async () => {
+    const f = await setup({
+      result: { ...terminalResult, status: 'needs_repair', recommendedTransition: 'repair' },
+    });
+    expect(await f.runtime.runOnce()).toBe(true);
+    expect(f.store.getRun('run')?.state).toBe('escalated');
+    expect(f.db.prepare('SELECT COUNT(*) AS n FROM repair_dispatches').get()).toEqual({ n: 0 });
   });
 
   it('persists broker interruption even while credential revocation is unavailable', async () => {

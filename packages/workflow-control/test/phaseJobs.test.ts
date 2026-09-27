@@ -1,3 +1,4 @@
+import { verifyCoordinatorProof } from '../src/coordinatorReceipts.js';
 import { deriveTransitionIdempotencyKey } from '../src/lifecycle.js';
 import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -712,4 +713,111 @@ it('finishes a coordinator from committed proof and atomically queues one typed 
     headSha: action.headSha,
   });
   expect(f.phases.claim('owner', 60000, f.now)?.id).toBe(next.id);
+});
+
+it.each(['runId', 'featureId', 'repository', 'childTaskIds'])(
+  'rejects a finalization report bound to another %s even with a matching digest',
+  async (field) => {
+    const f = await fixture('finalizing', 'complete');
+    const contract = JSON.parse(
+      (f.db.prepare('SELECT body_json FROM contracts').get() as { body_json: string }).body_json,
+    );
+    const action = { ...phaseActionForCallback(f.callback), phase: 'finalizing' };
+    const report: Record<string, unknown> = {
+      version: 1,
+      featureId: contract.featureId,
+      runId: action.runId,
+      epicId: contract.featureId,
+      repository: contract.authority.github.repository,
+      destination: 'staging',
+      mergedHeadSha: action.headSha,
+      mergeSha: action.headSha,
+      mergeEventIdentity: 'fixture-event',
+      evaluationId: 'sha256:' + 'a'.repeat(64),
+      childTaskIds: [action.taskId],
+      acceptance: [
+        {
+          criterion: 'fixture',
+          implementation: ['fixture'],
+          taskId: action.taskId,
+          evidence: [
+            {
+              digest: 'sha256:' + 'b'.repeat(64),
+              mediaType: 'text/plain',
+              sizeBytes: 1,
+              kind: 'test',
+            },
+          ],
+        },
+      ],
+      generatedAtMs: f.now,
+    };
+    report[field] = field === 'childTaskIds' ? ['other-task'] : 'other-value';
+    const digest = digestGovernedValue(report);
+    f.db
+      .prepare(`INSERT INTO feature_finalizations VALUES(?,?,?,'closed',?,?,?,?)`)
+      .run(
+        action.runId,
+        contract.featureId,
+        contract.featureId,
+        digest,
+        JSON.stringify(report),
+        f.now,
+        f.now,
+      );
+    f.db.prepare("UPDATE runs SET state='closed'").run();
+    expect(() =>
+      verifyCoordinatorProof(f.db, action, { kind: 'finalization', reportDigest: digest }),
+    ).toThrow('coordinator finalization report binding rejected');
+  },
+);
+
+it('retains coordinator identity for bounded recovery and blocks after its fixed budget', async () => {
+  const f = await fixture('feature_evaluation');
+  f.consume();
+  const job = f.phases.start(f.phases.claim('owner', 60000, f.now)!, f.now);
+  f.phases.deferCoordinator(job, 1, f.now);
+  expect(f.phases.get(job.id)?.status).toBe('started');
+  expect(f.phases.claimRecovery('next-owner', 60000, f.now + 999)).toBeUndefined();
+  const recovered = f.phases.claimRecovery('next-owner', 60000, f.now + 1001)!;
+  expect(recovered.execution_id).toBe(job.execution_id);
+  expect(() => f.phases.deferCoordinator(job, 1, f.now + 1001)).toThrow();
+  expect(() => f.phases.deferCoordinator(recovered, 2, f.now + 1001)).toThrow('budget changed');
+  f.phases.deferCoordinator(recovered, 1, f.now + 1001);
+  expect(f.phases.get(job.id)).toMatchObject({
+    status: 'blocked',
+    failure_code: 'phase_coordinator_recovery_exhausted',
+  });
+  expect(f.phases.claimRecovery('next-owner', 60000, f.now + 100000)).toBeUndefined();
+});
+
+it('does not charge coordinator recovery while another owner retains resource leases', async () => {
+  const f = await fixture('feature_evaluation');
+  f.consume();
+  const job = f.phases.start(f.phases.claim('owner', 60000, f.now)!, f.now);
+  f.phases.deferCoordinator(job, 2, f.now);
+  const next = f.phases.claimRecovery('replacement', 60000, f.now + 1001)!;
+  f.phases.deferCoordinatorAdmission(next, f.now + 1001);
+  expect(
+    f.db.prepare('SELECT attempts FROM coordinator_recovery_attempts WHERE job_id=?').get(job.id),
+  ).toEqual({ attempts: 1 });
+  expect(f.phases.get(job.id)?.failure_code).toBe('phase_coordinator_waiting_for_owner');
+  expect(f.phases.claimRecovery('replacement', 60000, f.now + 2001)).toBeUndefined();
+});
+
+it('reserves the initial implementation exactly once and leaves no free repair attempt', async () => {
+  const f = await fixture('repair_planning');
+  f.consume();
+  const job = f.phases.start(f.phases.claim('owner', 60000, f.now)!, f.now);
+  expect(f.phases.reserveImplementationAttempt(job, f.now)).toBe(1);
+  expect(f.phases.reserveImplementationAttempt(job, f.now)).toBe(1);
+  expect(f.db.prepare("SELECT COUNT(*) AS n FROM attempts WHERE scope='task'").get()).toEqual({
+    n: 1,
+  });
+  const contract = JSON.parse(
+    (f.db.prepare('SELECT body_json FROM contracts').get() as { body_json: string }).body_json,
+  );
+  expect(f.db.prepare("SELECT max_attempts FROM attempts WHERE scope='task'").get()).toEqual({
+    max_attempts: contract.retryPolicy.implementationAttempts,
+  });
 });

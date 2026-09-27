@@ -132,3 +132,9 @@ setInterval(()=>{},1000);
   ).toThrow('uncertain');
   expect(readFileSync(seen, 'utf8')).toBe('effect-observed');
 });
+it.each(['replace', 'graft'])('rejects %s metadata before source verification', (kind) => {
+  const { root, git, base, next } = refFixture();
+  if (kind === 'replace') git.run(['replace', base, next]);
+  else writeFileSync(join(root, '.git/info/grafts'), base + '\n');
+  expect(() => git.assertSafeIndex()).toThrow(kind === 'replace' ? 'replacement refs' : 'grafts');
+});

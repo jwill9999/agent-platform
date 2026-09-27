@@ -1,0 +1,761 @@
+
+> @agent-platform/workflow-control@0.0.0 test /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+> pnpm build && vitest run "--no-file-parallelism"
+
+
+> @agent-platform/workflow-control@0.0.0 build /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+> tsc -p tsconfig.json
+
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/phaseRuntime.test.ts (59 tests) 139505ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > reconciles a verified import under a new owner without relaunching the worker 4538ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: admission 3382ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: sync-admission 4258ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: cleanup-only 3476ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > renews live import fences across synchronous work longer than the initial lease without extending execution deadline 3469ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rechecks production import authority at mutation boundaries: before-files 2901ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rechecks production import authority at mutation boundaries: before-ref 3053ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > retains ordinary long code identifiers and string literals without entropy false positives 3441ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rejects source containing a secret assignment before importing 1648ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > imports actual worker bytes and commits a changed-head callback before verification 3499ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > publishes private-only objects with remote CAS and reconciles a lost acknowledgement 4004ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with failed criterion 1951ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with omitted criterion 2100ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with unapproved criterion 1787ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with unresolved finding 1705ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with remaining risk 1719ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with repair status with integrate intent 1765ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with blocked status with integrate intent 1938ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with continue review intent 2330ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with repair intent 1884ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with escalation intent 1831ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head without reusing evidence 3425ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to replacement owner without reusing evidence 3338ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head and replacement owner without reusing evidence 3349ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > executes verification then independent review through durable callbacks and exact evidence 3714ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > renews phase and resource leases across a specialist exceeding the initial TTL 8305ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > fails missing role or source authority before launch: {"roles":false} 473ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > fails missing role or source authority before launch: {"sourceFailure":true} 454ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > persists repair callback and queues no fake passing result 1819ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > persists broker interruption even while credential revocation is unavailable 5845ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rejects invalid structured output and settles/revokes before marking blocked 1737ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never dispatches started work again after a restart without an execution record 458ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > recovers an interrupted scheduler by removing, observing, and revoking before terminal bookkeeping 526ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > cannot add phase role authority through an automatic contract revision 323ms
+   ✓ rechecks admission after source preparation before credential issuance and dispatch 841ms
+   ✓ reconciles a crash before atomic interrupted finalization without acquiring execution leases 1830ms
+   ✓ contains the worker and latches admission when interruption persistence fails 4055ms
+   ✓ bounds shutdown when container removal fails while attach remains outstanding 1563ms
+   ✓ records ambiguous issuance before compensating revocation within the cleanup budget 922ms
+   ✓ seals the credential pathname before a delayed issuance reply can recreate token bytes 3511ms
+   ✓ rejects a late credential acknowledgement after cleanup ownership changes 3062ms
+   ✓ finishes pending cleanup after the run becomes terminal without advancing it 1680ms
+   ✓ preserves committed success when interruption loses the completion race 1769ms
+   ✓ reports pending recovery for an orphan whose phase lease has not expired 467ms
+   ✓ rejects late success and callback commitment when interruption wins the transaction race 1681ms
+   ✓ recovers a crash after the cancel effect before its durable acknowledgement 1645ms
+   ✓ recovers a crash after the revoke effect before its durable acknowledgement 1538ms
+   ✓ recovers a crash after the settle effect before its durable acknowledgement 1676ms
+   ✓ recovers a persisted pre-reservation interruption without stranding cleanup 494ms
+   ✓ keeps a delayed create isolated until acknowledgement, then attaches before start 2097ms
+   ✓ redacts source verification exceptions before persisting a blocked phase 455ms
+   ✓ bounds credential filesystem settlement and rejects a late completion 6696ms
+   ✓ bounds waiting for a held container lock and prevents a late start 6326ms
+   ✓ redacts sensitive exceptions from both background runtime rejection paths 1428ms
+   ✓ rechecks service admission after synchronous document verification: topology_stale 1474ms
+   ✓ rechecks service admission after synchronous document verification: control_unavailable 1563ms
+   ✓ settles a create rejected at admission before Docker was invoked 1141ms
+   ✓ settles a create rejected at preflight before Docker was invoked 984ms
+ ✓ test/documentApproval.test.ts (106 tests | 2 skipped) 31896ms
+   ✓ verifies unchanged journal and objects on repeated boundaries without new approval 367ms
+   ✓ validates persisted task material through the operator command and returns safe blocked reasons 373ms
+   ✓ survives failed invalidation, restart and restored bytes with unresolved authority quarantined 428ms
+   ✓ quarantines actual process death at before-read, including restored bytes 379ms
+   ✓ quarantines actual process death at failed-invalidation, including restored bytes 377ms
+   ✓ prevents a second process from accepting a pending attempt and fences the old verifier after takeover 380ms
+   ✓ keeps snapshot tamper denial durable when settlement fails: false 540ms
+   ✓ keeps snapshot tamper denial durable when settlement fails: true 517ms
+   ✓ rejects wrong task, approval, source and packet identities before creating a snapshot 519ms
+   ✓ rejects publication from an unrelated same-byte repository and unknown source revision 339ms
+   ✓ returns bounded publication errors without repository paths or remote credentials 349ms
+   ✓ checks accepted task worktree bytes instead of publication bytes 441ms
+   ✓ checks accepted run worktree bytes instead of publication bytes 396ms
+   ✓ checks accepted import worktree bytes instead of publication bytes 409ms
+   ✓ rejects 'deleted' material before 'scheduler.reserve' can persist authority 303ms
+   ✓ rejects 'changed' material before 'repair.dispatch' can persist authority 326ms
+   ✓ rejects 'deleted' material before 'delivery.contract' can persist authority 336ms
+   ✓ rejects 'changed' material before 'repair.child_prepare' can persist authority 308ms
+   ✓ rejects 'artifact' material before 'approval.resume' can persist authority 325ms
+   ✓ rejects 'changed' material before 'approval.notification' can persist authority 358ms
+   ✓ rejects 'artifact' material before 'approval.notification' can persist authority 304ms
+   ✓ rejects 'deleted' material before 'lineage.import' can persist authority 310ms
+   ✓ rejects 'artifact' material before 'lineage.import' can persist authority 325ms
+   ✓ rejects 'changed' material before 'feature.approval' can persist authority 300ms
+   ✓ denies 'artifact' material at persisted operation boundary 'transition.commit' 333ms
+   ✓ denies notification accepted after document changes 309ms
+   ✓ cannot authorize partial object or receipt publication and retries publication idempotently 477ms
+   ✓ rejects incoming lineage whose worktree changed before the ledger exists 430ms
+   ✓ does not allow approval creation to revive a run whose documents were invalidated 317ms
+   ✓ rechecks lease ownership at settlement and leaves a durable pending attempt after takeover 492ms
+   ✓ reopens unchanged publication and approval without requiring another owner decision 399ms
+   ✓ quarantines sibling runs while an invalidation attempt is unresolved 303ms
+ ✓ test/orchestrator.test.ts (23 tests) 14119ms
+   ✓ Beads-authoritative scheduling > rejects packet evidence that is bound only to another run 310ms
+   ✓ Beads-authoritative scheduling > closes only accepted exact-head results through the injected broker 722ms
+   ✓ Beads-authoritative scheduling > rejects substituted scheduler input before credentials or container dispatch 625ms
+   ✓ Beads-authoritative scheduling > launches bounded packets through the isolated launcher and releases capacity 1487ms
+   ✓ Beads-authoritative scheduling > revokes the single-run credential before releasing a retained workspace 1713ms
+   ✓ Beads-authoritative scheduling > compensates when a delayed issue response arrives after restart revocation 390ms
+   ✓ Beads-authoritative scheduling > validates the production command-backed credential protocol 1782ms
+   ✓ Beads-authoritative scheduling > 'interrupts timed-out specialists and …' 1081ms
+   ✓ Beads-authoritative scheduling > 'retains timed-out specialist work whe…' 1087ms
+   ✓ Beads-authoritative scheduling > rejects completion when leases expire while the specialist runs 1359ms
+   ✓ Beads-authoritative scheduling > rejects a blocked task using the official Beads snapshot 371ms
+   ✓ Beads-authoritative scheduling > reserves durable scheduler capacity before committing the Beads claim 478ms
+   ✓ Beads-authoritative scheduling > rolls back run-lease adoption when the task lease remains owned elsewhere 308ms
+   ✓ Beads-authoritative scheduling > removes the owned persisted container and escalates the run exactly once after restart 542ms
+   ✓ Beads-authoritative scheduling > finishes a scheduler intent when a conflicting prepared Beads claim escalates recovery 427ms
+   ✓ Beads-authoritative scheduling > quarantines an active pre-credential scheduler row until the legacy credential is rotated 318ms
+   ✓ recovers revocation after a crash between never-issued credential transitions 332ms
+ ✓ test/governedPersistence.test.ts (20 tests) 7290ms
+   ✓ governed SQLite persistence > fences takeover during notes read 1 and lets the new owner adopt prepared work 381ms
+   ✓ governed SQLite persistence > fences takeover during notes read 2 and lets the new owner adopt prepared work 370ms
+   ✓ governed SQLite persistence > requires separate authenticated approval and acknowledged resume transport 1043ms
+   ✓ governed SQLite persistence > reconciles resume provider acceptance after response loss and process restart 416ms
+   ✓ governed SQLite persistence > reconciles a callback wakeup lost across restart and rejects stale fences 635ms
+   ✓ governed SQLite persistence > atomically imports exact lineage and idempotently survives restart 693ms
+   ✓ governed SQLite persistence > uses the existing SQLite delivery journal for exact Beads note CAS and restart replay 356ms
+   ✓ governed SQLite persistence > persists independently evidenced review dispositions and binds resolution to their digest 632ms
+   ✓ denies effect dispatch when a peer makes authority invalidated after byte verification 300ms
+   ✓ denies effect dispatch when a peer makes authority pending after byte verification 344ms
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+ ✓ test/deliveryBrokers.test.ts (35 tests) 43916ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with none changed 2249ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with documents changed 1461ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with approval changed 1375ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with lease changed 1365ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with expiry changed 2462ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with expiry-after-commit changed 2258ms
+   ✓ DurableDeliveryBroker > denies delivery dispatch when approval changes at the last boundary 594ms
+   ✓ DurableDeliveryBroker > denies delivery dispatch when lease changes at the last boundary 556ms
+   ✓ DurableDeliveryBroker > denies delivery dispatch when cancellation changes at the last boundary 662ms
+   ✓ DurableDeliveryBroker > persists an attested zero-thread snapshot before the immediate merge re-observation 2152ms
+   ✓ DurableDeliveryBroker > rejects a provider review-event race after persisting the merge snapshot 1828ms
+   ✓ DurableDeliveryBroker > rejects unresolved threads and resolved threads without matching durable dispositions 3404ms
+   ✓ DurableDeliveryBroker > recovers response loss only after a durable verified merge precondition 2248ms
+   ✓ DurableDeliveryBroker > escalates an already-merged result without a durable verified precondition 1617ms
+   ✓ DurableDeliveryBroker > migrates a legacy prepared merge and completes verified recovery 2155ms
+   ✓ DurableDeliveryBroker > journals an approved mutation and replays it without a second side effect 783ms
+   ✓ DurableDeliveryBroker > requires durable broker-approved head lineage for every commit and push 3210ms
+   ✓ DurableDeliveryBroker > escalates a stale external state exactly once without mutation 432ms
+   ✓ DurableDeliveryBroker > recovers a crash after the external mutation without repeating it 781ms
+   ✓ DurableDeliveryBroker > rechecks leases immediately before mutation 331ms
+   ✓ DurableDeliveryBroker > requires atomic recovery adoption before a higher-fence execute replay 380ms
+   ✓ DurableDeliveryBroker > retries recovery idempotently after crashing immediately after adoption 749ms
+   ✓ DurableDeliveryBroker > rejects preparation and commit outside the operation state matrix 983ms
+   ✓ DurableDeliveryBroker > escalates corrupt journal rows without suppressing later recovery 2094ms
+   ✓ DurableDeliveryBroker > keeps the delivery journal capability internal 334ms
+   ✓ DurableDeliveryBroker > durably escalates undefined and cyclic port results instead of wedging prepared work 859ms
+   ✓ DurableDeliveryBroker > persists pipeline backoff, completes on success, and escalates an expired wait once 4737ms
+   ✓ DurableDeliveryBroker > rejects reconciliation through a broker bound to a different exact contract 338ms
+ ✓ test/repairLoops.test.ts (28 tests) 9557ms
+   ✓ DurableRepairCoordinator > uses real Git ancestry and exact HEAD for trusted repair-head verification 429ms
+   ✓ DurableRepairCoordinator > routes seeded compile failures to the implementation owner 311ms
+   ✓ DurableRepairCoordinator > routes seeded test failures to the implementation owner 313ms
+   ✓ DurableRepairCoordinator > routes seeded review failures to the implementation owner 308ms
+   ✓ DurableRepairCoordinator > routes seeded security failures to the implementation owner 303ms
+   ✓ DurableRepairCoordinator > routes seeded sonar failures to the implementation owner 313ms
+   ✓ DurableRepairCoordinator > routes seeded evaluator failures to the implementation owner 301ms
+   ✓ DurableRepairCoordinator > routes test-definition and environment failures to their non-code owners 356ms
+   ✓ DurableRepairCoordinator > uses one canonical hypothesis and compares the first repair with the failed attempt 310ms
+   ✓ DurableRepairCoordinator > requires evidence-based changes to advance monotonically beyond the failure baseline 463ms
+   ✓ DurableRepairCoordinator > rejects an unapproved acceptance criterion before consuming budget 320ms
+   ✓ DurableRepairCoordinator > rejects identical retries and escalates a finding exactly once after its budget 595ms
+   ✓ DurableRepairCoordinator > shares the task budget across findings and emits one task escalation 417ms
+   ✓ DurableRepairCoordinator > accepts only criterion-proving, in-scope results with task-bound verifier evidence 456ms
+   ✓ DurableRepairCoordinator > rejects a trusted Git diff with an 'omitted file' 360ms
+   ✓ DurableRepairCoordinator > rejects a trusted Git diff with an 'invented file' 348ms
+   ✓ DurableRepairCoordinator > rejects a trusted Git diff with an 'out-of-authority file' 361ms
+   ✓ DurableRepairCoordinator > rechecks lease expiry after exact-head verification and before acceptance 349ms
+   ✓ DurableRepairCoordinator > rejects a backward-moving injected test clock 307ms
+   ✓ DurableRepairCoordinator > rejects an unrelated workspace fence at every direct storage mutation boundary 428ms
+   ✓ DurableRepairCoordinator > preserves an accepted repair across cancellation and database recovery 368ms
+ ✓ test/featureDeliveryBroker.test.ts (25 tests) 12621ms
+   ✓ DurableFeatureDeliveryBroker > consumes an origin attestation committed by the v1 task delivery broker 1387ms
+   ✓ DurableFeatureDeliveryBroker > requires an active human approval bound to the exact run, material, and policy 750ms
+   ✓ DurableFeatureDeliveryBroker > refuses approval invalidation while an external feature effect is prepared 373ms
+   ✓ DurableFeatureDeliveryBroker > revalidates the exact critic authority before every external effect 348ms
+   ✓ DurableFeatureDeliveryBroker > allows exactly one invalidation CAS across two store connections 417ms
+   ✓ DurableFeatureDeliveryBroker > journals and commits the exact feature-to-staging merge without closing the run 1003ms
+   ✓ DurableFeatureDeliveryBroker > rejects cross-contract replay even when repository and refs are unchanged 670ms
+   ✓ DurableFeatureDeliveryBroker > fails closed when the committed task-to-feature attestation is changed 424ms
+   ✓ DurableFeatureDeliveryBroker > recovers a prepared operation after an external mutation without repeating it 851ms
+   ✓ DurableFeatureDeliveryBroker > production recovery driver reconciles PR after prepare after restart 647ms
+   ✓ DurableFeatureDeliveryBroker > production recovery driver reconciles PR after external mutation after restart 681ms
+   ✓ DurableFeatureDeliveryBroker > production recovery driver reconciles checks after prepare after restart 505ms
+   ✓ DurableFeatureDeliveryBroker > production recovery driver reconciles checks after external observation after restart 513ms
+   ✓ DurableFeatureDeliveryBroker > production recovery driver reconciles merge after prepare after restart 596ms
+   ✓ DurableFeatureDeliveryBroker > production recovery driver reconciles merge after external mutation after restart 588ms
+   ✓ DurableFeatureDeliveryBroker > prevents a finalizing recovery transition from bypassing prepared feature delivery 382ms
+   ✓ DurableFeatureDeliveryBroker > continues real orchestrator recovery after one prepared feature operation fails 632ms
+ ❯ test/bootstrap.test.ts (37 tests | 15 failed) 48682ms
+   ✓ approved bootstrap task artifact production composition > checks pinned adapter dependencies before constructing a production coordinator or preflight 865ms
+   × approved bootstrap task artifact production composition > reconciles a real commit effect with a lost acknowledgement under a new owner 1853ms
+     → expected '8851a9a1fa00dc95de96e044d102abd6dcc2f…' not to be '8851a9a1fa00dc95de96e044d102abd6dcc2f…' // Object.is equality
+   × approved bootstrap task artifact production composition > reconciles a real push effect with a lost acknowledgement under a new owner 1773ms
+     → expected [ { kind: 'git.commit', …(1) } ] to deeply equal [ { kind: 'git.push', …(1) } ]
+   ✓ approved bootstrap task artifact production composition > rejects lease expiry during the final adoption observation before dispatch 893ms
+   × approved bootstrap task artifact production composition > rejects lease expiry during the final commit observation before dispatch 1420ms
+     → expected [Function] to throw error including 'fence' but got 'owned workspace document identity mis…'
+   × approved bootstrap task artifact production composition > rejects lease expiry during the final push observation before dispatch 1349ms
+     → expected [Function] to throw error including 'fence' but got 'owned workspace document identity mis…'
+   × approved bootstrap task artifact production composition > rejects a successor takeover during push observation before any remote dispatch 1342ms
+     → expected [Function] to throw error including 'fence' but got 'owned workspace document identity mis…'
+   × approved bootstrap task artifact production composition > reopens cancellation after approval invalidation without allowing execution 1721ms
+     → owned workspace document identity mismatch
+   × approved bootstrap task artifact production composition > crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases 1946ms
+     → owned workspace document identity mismatch
+   ✓ approved bootstrap task artifact production composition > rejects changed producer identifiers before bootstrap evidence persistence 1531ms
+   ✓ approved bootstrap task artifact production composition > rejects additional producer identifiers before bootstrap evidence persistence 1529ms
+   × approved bootstrap task artifact production composition > still rejects direct github secret patterns inside an approved bootstrap producer 1693ms
+     → expected [Function] to throw error including 'bootstrap attestation was redacted' but got 'owned workspace document identity mis…'
+   × approved bootstrap task artifact production composition > still rejects direct openai secret patterns inside an approved bootstrap producer 1826ms
+     → expected [Function] to throw error including 'bootstrap attestation was redacted' but got 'owned workspace document identity mis…'
+   × approved bootstrap task artifact production composition > recovers response loss at after_task_observation without duplicate transitions or push 1813ms
+     → owned workspace document identity mismatch
+   × approved bootstrap task artifact production composition > recovers response loss at after_candidate_adoption without duplicate transitions or push 1393ms
+     → owned workspace document identity mismatch
+   × approved bootstrap task artifact production composition > recovers response loss at after_commit without duplicate transitions or push 1354ms
+     → expected [Function] to throw error including 'response lost' but got 'owned workspace document identity mis…'
+   × approved bootstrap task artifact production composition > recovers response loss at after_push without duplicate transitions or push 1320ms
+     → expected [Function] to throw error including 'response lost' but got 'owned workspace document identity mis…'
+   × approved bootstrap task artifact production composition > recovers response loss at after_attestation without duplicate transitions or push 1440ms
+     → expected [Function] to throw error including 'response lost' but got 'owned workspace document identity mis…'
+   ✓ approved bootstrap task artifact production composition > rejects changed observations between the two real lifecycle transitions 1142ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: author 473ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: source 486ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: tree 487ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: manifest 476ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: remote 613ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: beads 551ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: binary 606ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: evidence 649ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: beads 1702ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: source 1801ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: ref 1666ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: adapter 1543ms
+   ✓ approved bootstrap task artifact production composition > rejects stale owners and missing approval/evidence without preparing anything 1516ms
+   ✓ approved bootstrap task artifact production composition > retains the full hash-bound policy and rejects database payload substitution 1562ms
+   ✓ approved bootstrap task artifact production composition > preflight remains read-only, including an old journal without bootstrap schema 654ms
+   × approved bootstrap task artifact production composition > does not fabricate an artifact receipt when owned work remains 1701ms
+     → expected [Function] to throw error including 'settled published head' but got 'owned workspace document identity mis…'
+   ✓ approved bootstrap task artifact production composition > rolls back the adoption receipt, head ledger and second transition together on storage failure 2400ms
+   ✓ approved bootstrap task artifact production composition > rejects a substituted commit before preparing even with internal delivery capability 1591ms
+ ✓ test/featureEvaluation.test.ts (26 tests) 14575ms
+   ✓ ContractEvaluator > separates initial task-head evaluation from unapproved integrated-head delivery 340ms
+   ✓ ContractEvaluator > maps every criterion to secure exact-head evidence and freezes accepted evidence 439ms
+   ✓ DurableRepairChildBroker > creates an in-envelope append-only repair child idempotently 785ms
+   ✓ DurableRepairChildBroker > carries approved-head lineage and decremented retry authority into a second repair 1171ms
+   ✓ DurableRepairChildBroker > rejects a second child until its predecessor advances and is accepted and closed 823ms
+   ✓ DurableRepairChildBroker > derives child authority from durable attempts and rejects an exhausted aggregate budget 862ms
+   ✓ DurableRepairChildBroker > rejects repair count expansion before mutation 457ms
+   ✓ DurableRepairChildBroker > rejects repair path expansion before mutation 432ms
+   ✓ DurableRepairChildBroker > rejects repair role expansion before mutation 442ms
+   ✓ DurableRepairChildBroker > rejects repair authority expansion before mutation 454ms
+   ✓ DurableRepairChildBroker > rejects repair dependency expansion before mutation 447ms
+   ✓ DurableRepairChildBroker > rejects repair retry budget expansion before mutation 468ms
+   ✓ DurableRepairChildBroker > durably escalates conflicting external state without mutation 641ms
+   ✓ DurableRepairChildBroker > rechecks changed planning documents immediately before repair child mutation 808ms
+   ✓ DurableRepairChildBroker > rechecks 'invalidate' authority after suspended 'child' observation in the official repair port 905ms
+   ✓ DurableRepairChildBroker > rechecks 'takeover' authority after suspended 'child' observation in the official repair port 746ms
+   ✓ DurableRepairChildBroker > rechecks 'invalidate' authority after suspended 'ref' observation in the official repair port 809ms
+   ✓ DurableRepairChildBroker > rechecks 'takeover' authority after suspended 'ref' observation in the official repair port 803ms
+   ✓ DurableRepairChildBroker > reconciles a crash after external mutation without duplicating the effect 916ms
+   ✓ DurableRepairChildBroker > adopts a prepared intent after lease-owner rollover without duplicating the effect 878ms
+   ✓ DurableRepairChildBroker > rejects a fabricated evaluation and a run outside repair_planning 678ms
+ ✓ test/finalization.test.ts (11 tests) 16775ms
+   ✓ FeatureFinalizationCoordinator > derives durable feature authority and blocks omission of the staging attestation 1820ms
+   ✓ FeatureFinalizationCoordinator > closes only after exact merge, child close, epic close, Dolt sync, and final evidence 1826ms
+   ✓ FeatureFinalizationCoordinator > recovers beads.task_close after its external effect without duplication 1744ms
+   ✓ FeatureFinalizationCoordinator > recovers beads.dolt_push after its external effect without duplication 1760ms
+   ✓ FeatureFinalizationCoordinator > replays a crash after report persistence and never closes with missing evidence 1741ms
+   ✓ FeatureFinalizationCoordinator > rejects missing exact-head evaluation before any epic or Dolt mutation 1148ms
+   ✓ FeatureFinalizationCoordinator > preserves every accepted evidence reference from a passed criterion 1873ms
+   ✓ FeatureFinalizationCoordinator > rejects a legitimate broker backed by a different journal store 1221ms
+   ✓ FeatureFinalizationCoordinator > seals the verified broker against post-construction method or prototype replacement 1293ms
+   ✓ FeatureFinalizationCoordinator > uses the committed merge as the immediate finalizing recovery predecessor 1171ms
+   ✓ FeatureFinalizationCoordinator > prefers and binds the committed staging merge after a finalizing crash 1177ms
+ ❯ test/phaseJobs.test.ts (50 tests | 1 failed) 20865ms
+   ✓ standalone durable phase jobs > maps implementing/continue to task_verification without inventing a transition 334ms
+   ✓ standalone durable phase jobs > maps implementing/repair to task_verification without inventing a transition 356ms
+   ✓ standalone durable phase jobs > maps task_verification/continue to task_review without inventing a transition 328ms
+   ✓ standalone durable phase jobs > maps task_verification/repair to repair without inventing a transition 359ms
+   ✓ standalone durable phase jobs > maps task_review/continue to task_accepted without inventing a transition 342ms
+   ✓ standalone durable phase jobs > maps task_review/repair to repair without inventing a transition 331ms
+   ✓ standalone durable phase jobs > maps feature_evaluation/repair to repair_planning without inventing a transition 344ms
+   ✓ standalone durable phase jobs > maps repair_planning/continue to implementing without inventing a transition 327ms
+   ✓ standalone durable phase jobs > maps pipeline/continue to delivery without inventing a transition 333ms
+   ✓ standalone durable phase jobs > maps delivery/continue to finalizing without inventing a transition 343ms
+   ✓ standalone durable phase jobs > maps finalizing/complete to finalizing without inventing a transition 334ms
+   ✓ standalone durable phase jobs > atomically consumes a callback into exactly one job across duplicate consumption and restart 333ms
+   ✓ standalone durable phase jobs > rejects stale run at enqueue and leaves no partial action 331ms
+   ✓ standalone durable phase jobs > rejects stale head at enqueue and leaves no partial action 339ms
+   ✓ standalone durable phase jobs > rejects substituted callback identity and phase 394ms
+   ✓ standalone durable phase jobs > allows only one claimer and fences stale workers after a pre-start crash 592ms
+   ✓ standalone durable phase jobs > revalidates authority at claim and start with a visible blocker for stale queued work 400ms
+   ✓ standalone durable phase jobs > rejects a head change between claim and start without a false phase-start event 465ms
+   ✓ standalone durable phase jobs > does not infer a head ledger or active callback authority when either is absent 594ms
+   ✓ standalone durable phase jobs > keeps started work beyond five seconds and requires recovery instead of duplicate launch 558ms
+   ✓ standalone durable phase jobs > requires execution-bound durable completion and fences late completion 540ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted head_sha without completing 535ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted producer without completing 534ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted producer_role without completing 560ms
+   ✓ standalone durable phase jobs > rejects a previous implementation result even when it has valid generic evidence scope 578ms
+   ✓ standalone durable phase jobs > does not invent coordinator completion authority from a generic transition receipt 494ms
+   ✓ standalone durable phase jobs > production continuation queues runnable work and reports missing authority visibly 618ms
+   ✓ standalone durable phase jobs > preserves approval and blocked outcomes without enqueueing specialist work 551ms
+   ✓ cancellation queue fencing > keeps phase launch fenced after an incomplete cancellation deadline while allowing observation recovery 614ms
+   ✓ cancellation queue fencing > atomically fences pending phase work and rejects cancellation-time enqueues/claims 399ms
+   ✓ cancellation queue fencing > atomically fences claimed phase work and rejects cancellation-time enqueues/claims 408ms
+   ✓ cancellation queue fencing > does not declare started phase execution stopped from a cleanup boolean alone 474ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'enqueue' without starting work 346ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'enqueue' without starting work 371ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'enqueue' without starting work 356ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'claim' without starting work 417ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'claim' without starting work 399ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'claim' without starting work 411ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'start' without starting work 468ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'start' without starting work 462ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'start' without starting work 462ms
+   ✓ finishes a coordinator from committed proof and atomically queues one typed successor 794ms
+   × retains coordinator identity for bounded recovery and blocks after its fixed budget 491ms
+     → f.phases.deferCoordinator is not a function
+ ❯ test/storage.test.ts (28 tests | 1 failed) 14831ms
+   × WorkflowStore > uses CAS versions, idempotency keys, and fenced commits 568ms
+     → expected [Function] to throw error including 'already has a prepared transition' but got 'document_lease_stale'
+   ✓ JournaledMutationBroker recovery > guards beads.task_claim after suspended observations in execution and recovery 2429ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_close after suspended observations in execution and recovery 2443ms
+   ✓ JournaledMutationBroker recovery > guards beads.dolt_push after suspended observations in execution and recovery 2512ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_prepare without duplicate mutation 378ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_prepare without duplicate mutation 395ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_external_mutation without duplicate mutation 380ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_external_mutation without duplicate mutation 388ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_local_commit without duplicate mutation 375ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_local_commit without duplicate mutation 436ms
+   ✓ JournaledMutationBroker recovery > commits an externally applied close without repeating it and escalates contradictions 597ms
+   ✓ JournaledMutationBroker recovery > brokers beads.task_claim through the pinned official adapter 400ms
+   ✓ JournaledMutationBroker recovery > brokers beads.task_close through the pinned official adapter 385ms
+   ✓ JournaledMutationBroker recovery > brokers beads.dolt_push through the pinned official adapter 440ms
+ ✓ test/activeSpecialistSettlement.test.ts (35 tests) 30589ms
+   ✓ durable active specialist settlement > honors durable cancellation during awaited conformance before the next effect 722ms
+   ✓ durable active specialist settlement > honors durable cancellation during awaited issued before the next effect 680ms
+   ✓ durable active specialist settlement > honors durable cancellation during awaited inspect before the next effect 849ms
+   ✓ durable active specialist settlement > denies credential issuance after snapshot authority becomes invalidated 494ms
+   ✓ durable active specialist settlement > denies credential issuance after snapshot authority becomes pending 507ms
+   ✓ durable active specialist settlement > pins identity, confirms removal/revocation and returns staged source with an unrestricted reservation deadline 1264ms
+   ✓ durable active specialist settlement > keeps malformed acknowledgement unresolved when absent, then positively reconciles late create after restart 768ms
+   ✓ durable active specialist settlement > keeps extra acknowledgement unresolved when absent, then positively reconciles late create after restart 768ms
+   ✓ durable active specialist settlement > keeps lost acknowledgement unresolved when absent, then positively reconciles late create after restart 791ms
+   ✓ durable active specialist settlement > never starts/removes a container with substituted id 890ms
+   ✓ durable active specialist settlement > never starts/removes a container with substituted name 768ms
+   ✓ durable active specialist settlement > never starts/removes a container with substituted owner 743ms
+   ✓ durable active specialist settlement > accepts Docker 29 absence only with exact identity and status: exact 1591ms
+   ✓ durable active specialist settlement > accepts Docker 29 absence only with exact identity and status: wrong_id 1920ms
+   ✓ durable active specialist settlement > accepts Docker 29 absence only with exact identity and status: wrong_code 1487ms
+   ✓ durable active specialist settlement > accepts Docker 29 absence only with exact identity and status: extra_diagnostic 1205ms
+   ✓ durable active specialist settlement > retains staging and capacity after remove uncertainty 1109ms
+   ✓ durable active specialist settlement > retains staging and capacity after inspect uncertainty 1090ms
+   ✓ durable active specialist settlement > retains staging and capacity after wrong_absence uncertainty 1103ms
+   ✓ durable active specialist settlement > attempts cleanup independently when revocation fails and exposes no workspace 1043ms
+   ✓ durable active specialist settlement > settles never-dispatched cancellation without inventing a container ID 308ms
+   ✓ durable active specialist settlement > fails closed on legacy unknown state after reconstruction 300ms
+   ✓ durable active specialist settlement > rejects expired authority during inspect and reconciles as a newly adopted owner 686ms
+   ✓ durable active specialist settlement > rejects expired authority during rm and reconciles as a newly adopted owner 1072ms
+   ✓ durable active specialist settlement > rejects expired authority during revoke and reconciles as a newly adopted owner 1061ms
+   ✓ durable active specialist settlement > rejects a takeover during removal before recording stale-owner settlement 1027ms
+   ✓ durable active specialist settlement > reconciles confirmed external removal after its journal write loses acknowledgement 1047ms
+   ✓ durable active specialist settlement > withholds success when cancelled at create boundary 693ms
+   ✓ durable active specialist settlement > withholds success when cancelled at start boundary 1123ms
+   ✓ durable active specialist settlement > withholds success when cancelled at rm boundary 1056ms
+   ✓ durable active specialist settlement > checks deadline again after create without starting an expired reservation 672ms
+   ✓ durable active specialist settlement > passes a deferred launcher clock so expiry at writer acquisition prevents create 578ms
+   ✓ durable active specialist settlement > rejects dispatch when its deadline expires under the writer lock with leases still valid 576ms
+ ↓ test/developmentHost.integration.test.ts (21 tests | 21 skipped)
+ ✓ test/featureDeliveryApproval.test.ts (7 tests) 2428ms
+   ✓ FeatureDeliveryApprovalBroker > authenticates a canonical intent snapshot and ignores caller mutation after authentication starts 407ms
+   ✓ FeatureDeliveryApprovalBroker > persists explicit intent, feature-specific critic review, and authenticated approval 407ms
+   ✓ FeatureDeliveryApprovalBroker > atomically fences intent persistence against a competing delivery transition 667ms
+ ✓ test/governedOperations.test.ts (11 tests) 8ms
+ ✓ test/recoveryCancellation.test.ts (8 tests) 1926ms
+   ✓ durable workflow recovery > persists the interrupted target and rejects caller-selected resume states after restart 457ms
+ ✓ test/developmentHostJournal.test.ts (32 tests) 778ms
+ ✓ test/bootstrapAdapters.test.ts (31 tests) 18281ms
+   ✓ pinned production bootstrap subprocess adapters > rejects a writable pinned dependency (mode=509) 1472ms
+   ✓ pinned production bootstrap subprocess adapters > rejects a writable pinned dependency (mode=455) 504ms
+   ✓ pinned production bootstrap subprocess adapters > reads one complete official snapshot using only readonly sandbox CLI commands and allowlisted environment 712ms
+   ✓ pinned production bootstrap subprocess adapters > observes and CAS-pushes the exact task ref through a real bare remote (existing=false) 1042ms
+   ✓ pinned production bootstrap subprocess adapters > observes and CAS-pushes the exact task ref through a real bare remote (existing=true) 1075ms
+   ✓ pinned production bootstrap subprocess adapters > ignores hostile repository config, URL rewrites and local pre-push hooks 689ms
+   ✓ pinned production bootstrap subprocess adapters > rejects a valid but unapproved local commit and a provider-side CAS race 936ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: kind 459ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: workspaceRoot 451ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: repository 441ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: remoteName 468ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: remoteUrl 450ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: ref 456ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: expectedOldSha 459ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: newSha 438ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: extra 444ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: kind 427ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: workspaceRoot 439ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: taskId 457ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: extra 454ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a redirect Beads subprocess response 619ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a wrong-task Beads subprocess response 638ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a wrong-project Beads subprocess response 648ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a failure Beads subprocess response 572ms
+   ✓ pinned production bootstrap subprocess adapters > rejects modified dependencies, oversized input, malformed JSON and CLI arguments 776ms
+   ✓ pinned production bootstrap subprocess adapters > rejects traversal and symlinked deployment parents before creating a bundle 727ms
+   ✓ pinned production bootstrap subprocess adapters > uses canonical nested destinations and never follows an existing destination symlink 359ms
+   ✓ pinned production bootstrap subprocess adapters > confines deployment to the default or explicitly trusted root 651ms
+   ✓ pinned production bootstrap subprocess adapters > validates CLI config files and rejects symlinks and relative escapes 522ms
+ ✓ test/specialistOutputManifest.test.ts (66 tests) 217ms
+ ↓ test/activeSpecialistSettlement.integration.test.ts (4 tests | 4 skipped)
+ ✓ test/specialistContainerLifecycle.test.ts (52 tests) 14ms
+ ✓ test/implementationImport.test.ts (33 tests) 33387ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > preserves concurrent destination symlink replacement in the original checkout 1553ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > preserves concurrent ancestor symlink replacement in the original checkout 1645ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > preserves a same-inode editor write during modify import 1789ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > preserves a same-inode editor write during delete import 1592ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > fails closed after restart with a missing registered workspace 936ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > fails closed after restart with a replaced registered workspace 957ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > fails closed after restart with a symlinked registered workspace 958ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > does not inherit host hooks, credentials, ignored files or hardlinked source 1521ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > imports verified bytes, advances the exact base and replays without another commit 2097ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_prepare without duplicate effects 1877ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_head_apply without duplicate effects 1897ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_apply without duplicate effects 2029ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_prepare 1988ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_head_apply 2041ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_apply 2041ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > retains prepared evidence and refuses uncertain partial application 1575ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects concurrent source drift and revoked authority before any writes 328ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > refuses deletion of ignored host files absent from the approved base 339ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects another checked-out branch even at the approved commit 363ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects a symlink source without importing 332ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects a hardlink source without importing 394ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rechecks authority when reconciling an already verified import 1516ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > imports a new regular file under newly created parent directories 1975ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects forged content, missing prior digest, and unsupported file types 368ms
+ ✓ test/continuationWorker.test.ts (15 tests) 3855ms
+   ✓ durable continuation watchdog > accepts an eventual immutable callback after watchdog acceptance and consumes the next action once 410ms
+   ✓ durable continuation watchdog > attaches a callback when completion is retried after the result transaction survived a restart 305ms
+   ✓ durable continuation watchdog > recovers a missed completion intent, defers missing callback, then consumes eventual callback once 365ms
+ ✓ test/secureEvidence.test.ts (26 tests) 319ms
+ ✓ test/runDiscovery.test.ts (18 tests) 1066ms
+   ✓ canonical discovery and atomic admission > does not mutate database bytes during canonical lookup or readonly store inspection 603ms
+Preparing worktree (new branch 'task/delivery-feature.7')
+ ✓ test/gitDeliveryPort.test.ts (8 tests) 2673ms
+   ✓ LocalGitDeliveryPort > commits the verified task worktree and rejects changed normative blobs in an adopted tree 1056ms
+   ✓ LocalGitDeliveryPort > creates and recovers an exact-tree commit without executing hooks 397ms
+   ✓ LocalGitDeliveryPort > performs a fast-forward CAS push through the narrow remote client 409ms
+ ✓ test/githubDeliveryPort.test.ts (11 tests) 10ms
+ ✓ test/localCredentialBroker.test.ts (13 tests) 695ms
+   ✓ satisfies CLI protocol without returning a worker token on stdout 502ms
+ ✓ test/authorization.test.ts (19 tests) 15ms
+ ↓ test/specialistContainerLifecycle.integration.test.ts (3 tests | 3 skipped)
+ ↓ test/supervisedReviewCapabilities.integration.test.ts (3 tests | 3 skipped)
+ ✓ test/specialistLauncher.test.ts (8 tests) 22ms
+ ↓ test/implementationImport.integration.test.ts (2 tests | 2 skipped)
+ ✓ test/preapprovalMaterial.test.ts (49 tests) 53ms
+ ✓ test/planning.test.ts (8 tests) 2129ms
+   ✓ planning maker-checker gate > requires every correction to have a disposition before approval 339ms
+   ✓ planning maker-checker gate > invalidates approval on policy_digest_changed 324ms
+   ✓ planning maker-checker gate > invalidates approval on material_plan_changed 324ms
+   ✓ planning maker-checker gate > invalidates approval on material_plan_changed 324ms
+ ✓ test/cancellationWork.test.ts (4 tests) 1082ms
+   ✓ cancellation owns asynchronous outbox fencing > refuses a pending approval transport rather than inventing cancellation acknowledgement 309ms
+ ✓ test/continuationNotifications.test.ts (6 tests) 1612ms
+   ✓ durable human visibility outbox > records one handoff and one next action despite duplicate callbacks and acknowledgements 308ms
+ ↓ test/roleTools.integration.test.ts (12 tests | 12 skipped)
+ ✓ test/continuationProcess.test.ts (12 tests) 5400ms
+   ✓ production process continuation release gate > consumes feature_planner completion exactly once in a real parent process with no user turn 442ms
+   ✓ production process continuation release gate > consumes plan_critic completion exactly once in a real parent process with no user turn 420ms
+   ✓ production process continuation release gate > consumes repo_explorer completion exactly once in a real parent process with no user turn 427ms
+   ✓ production process continuation release gate > consumes implementation_worker completion exactly once in a real parent process with no user turn 421ms
+   ✓ production process continuation release gate > consumes code_reviewer completion exactly once in a real parent process with no user turn 417ms
+   ✓ production process continuation release gate > consumes test_runner completion exactly once in a real parent process with no user turn 438ms
+   ✓ production process continuation release gate > consumes qa_evaluator completion exactly once in a real parent process with no user turn 455ms
+   ✓ production process continuation release gate > consumes feature_evaluator completion exactly once in a real parent process with no user turn 459ms
+   ✓ production process continuation release gate > startup watchdog recovers result persistence without a callback or live original coordinator 421ms
+   ✓ production process continuation release gate > watchdog bounds acceptance from a real host process that never starts the parent 753ms
+   ✓ production process continuation release gate > retries a real busy host then consumes its actual parent process exactly once 672ms
+ ✓ test/localCredentialGateway.test.ts (7 tests) 166ms
+ ✓ test/waitRecovery.test.ts (1 test) 1229ms
+   ✓ PipelineWaitRecoveryDriver > restarts a committed repair-child wait and completes it at the exact head 1229ms
+ ✓ test/lifecycle.test.ts (8 tests) 6ms
+ ✓ test/featureDeliveryContracts.test.ts (12 tests) 6ms
+ ↓ test/roleEnforcement.integration.test.ts (13 tests | 13 skipped)
+ ✓ test/schedulerCompletionContention.test.ts (3 tests) 1000ms
+   ✓ scheduler completion writer reservation > samples default time after obtaining the writer reservation and preserves explicit timestamps 306ms
+   ✓ scheduler completion writer reservation > excludes a peer WAL commit after the first read and preserves exactly-once replay 366ms
+   ✓ scheduler completion writer reservation > rolls back terminal state and continuation when callback validation fails 328ms
+ ↓ test/isolation.integration.test.ts (4 tests | 4 skipped)
+ ✓ test/runAdmissionRepair.test.ts (7 tests) 2198ms
+   ✓ serializes process-level repair reservation versus run admission after both observe absence 390ms
+   ✓ rechecks cancel after a competing process changes authority before transaction acquisition 303ms
+   ✓ rechecks workspace after a competing process changes authority before transaction acquisition 314ms
+   ✓ rechecks run after a competing process changes authority before transaction acquisition 311ms
+   ✓ rechecks task after a competing process changes authority before transaction acquisition 314ms
+ ✓ test/stateMachine.test.ts (17 tests) 9ms
+ ✓ test/planningDocuments.test.ts (12 tests) 54ms
+ ✓ test/integrationGate.test.ts (4 tests) 55ms
+ ✓ test/sourceGit.test.ts (9 tests) 4516ms
+   ✓ publishes an exact-head transaction only after preparing its ref locks 473ms
+   ✓ does not send commit when a started transaction cannot prepare before the deadline 1507ms
+   ✓ reports uncertain publication when the commit acknowledgement is lost 1509ms
+ ✓ test/prePushIsolation.test.ts (4 tests) 2673ms
+   ✓ pre-push Git environment isolation > preserves state: exit +0, full environment false 707ms
+   ✓ pre-push Git environment isolation > preserves state: exit 23, full environment false 615ms
+   ✓ pre-push Git environment isolation > preserves state: exit +0, full environment true 635ms
+   ✓ pre-push Git environment isolation > preserves state: exit 23, full environment true 715ms
+ ✓ test/supervisedReviewLifecycle.test.ts (6 tests) 30ms
+ ✓ test/bootstrapPolicy.test.ts (3 tests) 913ms
+   ✓ bootstrap Git identity and independent content comparison > matches Git tree IDs and the existing manifest without writing the index or objects 389ms
+ ✓ test/roleEnforcement.test.ts (4 tests) 15ms
+{"serviceId":"4af9fb32-5284-460e-93c5-a58e3c39f871","code":"docker_unavailable","observedAtMs":1790535789322,"recoveryAction":"inspect development-status; use development-recover after resolving the reported cause"}
+{"serviceId":"30ab4823-6be4-4020-bd6d-352e027f0de9","code":"image_unavailable","observedAtMs":1790535789333,"recoveryAction":"inspect development-status; use development-recover after resolving the reported cause"}
+{"serviceId":"b4f75390-ddda-4571-b8c7-8529c48a157f","code":"topology_invalid","observedAtMs":1790535789341,"recoveryAction":"inspect development-status; use development-recover after resolving the reported cause"}
+{"serviceId":"8512f32d-b03e-406d-b5c9-a1cfbc3666be","code":"topology_invalid","observedAtMs":1790535789360,"recoveryAction":"inspect development-status; use development-recover after resolving the reported cause"}
+ ✓ test/developmentHostFailures.test.ts (4 tests) 54ms
+ ✓ test/contracts.test.ts (7 tests) 5ms
+ ✓ test/supervisedReview.test.ts (7 tests) 17ms
+ ✓ test/reviewProxyStreams.test.ts (3 tests) 27ms
+ ✓ test/coordinatorTransport.test.ts (5 tests) 884ms
+   ✓ terminates forked descendants on abort before accepting another operation 780ms
+ ✓ test/artifacts.test.ts (5 tests) 57ms
+ ✓ test/executionInterruptions.test.ts (4 tests) 8ms
+ ✓ test/reviewProxy.test.ts (19 tests) 17ms
+ ↓ test/supervisedReview.integration.test.ts (1 test | 1 skipped)
+ ✓ test/mcpServer.test.ts (1 test) 22ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 17 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > reconciles a real commit effect with a lost acknowledgement under a new owner
+AssertionError: expected '8851a9a1fa00dc95de96e044d102abd6dcc2f…' not to be '8851a9a1fa00dc95de96e044d102abd6dcc2f…' // Object.is equality
+ ❯ test/bootstrap.test.ts:359:24
+    357|       ).toEqual([{ kind: `git.${effect}`, status: 'prepared' }]);
+    358|       const head = git(f.source, ['rev-parse', 'HEAD']);
+    359|       expect(head).not.toBe(f.policy.initialHeadSha);
+       |                        ^
+    360|       if (effect === 'push') expect(git(f.remote, ['rev-parse', f.poli…
+    361|       f.expire();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/17]⎯
+
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > reconciles a real push effect with a lost acknowledgement under a new owner
+AssertionError: expected [ { kind: 'git.commit', …(1) } ] to deeply equal [ { kind: 'git.push', …(1) } ]
+
+- Expected
++ Received
+
+  Array [
+    Object {
+-     "kind": "git.push",
++     "kind": "git.commit",
+      "status": "prepared",
+    },
+  ]
+
+ ❯ test/bootstrap.test.ts:357:9
+    355|       expect(
+    356|         raw.prepare("SELECT kind,status FROM delivery_operations WHERE…
+    357|       ).toEqual([{ kind: `git.${effect}`, status: 'prepared' }]);
+       |         ^
+    358|       const head = git(f.source, ['rev-parse', 'HEAD']);
+    359|       expect(head).not.toBe(f.policy.initialHeadSha);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/17]⎯
+
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > rejects lease expiry during the final commit observation before dispatch
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > rejects lease expiry during the final push observation before dispatch
+AssertionError: expected [Function] to throw error including 'fence' but got 'owned workspace document identity mis…'
+
+Expected: "fence"
+Received: "owned workspace document identity mismatch"
+
+ ❯ test/bootstrap.test.ts:453:7
+    451|         },
+    452|       );
+    453|       await expect(coordinator.commitAndPush()).rejects.toThrow('fence…
+       |       ^
+    454|       expect(expired).toBe(true);
+    455|       expect(pushes).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/17]⎯
+
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > rejects a successor takeover during push observation before any remote dispatch
+AssertionError: expected [Function] to throw error including 'fence' but got 'owned workspace document identity mis…'
+
+Expected: "fence"
+Received: "owned workspace document identity mismatch"
+
+ ❯ test/bootstrap.test.ts:501:5
+    499|       },
+    500|     );
+    501|     await expect(coordinator.commitAndPush()).rejects.toThrow('fence');
+       |     ^
+    502|     expect(pushes).toBe(0);
+    503|     successor.close();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/17]⎯
+
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > reopens cancellation after approval invalidation without allowing execution
+Error: owned workspace document identity mismatch
+ ❯ new LocalGitDeliveryPort src/gitDeliveryPort.ts:135:13
+    133|       input.ownedSourceRoot &&
+    134|       input.documents &&
+    135|       realpathSync(input.documents.sourceRoot) !== this.#workspaceRoot
+       |             ^
+    136|     )
+    137|       throw new Error('owned workspace document identity mismatch');
+ ❯ LocalGitDeliveryPort.#forDocuments src/gitDeliveryPort.ts:247:18
+ ❯ LocalGitDeliveryPort.observe src/gitDeliveryPort.ts:280:32
+ ❯ DurableDeliveryBroker.#observeDelivery src/deliveryBrokers.ts:976:23
+ ❯ DurableDeliveryBroker.execute src/deliveryBrokers.ts:550:31
+ ❯ BootstrapCoordinator.commitAndPush src/bootstrap.ts:386:33
+ ❯ test/bootstrap.test.ts:509:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/17]⎯
+
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases
+Error: owned workspace document identity mismatch
+ ❯ new LocalGitDeliveryPort src/gitDeliveryPort.ts:135:13
+    133|       input.ownedSourceRoot &&
+    134|       input.documents &&
+    135|       realpathSync(input.documents.sourceRoot) !== this.#workspaceRoot
+       |             ^
+    136|     )
+    137|       throw new Error('owned workspace document identity mismatch');
+ ❯ LocalGitDeliveryPort.#forDocuments src/gitDeliveryPort.ts:247:18
+ ❯ LocalGitDeliveryPort.observe src/gitDeliveryPort.ts:280:32
+ ❯ DurableDeliveryBroker.#observeDelivery src/deliveryBrokers.ts:976:23
+ ❯ DurableDeliveryBroker.execute src/deliveryBrokers.ts:550:31
+ ❯ BootstrapCoordinator.commitAndPush src/bootstrap.ts:386:33
+ ❯ test/bootstrap.test.ts:536:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/17]⎯
+
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > still rejects direct github secret patterns inside an approved bootstrap producer
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > still rejects direct openai secret patterns inside an approved bootstrap producer
+AssertionError: expected [Function] to throw error including 'bootstrap attestation was redacted' but got 'owned workspace document identity mis…'
+
+Expected: "bootstrap attestation was redacted"
+Received: "owned workspace document identity mismatch"
+
+ ❯ test/bootstrap.test.ts:646:9
+    644|       const coordinator = BootstrapCoordinator.create(f.database, 'boo…
+    645|       try {
+    646|         await expect(coordinator.commitAndPush()).rejects.toThrow(
+       |         ^
+    647|           'bootstrap attestation was redacted',
+    648|         );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/17]⎯
+
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > recovers response loss at after_task_observation without duplicate transitions or push
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > recovers response loss at after_candidate_adoption without duplicate transitions or push
+Error: owned workspace document identity mismatch
+ ❯ new LocalGitDeliveryPort src/gitDeliveryPort.ts:135:13
+    133|       input.ownedSourceRoot &&
+    134|       input.documents &&
+    135|       realpathSync(input.documents.sourceRoot) !== this.#workspaceRoot
+       |             ^
+    136|     )
+    137|       throw new Error('owned workspace document identity mismatch');
+ ❯ LocalGitDeliveryPort.#forDocuments src/gitDeliveryPort.ts:247:18
+ ❯ LocalGitDeliveryPort.observe src/gitDeliveryPort.ts:280:32
+ ❯ DurableDeliveryBroker.#observeDelivery src/deliveryBrokers.ts:976:23
+ ❯ DurableDeliveryBroker.execute src/deliveryBrokers.ts:550:31
+ ❯ BootstrapCoordinator.commitAndPush src/bootstrap.ts:386:33
+ ❯ test/bootstrap.test.ts:720:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/17]⎯
+
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > recovers response loss at after_commit without duplicate transitions or push
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > recovers response loss at after_push without duplicate transitions or push
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > recovers response loss at after_attestation without duplicate transitions or push
+AssertionError: expected [Function] to throw error including 'response lost' but got 'owned workspace document identity mis…'
+
+Expected: "response lost"
+Received: "owned workspace document identity mismatch"
+
+ ❯ test/bootstrap.test.ts:711:7
+    709|         },
+    710|       );
+    711|       await expect(first.commitAndPush()).rejects.toThrow('response lo…
+       |       ^
+    712|       first.close();
+    713|       f.expire();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/17]⎯
+
+ FAIL  test/bootstrap.test.ts > approved bootstrap task artifact production composition > does not fabricate an artifact receipt when owned work remains
+AssertionError: expected [Function] to throw error including 'settled published head' but got 'owned workspace document identity mis…'
+
+Expected: "settled published head"
+Received: "owned workspace document identity mismatch"
+
+ ❯ test/bootstrap.test.ts:861:5
+    859|     journal.close();
+    860|     const coordinator = BootstrapCoordinator.create(f.database, 'boots…
+    861|     await expect(coordinator.commitAndPush()).rejects.toThrow('settled…
+       |     ^
+    862|     const raw = new Database(f.database);
+    863|     expect(raw.prepare('SELECT attestation_digest,status FROM bootstra…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/17]⎯
+
+ FAIL  test/phaseJobs.test.ts > retains coordinator identity for bounded recovery and blocks after its fixed budget
+TypeError: f.phases.deferCoordinator is not a function
+ ❯ test/phaseJobs.test.ts:779:12
+    777|   f.consume();
+    778|   const job = f.phases.start(f.phases.claim('owner', 60000, f.now)!, f…
+    779|   f.phases.deferCoordinator(job, 1, f.now);
+       |            ^
+    780|   expect(f.phases.get(job.id)?.status).toBe('started');
+    781|   expect(f.phases.claimRecovery('next-owner', 60000, f.now + 999)).toB…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/17]⎯
+
+ FAIL  test/storage.test.ts > WorkflowStore > uses CAS versions, idempotency keys, and fenced commits
+AssertionError: expected [Function] to throw error including 'already has a prepared transition' but got 'document_lease_stale'
+
+Expected: "already has a prepared transition"
+Received: "document_lease_stale"
+
+ ❯ test/storage.test.ts:262:7
+    260|         }),
+    261|       ),
+    262|     ).toThrow('already has a prepared transition');
+       |       ^
+    263|     expect(() => store.commitTransition(input.id, 'other', input.lease…
+    264|       'document_lease_stale',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/17]⎯
+
+ Test Files  3 failed | 54 passed | 9 skipped (66)
+      Tests  17 failed | 1053 passed | 65 skipped (1135)
+   Start at  19:54:44
+   Duration  507.22s (transform 753ms, setup 0ms, collect 4.77s, tests 495.15s, environment 6ms, prepare 1.82s)
+
+/Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @agent-platform/workflow-control@0.0.0 test: `pnpm build && vitest run "--no-file-parallelism"`
+Exit status 1

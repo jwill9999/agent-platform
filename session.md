@@ -8,26 +8,29 @@ The owner authorized completing R2 governed import and R3 coordinator completion
 [Draft PR278](https://github.com/jwill9999/agent-platform/pull/278) preserves the work.
 Supervised prerequisite mode applies. No pilot, merge or staging promotion is authorized here.
 
-The [draft qualification report](docs/reviews/artifact-import-coordinator-qualification.md)
-records changes, executed checks and remaining gaps. R2 has a real-container controlled-transport
-import pass, but concurrent host edits remain an unresolved high-severity finding. A broker-owned
-isolated import workspace is recommended; the owner decision is pending. Git deadline/ref-lock
-repairs passed focused tests and narrow independent review, with commit-dispatch versus publication
-deadline semantics explicitly retained as a limitation. R3 receipt/dispatch composition is a
-compiling draft, not a completed coordinator journey. Repair, feature evaluation, delivery/finalization
-and recovery coverage remain outstanding. Build/lint/type checks pass; the full suite passed
-1,054 tests with 64 skipped. Real-container import passed again after the deadline fix. The initial
-hosted dependency-cycle failure was fixed locally; new-head hosted checks remain pending.
-The later Sonar refactor passes 215 focused tests and 29 storage/container tests, plus build/lint;
-Sonar's gate passed on `f15147e` and the remaining minor readability finding was corrected afterward.
-The 1,054-test full run predates that refactor. Entire-composition independent review is outstanding.
-Task-owned reviewer gateway/networks are cleaned up. The workspace decision was sent by iMessage.
-Do not mark either requirement complete or the branch merge-ready. Beads `.17` stays in progress;
-`.13` and the live pilot remain blocked. The earlier pilot-delivery question does not block current
-fixture qualification. Notion alignment is still separately deferred.
+The owner approved the broker-private import workspace. That decision is no longer pending.
+R2 now imports into a registered independent clone, preserves original source files and the published
+CAS head, and uses the private source for subsequent verification/review and delivery. Missing,
+replaced or symlinked owned workspaces fail closed. Review 9 found no confirmed R2 code defect;
+requested registry and private-object push tests pass. Real Docker controlled-response tests passed
+single import and continuous implement → verify → review. This stops at task acceptance, not R3 completion.
 
-Resume from the report and live Beads. Preserve the pending workspace ownership decision, resolve
-that boundary before redesigning import, then complete R2/R3 and their independent/connected checks.
+The [draft qualification report](docs/reviews/artifact-import-coordinator-qualification.md) retains
+failed and passing evidence. Review 10 found five R3 defects; current fixes cover parent-SHA policy,
+bounded durable retry, pipeline recovery, repeated finding identity and closeout renewal. Follow-up
+review is underway. Fifty-five queue/process and 29 repair tests pass. Initial full regression found
+bootstrap source/owned identity confusion (fixed; 65 bootstrap/storage tests pass), a module-editing
+race, and a short lease in a storage identity test (fresh 28 storage tests pass). A fresh full run and
+current-head hosted checks remain required; do not quote earlier full results as final-head evidence.
+
+R3 is still incomplete: repair planning/child creation and the approved integrated-feature delivery/
+finalization sequence require composition and connected SP-11/SP-13 tests. Preserve all approval and
+role boundaries; do not bypass the mandatory feature-delivery contract to obtain fixture success.
+Continue under existing owner authorization; no new workspace decision or implementation permission
+is needed. PR278 remains draft, `.17` in progress and `.13`/live pilot blocked. No merge or staging.
+The separate Notion alignment task remains deferred. Review gateway cleanup and publication state
+must be verified before claiming session completion.
+
 The historical entries below retain their original evidence and may describe superseded statuses.
 
 ---

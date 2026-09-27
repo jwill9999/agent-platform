@@ -2,6 +2,8 @@ import {
   StandaloneCoordinators,
   standaloneCoordinatorConfigSchema,
 } from './standaloneCoordinators.js';
+import { repairDispatchPacketSchema } from './repairLoops.js';
+import { ContractEvaluator } from './featureEvaluation.js';
 import { TrustedSourceGit } from './sourceGit.js';
 import { withinCleanupDeadline } from './executionInterruptions.js';
 import { modelGatewayConfigSchema } from './modelGatewayConfig.js';
@@ -111,6 +113,11 @@ function phaseTerminalStatus(
     );
     return 'continue';
   } catch {
+    if (
+      (phase === 'task_verification' || phase === 'task_review') &&
+      !terminal.findings[0]?.repairHypothesis?.trim()
+    )
+      return 'blocked';
     return 'repair';
   }
 }
@@ -263,6 +270,7 @@ export class StandalonePhaseRuntime {
           store,
           ownerId: owner,
           sourceRoot,
+          executionSourceRoot: (runId) => store.getImplementationWorkspace(runId, sourceRoot),
           image: config.image,
           credentialBroker: broker,
           egressNetwork: config.egressNetwork,
@@ -272,7 +280,11 @@ export class StandalonePhaseRuntime {
         cleanupOnly,
         verifySource: async (action, paths) => {
           if (!gitPin) throw new Error('cleanup_only_runtime');
-          const repository = new TrustedSourceGit(sourceRoot, gitPin.path, gitPin.digest);
+          const repository = new TrustedSourceGit(
+            store.getImplementationWorkspace(config.runId, sourceRoot),
+            gitPin.path,
+            gitPin.digest,
+          );
           repository.assertClean(paths);
           if (repository.run(['rev-parse', 'HEAD']).toString().trim() !== action.headSha)
             throw new Error('phase_source_head_or_tree_stale');
@@ -455,7 +467,8 @@ export class StandalonePhaseRuntime {
     if (
       action.phase !== 'implementing' &&
       action.phase !== 'task_verification' &&
-      action.phase !== 'task_review'
+      action.phase !== 'task_review' &&
+      action.phase !== 'feature_evaluation'
     )
       throw new Error('phase_executor_unavailable');
     const task = this.#contract.tasks.find((item) => item.id === action.taskId);
@@ -488,6 +501,22 @@ export class StandalonePhaseRuntime {
       retryBudget: this.#contract.retryPolicy,
       evidence: [],
     };
+    if (action.phase === 'implementing') {
+      const active = this.#store.listActiveRepairDispatches(action.runId, action.taskId);
+      if (active.length > 1) throw new Error('ambiguous_active_repair');
+      if (active[0]) {
+        const repair = repairDispatchPacketSchema.parse(active[0].packet);
+        if (repair.failureHeadSha !== action.headSha)
+          throw new Error('repair_context_head_mismatch');
+        packet.repairContext = {
+          dispatchId: repair.dispatchId,
+          failureHeadSha: repair.failureHeadSha,
+          summary: repair.summary,
+          hypothesis: repair.hypothesis,
+        };
+        packet.evidence = repair.evidence;
+      }
+    }
     if (
       !packet.allowedOperations.includes('workspace.read') ||
       (role === 'test_runner' && !packet.allowedOperations.includes('process.test'))
@@ -553,11 +582,14 @@ export class StandalonePhaseRuntime {
       const job = this.#journal.start(claim, Date.now());
       return await this.#runCoordinator(job, action, fences);
     } catch {
-      this.#journal.block(
-        this.#journal.get(claim.id)!,
-        'phase_coordinator_reconciliation_required',
-        Date.now(),
-      );
+      const current = this.#journal.get(claim.id)!;
+      if (current.status === 'started')
+        this.#journal.deferCoordinator(
+          current,
+          this.#contract.retryPolicy.infrastructureAttempts,
+          Date.now(),
+        );
+      else this.#journal.block(current, 'phase_coordinator_admission_failed', Date.now());
       return false;
     }
   }
@@ -580,6 +612,14 @@ export class StandalonePhaseRuntime {
       return false;
     }
     const job = this.#journal.start(claim, Date.now());
+    if (action.phase === 'implementing') {
+      try {
+        this.#journal.reserveImplementationAttempt(job, Date.now());
+      } catch {
+        this.#journal.block(job, 'phase_implementation_attempt_rejected', Date.now());
+        return false;
+      }
+    }
     let heartbeatError: unknown;
     let cancellation: Promise<void> | undefined;
     const heartbeat = setInterval(
@@ -825,7 +865,8 @@ export class StandalonePhaseRuntime {
           this.#journal.renew(job, this.#config.leaseTtlMs, Date.now());
           this.#fences(action);
         } catch {
-          /* Every effect and completion repeats authority checks. */
+          // Stop in-flight adapter/check processes when their authority expires.
+          this.#coordinators?.abort();
         }
       },
       Math.floor(this.#config.leaseTtlMs / 3),
@@ -884,6 +925,48 @@ export class StandalonePhaseRuntime {
     if (resultEvidence.reference.digest !== digestGovernedValue(result))
       throw new Error('phase_result_evidence_redacted');
     const terminalStatus = phaseTerminalStatus(terminal, packet, action.phase);
+    if (
+      (action.phase === 'task_verification' || action.phase === 'task_review') &&
+      terminalStatus === 'continue'
+    ) {
+      if (
+        this.#store.listActiveRepairDispatches(action.runId, action.taskId).length &&
+        !this.#coordinators
+      )
+        throw new Error('repair_acceptance_coordinator_unavailable');
+      this.#coordinators?.acceptRepairResult(
+        action,
+        {
+          ownerId: this.#owner,
+          workspaceLeaseEpoch: fences.workspace,
+          runLeaseEpoch: fences.run,
+          taskLeaseEpoch: fences.task,
+        },
+        terminal,
+        resultEvidence.reference,
+      );
+    }
+    if (action.phase === 'feature_evaluation' && terminalStatus !== 'blocked') {
+      new ContractEvaluator({ store: this.#store, contract: this.#contract }).evaluate({
+        workspaceId: action.workspaceId,
+        runId: action.runId,
+        taskId: action.taskId,
+        headSha: resultHead,
+        contractVersion: action.contractVersion,
+        policyDigest: action.policyDigest,
+        evaluatorRole: packet.assignedRole,
+        summary: terminal.summary,
+        criteria: packet.acceptanceCriteria.map((criterion) => ({
+          criterion,
+          status:
+            terminalStatus === 'continue' && terminal.acceptanceCriteria.passed.includes(criterion)
+              ? 'passed'
+              : 'failed',
+          summary: terminal.summary,
+          evidence: [resultEvidence.reference],
+        })),
+      });
+    }
     const identity = {
       kind: 'workflow.delegate_callback' as const,
       workspaceId: action.workspaceId,
@@ -1043,8 +1126,15 @@ export class StandalonePhaseRuntime {
       if (PHASE_JOB_DISPATCH[action.phase].endsWith('_coordinator')) {
         try {
           await this.#runCoordinator(job, action, this.#fences(action));
-        } catch {
-          this.#journal.block(job, 'phase_coordinator_reconciliation_required', Date.now());
+        } catch (error) {
+          if (error instanceof Error && error.message === 'resource lease is held by another owner')
+            this.#journal.deferCoordinatorAdmission(job, Date.now());
+          else
+            this.#journal.deferCoordinator(
+              job,
+              this.#contract.retryPolicy.infrastructureAttempts,
+              Date.now(),
+            );
         }
         return;
       }
@@ -1105,7 +1195,7 @@ export class StandalonePhaseRuntime {
     if (this.#closing) throw new Error('phase_runtime_closing');
     // A recovery may observe a prepared or applied head; pin Git before any import mutation.
     const recoveryGit = new TrustedSourceGit(
-      this.#config.sourceRoot,
+      this.#store.getImplementationWorkspace(this.#config.runId, this.#config.sourceRoot),
       this.#config.gitBinary,
       this.#config.gitBinaryDigest,
     );

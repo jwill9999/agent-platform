@@ -2,6 +2,7 @@ import { queryRunInventory } from './runDiscovery.js';
 import {
   initializeImplementationImports,
   importImplementationOutput,
+  implementationWorkspace,
 } from './implementationImport.js';
 import { assertTaskPacketWithinContract } from './contracts.js';
 import { specialistInputEnvelopeSchema } from './specialistInput.js';
@@ -2725,6 +2726,12 @@ export class WorkflowStore {
     ) {
       throw new Error('approved evaluation-head verification requires an internal capability');
     }
+    // Initial evaluation is of the approved task head. A required future feature-delivery
+    // intent is not yet authority for an integrated head; finalizing retains that stronger gate.
+    if (this.getRun(input.runId)?.state === 'feature_evaluation') {
+      this.assertApprovedTaskHead(input, capability);
+      return;
+    }
     const featureContract = this.getApprovedFeatureDeliveryContract(input.runId);
     if (featureContract !== undefined) {
       const parsed = featureDeliveryContractSchema.parse(featureContract);
@@ -3939,7 +3946,7 @@ export class WorkflowStore {
         for (const table of ['delivery_approved_heads', 'repair_approved_heads']) {
           changed += this.#database
             .prepare(
-              `UPDATE ${table} SET current_sha=?, published_sha=NULL,
+              `UPDATE ${table} SET current_sha=?,
             import_execution_id=?,updated_at_ms=? WHERE workspace_id=? AND run_id=? AND task_id=?
             AND ref=? AND (current_sha=? OR (current_sha=? AND import_execution_id=?))`,
             )
@@ -4134,6 +4141,10 @@ export class WorkflowStore {
 
     return imported;
   }
+  getImplementationWorkspace(runId: string, sourceRoot: string): string {
+    return implementationWorkspace(this.#database, runId, sourceRoot);
+  }
+
   getImplementationImport(
     executionId: string,
   ): { artifactDigest: string; status: string } | undefined {
@@ -4888,6 +4899,15 @@ export class WorkflowStore {
     })();
   }
 
+  listActiveRepairDispatches(runId: string, taskId: string): RepairDispatchRecord[] {
+    const rows = this.#database
+      .prepare(
+        "SELECT id FROM repair_dispatches WHERE run_id=? AND task_id=? AND status='dispatched' ORDER BY created_at_ms,id",
+      )
+      .all(runId, taskId) as { id: string }[];
+    return rows.map((row) => this.getRepairDispatch(row.id)!);
+  }
+
   getRepairDispatch(id: string): RepairDispatchRecord | undefined {
     const row = this.#database.prepare('SELECT * FROM repair_dispatches WHERE id = ?').get(id) as
       | RepairDispatchRow
@@ -4929,9 +4949,20 @@ export class WorkflowStore {
       if (before === undefined) throw new Error('repair dispatch not found');
       this.#assertRepairMutationLeases(before, input, nowMs);
       const run = this.getRun(before.runId);
-      if (run?.state !== 'repair' && run?.state !== 'repair_planning') {
-        throw new Error('run is not in a repair state');
-      }
+      const handedOff = this.#database
+        .prepare(
+          `SELECT 1 FROM transitions WHERE run_id=?
+        AND operation='internal.repair_dispatched' AND status='committed'
+        AND json_extract(external_arguments_json,'$.dispatchId')=?
+        AND json_extract(external_arguments_json,'$.taskId')=?`,
+        )
+        .get(before.runId, before.id, before.taskId);
+      if (
+        run?.state !== 'repair' &&
+        run?.state !== 'repair_planning' &&
+        !(handedOff && (run?.state === 'task_verification' || run?.state === 'task_review'))
+      )
+        throw new Error('run is not in a repair state or its verified handoff');
       input.assertExternalState();
       const verifiedAtMs = input.clock();
       this.#assertRepairMutationLeases(before, input, verifiedAtMs);

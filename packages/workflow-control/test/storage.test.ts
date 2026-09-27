@@ -227,6 +227,9 @@ describe('WorkflowStore', () => {
 
   it('uses CAS versions, idempotency keys, and fenced commits', async () => {
     const { store, input } = await createStore();
+    // This tests transition identity, not the separate short-lease expiry cases below.
+    store.acquireLease('workspace', contract.workspaceId, 'owner-1', 60000, 1000);
+    store.acquireLease('run', input.runId, 'owner-1', 60000, 1000);
     const prepared = store.prepareTransition(input);
     expect(prepared.status).toBe('prepared');
     expect(() =>

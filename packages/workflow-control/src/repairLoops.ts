@@ -1,3 +1,4 @@
+import { TrustedSourceGit } from './sourceGit.js';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
@@ -69,6 +70,7 @@ export const repairDispatchPacketSchema = z
     runId: identifierSchema,
     taskId: identifierSchema,
     findingId: identifierSchema,
+    canonicalFinding: repairFindingSchema.optional(),
     failureHeadSha: z.string().regex(/^[a-f0-9]{40}$/u),
     source: repairFailureSourceSchema,
     producerRole: workflowRoleSchema,
@@ -330,6 +332,35 @@ export class DurableRepairCoordinator {
     );
   }
 
+  static createForWorkflow(input: {
+    store: WorkflowStore;
+    contract: unknown;
+    ownerId: string;
+    fence: RepairFenceProvider;
+    workspaceRoot: string;
+    runId: string;
+    gitPin: { path: string; digest: string };
+  }): DurableRepairCoordinator {
+    const contract = executionContractSchema.parse(input.contract);
+    const canonical = realpathSync(input.workspaceRoot);
+    if (`sha256:${createHash('sha256').update(canonical).digest('hex')}` !== contract.workspaceId)
+      throw new Error('repair workspace root does not match the execution contract');
+    const root = input.store.getImplementationWorkspace(input.runId, canonical);
+    if (root === canonical) throw new Error('repair requires broker-owned workspace');
+    const git = new TrustedSourceGit(root, input.gitPin.path, input.gitPin.digest);
+    git.assertSafeIndex();
+    const verifier = new LocalGitRepairHeadVerifier(root, (args) => git.run([...args]).toString());
+    verifier.assertWorkspaceRoot(root);
+    return new DurableRepairCoordinator(
+      input.store,
+      contract,
+      input.ownerId,
+      input.fence,
+      verifier,
+      Date.now,
+    );
+  }
+
   static createForTest(input: {
     store: WorkflowStore;
     contract: unknown;
@@ -354,6 +385,7 @@ export class DurableRepairCoordinator {
   dispatch(input: {
     dispatchId: string;
     finding: unknown;
+    observation?: unknown;
     hypothesis: string;
     change: unknown;
   }): RepairDecision {
@@ -398,7 +430,24 @@ export class DurableRepairCoordinator {
         policyDigest: this.#contract.policyDigest,
         allowedProducerRoles,
       });
-    const failureEvidenceBindings = finding.evidence.map((reference) =>
+    const observation =
+      input.observation === undefined ? finding : repairFindingSchema.parse(input.observation);
+    for (const key of [
+      'id',
+      'runId',
+      'taskId',
+      'source',
+      'producerRole',
+      'acceptanceCriterion',
+    ] as const)
+      if (observation[key] !== finding[key])
+        throw new Error('repair observation changes finding identity');
+    const originalBindings = finding.evidence.map((reference) =>
+      evidenceCreatedAt(reference, [finding.producerRole]),
+    );
+    if (originalBindings.some((binding) => !binding))
+      throw new Error('repair finding references unbound producer evidence');
+    const failureEvidenceBindings = observation.evidence.map((reference) =>
       evidenceCreatedAt(reference, [finding.producerRole]),
     );
     if (failureEvidenceBindings.some((binding) => binding === undefined)) {
@@ -410,6 +459,16 @@ export class DurableRepairCoordinator {
     }
     const failureHeadSha = [...failureHeads][0]!;
     this.#headVerifier.assertCanonicalCommit(failureHeadSha);
+    if (input.observation !== undefined && findingDigest(observation) !== findingDigest(finding)) {
+      const originalHeads = new Set(originalBindings.map((binding) => binding!.headSha));
+      if (originalHeads.size !== 1) throw new Error('original repair finding spans heads');
+      this.#headVerifier.assertStrictDescendant([...originalHeads][0]!, failureHeadSha);
+      if (
+        Math.min(...failureEvidenceBindings.map((binding) => binding!.createdAtMs)) <=
+        Math.max(...originalBindings.map((binding) => binding!.createdAtMs))
+      )
+        throw new Error('repair observation is not newer than original finding');
+    }
     const changeEvidenceBindings = changedEvidence.map((reference) =>
       evidenceCreatedAt(reference, [ownerRole]),
     );
@@ -445,13 +504,14 @@ export class DurableRepairCoordinator {
         runId: finding.runId,
         taskId: finding.taskId,
         findingId: finding.id,
+        canonicalFinding: finding,
         failureHeadSha,
         source: finding.source,
         producerRole: finding.producerRole,
         ownerRole,
-        summary: finding.summary,
+        summary: observation.summary,
         acceptanceCriterion: finding.acceptanceCriterion,
-        evidence: finding.evidence,
+        evidence: observation.evidence,
         hypothesis: input.hypothesis.trim(),
         change: normalizedChange,
         remainingBudget: {

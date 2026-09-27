@@ -729,6 +729,7 @@ export interface DockerSpecialistLauncherOptions {
   store: WorkflowStore;
   ownerId: string;
   sourceRoot: string;
+  executionSourceRoot?: (runId: string) => string;
   image: string;
   credentialBroker: RevocableSpecialistCredentialBroker;
   egressNetwork: string;
@@ -884,7 +885,7 @@ export class DockerIsolatedSpecialistLauncher {
       this.#assertCanStart(reservation);
       const credentialBrokerGeneration = await this.#options.credentialBroker.assertConformant();
       const workspace = await prepareSpecialistWorkspace(
-        this.#options.sourceRoot,
+        this.#options.executionSourceRoot?.(packet.runId) ?? this.#options.sourceRoot,
         packet.allowedPaths,
       );
       stagingRoot = resolve(workspace.root, '..');

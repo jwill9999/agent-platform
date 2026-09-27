@@ -31,10 +31,30 @@ rejects filters and index flags that hide changes. Checked directory anchors pre
 redirection through symlink parents. Git ref publication uses a prepared transaction and checks the
 immutable deadline before the commit decision; lock acquisition is non-waiting.
 
-This does **not** yet guarantee exclusion of a concurrent editor or another host process writing
-the destination. Same-inode changes after inspection can be overwritten. Workflow leases exclude
-managed agents, not arbitrary filesystem writers. Independent review identified this as an
-unresolved high-severity finding. Do not advertise safe shared-checkout import or approve R2 yet.
+The owner approved changing workspace ownership after the concurrent-editor finding. Import now
+creates a broker-private checkout with independent source inodes, index and Git objects; it never
+rewrites the original checkout. The durable registry binds run/source/directory identity and recovery
+fails closed if that identity changes. Worker containers receive separate copies or bounded source
+evidence, never the broker checkout. Original document paths remain the approval authority. Git
+replacement refs and grafts are rejected; the last published SHA is retained for remote push CAS.
+
+This protects the original checkout from import overwrites; it is not a sandbox against a hostile
+same-UID host process or a Docker administrator. The broker workspace is retained for recovery and
+must not be manually edited. Missing or dirty recovery state blocks progress rather than being reset.
+
+New evidence: 33 importer tests pass, including concurrent same-inode editor writes during modification
+and deletion, symlink replacement, independent files and crash replay. A focused 71-test runtime,
+Git-delivery and coordinator-transport run passes. The real Docker qualification now passes both the
+single import and a continuously supervised implement → verify → review journey: the test runner reads
+the imported source, the reviewer receives that exact source through its bounded evidence input,
+and all three phases complete without a human restart. Controlled model transport/dummy credentials
+remain explicit. This does not qualify the later coordinators or the live pilot.
+
+Independent review 8 identified lost published-head CAS state, outdated fixture source assumptions
+and Git replacement metadata. Corrections are implemented. Review 9 found no confirmed actionable R2 defect under the stated
+private-workspace threat model. Its requested missing/replaced/symlinked registry and private-object
+CAS publication tests now pass. Per-command authority renewal also fixes an observed synchronous
+clone lease-expiry regression without extending the execution deadline.
 
 ## R3 implemented draft and missing qualification
 
@@ -44,16 +64,47 @@ The draft production composition connects existing task acceptance, exact-head i
 delivery and finalization classes through a pinned operator service adapter. The adapter has explicit
 configuration and an empty inherited environment; missing configuration blocks execution.
 
-This composition is incomplete. Repair handoff and later verified acceptance need consistent durable
-state; feature evaluation and repair planning are not enabled by the standalone packet path. Initial
-feature evaluation and evaluation of an integrated delivery head must retain their different approval
-requirements. The finalization path must satisfy the existing mandatory feature-delivery contract;
-it cannot bypass it to close a fixture. Pending/failed pipeline checks, uncertain external operations,
-coordinator restart and shutdown reconciliation still need connected coverage. Direct adapter process
-cancellation is tested; descendant-process containment and cancellation of gate commands are not.
-No live operator adapter has been qualified. No full R3 independent review or end-to-end pass exists.
+The current draft additionally connects bounded repair dispatch and verifier acceptance, task-head
+feature evaluation, persistent pipeline waits, prepared delivery reconciliation, bounded coordinator
+recovery and closeout lease renewal. Gate and adapter commands use abortable POSIX process groups.
+The trusted coordinator configuration must explicitly supply approved parent SHAs; no empty policy
+or inferred parent is accepted. Review 10 found five defects; fixes are implemented but follow-up
+review and connected qualification are not yet complete.
 
-## Executed evidence and limits
+Repeated repair keeps its canonical finding identity and budget while separately binding a newer
+failure observation to producer evidence and a descendant head. Finalization receipts reject reports
+for another run, feature, repository or task. Fifty-five queue/transport tests and 29 repair tests
+pass, including bounded recovery, stale-owner rejection and repeated-finding attempts. These are
+component tests, not the SP-11/SP-13 full production composition.
+
+This composition remains incomplete: repair planning/child dispatch, integrated-head evaluation,
+approved feature delivery and finalization are not yet composed end to end. The finalization path
+must satisfy the existing mandatory feature-delivery contract; it cannot bypass approval to close a
+fixture. Pipeline/recovery fixes still need production-composition crash tests. Process-group abort
+is tested with an ordinary descendant; hostile process escape is outside that guarantee. No live
+operator adapter or full R3 unattended cycle has been qualified.
+
+## Follow-up review 11
+
+The follow-up found five further boundaries: integration must use the configured approved parent;
+resource-lease contention must not consume coordinator recovery budget; retained successful checks
+must settle any existing durable wait and obey its deadline; a repair callback must contain an
+actionable hypothesis; and the initial implementation must consume its attempt budget.
+Draft fixes are in place. Initial execution reserves a durable attempt once; repair execution reuses
+its dispatch reservation. Non-actionable verifier results escalate before queuing repair, rather than
+looping on missing information. None of these changes waives the pending full composition tests.
+
+## Latest regression checkpoint
+
+The first broader private-workspace run reported 1,053 passed, 17 failed and 65 skipped. Fifteen
+failures exposed bootstrap source identity being incorrectly treated as owned-import identity;
+explicit ownership tracking fixes that regression and all 65 bootstrap/storage checks now pass.
+One queue test observed an older module during active editing; the isolated fresh 55-test run passes.
+The remaining storage identity test used a 100 ms lease while performing unrelated verification;
+its lease-expiry assertions are separate, and a longer fixture lease removes this timing dependency.
+All 28 storage tests pass independently. Retain the failed run; it is not final-head green evidence.
+
+## Earlier executed evidence and limits
 
 - Package build and lint pass; repository-wide type checks pass at this checkpoint.
 - The focused import/phase suite passed 73 tests, including one real Docker journey through the
@@ -89,21 +140,21 @@ present it as a new full-suite run at the final head. Current-head hosted checks
 No final independent review of the entire R2/R3 composition is claimed.
 
 Retained evidence snapshots live in the [evidence directory](evidence/artifact-import-coordinator/).
-Task-owned isolated-review gateway and its two networks were removed after review; other services
-were left untouched. Current-head hosted checks remain pending.
-Tests do not qualify staging, paid service latency, host editing races or unattended final delivery.
-The Sonar/Problems completion gate remains **blocked** by the unresolved import finding and missing
+Task-owned isolated-review gateway/networks are used only for bounded reviews. Their cleanup is
+recorded in the session handoff. Current-head hosted checks remain pending.
+Tests do not qualify staging, paid service latency, hostile host process isolation or unattended final delivery.
+The Sonar/Problems completion gate remains **blocked** by remaining R3 review/qualification and missing
 required connected coordinator coverage, even where individual build/lint/type/test checks pass.
 
 ## Decision and continuation boundary
 
-The owner has been asked whether to qualify a broker-owned isolated import workspace instead of
-rewriting a shared checkout. That changes workspace ownership and must not be silently assumed.
-The plan limits repeated repairs per finding; the concurrent-writer finding has reached escalation.
+The owner explicitly approved the broker-private import workspace change. No further ownership
+approval is pending. Continue the authorized R2/R3 qualification; the private workspace design
+preserves the original source identity and leaves shared-checkout contents untouched.
 A separate earlier question about the later pilot delivery target is not a blocker for disposable
 coordinator qualification and does not expand this repair's delivery authority.
 
-After the workspace decision, complete the bounded import design and its adversarial tests, finish
+Finish the independent workspace re-review, then finish
 coordinator composition and connected recovery/repair/finalization tests, rerun the exact changed
 source checks and independent review, then present a ready PR only when all required gates pass.
 Keep `.17` open and `.13` blocked. A draft checkpoint is preservation, not completion or approval.

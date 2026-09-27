@@ -62,7 +62,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-async function setup(executor: GateCommandExecutor) {
+async function setup(executor: GateCommandExecutor, approvedParentShas?: Record<string, string>) {
   const root = await mkdtemp(join(tmpdir(), 'workflow-integration-gate-'));
   roots.push(root);
   const workspaceRoot = join(root, 'workspace');
@@ -76,6 +76,7 @@ async function setup(executor: GateCommandExecutor) {
     artifacts: new JournaledArtifactRecorder(artifacts, store),
     checkCommands: { test: ['pnpm', 'test'] },
     executor,
+    approvedParentShas,
   });
   return { artifacts, gate, store };
 }
@@ -162,4 +163,19 @@ describe('LocalExactHeadIntegrationGate', () => {
     expect(diffRange).toBe(`${base}...${head}`);
     store.close();
   });
+});
+
+it('rejects a moved parent ref before running checks even with a valid head', async () => {
+  const f = await setup(
+    async (executable, args) => {
+      if (executable !== 'git') throw new Error('checks must not run');
+      if (args[0] === 'status') return { stdout: '', stderr: '' };
+      return { stdout: 'a'.repeat(40), stderr: '' };
+    },
+    { 'gate-feature.1': 'b'.repeat(40) },
+  );
+  await expect(
+    f.gate.verify({ contract, runId: 'gate-run', taskId: 'gate-feature.1' }),
+  ).rejects.toThrow('parent differs from approved SHA');
+  f.store.close();
 });

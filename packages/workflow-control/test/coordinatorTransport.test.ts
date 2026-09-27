@@ -66,3 +66,28 @@ it('stops an active direct adapter process and rejects subsequent dispatch', asy
   await rejected;
   await expect(port.call('beads.readIssue', {}, () => {})).rejects.toThrow('stopped');
 });
+it('terminates forked descendants on abort before accepting another operation', async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'coordinator-descendant-')));
+  roots.push(root);
+  const marker = join(root, 'late-effect');
+  const ready = join(root, 'ready');
+  const childProgram = `require('node:fs').writeFileSync(${JSON.stringify(ready)},'ready');setTimeout(()=>require('node:fs').writeFileSync(${JSON.stringify(marker)},'bad'),400);setInterval(()=>{},1000);`;
+  const { port } = transport(
+    `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(childProgram)}],{stdio:'ignore'});setInterval(()=>{},1000);`,
+  );
+  const pending = port.call('beads.readIssue', {}, () => {});
+  const rejected = expect(pending).rejects.toThrow('unavailable');
+  for (let n = 0; n < 100; n++) {
+    try {
+      readFileSync(ready);
+      break;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+  expect(readFileSync(ready, 'utf8')).toBe('ready');
+  port.abort();
+  await rejected;
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  expect(() => readFileSync(marker)).toThrow();
+});

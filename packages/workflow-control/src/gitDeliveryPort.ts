@@ -1,4 +1,5 @@
 import { assertBootstrapExecutablePin } from './bootstrapAdapterRuntime.js';
+import type { WorkflowStore } from './storage.js';
 import type { DeliveryDocumentSource } from './documentApproval.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -39,6 +40,7 @@ export interface BrokeredRemoteRefClient {
     ref: string;
     expectedOldSha: string | null;
     newSha: string;
+    objectSourceRoot?: string;
   }): Promise<void>;
 }
 
@@ -96,8 +98,10 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
   readonly #gitPin?: { path: string; digest: string };
   readonly #gitCommonDir: string;
 
+  readonly #ownedSourceRoot?: string;
   private constructor(input: {
     workspaceRoot: string;
+    ownedSourceRoot?: string;
     remoteName: string;
     remote: BrokeredRemoteRefClient;
     gitBinary?: string;
@@ -110,10 +114,14 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     };
   }) {
     this.#workspaceRoot = realpathSync(input.workspaceRoot);
+    this.#ownedSourceRoot = input.ownedSourceRoot;
     this.#bootstrap = input.bootstrap;
     this.#documents = input.documents;
     this.#sourceRoot = realpathSync(
-      input.documents?.sourceRoot ?? input.bootstrap?.policy.sourceRoot ?? this.#workspaceRoot,
+      input.ownedSourceRoot ??
+        input.documents?.sourceRoot ??
+        input.bootstrap?.policy.sourceRoot ??
+        this.#workspaceRoot,
     );
     if (
       input.bootstrap &&
@@ -121,6 +129,12 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       realpathSync(input.bootstrap.policy.sourceRoot) !== this.#sourceRoot
     )
       throw new Error('bootstrap document source differs from approved policy');
+    if (
+      input.ownedSourceRoot &&
+      input.documents &&
+      realpathSync(input.documents.sourceRoot) !== this.#workspaceRoot
+    )
+      throw new Error('owned workspace document identity mismatch');
     this.#remoteName = input.remoteName;
     this.#observeRemoteRef = input.remote.observeRef.bind(input.remote);
     this.#pushRemoteRef = input.remote.pushCas.bind(input.remote);
@@ -147,6 +161,20 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     remote: BrokeredRemoteRefClient;
   }): LocalGitDeliveryPort {
     return new LocalGitDeliveryPort(input);
+  }
+
+  static createForWorkflow(input: {
+    store: WorkflowStore;
+    runId: string;
+    workspaceRoot: string;
+    gitPin: { path: string; digest: string };
+    remoteName: string;
+    remote: BrokeredRemoteRefClient;
+  }): LocalGitDeliveryPort {
+    const root = realpathSync(input.workspaceRoot);
+    const ownedSourceRoot = input.store.getImplementationWorkspace(input.runId, root);
+    if (ownedSourceRoot === root) throw new Error('broker-owned delivery workspace unavailable');
+    return new LocalGitDeliveryPort({ ...input, ownedSourceRoot });
   }
 
   static createForTest(input: {
@@ -226,6 +254,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       gitPin: this.#gitPin,
       bootstrap: this.#bootstrap,
       documents,
+      ownedSourceRoot: this.#ownedSourceRoot,
     });
     if (port.#gitCommonDir !== this.#gitCommonDir)
       throw new Error('delivery document source belongs to another repository');
@@ -340,6 +369,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
         ref: gitRequest.ref,
         expectedOldSha: gitRequest.expectedRemoteSha,
         newSha: gitRequest.newSha,
+        ...(this.#ownedSourceRoot ? { objectSourceRoot: this.#ownedSourceRoot } : {}),
       });
       return { ref: gitRequest.ref, sha: gitRequest.newSha };
     }

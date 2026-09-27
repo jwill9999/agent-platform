@@ -2,7 +2,7 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createServer } from 'node:net';
@@ -26,13 +26,14 @@ async function port(): Promise<number> {
 }
 const docker = (args: string[]) =>
   execute('/usr/local/bin/docker', args, { env: {}, timeout: 30000, maxBuffer: 1024 * 1024 });
-it.skipIf(!image)(
-  'imports actual Codex source changes through production runtime, Docker, credential broker and retained evidence',
-  async () => {
-    const f = await developmentWorkflowFixture(true);
+it.skipIf(!image).each(['import', 'verify-review'] as const)(
+  'qualifies %s through production runtime, Docker, credential broker and retained evidence',
+  async (mode) => {
+    const f = await developmentWorkflowFixture(true, mode === 'verify-review');
     const root = await realpath(await mkdtemp(join(tmpdir(), 'implementation-connected-')));
     const name = `r2-${randomUUID()}`;
     let broker: ChildProcess | undefined;
+    const supervisors: ChildProcess[] = [];
     const db = new Database(f.database);
     try {
       const account = join(root, 'dummy-account.json'),
@@ -112,26 +113,68 @@ it.skipIf(!image)(
         }),
         { mode: 0o600 },
       );
-      const result = await execute(
-        process.execPath,
-        [cli, 'standalone-conformance', f.database, runtime],
-        { env: {}, timeout: 90000, maxBuffer: 100000 },
-      );
-      expect(JSON.parse(result.stdout)).toMatchObject({ passed: true });
+      if (mode === 'import') {
+        const result = await execute(
+          process.execPath,
+          [cli, 'standalone-conformance', f.database, runtime],
+          { env: {}, timeout: 90000, maxBuffer: 100000 },
+        );
+        expect(JSON.parse(result.stdout)).toMatchObject({ passed: true });
+      } else {
+        // Two supported long-lived production processes; no phase or continuation injected
+        // after startup and no human turn between implement, verify and review.
+        for (const args of [
+          ['coordinator', f.database],
+          ['phase-runtime', f.database, runtime],
+        ])
+          supervisors.push(spawn(process.execPath, [cli, ...args], { env: {}, stdio: 'ignore' }));
+        const deadline = Date.now() + 90000;
+        while (Date.now() < deadline) {
+          const run = db.prepare('SELECT state FROM runs WHERE id=?').get('run') as {
+            state: string;
+          };
+          if (run.state === 'task_accepted' || run.state === 'escalated') break;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        expect(db.prepare('SELECT state FROM runs WHERE id=?').get('run')).toEqual({
+          state: 'task_accepted',
+        });
+        for (const child of supervisors) child.kill('SIGTERM');
+        await Promise.all(
+          supervisors.map((child) =>
+            child.exitCode !== null
+              ? Promise.resolve()
+              : new Promise<void>((resolve) => child.once('exit', () => resolve())),
+          ),
+        );
+      }
+      const owned = db
+        .prepare('SELECT workspace_root FROM implementation_workspaces WHERE run_id=?')
+        .get('run') as { workspace_root: string };
+      expect(
+        await readFile(join(owned.workspace_root, 'packages/workflow-control/example.txt'), 'utf8'),
+      ).toBe('verified fixture change\n');
       expect(
         await readFile(join(f.root, 'source/packages/workflow-control/example.txt'), 'utf8'),
-      ).toBe('verified fixture change\n');
+      ).not.toBe('verified fixture change\n');
       expect(db.prepare('SELECT status FROM implementation_imports').get()).toEqual({
         status: 'verified',
       });
-      expect(db.prepare('SELECT status FROM phase_jobs').get()).toEqual({ status: 'completed' });
+      expect(
+        db.prepare("SELECT COUNT(*) AS n FROM phase_jobs WHERE status='completed'").get(),
+      ).toEqual({ n: mode === 'import' ? 1 : 3 });
       const actual = db
         .prepare("SELECT status,credential_status FROM scheduler_executions WHERE id!='child'")
         .all();
-      expect(actual).toEqual([{ status: 'completed', credential_status: 'revoked' }]);
+      expect(actual).toEqual(
+        Array.from({ length: mode === 'import' ? 1 : 3 }, () => ({
+          status: 'completed',
+          credential_status: 'revoked',
+        })),
+      );
       expect(
         db.prepare("SELECT COUNT(*) AS n FROM delegate_callbacks WHERE status='committed'").get(),
-      ).toEqual({ n: 2 });
+      ).toEqual({ n: mode === 'import' ? 2 : 4 });
       expect(
         db
           .prepare(
@@ -152,6 +195,7 @@ it.skipIf(!image)(
         }),
       );
     } finally {
+      for (const child of supervisors) if (child.exitCode === null) child.kill('SIGKILL');
       for (const row of db
         .prepare("SELECT id FROM scheduler_executions WHERE id!='child'")
         .all() as Array<{ id: string }>)
@@ -160,6 +204,10 @@ it.skipIf(!image)(
         root: string;
       }>)
         await rm(row.root, { recursive: true, force: true });
+      for (const row of db
+        .prepare('SELECT workspace_root FROM implementation_workspaces')
+        .all() as { workspace_root: string }[])
+        await rm(dirname(row.workspace_root), { recursive: true, force: true });
       db.close();
       if (broker && broker.exitCode === null) {
         broker.kill('SIGTERM');
