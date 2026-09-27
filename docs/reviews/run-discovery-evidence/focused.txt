@@ -1,0 +1,17 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/mcpServer.test.ts (1 test) 43ms
+ ✓ test/runDiscovery.test.ts (17 tests) 1696ms
+   ✓ canonical discovery and atomic admission > does not mutate database bytes during canonical lookup or readonly store inspection 752ms
+   ✓ canonical discovery and atomic admission > serializes independent racing processes and makes same-id retry idempotent after restart 310ms
+ ✓ test/runAdmissionRepair.test.ts (3 tests) 2108ms
+   ✓ rejects competing owner: repair-first 590ms
+   ✓ rejects competing owner: run-first 598ms
+   ✓ serializes process-level repair reservation versus run admission after both observe absence 919ms
+
+ Test Files  3 passed (3)
+      Tests  21 passed (21)
+   Start at  16:32:14
+   Duration  2.95s (transform 605ms, setup 0ms, collect 1.68s, tests 3.85s, environment 0ms, prepare 278ms)
+

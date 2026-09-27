@@ -1,4 +1,24 @@
-# Paused handoff — 27 September 2026
+# Resumed: R1 run discovery — 27 September 2026
+
+PR276 is verified merged into `feature/harness-backlog-review` at `87c5cc4`; its final nine executed
+checks passed, with Sourcery and staging VM skipped. The Notion publishing and iMessage policy
+documentation tasks are closed and synced in Beads. Runtime adapters are still unimplemented.
+
+Current work: `agent-platform-pilot-zero.17`, R1 authoritative discovery and guarded admission,
+on `task/run-discovery-admission` in `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+The owner resumed and said continue; existing approved scope is retained. Supervised prerequisite
+mode applies; no managed run, merge or staging promotion. The canonical journal was inspected
+read-only (four cancelled runs, zero live leases); it was not migrated or given new execution authority.
+
+[Qualification report](docs/reviews/run-discovery-qualification.md) records fixes and verification.
+R1 implementation and 21 focused tests pass; final regression/re-review are pending. Continue those
+checks and address findings before publishing a merge recommendation. R2 governed worker artifact
+import and R3 coordinator completion remain next in the same task; `.13` pilot planning stays blocked.
+Do not confuse run admission with approval to execute or claim a successful managed task cycle.
+
+---
+
+## Previous paused handoff — 27 September 2026
 
 Owner requested a pause. Resume from this section; older checkpoints below are historical and do not
 supersede it. No further implementation, orchestration pilot, merge or staging promotion was started.

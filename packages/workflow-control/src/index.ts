@@ -409,3 +409,5 @@ export {
   publishPlanningDocumentObjects,
   type PlanningDocuments,
 } from './planningDocuments.js';
+
+export { discoverCanonicalRuns, type RunInventory } from './runDiscovery.js';
