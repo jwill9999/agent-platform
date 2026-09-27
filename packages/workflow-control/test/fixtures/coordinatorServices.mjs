@@ -16,14 +16,7 @@ export async function serve(config) {
   let result = null;
   switch (method) {
     case 'beads.readIssue':
-      result = {
-        status: state.closed.includes(args.taskId)
-          ? 'closed'
-          : (state.children?.[args.taskId]?.status ?? 'in_progress'),
-        blockingDependencies: (state.children?.[args.taskId]?.blockingDependencies ?? []).filter(
-          (id) => !state.closed.includes(id),
-        ),
-      };
+      result = readIssue(state, args.taskId);
       break;
     case 'beads.readRepairChild':
       result = state.children?.[args.childId] ?? null;
@@ -147,4 +140,15 @@ async function findPullRequest(state, args, config) {
     await wait(config.delayFirstChecksMs);
   }
   return state.pr;
+}
+
+function readIssue(state, taskId) {
+  return {
+    status: state.closed.includes(taskId)
+      ? 'closed'
+      : (state.children?.[taskId]?.status ?? 'in_progress'),
+    blockingDependencies: (state.children?.[taskId]?.blockingDependencies ?? []).filter(
+      (id) => !state.closed.includes(id),
+    ),
+  };
 }
