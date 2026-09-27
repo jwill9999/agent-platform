@@ -116,7 +116,7 @@ export function queryRunInventory(
       (lease) =>
         (lease.resource_type === 'workspace' && lease.resource_id === query.workspaceId) ||
         (lease.resource_type === 'task' && lease.resource_id === query.taskId) ||
-        (lease.resource_type === 'run' && ids.has(lease.resource_id)),
+        (['run', 'closeout'].includes(lease.resource_type) && ids.has(lease.resource_id)),
     )
     .map((lease) => ({
       resourceType: lease.resource_type,

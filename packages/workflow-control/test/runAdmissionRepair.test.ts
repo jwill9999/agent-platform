@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { afterEach, expect, it } from 'vitest';
 import { documentFixture } from './documentFixture.js';
@@ -147,3 +147,32 @@ it('serializes process-level repair reservation versus run admission after both 
   const results = (await Promise.all(pending)).map((r) => r.stdout.trim()).sort();
   expect(results).toEqual(['admitted', 'run_admission_conflict']);
 }, 15000);
+
+it.each(['cancel', 'workspace', 'run', 'task'])(
+  'rechecks %s after a competing process changes authority before transaction acquisition',
+  async (kind) => {
+    const f = await setup();
+    const original = f.input.request;
+    const script = `import Database from 'better-sqlite3';
+    const db = new Database(process.argv[1]);
+    if(process.argv[2] === 'cancel') db.prepare("UPDATE runs SET state='cancelled' WHERE id='parent'").run();
+    else db.prepare("UPDATE leases SET owner_id='replacement', epoch=epoch+1 WHERE resource_type=?").run(process.argv[2]);
+    db.close();`;
+    Object.defineProperty(f.input.request, 'toJSON', {
+      value() {
+        execFileSync(process.execPath, ['--input-type=module', '-e', script, f.database, kind], {
+          cwd: new URL('..', import.meta.url),
+        });
+        return { ...original };
+      },
+    });
+    try {
+      expect(() =>
+        f.store.prepareRepairChildIntent(f.input, workflowEvaluationMutationCapability),
+      ).toThrow();
+      expect(f.store.getRepairChildIntent('child')).toBeUndefined();
+    } finally {
+      f.store.close();
+    }
+  },
+);

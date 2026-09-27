@@ -7453,35 +7453,35 @@ export class WorkflowStore {
     if (contract.workspaceId !== input.workspaceId) {
       throw new Error('repair-child workspace differs from the run contract');
     }
-    const run = this.getRun(input.runId);
-    if (run?.state !== 'repair_planning') {
-      throw new Error('repair children require the repair_planning state');
-    }
-    this.#assertResourceLease(
-      'workspace',
-      input.workspaceId,
-      input.ownerId,
-      input.workspaceLeaseEpoch,
-      input.createdAtMs,
-    );
-    this.#assertResourceLease(
-      'run',
-      input.runId,
-      input.ownerId,
-      input.runLeaseEpoch,
-      input.createdAtMs,
-    );
-    this.#assertResourceLease(
-      'task',
-      input.chainTipTaskId,
-      input.ownerId,
-      input.taskLeaseEpoch,
-      input.createdAtMs,
-    );
     const requestJson = serializeDurableJson(input.request);
     const request = input.request as Record<string, unknown>;
     return this.#database
       .transaction(() => {
+        const run = this.getRun(input.runId);
+        if (run?.state !== 'repair_planning') {
+          throw new Error('repair children require the repair_planning state');
+        }
+        this.#assertResourceLease(
+          'workspace',
+          input.workspaceId,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          input.createdAtMs,
+        );
+        this.#assertResourceLease(
+          'run',
+          input.runId,
+          input.ownerId,
+          input.runLeaseEpoch,
+          input.createdAtMs,
+        );
+        this.#assertResourceLease(
+          'task',
+          input.chainTipTaskId,
+          input.ownerId,
+          input.taskLeaseEpoch,
+          input.createdAtMs,
+        );
         assertDocuments();
         const owners = queryRunInventory(this.#database, {
           workspaceId: input.workspaceId,

@@ -371,3 +371,25 @@ describe('canonical discovery and atomic admission', () => {
     }
   });
 });
+
+it('includes active and expired closeout ownership only for discovered runs', async () => {
+  const f = await fixture();
+  try {
+    f.store.createRun(f.contractId, 'finalizing', 'one');
+    f.store.acquireLease('closeout', 'one', 'closer', 100000);
+    f.store.acquireLease('closeout', 'unrelated', 'other', 100000);
+    expect(discoverCanonicalRuns(f.input)).toMatchObject({
+      leases: [{ resourceType: 'closeout', resourceId: 'one', ownerId: 'closer', expired: false }],
+    });
+    const db = new Database(f.database);
+    db.prepare(
+      "UPDATE leases SET expires_at_ms=1 WHERE resource_type='closeout' AND resource_id='one'",
+    ).run();
+    db.close();
+    expect(discoverCanonicalRuns(f.input)).toMatchObject({
+      leases: [{ resourceType: 'closeout', resourceId: 'one', ownerId: 'closer', expired: true }],
+    });
+  } finally {
+    f.store.close();
+  }
+});
