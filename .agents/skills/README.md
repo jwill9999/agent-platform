@@ -29,3 +29,11 @@ Codex detects skill changes automatically. Start a new session or restart Codex 
 not appear.
 
 See the [official OpenAI skill authoring guide](https://learn.chatgpt.com/docs/build-skills).
+
+## Documentation workflow
+
+Use [documentation](documentation/SKILL.md) for repository locations and authoritative records, then
+[agent-platform-documentation](agent-platform-documentation/SKILL.md) for publishing the changed
+material to Notion. The latter is bundled here with its destination map, so it does not depend on a
+personal skill installation. Planning, critique and implementation already enter through the
+documentation workflow; read-only roles return publication instructions to an authorized publisher.

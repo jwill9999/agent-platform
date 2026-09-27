@@ -1,4 +1,12 @@
-# Session update: owner iMessage notifications — 27 September 2026
+# Session update: documentation publication — 27 September 2026
+
+The owner-provided Notion publishing skill is now project-local under
+`.agents/skills/agent-platform-documentation/` and linked from documentation guidance. It requires
+full mirrors, version metadata, preservation of human notes and verified readback, with explicit
+pending status when access is unavailable. Beads: `agent-platform-notion-doc-skill`. This is agent
+guidance, not an orchestration Notion adapter or automatic watcher. Existing iMessage policy follows.
+
+## Owner iMessage notifications
 
 Owner authorized brief iMessage alerts for verified completion, actionable blockers and significant
 failures. AGENTS.md points to the exact recipient and delivery rules in shared instructions. Beads:

@@ -226,6 +226,11 @@ See `decisions.md` for the full locked decision table and ADRs in [docs/adr/](ad
 
 ## Reference Documentation
 
+For documentation creation or updates, follow the
+[documentation skill](../.agents/skills/documentation/SKILL.md) and its linked
+[Notion publishing skill](../.agents/skills/agent-platform-documentation/SKILL.md). Update and verify
+both repository and Notion copies within the authorized scope; explicitly report pending publication.
+
 | Document                                                          | Contents                                                                                                     |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | [docs/architecture.md](architecture.md)                           | System overview, data flow with security checkpoints, streaming protocol, session locking                    |
