@@ -9,7 +9,7 @@ on return rather than assuming completion. Revisit Notion alignment later, not a
 
 ---
 
-# Resumed: R1 run discovery — 27 September 2026
+## Resumed: R1 run discovery — 27 September 2026
 
 PR276 is verified merged into `feature/harness-backlog-review` at `87c5cc4`; its final nine executed
 checks passed, with Sourcery and staging VM skipped. The Notion publishing and iMessage policy
