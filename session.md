@@ -18,6 +18,9 @@ compiling draft, not a completed coordinator journey. Repair, feature evaluation
 and recovery coverage remain outstanding. Build/lint/type checks pass; the full suite passed
 1,054 tests with 64 skipped. Real-container import passed again after the deadline fix. The initial
 hosted dependency-cycle failure was fixed locally; new-head hosted checks remain pending.
+The later Sonar refactor passes 215 focused tests and 29 storage/container tests, plus build/lint;
+Sonar's gate passed on `f15147e` and the remaining minor readability finding was corrected afterward.
+The 1,054-test full run predates that refactor. Entire-composition independent review is outstanding.
 Task-owned reviewer gateway/networks are cleaned up. The workspace decision was sent by iMessage.
 Do not mark either requirement complete or the branch merge-ready. Beads `.17` stays in progress;
 `.13` and the live pilot remain blocked. The earlier pilot-delivery question does not block current

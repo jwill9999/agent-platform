@@ -80,9 +80,10 @@ function validateReturnedPath(
 ): void {
   if (
     /[\\:]/u.test(file.path) ||
-    [...file.path].some(
-      (character) => character.codePointAt(0)! < 32 || character.codePointAt(0)! === 127,
-    ) ||
+    [...file.path].some((character) => {
+      const code = character.codePointAt(0)!;
+      return code < 32 || code === 127;
+    }) ||
     file.path
       .split('/')
       .some((part) => part === '' || part === '.' || part.endsWith('.') || part.endsWith(' ')) ||

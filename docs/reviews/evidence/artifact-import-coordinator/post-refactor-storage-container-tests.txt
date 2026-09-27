@@ -1,0 +1,26 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/storage.test.ts (28 tests) 15499ms
+   ✓ WorkflowStore > uses CAS versions, idempotency keys, and fenced commits 534ms
+   ✓ WorkflowStore > rejects stale contract and policy metadata at the durable boundary 310ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_claim after suspended observations in execution and recovery 2660ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_close after suspended observations in execution and recovery 2797ms
+   ✓ JournaledMutationBroker recovery > guards beads.dolt_push after suspended observations in execution and recovery 2514ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_prepare without duplicate mutation 368ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_prepare without duplicate mutation 424ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_external_mutation without duplicate mutation 382ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_external_mutation without duplicate mutation 442ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_local_commit without duplicate mutation 428ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_local_commit without duplicate mutation 465ms
+   ✓ JournaledMutationBroker recovery > commits an externally applied close without repeating it and escalates contradictions 668ms
+   ✓ JournaledMutationBroker recovery > brokers beads.task_claim through the pinned official adapter 378ms
+   ✓ JournaledMutationBroker recovery > brokers beads.task_close through the pinned official adapter 373ms
+   ✓ JournaledMutationBroker recovery > brokers beads.dolt_push through the pinned official adapter 386ms
+ ✓ test/implementationImport.integration.test.ts (1 test) 11140ms
+   ✓ imports actual Codex source changes through production runtime, Docker, credential broker and retained evidence 11139ms
+
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+   Start at  18:58:41
+   Duration  27.41s (transform 339ms, setup 0ms, collect 522ms, tests 26.64s, environment 0ms, prepare 70ms)

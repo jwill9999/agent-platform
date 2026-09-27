@@ -80,6 +80,14 @@ No live operator adapter has been qualified. No full R3 independent review or en
   Review evidence is advisory,
   not execution approval. R3 has not received final independent review.
 
+The initial SonarCloud analysis reported 20 findings, including two bugs and complexity issues.
+The refactor makes file ordering explicit, uses the recovery Git validation result and extracts
+focused validation/coordinator helpers. Build/lint pass; 215 focused tests and 29 storage/container
+tests pass after refactoring. SonarCloud's gate is OK on `f15147e`; its one remaining minor readability
+finding was subsequently corrected. The 1,054-test full suite above predates this refactor; do not
+present it as a new full-suite run at the final head. Current-head hosted checks remain pending.
+No final independent review of the entire R2/R3 composition is claimed.
+
 Retained evidence snapshots live in the [evidence directory](evidence/artifact-import-coordinator/).
 Task-owned isolated-review gateway and its two networks were removed after review; other services
 were left untouched. Current-head hosted checks remain pending.
