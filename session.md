@@ -1,3 +1,20 @@
+# PR278 integration confirmed — 27 September 2026
+
+GitHub confirms PR278 merged into `feature/harness-backlog-review` at
+`c9729617759be0cb0d3c89f7cb3b18f914553914` on 27 September at 22:22 UTC.
+The merged packages and CI configuration match the qualified PR head `3ec6b1a`.
+All nine executed pre-merge checks passed; Sourcery and staging-only packaged VM checks were skipped.
+R2/R3 implementation is now integrated. The previous awaiting-merge statements below are historical.
+
+Next: reconcile the remaining `.17` readiness gate against this merged baseline, including explicit
+canonical journal identity provisioning and read-only discovery verification, then prepare the exact
+single-task pilot plan (`.13`). Keep `.17` open until that prerequisite reconciliation is complete;
+do not treat integration as authorization to launch the pilot. No pilot or staging promotion occurred.
+Notion alignment remains the separately deferred task. This post-merge handoff is saved on
+`task/artifact-import-coordinator`; it is not an additional feature-branch merge.
+
+---
+
 # R2/R3 qualification handoff — 27 September 2026
 
 Owner-approved R2 governed worker import and R3 standalone coordinator completion are implemented on
