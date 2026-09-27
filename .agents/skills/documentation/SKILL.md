@@ -24,7 +24,12 @@ project knowledge belongs. This skill supplies locations and consistency checks,
 5. Preserve role permissions: a read-only planner/critic returns material and intended paths; an
    authorized coordinator saves it. During an active managed run use its journaled publication brokers.
    Neither skill invocation nor the presence of a tool grants extra authority.
-6. Validate Markdown, relative links and manifest completeness; read back published content and Beads
+6. For every substantive documentation creation or update, load
+   [Agent Platform documentation publishing](../agent-platform-documentation/SKILL.md) and mirror the
+   changed documents into the Notion hub. Reuse already-loaded guidance; do not recursively restart
+   this workflow. Explicit local-only requests and managed-run permissions still apply. Report
+   blocked Notion publication separately from saved repository work.
+7. Validate Markdown, relative links and manifest completeness; read back published content and Beads
    links/dependencies. Keep requirement/scenario identifiers consistent. Report missing artifacts and
    required verification gaps explicitly instead of marking the handoff complete.
 

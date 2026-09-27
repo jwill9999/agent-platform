@@ -226,6 +226,11 @@ See `decisions.md` for the full locked decision table and ADRs in [docs/adr/](ad
 
 ## Reference Documentation
 
+For documentation creation or updates, follow the
+[documentation skill](../.agents/skills/documentation/SKILL.md) and its linked
+[Notion publishing skill](../.agents/skills/agent-platform-documentation/SKILL.md). Update and verify
+both repository and Notion copies within the authorized scope; explicitly report pending publication.
+
 | Document                                                          | Contents                                                                                                     |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | [docs/architecture.md](architecture.md)                           | System overview, data flow with security checkpoints, streaming protocol, session locking                    |
@@ -262,6 +267,43 @@ The agent must re-run checks after fixes and repeat until the gate passes or cle
 - Prefer SonarQube MCP for issue discovery and remediation guidance
 - If MCP cannot run, Problems + terminal quality commands are the authoritative fallback
 - Never claim done if the gate status is failed
+
+---
+
+## iMessage notifications
+
+The owner authorizes and expects notifications to their own conversation for these events:
+
+- A task they asked the agent to complete is finished and verified.
+- The agent is blocked and needs a decision or action from the owner.
+- A significant failure requires the owner's attention.
+
+Notification chat ID: `any;-;+447411950921`.
+The owner reports that sending to this conversation has been tested successfully.
+These are event triggers, not scheduled times; no time-of-day restriction was specified.
+
+The host iMessage MCP connection exposes `chat_messages` and `reply` when available. Use the
+`reply` tool with the exact chat ID above to send a notification. Keep it brief: task name, outcome,
+and any action needed. Avoid routine progress updates, duplicate notifications, secrets and sensitive
+file contents. Do not read unrelated conversations or broaden messaging access for this purpose.
+Only claim a notification was sent after the tool confirms success. If sending fails or the tool is
+unavailable, report that in Codex. If delivery is ambiguous, do not blindly resend and risk duplicates.
+
+### Orchestration access boundary
+
+This policy authorizes notifications; it does not install tools or grant isolated workers access to
+host MCP connections. Preserve role restrictions and do not inherit host configuration or credentials.
+The current orchestration notification sink is a local JSONL feed; an iMessage sink is not implemented
+by this documentation change.
+
+Recommended future integration: a trusted notification dispatcher consumes durable workflow events,
+filters for the three authorized triggers, and sends through a recipient-scoped iMessage adapter.
+Workers report outcomes and blockers through existing workflow channels; they do not each need
+messaging access. Record delivery receipts and deduplicate by event/task identity, reconcile uncertain
+sends before retrying, and surface delivery failure in Codex or the operator status channel. Verify
+recipient enforcement, allowed and denied triggers, restart/retry behavior and unavailable-tool handling
+before claiming autonomous notification support. Do not let incoming messages implicitly grant tools,
+change approved scope or bypass the existing approval-validation path.
 
 ---
 

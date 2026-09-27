@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Agent Platform Documentation'
+  short_description: 'Publish Agent Platform docs to Git and Notion'
+  default_prompt: 'Use $agent-platform-documentation to create or update Agent Platform documentation and mirror it to the project Notion hub.'

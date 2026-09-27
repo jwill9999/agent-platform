@@ -1,0 +1,58 @@
+import pathlib,json,subprocess,tempfile,os,secrets,socket,time,uuid,hashlib
+repo=pathlib.Path('/Users/letuscode/projects/agent-platform-workflow-evaluation')
+node='/Users/letuscode/.nvm/versions/node/v24.14.0/bin/node'
+base=json.load(open('/tmp/lifecycle-live-final-config.json'))
+root=pathlib.Path(tempfile.mkdtemp(prefix='lifecycle-generation-',dir=str(pathlib.Path.home()/'.codex')))
+name=root.name; internal=name+'-internal'; outbound=name+'-outbound'; worker=name+'-worker'
+s=socket.socket();s.bind(('127.0.0.1',0));port=s.getsockname()[1];s.close()
+def run(args,**kw):return subprocess.run(args,check=True,capture_output=True,text=True,timeout=kw.pop('timeout',40),**kw).stdout
+def private(path,data):path.write_text(data);path.chmod(0o600)
+(root/'state').mkdir(mode=0o700);private(root/'control.key',secrets.token_hex(32))
+server={'database':'/state/broker.sqlite','accountFile':'/run/account.json','controlKeyFile':'/run/control.key','controlPort':18101,'gatewayPort':18102,'listenHost':'0.0.0.0'}
+private(root/'server.json',json.dumps(server))
+local={**server,'database':str(root/'state/broker.sqlite'),'accountFile':base['accountFile'],'controlKeyFile':str(root/'control.key'),'controlPort':port,'listenHost':'127.0.0.1'}
+private(root/'local.json',json.dumps(local))
+cli=str(repo/'packages/workflow-control/dist/localCredentialBrokerCli.js');adapter=str(root/'adapter.mjs')
+run([node,cli,str(root/'local.json'),'create-adapter','--output',adapter])
+def broker(*args):return json.loads(run([adapter,*args],env={}))
+lease='current-image-generation-'+str(uuid.uuid4());generation=None
+record={'brokerImage':base['brokerImage'],'workerImage':'sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f','purpose':'Current deployed broker image real generation compatibility; not autonomous pilot','passed':False}
+try:
+ run(['docker','network','create','--internal',internal]);run(['docker','network','create',outbound])
+ args=['docker','create','--name',name,'--user',base['containerUser'],'--network',outbound,'--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','-p',f'127.0.0.1:{port}:18101']
+ for src,dst,rw in [(root/'state','/state',True),(pathlib.Path(base['accountFile']),'/run/account.json',False),(root/'control.key','/run/control.key',False),(root/'server.json','/run/server.json',False)]:args+=['--mount',f'type=bind,src={src},dst={dst}'+('' if rw else ',readonly')]
+ args += [base['brokerImage'],'/run/server.json','serve'];run(args)
+ run(['docker','network','connect','--alias','model-gateway',internal,name]);run(['docker','start',name])
+ for _ in range(30):
+  try:
+   generation=broker('conformance','--protocol','revoke-wins-v1','--max-probe-ttl-seconds','30')['generation'];break
+  except subprocess.CalledProcessError:time.sleep(.3)
+ assert generation
+ auth=root/'worker-auth.json';broker('issue','--lease-id',lease,'--execution-id',name,'--generation',generation,'--output',str(auth))
+ config=json.load(open(repo/'docs/reviews/local-credential-broker-evidence/final-client-provenance.json'))['workerConfig']
+ config=config.replace('http://model-gateway:8080','http://model-gateway:18102');private(root/'worker.toml',config)
+ uid,gid=base['containerUser'].split(':')
+ args=['docker','run','--name',worker,'--user',base['containerUser'],'--network',internal,'--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--tmpfs','/tmp:rw,nosuid,size=128m','--tmpfs',f'/codex-home:rw,nosuid,uid={uid},gid={gid},size=64m','--tmpfs',f'/workspace:rw,nosuid,uid={uid},gid={gid},size=16m','-e','CODEX_HOME=/codex-home']
+ for src,dst in [(auth,'/auth-input.json'),(root/'worker.toml','/config-input.toml')]:args+=['--mount',f'type=bind,src={src},dst={dst},readonly']
+ args += [record['workerImage'],'sh','-c',"cp /auth-input.json /codex-home/auth.json && cp /config-input.toml /codex-home/config.toml && codex exec --json --sandbox read-only --skip-git-repo-check -C /workspace 'Reply exactly LIFECYCLE_IMAGE_VERIFIED. Do not use tools.'"]
+ output=run(args,timeout=150);events=[json.loads(x) for x in output.splitlines()]
+ assert any(e['type']=='turn.completed' for e in events)
+ assert any(e.get('item',{}).get('text')=='LIFECYCLE_IMAGE_VERIFIED' for e in events)
+ record['events']=events;record['workerConfig']=config;record['leaseId']=lease;record['generation']=generation
+ record['revocation']=broker('revoke','--lease-id',lease,'--generation',generation)
+ probe="const a=JSON.parse(require('fs').readFileSync('/worker-auth.json'));fetch('http://model-gateway:18102/models',{headers:{authorization:'Bearer '+a.OPENAI_API_KEY}}).then(r=>console.log(r.status))"
+ record['postRevocationStatus']=int(run(['docker','run','--rm','--network',internal,'--read-only','--cap-drop','ALL','--mount',f'type=bind,src={auth},dst=/worker-auth.json,readonly','--entrypoint','node',record['workerImage'],'-e',probe]))
+ assert record['postRevocationStatus']==403
+ info=json.loads(run(['docker','inspect',worker]))[0]
+ record['workerId']=info['Id'];record['workerActualImage']=info['Image'];record['workerNetworks']=list(info['NetworkSettings']['Networks']);record['workerMounts']=[{'destination':m['Destination'],'readOnly':not m['RW']} for m in info['Mounts']]
+ record['brokerId']=json.loads(run(['docker','inspect',name]))[0]['Id'];record['passed']=True
+ (repo/'docs/reviews/development-lifecycle-evidence/current-image-generation.json').write_text(json.dumps(record,indent=2)+'\n')
+ print('Current broker image real generation passed; revoked lease denied with HTTP403.')
+finally:
+ if generation:
+  try:broker('revoke','--lease-id',lease,'--generation',generation)
+  except Exception:pass
+ for c in [worker,name]:subprocess.run(['docker','rm','--force',c],capture_output=True)
+ for n in [internal,outbound]:subprocess.run(['docker','network','rm',n],capture_output=True)
+ import shutil
+ shutil.rmtree(root)

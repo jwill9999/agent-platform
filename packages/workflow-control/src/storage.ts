@@ -1,3 +1,9 @@
+import { lstatSync } from 'node:fs';
+import {
+  InterruptionCleanupJournal,
+  type ExecutionInterruption,
+} from './executionInterruptions.js';
+import { assertExecutionNotInterrupted } from './executionInterruptions.js';
 import { isDeepStrictEqual } from 'node:util';
 import {
   assertDocumentAuthority,
@@ -16,7 +22,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { fenceRunWork, runAcceptsWork } from './workCancellation.js';
 import { assertBootstrapDeliveryPolicy, initializeBootstrapSchema } from './bootstrapJournal.js';
 import { mkdir, realpath } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 
 import Database from 'better-sqlite3';
 import { enqueueContinuation, initializeContinuationSchema } from './continuationJournal.js';
@@ -1272,6 +1278,7 @@ export class WorkflowStore {
         version: number;
         needsWake: boolean;
       } => {
+        assertExecutionNotInterrupted(this.#database, callback.delegationId);
         const prior = this.#database
           .prepare(
             'SELECT callback_json, target_state, parent_version, wake_status FROM delegate_callbacks WHERE callback_id = ?',
@@ -3540,6 +3547,37 @@ export class WorkflowStore {
       .get(id) as SchedulerContainerRecord | undefined;
   }
 
+  /** Trusted launcher proof that its Docker create callback was never invoked. A crash before
+   * this acknowledgement deliberately leaves create_pending uncertain; never infer absence. */
+  recordRejectedSchedulerCreate(authority: SchedulerContainerAuthority, capability?: symbol): void {
+    if (capability !== workflowContainerJournalCapability)
+      throw new Error('container journal mutation requires launcher capability');
+    this.#database
+      .transaction(() => {
+        const execution = this.getSchedulerExecution(authority.id);
+        if (execution?.status !== 'active') throw new Error('active scheduler execution required');
+        for (const key of [
+          'ownerId',
+          'workspaceLeaseEpoch',
+          'runLeaseEpoch',
+          'taskLeaseEpoch',
+        ] as const)
+          if (execution[key] !== authority[key])
+            throw new Error('container execution fence changed');
+        const state = this.getSchedulerContainer(authority.id);
+        if (
+          state?.status !== 'create_pending' ||
+          state.containerId !== null ||
+          execution.processIdentity !== `docker:${state.name}`
+        )
+          throw new Error('container create rejection is stale');
+        this.#database
+          .prepare("UPDATE scheduler_containers SET status='not_dispatched' WHERE execution_id=?")
+          .run(authority.id);
+      })
+      .immediate();
+  }
+
   advanceSchedulerContainer(
     input: {
       execution: SchedulerContainerAuthority;
@@ -3654,54 +3692,67 @@ export class WorkflowStore {
       from: readonly SchedulerCredentialStatus[];
       to: SchedulerCredentialStatus;
       nowMs?: number;
+      cleanup?: ExecutionInterruption;
     },
     capability?: symbol,
   ): SchedulerExecutionRecord {
     if (capability !== workflowCredentialJournalCapability) {
       throw new Error('credential journal mutation requires broker capability');
     }
-    const execution = this.getSchedulerExecution(input.id);
-    if (execution === undefined || execution.status !== 'active') {
-      throw new Error('active scheduler execution not found for credential transition');
-    }
-    if (execution.credentialLeaseId !== input.leaseId) {
-      throw new Error('scheduler credential lease identity changed');
-    }
-    if (execution.credentialStatus === input.to) return execution;
-    const normativeTransitions: Readonly<
-      Record<SchedulerCredentialStatus, readonly SchedulerCredentialStatus[]>
-    > = {
-      pending: ['issuing', 'revoking'],
-      issuing: ['issued', 'revoking'],
-      issued: ['revoking'],
-      revoking: ['revoked'],
-      revoked: [],
-      legacy_quarantined: [],
-    };
-    if (!normativeTransitions[execution.credentialStatus].includes(input.to)) {
-      throw new Error(
-        `credential transition ${execution.credentialStatus} -> ${input.to} is forbidden`,
-      );
-    }
-    if (!input.from.includes(execution.credentialStatus)) {
-      throw new Error(
-        `credential transition ${execution.credentialStatus} -> ${input.to} is not allowed`,
-      );
-    }
-    if (
-      !this.#compareAndSwapSchedulerCredential({
-        id: input.id,
-        leaseId: input.leaseId,
-        expected: execution.credentialStatus,
-        to: input.to,
-        nowMs: input.nowMs,
+    return this.#database
+      .transaction(() => {
+        if (input.cleanup) {
+          if (
+            input.cleanup.execution_id !== input.id ||
+            !['revoking', 'revoked'].includes(input.to)
+          )
+            throw new Error('cleanup_transition_forbidden');
+          this.assertInterruptionCleanup(input.cleanup);
+        } else assertExecutionNotInterrupted(this.#database, input.id);
+        const execution = this.getSchedulerExecution(input.id);
+        if (execution === undefined || execution.status !== 'active') {
+          throw new Error('active scheduler execution not found for credential transition');
+        }
+        if (execution.credentialLeaseId !== input.leaseId) {
+          throw new Error('scheduler credential lease identity changed');
+        }
+        if (execution.credentialStatus === input.to) return execution;
+        const normativeTransitions: Readonly<
+          Record<SchedulerCredentialStatus, readonly SchedulerCredentialStatus[]>
+        > = {
+          pending: ['issuing', 'revoking'],
+          issuing: ['issued', 'revoking'],
+          issued: ['revoking'],
+          revoking: ['revoked'],
+          revoked: [],
+          legacy_quarantined: [],
+        };
+        if (!normativeTransitions[execution.credentialStatus].includes(input.to)) {
+          throw new Error(
+            `credential transition ${execution.credentialStatus} -> ${input.to} is forbidden`,
+          );
+        }
+        if (!input.from.includes(execution.credentialStatus)) {
+          throw new Error(
+            `credential transition ${execution.credentialStatus} -> ${input.to} is not allowed`,
+          );
+        }
+        if (
+          !this.#compareAndSwapSchedulerCredential({
+            id: input.id,
+            leaseId: input.leaseId,
+            expected: execution.credentialStatus,
+            to: input.to,
+            nowMs: input.nowMs,
+          })
+        ) {
+          const current = this.getSchedulerExecution(input.id);
+          if (current?.credentialStatus === input.to) return current;
+          throw new Error('credential transition lost compare-and-swap race');
+        }
+        return this.getSchedulerExecution(input.id)!;
       })
-    ) {
-      const current = this.getSchedulerExecution(input.id);
-      if (current?.credentialStatus === input.to) return current;
-      throw new Error('credential transition lost compare-and-swap race');
-    }
-    return this.getSchedulerExecution(input.id)!;
+      .immediate();
   }
 
   #compareAndSwapSchedulerCredential(input: {
@@ -3735,6 +3786,7 @@ export class WorkflowStore {
   }
 
   assertSchedulerAcceptsWork(id: string): void {
+    assertExecutionNotInterrupted(this.#database, id);
     const execution = this.getSchedulerExecution(id);
     if (!execution || !runAcceptsWork(this.#database, execution.runId))
       throw new Error('specialist run is cancelled or closed');
@@ -3862,6 +3914,7 @@ export class WorkflowStore {
     }
     return this.#database
       .transaction(() => {
+        if (input.status === 'completed') assertExecutionNotInterrupted(this.#database, input.id);
         assertDocuments?.();
         const nowMs = input.nowMs ?? Date.now();
         const execution = this.getSchedulerExecution(input.id);
@@ -3930,6 +3983,129 @@ export class WorkflowStore {
         return this.getSchedulerExecution(input.id)!;
       })
       .immediate();
+  }
+
+  assertInterruptionCleanup(row: ExecutionInterruption, nowMs = Date.now()): void {
+    new InterruptionCleanupJournal(this.#database).assertOwner(row, nowMs);
+    const current = this.#database
+      .prepare(
+        'SELECT attempt,attempt_deadline_ms FROM execution_interruptions WHERE execution_id=?',
+      )
+      .get(row.execution_id) as { attempt: number; attempt_deadline_ms: number };
+    if (current.attempt !== row.attempt || current.attempt_deadline_ms <= nowMs)
+      throw new Error('cleanup_attempt_expired');
+  }
+  advanceInterruptedContainer(
+    row: ExecutionInterruption,
+    from: SchedulerContainerRecord['status'],
+    to: SchedulerContainerRecord['status'],
+    containerId: string | undefined,
+    capability: typeof workflowContainerJournalCapability,
+  ): SchedulerContainerRecord {
+    if (capability !== workflowContainerJournalCapability)
+      throw new Error('cleanup_capability_required');
+    return this.#database
+      .transaction(() => {
+        this.assertInterruptionCleanup(row);
+        const execution = this.getSchedulerExecution(row.execution_id);
+        const state = this.getSchedulerContainer(row.execution_id);
+        if (
+          execution?.runId !== row.run_id ||
+          !state ||
+          execution.processIdentity !== `docker:${state.name}`
+        )
+          throw new Error('cleanup_identity_changed');
+        if (
+          !(
+            (from === 'create_pending' && to === 'acknowledged') ||
+            (from === 'acknowledged' && to === 'removal_confirmed')
+          )
+        )
+          throw new Error('cleanup_transition_forbidden');
+        if (
+          state.status !== from ||
+          !containerId ||
+          !/^[a-f0-9]{64}$/u.test(containerId) ||
+          (state.containerId !== null && state.containerId !== containerId)
+        )
+          throw new Error('cleanup_container_changed');
+        this.#database
+          .prepare('UPDATE scheduler_containers SET status=?,container_id=? WHERE execution_id=?')
+          .run(to, containerId, row.execution_id);
+        return this.getSchedulerContainer(row.execution_id)!;
+      })
+      .immediate();
+  }
+
+  bindSchedulerStaging(
+    authority: SchedulerContainerAuthority,
+    root: string,
+    capability: typeof workflowContainerJournalCapability,
+    nowMs = Date.now(),
+  ): void {
+    const identity = lstatSync(root, { bigint: true });
+    if (
+      !identity.isDirectory() ||
+      identity.isSymbolicLink() ||
+      Number(identity.uid) !== process.getuid?.()
+    )
+      throw new Error('staging_identity_changed');
+    if (capability !== workflowContainerJournalCapability || !isAbsolute(root))
+      throw new Error('invalid_staging_authority');
+    this.#database
+      .transaction(() => {
+        const execution = this.getSchedulerExecution(authority.id);
+        if (execution?.ownerId !== authority.ownerId || execution.status !== 'active')
+          throw new Error('staging_owner_changed');
+        this.#assertResourceLease(
+          'run',
+          execution.runId,
+          authority.ownerId,
+          authority.runLeaseEpoch,
+          nowMs,
+        );
+        const existing = this.#database
+          .prepare('SELECT root FROM scheduler_staging WHERE execution_id=?')
+          .get(authority.id) as { root: string } | undefined;
+        if (existing && existing.root !== root) throw new Error('staging_identity_changed');
+        this.#database
+          .prepare(
+            'INSERT OR IGNORE INTO scheduler_staging (execution_id,root,created_at_ms,device,inode,uid) VALUES (?,?,?,?,?,?)',
+          )
+          .run(
+            authority.id,
+            root,
+            nowMs,
+            String(identity.dev),
+            String(identity.ino),
+            Number(identity.uid),
+          );
+      })
+      .immediate();
+  }
+
+  getSchedulerStaging(id: string):
+    | {
+        root: string;
+        created_at_ms: number;
+        device: string | null;
+        inode: string | null;
+        uid: number | null;
+      }
+    | undefined {
+    return this.#database
+      .prepare(
+        'SELECT root,created_at_ms,device,inode,uid FROM scheduler_staging WHERE execution_id=?',
+      )
+      .get(id) as
+      | {
+          root: string;
+          created_at_ms: number;
+          device: string | null;
+          inode: string | null;
+          uid: number | null;
+        }
+      | undefined;
   }
 
   getSchedulerExecution(id: string): SchedulerExecutionRecord | undefined {

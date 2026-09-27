@@ -20,6 +20,12 @@ Read that file first. The sections it covers:
 - **SonarQube / Problems Completion Gate** (mandatory before declaring done)
 - Session-completion protocol (push is mandatory)
 
+## iMessage notifications
+
+Send the owner brief notifications for verified completion, actionable blockers and significant
+failures, following the [iMessage policy](docs/agent-instructions-shared.md#imessage-notifications).
+Use its exact recipient and confirmed-delivery rules; isolated workers do not inherit this connection.
+
 ## Tool-specific notes
 
 - Run `bd onboard` once per machine to wire up beads.

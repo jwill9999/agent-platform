@@ -241,3 +241,71 @@ it('writes only validated operator gateway/model configuration', async () => {
       .success,
   ).toBe(false);
 });
+
+it('reconciles lost probe issuance replies and caps probe lifetime at thirty seconds', () => {
+  let now = 100;
+  const { leases } = fixture(300000, () => now);
+  const id = '11111111-1111-4111-8111-111111111111';
+  expect(leases.probeStatus(id, leases.generation).status).toBe('never_issued');
+  const first = leases.issueProbe(id, leases.generation);
+  expect(leases.issueProbe(id, leases.generation)).toEqual(first);
+  expect(leases.probeStatus(id, leases.generation)).toMatchObject({
+    status: 'active',
+    expiresAtMs: 30100,
+  });
+  now = 30100;
+  expect(leases.authorize(first.token)).toBeUndefined();
+  leases.revoke(first.leaseId, first.generation);
+  expect(leases.probeStatus(id, leases.generation).status).toBe('revoked');
+  expect(() => leases.issueProbe(id, leases.generation)).toThrow();
+});
+it('tombstones an unacknowledged probe before delayed issuance', () => {
+  const { leases } = fixture();
+  const id = '22222222-2222-4222-8222-222222222222';
+  leases.revoke(`probe:${id}`, leases.generation);
+  expect(() => leases.issueProbe(id, leases.generation)).toThrow();
+  expect(leases.probeStatus(id, leases.generation).status).toBe('revoked');
+});
+it.each(['control', 'gateway'])(
+  'closes both listeners when the %s listener cannot bind',
+  async (occupied) => {
+    const { dir } = fixture();
+    const busy = createServer();
+    const occupiedPort = await listen(busy);
+    const free = createServer();
+    const freePort = await listen(free);
+    await new Promise<void>((resolve) => free.close(() => resolve()));
+    const account = join(dir, 'account.json'),
+      key = join(dir, 'key'),
+      config = join(dir, 'server.json');
+    writeFileSync(account, '{}', { mode: 0o600 });
+    writeFileSync(key, 'a'.repeat(64), { mode: 0o600 });
+    writeFileSync(
+      config,
+      JSON.stringify({
+        database: join(dir, 'server.sqlite'),
+        accountFile: account,
+        controlKeyFile: key,
+        controlPort: occupied === 'control' ? occupiedPort : freePort,
+        gatewayPort: occupied === 'gateway' ? occupiedPort : freePort,
+      }),
+      { mode: 0o600 },
+    );
+    await expect(
+      promisify(execFile)(
+        process.execPath,
+        [
+          fileURLToPath(new URL('../dist/localCredentialBrokerCli.js', import.meta.url)),
+          config,
+          'serve',
+        ],
+        { env: {}, timeout: 5000 },
+      ),
+    ).rejects.toMatchObject({ code: 1, killed: false });
+    const available = createServer();
+    available.listen(freePort, '127.0.0.1');
+    await once(available, 'listening');
+    await new Promise<void>((resolve) => available.close(() => resolve()));
+  },
+  10000,
+);

@@ -1,3 +1,9 @@
+import {
+  initializeInterruptionSchema,
+  assertExecutionNotInterrupted,
+  getInterruption,
+  InterruptionCleanupJournal,
+} from './executionInterruptions.js';
 import { verifyDocumentBoundary, assertDocumentAuthority } from './documentApproval.js';
 import { createHash } from 'node:crypto';
 
@@ -75,6 +81,7 @@ export function phaseActionForCallback(input: unknown): ExecutePhaseAction {
 }
 
 export function initializePhaseJobSchema(database: Database.Database): void {
+  initializeInterruptionSchema(database);
   database.exec(`CREATE TABLE IF NOT EXISTS phase_jobs (
     id TEXT PRIMARY KEY, continuation_id TEXT NOT NULL UNIQUE REFERENCES continuation_jobs(id),
     callback_id TEXT NOT NULL UNIQUE REFERENCES delegate_callbacks(callback_id),
@@ -375,10 +382,13 @@ export class PhaseJobJournal {
         const job = this.#database
           .prepare(
             `SELECT * FROM phase_jobs WHERE status = 'started' AND lease_until_ms <= ? AND (? IS NULL OR run_id = ?)
-            AND EXISTS (SELECT 1 FROM runs r WHERE r.id = phase_jobs.run_id AND r.state NOT IN ('cancelled', 'closed'))
+            AND (EXISTS (SELECT 1 FROM runs r WHERE r.id=phase_jobs.run_id AND r.state NOT IN ('cancelled','closed'))
+              OR EXISTS (SELECT 1 FROM execution_interruptions i WHERE i.execution_id=phase_jobs.execution_id))
+            AND NOT EXISTS (SELECT 1 FROM execution_interruptions i WHERE i.execution_id=phase_jobs.execution_id
+              AND (i.state='exhausted' OR (i.state='pending' AND i.next_attempt_ms>?)))
             ORDER BY created_at_ms, id LIMIT 1`,
           )
-          .get(nowMs, runId ?? null, runId ?? null) as PhaseJob | undefined;
+          .get(nowMs, runId ?? null, runId ?? null, nowMs) as PhaseJob | undefined;
         if (job === undefined) return undefined;
         this.#database
           .prepare(
@@ -413,6 +423,7 @@ export class PhaseJobJournal {
       .parse(receipt);
     this.#database
       .transaction(() => {
+        assertExecutionNotInterrupted(this.#database, value.executionId);
         const current = this.get(job.id);
         if (
           current?.status === 'completed' &&
@@ -495,6 +506,101 @@ export class PhaseJobJournal {
           nowMs,
         );
         this.#event(job, 'phase_completed', value.executionId, value, nowMs);
+      })
+      .immediate();
+  }
+
+  finalizeInterrupted(job: PhaseJob, nowMs = Date.now()): void {
+    this.#database
+      .transaction(() => {
+        const interruption = getInterruption(this.#database, job.execution_id!);
+        if (interruption?.state !== 'settled' || interruption.job_id !== job.id)
+          throw new Error('cleanup_unsettled');
+        const execution = this.#database
+          .prepare(
+            'SELECT status,credential_status FROM scheduler_executions WHERE id=? AND run_id=?',
+          )
+          .get(job.execution_id, job.run_id) as
+          | { status: string; credential_status: string }
+          | undefined;
+        if (
+          execution &&
+          (execution.status === 'completed' || execution.credential_status !== 'revoked')
+        )
+          throw new Error('cleanup_finalization_rejected');
+        this.#update(
+          job,
+          "status='blocked',failure_code=?,lease_until_ms=0",
+          [interruption.reason],
+          nowMs,
+        );
+        this.#database
+          .prepare(
+            "UPDATE scheduler_executions SET status='escalated',result_json=?,updated_at_ms=? WHERE id=? AND status='active'",
+          )
+          .run(JSON.stringify({ reason: interruption.reason }), nowMs, job.execution_id);
+        this.#event(
+          job,
+          'phase_blocked',
+          String(job.lease_epoch),
+          { reason: interruption.reason },
+          nowMs,
+        );
+      })
+      .immediate();
+  }
+
+  deferInterrupted(job: PhaseJob, nowMs: number): void {
+    if (!job.execution_id || !getInterruption(this.#database, job.execution_id))
+      throw new Error('interruption_missing');
+    this.#update(job, 'lease_until_ms=0', [], nowMs);
+  }
+
+  interruptions(): InterruptionCleanupJournal {
+    return new InterruptionCleanupJournal(this.#database);
+  }
+
+  interrupt(job: PhaseJob, reason: string, nowMs: number): boolean {
+    if (!/^[a-z][a-z0-9_]{0,95}$/u.test(reason) || !job.execution_id)
+      throw new Error('invalid_interruption');
+    return this.#database
+      .transaction(() => {
+        const execution = this.#database
+          .prepare(
+            'SELECT status,credential_broker_generation FROM scheduler_executions WHERE id=?',
+          )
+          .get(job.execution_id) as
+          | { status: string; credential_broker_generation: string | null }
+          | undefined;
+        if (execution?.status === 'completed') return false;
+        this.#update(job, 'failure_code=COALESCE(failure_code,?)', [reason], nowMs);
+        if (!getInterruption(this.#database, job.execution_id!)) {
+          this.#database
+            .prepare(
+              `INSERT INTO execution_interruptions
+          (execution_id,job_id,run_id,reason,observed_at_ms,broker_generation,owner,epoch,lease_until_ms)
+          VALUES (?,?,?,?,?,?,?,?,?)`,
+            )
+            .run(
+              job.execution_id,
+              job.id,
+              job.run_id,
+              reason,
+              nowMs,
+              execution?.credential_broker_generation ?? null,
+              job.lease_owner,
+              job.lease_epoch,
+              0,
+            );
+          this.#event(
+            job,
+            'phase_recovery_required',
+            'interrupted',
+            { executionId: job.execution_id, reason, cleanup: 'pending' },
+            nowMs,
+          );
+        }
+        return true;
       })
       .immediate();
   }

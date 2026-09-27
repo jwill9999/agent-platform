@@ -1,3 +1,4 @@
+import { assertExecutionNotInterrupted } from './executionInterruptions.js';
 import { verifyDocumentBoundary, assertDocumentAuthority } from './documentApproval.js';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
@@ -408,6 +409,7 @@ export class ContinuationJournal {
         if (action.kind === 'execute_phase' && verified)
           assertDocumentAuthority(this.#database, action.runId, verified.approvalId);
         const job = this.get(id);
+        if (job) assertExecutionNotInterrupted(this.#database, job.execution_id);
         if (job !== undefined && !runAcceptsWork(this.#database, job.run_id))
           throw new Error('continuation run is cancelled');
         if (job?.status === 'consumed') {

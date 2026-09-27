@@ -1,4 +1,101 @@
-# Current session: role enforcement repair — 26 September 2026
+# Paused handoff — 27 September 2026
+
+Owner requested a pause. Resume from this section; older checkpoints below are historical and do not
+supersede it. No further implementation, orchestration pilot, merge or staging promotion was started.
+
+## Saved position and next action
+
+Active worktree: `/Users/letuscode/projects/agent-platform-workflow-evaluation`; branch:
+`task/development-lifecycle-plan`; integration target: `feature/harness-backlog-review`.
+[PR276](https://github.com/jwill9999/agent-platform/pull/276) is open and unmerged. At `da8bf48`, all nine
+executed hosted checks passed, including browser/desktop E2E and SonarCloud; Sourcery and the staging
+packaged macOS VM test were skipped. This handoff amendment will change the head: refresh its checks
+before recommending merge. The lifecycle implementation evidence remains at source `cb6c547`.
+
+The repository Notion publishing skill and documentation links are committed at `da8bf48`. All eight
+substantive changed documents were mirrored and read back successfully. The iMessage policy is also
+published and its completion notification was confirmed. These are supervised agent capabilities;
+neither a background documentation watcher nor unattended orchestration messaging is implemented.
+
+On return, first review PR276 and its current checks together before owner integration. Then continue
+existing `agent-platform-pilot-zero.17` prerequisites: authoritative matching-run discovery (R1),
+governed worker artifact import (R2), and required coordinator completion (R3). Pilot planning `.13`
+remains blocked until prerequisites are satisfied; no successful autonomous task cycle is claimed.
+
+The notification adapter is a proposed bounded follow-up, recorded against
+`agent-platform-imessage-policy`; its separate implementation task/plan is not yet created or approved.
+Prepare that scope before unattended pilot use: trusted dispatcher only, fixed approved recipient,
+authorized completion/blocker/failure events, duplicate prevention, confirmed receipts, uncertain-send
+reconciliation and visible unavailable-tool failures. Workers must not inherit messaging MCP access.
+Notion orchestration publishing access is a separate future adapter, not granted by the new skill.
+Keep the reliable single-task execution path as the primary objective; do not expand into a broad
+messaging project. Preserve existing scope approvals, and respect this explicit pause until return.
+
+Beads authority remains `/Users/letuscode/projects/agent-platform`. Documentation issues
+`agent-platform-notion-doc-skill` and `agent-platform-imessage-policy` remain in progress pending PR
+integration. Preserve unrelated changes in the canonical checkout and historical records below.
+Use `/tmp/agent-platform-git-bin` for Git while the Apple licence remains unaccepted.
+
+---
+
+## Session update: documentation publication — 27 September 2026
+
+The owner-provided Notion publishing skill is now project-local under
+`.agents/skills/agent-platform-documentation/` and linked from documentation guidance. It requires
+full mirrors, version metadata, preservation of human notes and verified readback, with explicit
+pending status when access is unavailable. Beads: `agent-platform-notion-doc-skill`. This is agent
+guidance, not an orchestration Notion adapter or automatic watcher. Existing iMessage policy follows.
+
+## Owner iMessage notifications
+
+Owner authorized brief iMessage alerts for verified completion, actionable blockers and significant
+failures. AGENTS.md points to the exact recipient and delivery rules in shared instructions. Beads:
+`agent-platform-imessage-policy`. Host MCP access is available; isolated workers still do not inherit
+it. Proposed orchestration integration belongs in the trusted notification dispatcher, with recipient
+scoping, deduplication and delivery evidence; no runtime adaptation was made. Documentation amendment
+uses the existing task/development-lifecycle-plan branch/PR276. Recheck hosted gates on the amended
+head before merge. Prior lifecycle evidence remains valid for its unchanged source.
+
+---
+
+## Previous session: development lifecycle implementation — 27 September 2026
+
+PR275 was merged into `feature/harness-backlog-review` at
+`b53fdbb9cd3f184fc430d244df94c20dce48e7ff`. The active worktree is
+`/Users/letuscode/projects/agent-platform-workflow-evaluation`, branch
+`task/development-lifecycle-plan`; it incorporated that feature baseline at
+`fc65cc83c68149c7f262d8856e016871c8a11a52`.
+
+Owner explicitly authorized completing the bounded startup/recovery work and said **resume** after
+Codex restarted. Continue without repeating that approval. Execution is supervised prerequisite
+implementation, not a managed pilot. No merge, staging or live pilot is authorized by this slice.
+
+Beads `agent-platform-pilot-zero.17` remains in progress; `.13` remains blocked. Active draft PR:
+[276](https://github.com/jwill9999/agent-platform/pull/276). Requirements, execution evidence and review
+history are in [the lifecycle report](docs/reviews/development-lifecycle-qualification.md).
+
+The development startup/recovery component is implemented and pushed. Source `cb6c547` passes
+971 Linux package tests (63 optional skipped), 36 focused journal/startup tests and all 21 connected
+lifecycle/topology scenarios. Earlier 13 real-container role checks remain applicable; the unchanged
+broker image completed a real model turn and denied its revoked token. Build/lint pass. Isolated
+review19 reports no remaining actionable implementation blockers; its summary-count mismatch is fixed.
+Retained evidence distinguishes injected faults, actual Docker/process recovery, and the delayed-probe
+journal-restart fixture. Probe dispatch uncertainty survives restart and migration; malformed runtime
+configuration is rejected before adapter generation. Effects remain uncertain after containment and
+block replay. This is component qualification, not a completed autonomous task cycle.
+
+Current publication boundary: PR276 remains unmerged. Final-head hosted browser/desktop/full
+verification, SonarCloud and docs/security gates must be green before recommending owner merge.
+Continue those gates under the existing approval; fix findings rather than requesting approval again.
+After component integration, remaining R1–R3 cover authoritative run discovery, governed implementation
+artifact import and required coordinator completion before the single-task pilot. `.17` stays in
+progress and `.13` blocked. No pilot, staging promotion or feature merge occurred in this session.
+Use the Git fallback in `/tmp/agent-platform-git-bin`; do not accept the Apple licence. Beads operations
+use `/Users/letuscode/projects/agent-platform`, not this worktree. Historical checkpoints follow.
+
+---
+
+## Historical session: role enforcement repair — 26 September 2026
 
 Owner authorized auditing and technically enforcing every specialist role, separately from broker
 model access. Work is supervised under `.17` on `task/standalone-pilot-plan`, PR275 into

@@ -1,6 +1,7 @@
 import { documentFixture } from './documentFixture.js';
 import { deriveContractMaterialDigest } from '../src/planning.js';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -25,6 +26,7 @@ export async function continuationFixture(
   nowMs = Date.now(),
   role: WorkflowRole = 'code_reviewer',
   resultInput: unknown = terminalResult,
+  connectedSource = false,
 ) {
   const root = await mkdtemp(join(tmpdir(), 'continuation-'));
   const database = join(root, 'workflow.sqlite');
@@ -78,6 +80,26 @@ export async function continuationFixture(
     escalationPolicy: [],
   };
   const publishDocuments = await documentFixture(contract, root, join(root, 'source'));
+  let headSha = 'a'.repeat(40);
+  if (connectedSource) {
+    const source = join(root, 'source');
+    await mkdir(join(source, 'packages/workflow-control'), { recursive: true });
+    await writeFile(join(source, 'packages/workflow-control/example.txt'), 'fixture source');
+    const git = (args: string[]) =>
+      execFileSync(process.env.WORKFLOW_GIT_BINARY ?? '/usr/bin/git', ['-C', source, ...args], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Fixture',
+          GIT_AUTHOR_EMAIL: 'fixture@example.com',
+          GIT_COMMITTER_NAME: 'Fixture',
+          GIT_COMMITTER_EMAIL: 'fixture@example.com',
+        },
+      }).trim();
+    git(['add', 'packages']);
+    git(['commit', '-qm', 'disposable worker input']);
+    headSha = git(['rev-parse', 'HEAD']);
+  }
   const materialDigest = deriveContractMaterialDigest(contract);
   const contractId = store.createContract(contract, nowMs);
   store.createRunForTest(contractId, 'task_review', 'run');
@@ -103,7 +125,7 @@ export async function continuationFixture(
     runLeaseEpoch,
     taskLeaseEpoch,
     materialDigest,
-    headSha: 'a'.repeat(40),
+    headSha,
     inputProducerIdentity: 'orchestrator',
     input: { task: 'fixture' },
     result: resultInput,
@@ -132,7 +154,7 @@ export async function continuationFixture(
     workspaceLeaseEpoch,
     parentRunLeaseEpoch: runLeaseEpoch,
     taskLeaseEpoch,
-    headSha: 'a'.repeat(40),
+    headSha,
     inputProducerIdentity: 'orchestrator',
     resultProducerIdentity: 'child-process',
     inputArtifactDigest: artifacts.inputArtifactDigest,

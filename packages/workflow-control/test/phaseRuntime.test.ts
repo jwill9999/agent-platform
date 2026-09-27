@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import Database from 'better-sqlite3';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { InterruptionCleanupJournal } from '../src/executionInterruptions.js';
 import { ContinuationJournal } from '../src/continuationJournal.js';
 import { runParentContinuation } from '../src/continuationProcess.js';
 import { executionContractSchema, type ExecutionContract } from '../src/contracts.js';
@@ -20,7 +21,11 @@ import {
   RevocableSpecialistCredentialBroker,
 } from '../src/specialistLauncher.js';
 import { continuationFixture, terminalResult } from './continuationFixture.js';
-import { WorkflowStore, workflowContainerJournalCapability } from '../src/storage.js';
+import {
+  WorkflowStore,
+  workflowContainerJournalCapability,
+  workflowGovernedPersistenceCapability,
+} from '../src/storage.js';
 import { schedulerDockerFixture } from './schedulerDockerFixture.js';
 import {
   specialistInputEnvelopeSchema,
@@ -40,6 +45,17 @@ async function setup(
     result?: unknown;
     sourceFailure?: boolean;
     review?: boolean;
+    healthFailure?: boolean;
+    revokeFailure?: boolean;
+    removeFailure?: boolean;
+    issueFailure?: boolean;
+    issueDelayMs?: number;
+    createDelayMs?: number;
+    revokeDelayMs?: number;
+    admission?: () => Promise<void>;
+    assertAdmission?: () => void;
+    onFatal?: () => void;
+    verifySource?: () => Promise<void>;
   } = {},
 ) {
   const f = await continuationFixture(Date.now(), 'implementation_worker');
@@ -102,17 +118,39 @@ async function setup(
   await mkdir(dirname(sourceFile), { recursive: true });
   await writeFile(sourceFile, 'source');
   const credentials = new Map<string, 'active' | 'revoked'>();
+  const revocationSawInterruption: boolean[] = [];
+  const brokerState = {
+    healthFailure: options.healthFailure ?? false,
+    revokeFailure: options.revokeFailure ?? false,
+  };
   const credentialBroker = (store: WorkflowStore) =>
     RevocableSpecialistCredentialBroker.createForTest({
       store,
       conformance: async () => 'generation-one',
+      health: async () => {
+        if (brokerState.healthFailure) throw new Error('offline');
+        return 'generation-one';
+      },
       issue: async (root, _executionId, leaseId, generation) => {
-        const authFile = join(root, 'auth.json');
-        await writeFile(authFile, '{}');
+        const authFile = join(root, 'codex-auth.json');
         credentials.set(leaseId, 'active');
+        if (options.issueDelayMs)
+          await new Promise((resolve) => setTimeout(resolve, options.issueDelayMs));
+        await writeFile(authFile, '{}', { flag: 'wx' });
+        if (options.issueFailure) throw new Error('lost_issuance_reply');
         return { authFile, leaseId, generation };
       },
       revoke: async (leaseId) => {
+        revocationSawInterruption.push(
+          (
+            db
+              .prepare("SELECT COUNT(*) AS n FROM execution_interruptions WHERE run_id='run'")
+              .get() as { n: number }
+          ).n > 0,
+        );
+        if (brokerState.revokeFailure) throw new Error('offline');
+        if (options.revokeDelayMs)
+          await new Promise((resolve) => setTimeout(resolve, options.revokeDelayMs));
         credentials.set(leaseId, 'revoked');
       },
       observe: async (leaseId) => credentials.get(leaseId) ?? 'revoked',
@@ -134,7 +172,11 @@ async function setup(
         const transport = schedulerDockerFixture(async (_binary, args, settings) => {
           expect(settings.env).toEqual({});
           launches.push([...args]);
+          if (args[0] === 'rm' && options.removeFailure)
+            throw new Error('fixture_removal_unavailable');
           if (args[0] === 'create') {
+            if (options.createDelayMs)
+              await new Promise((resolve) => setTimeout(resolve, options.createDelayMs));
             const mount = args.find((arg) => /:\/workspace:(?:ro|rw)$/u.test(arg))!;
             staging.push(dirname(mount.slice(0, -':/workspace:rw'.length)));
             const promptMount = args.find((arg) => arg.endsWith(':/run/specialist/prompt.txt:ro'))!;
@@ -174,7 +216,7 @@ async function setup(
                 }),
                 String(options.delayMs ?? 0),
               ],
-              { env: {}, timeout: 15000 },
+              { env: {}, timeout: 15000, signal: settings.signal },
             );
           }
           return { stdout: 'false', stderr: '' };
@@ -204,7 +246,11 @@ async function setup(
       startTimeMs: 1,
       executableDigest: digestGovernedValue('fixture-process'),
     },
+    admission: options.admission,
+    assertAdmission: options.assertAdmission,
+    onFatal: options.onFatal,
     verifySource: async () => {
+      await options.verifySource?.();
       if (options.sourceFailure) throw new Error('source changed');
     },
   });
@@ -224,6 +270,8 @@ async function setup(
     runtime,
     launches,
     credentials,
+    revocationSawInterruption,
+    brokerState,
     config,
     launcher,
     prompts,
@@ -477,6 +525,37 @@ describe('standalone phase runtime production orchestration with fixture launche
     expect(f.store.getRun('run')?.state).toBe('repair');
   });
 
+  it('persists broker interruption even while credential revocation is unavailable', async () => {
+    const f = await setup({ delayMs: 2500 });
+    const work = f.runtime.runOnce();
+    while (!f.launches.some((args) => args[0] === 'start'))
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    f.brokerState.healthFailure = true;
+    f.brokerState.revokeFailure = true;
+    await new Promise((resolve) => setTimeout(resolve, 2200));
+    expect(f.journal.interruptions().list('run')[0]).toMatchObject({
+      reason: 'control_unavailable',
+      state: 'pending',
+      revoke: 0,
+    });
+    expect(await work).toBe(false);
+    expect(f.journal.list()[0]?.status).toBe('started');
+    expect(f.store.getRun('run')?.state).toBe('task_verification');
+    f.brokerState.healthFailure = false;
+    f.brokerState.revokeFailure = false;
+    f.db
+      .prepare("UPDATE leases SET owner_id='competing-owner',expires_at_ms=?")
+      .run(Date.now() + 60000);
+    await new Promise((resolve) => setTimeout(resolve, 2100));
+    expect(await f.runtime.runOnce()).toBe(false);
+    expect(f.journal.list()[0]?.status).toBe('blocked');
+    expect(f.journal.interruptions().list('run')[0]).toMatchObject({
+      state: 'settled',
+      reason: 'control_unavailable',
+    });
+    expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+  }, 15000);
+
   it('rejects invalid structured output and settles/revokes before marking blocked', async () => {
     const f = await setup({ result: { summary: 'not a valid result' } });
     expect(await f.runtime.runOnce()).toBe(false);
@@ -569,3 +648,427 @@ describe('standalone phase runtime production orchestration with fixture launche
     ).toContain('StandalonePhaseRuntime.create');
   });
 });
+
+it('rechecks admission after source preparation before credential issuance and dispatch', async () => {
+  let available = true;
+  const f = await setup({
+    admission: async () => {
+      if (!available) throw new Error('control_unavailable');
+    },
+    verifySource: async () => {
+      available = false;
+    },
+  });
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.launches.some((args) => args[0] === 'start' || args[0] === 'create')).toBe(false);
+  expect(f.credentials.size).toBe(0);
+});
+
+it('reconciles a crash before atomic interrupted finalization without acquiring execution leases', async () => {
+  const f = await setup({ result: { invalid: true } });
+  vi.spyOn(f.journal, 'finalizeInterrupted').mockImplementationOnce(() => {
+    throw new Error('injected_crash');
+  });
+  await expect(f.runtime.runOnce()).rejects.toThrow('injected_crash');
+  expect(f.journal.interruptions().list('run')[0]?.state).toBe('settled');
+  f.db.prepare('UPDATE phase_jobs SET lease_until_ms=0').run();
+  f.db
+    .prepare("UPDATE leases SET owner_id='competing-owner',expires_at_ms=?")
+    .run(Date.now() + 60000);
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.journal.list()[0]?.status).toBe('blocked');
+  expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+});
+it('contains the worker and latches admission when interruption persistence fails', async () => {
+  const report = vi.fn();
+  const f = await setup({ delayMs: 2500, onFatal: report });
+  const failure = vi.spyOn(f.journal, 'interrupt').mockImplementation(() => {
+    throw new Error('journal_unavailable');
+  });
+  const work = f.runtime.runOnce();
+  const rejected = expect(work).rejects.toThrow('journal_unavailable');
+  while (!f.launches.some((args) => args[0] === 'start'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  await expect(f.runtime.interruptActive('service_stopped')).rejects.toThrow('journal_unavailable');
+  expect(report).toHaveBeenCalled();
+  expect(f.runtime.cleanupStatus()).toBe('journal_unavailable');
+  expect(f.brokerState.healthFailure).toBe(false);
+  await rejected;
+  expect(f.launches.some((args) => args[0] === 'rm')).toBe(true);
+  expect([...f.credentials.values()]).toEqual(['revoked']);
+  expect(f.journal.interruptions().list('run')).toEqual([]);
+  failure.mockRestore();
+  await expect(f.runtime.runOnce()).rejects.toThrow('journal_unavailable');
+  expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+}, 10000);
+
+it('bounds shutdown when container removal fails while attach remains outstanding', async () => {
+  const f = await setup({ delayMs: 60000, removeFailure: true });
+  const work = f.runtime.runOnce();
+  while (!f.launches.some((args) => args[0] === 'start'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  const start = Date.now();
+  await f.runtime.close();
+  expect(Date.now() - start).toBeLessThan(7000);
+  expect(await work).toBe(false);
+  expect(
+    f.db.prepare('SELECT state,cancel,revoke FROM execution_interruptions').get(),
+  ).toMatchObject({ state: 'pending', cancel: 0, revoke: 1 });
+}, 10000);
+
+it('records ambiguous issuance before compensating revocation within the cleanup budget', async () => {
+  const f = await setup({ issueFailure: true });
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.revocationSawInterruption).toEqual([true]);
+  expect(f.journal.interruptions().list('run')[0]).toMatchObject({ state: 'settled', attempt: 1 });
+  expect(f.launches.some((args) => args[0] === 'create')).toBe(false);
+});
+
+it('seals the credential pathname before a delayed issuance reply can recreate token bytes', async () => {
+  const f = await setup({ issueDelayMs: 2500 });
+  const work = f.runtime.runOnce();
+  while (!f.credentials.size) await new Promise((resolve) => setTimeout(resolve, 10));
+  f.brokerState.healthFailure = true;
+  expect(await work).toBe(false);
+  const interrupted = f.journal.interruptions().list('run')[0]!;
+  expect(interrupted.state).toBe('settled');
+  expect(interrupted.effects).toBe('uncertain');
+  expect(f.runtime.cleanupStatus()).toBe('reconciliation_required');
+  const staging = f.store.getSchedulerStaging(interrupted.execution_id)!;
+  expect(await readFile(join(staging.root, 'codex-auth.json'))).toHaveLength(0);
+  expect(f.launches.some((args) => args[0] === 'create')).toBe(false);
+}, 10000);
+
+it('rejects a late credential acknowledgement after cleanup ownership changes', async () => {
+  const f = await setup({ delayMs: 10000, revokeDelayMs: 500 });
+  const work = f.runtime.runOnce();
+  const rejected = expect(work).rejects.toThrow('cleanup_fence_rejected');
+  while (!f.launches.some((args) => args[0] === 'start'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  f.brokerState.healthFailure = true;
+  while (
+    !f.db.prepare("SELECT 1 FROM scheduler_executions WHERE credential_status='revoking'").get()
+  )
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  f.db.prepare("UPDATE execution_interruptions SET owner='replacement',epoch=epoch+1").run();
+  await rejected;
+  expect(
+    f.db.prepare("SELECT credential_status FROM scheduler_executions WHERE id!='child'").get(),
+  ).toEqual({ credential_status: 'revoking' });
+  expect(f.journal.interruptions().list('run')[0]?.state).toBe('pending');
+}, 10000);
+
+it('finishes pending cleanup after the run becomes terminal without advancing it', async () => {
+  const f = await setup({ delayMs: 10000, revokeFailure: true });
+  const work = f.runtime.runOnce();
+  while (!f.launches.some((args) => args[0] === 'start'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  await f.runtime.interruptActive('service_stopped');
+  expect(await work).toBe(false);
+  f.db.prepare("UPDATE runs SET state='cancelled'").run();
+  f.brokerState.revokeFailure = false;
+  f.db.prepare('UPDATE execution_interruptions SET next_attempt_ms=0').run();
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.journal.interruptions().list('run')[0]?.state).toBe('settled');
+  expect(f.journal.list()[0]?.status).toBe('blocked');
+  expect(f.store.getRun('run')?.state).toBe('cancelled');
+  expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+});
+
+it('preserves committed success when interruption loses the completion race', async () => {
+  const f = await setup();
+  expect(await f.runtime.runOnce()).toBe(true);
+  const completed = f.journal.list().find((job) => job.status === 'completed')!;
+  expect(f.journal.interrupt(completed, 'service_stopped', Date.now())).toBe(false);
+  expect(f.journal.interruptions().list('run')).toEqual([]);
+  expect(f.store.getSchedulerExecution(completed.execution_id!)?.status).toBe('completed');
+});
+
+it('reports pending recovery for an orphan whose phase lease has not expired', async () => {
+  const f = await setup();
+  const claim = f.journal.claim('previous-runtime', 60000, Date.now())!;
+  f.journal.start(claim, Date.now());
+  expect(f.runtime.cleanupStatus()).toBe('pending');
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.launches).toEqual([]);
+});
+
+it('rejects late success and callback commitment when interruption wins the transaction race', async () => {
+  const f = await setup({ delayMs: 10000 });
+  const work = f.runtime.runOnce();
+  while (!f.launches.some((args) => args[0] === 'start'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  const job = f.journal.list().find((job) => job.status === 'started')!;
+  const execution = f.store.getSchedulerExecution(job.execution_id!)!;
+  f.journal.interrupt(job, 'service_stopped', Date.now());
+  expect(() =>
+    f.store.finishSchedulerExecution({
+      id: execution.id,
+      status: 'completed',
+      ownerId: execution.ownerId,
+      workspaceLeaseEpoch: execution.workspaceLeaseEpoch,
+      runLeaseEpoch: execution.runLeaseEpoch,
+      taskLeaseEpoch: execution.taskLeaseEpoch,
+      result: terminalResult,
+    }),
+  ).toThrow('execution_interrupted');
+  const identity = {
+    ...Object.fromEntries(Object.entries(f.callback).filter(([key]) => key !== 'callbackId')),
+    delegationId: execution.id,
+  };
+  const callback = { ...identity, callbackId: digestGovernedValue(identity) };
+  expect(() =>
+    f.store.recordDelegateCallbackAndTransition(
+      { callback, target: 'task_verification', ownerId: execution.ownerId, nowMs: Date.now() },
+      workflowGovernedPersistenceCapability,
+    ),
+  ).toThrow('execution_interrupted');
+  await f.runtime.interruptActive('service_stopped');
+  expect(await work).toBe(false);
+  expect(f.store.getRun('run')?.state).toBe('task_verification');
+  expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+});
+
+it.each(['cancel', 'revoke', 'settle'] as const)(
+  'recovers a crash after the %s effect before its durable acknowledgement',
+  async (position) => {
+    const f = await setup({ delayMs: 10000 });
+    const work = f.runtime.runOnce().catch(() => false);
+    while (!f.launches.some((args) => args[0] === 'start'))
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    const original = InterruptionCleanupJournal.prototype.confirm;
+    let injected = false;
+    const fault = vi
+      .spyOn(InterruptionCleanupJournal.prototype, 'confirm')
+      .mockImplementation(function (this: InterruptionCleanupJournal, row, operation, now) {
+        if (operation === position && !injected) {
+          injected = true;
+          throw new Error('injected_crash_before_ack');
+        }
+        return original.call(this, row, operation, now);
+      });
+    try {
+      await f.runtime.interruptActive('service_stopped').catch(() => undefined);
+      await work;
+      expect(injected).toBe(true);
+    } finally {
+      fault.mockRestore();
+    }
+    f.db.prepare('UPDATE phase_jobs SET lease_until_ms=0').run();
+    f.db
+      .prepare(
+        'UPDATE execution_interruptions SET lease_until_ms=0,attempt_deadline_ms=0,next_attempt_ms=0',
+      )
+      .run();
+    await f.runtime.runOnce();
+    expect(f.journal.interruptions().list('run')[0]).toMatchObject({
+      state: 'settled',
+      cancel: 1,
+      revoke: 1,
+      settle: 1,
+      effects: 'uncertain',
+    });
+    expect(f.journal.list()[0]?.status).toBe('blocked');
+    expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+    expect(f.store.getRun('run')?.state).toBe('task_verification');
+  },
+);
+
+it('recovers a persisted pre-reservation interruption without stranding cleanup', async () => {
+  const f = await setup();
+  const past = Date.now() - 1000;
+  const claim = f.journal.claim('lost', 500, past)!;
+  const job = f.journal.start(claim, past);
+  f.journal.interrupt(job, 'service_stopped', past + 1);
+  const reopened = new PhaseJobJournal(f.database);
+  try {
+    expect(reopened.interruptions().list('run')).toHaveLength(1);
+  } finally {
+    reopened.close();
+  }
+  expect(f.store.getSchedulerExecution(job.execution_id!)).toBeUndefined();
+  await f.runtime.runOnce();
+  expect(f.journal.interruptions().list('run')[0]?.state).toBe('settled');
+  expect(f.journal.get(job.id)?.status).toBe('blocked');
+  expect(f.launches).toEqual([]);
+});
+
+it('keeps a delayed create isolated until acknowledgement, then attaches before start', async () => {
+  const f = await setup({ createDelayMs: 300 });
+  const work = f.runtime.runOnce();
+  while (!f.launches.some((args) => args[0] === 'create'))
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  const create = f.launches.find((args) => args[0] === 'create')!;
+  expect(create[create.indexOf('--network') + 1]).toBe('none');
+  expect(f.launches.some((args) => args[0] === 'network' || args[0] === 'start')).toBe(false);
+  expect(await work).toBe(true);
+  const connect = f.launches.findIndex((args) => args[0] === 'network' && args[1] === 'connect');
+  expect(connect).toBeGreaterThan(0);
+  expect(f.launches.findIndex((args) => args[0] === 'start')).toBeGreaterThan(connect);
+});
+
+it('redacts source verification exceptions before persisting a blocked phase', async () => {
+  const f = await setup({
+    verifySource: async () => {
+      throw new Error('secret-sentinel subprocess stderr');
+    },
+  });
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.journal.list()[0]?.failure_code).toBe('phase_source_or_packet_invalid');
+  expect(JSON.stringify(f.journal.list())).not.toContain('secret-sentinel');
+});
+
+it('bounds credential filesystem settlement and rejects a late completion', async () => {
+  const f = await setup({ result: { invalid: true } });
+  let release!: () => void;
+  const blocked = vi.spyOn(f.launcher, 'removeInterruptedCredentials').mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
+  const start = Date.now();
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(Date.now() - start).toBeLessThan(6500);
+  expect(f.journal.interruptions().list('run')[0]).toMatchObject({ state: 'pending', settle: 0 });
+  release();
+  await Promise.resolve();
+  blocked.mockRestore();
+  expect(f.journal.interruptions().list('run')[0]?.settle).toBe(0);
+}, 10000);
+
+it('bounds waiting for a held container lock and prevents a late start', async () => {
+  let release!: () => void;
+  let waiting = false;
+  let released = false;
+  const f = await setup({
+    admission: async () => {
+      if (!released && f?.launches.some((args) => args[0] === 'network' && args[1] === 'connect')) {
+        waiting = true;
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+    },
+  });
+  const work = f.runtime.runOnce();
+  while (!waiting) await new Promise((resolve) => setTimeout(resolve, 10));
+  const job = f.journal.list().find((job) => job.status === 'started')!;
+  const execution = f.store.getSchedulerExecution(job.execution_id!)!;
+  const started = Date.now();
+  await expect(
+    f.launcher.stopContainer({
+      id: execution.id,
+      role: execution.role,
+      deadlineMs: execution.deadlineMs,
+    }),
+  ).rejects.toThrow('cleanup_operation_timed_out');
+  expect(Date.now() - started).toBeLessThan(6000);
+  released = true;
+  release();
+  expect(await work).toBe(false);
+  expect(f.launches.some((args) => args[0] === 'start')).toBe(false);
+}, 12000);
+
+it('redacts sensitive exceptions from both background runtime rejection paths', async () => {
+  const f = await setup();
+  const diagnostics: string[] = [];
+  const write = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+    diagnostics.push(String(chunk));
+    return true;
+  });
+  const tick = vi
+    .spyOn(f.runtime, 'runOnce')
+    .mockRejectedValue(new Error('secret-sentinel bearer-token'));
+  try {
+    f.runtime.start();
+    await vi.waitFor(() => expect(diagnostics.join('')).toContain('background_tick_failed'), {
+      timeout: 2000,
+    });
+    expect(diagnostics.join('')).toContain('background_start_failed');
+    expect(diagnostics.join('')).not.toContain('secret-sentinel');
+  } finally {
+    await f.runtime.close();
+    tick.mockRestore();
+    write.mockRestore();
+  }
+});
+
+it.each(['topology_stale', 'control_unavailable'])(
+  'rechecks service admission after synchronous document verification: %s',
+  async (code) => {
+    let failure: string | undefined;
+    const f = await setup({
+      assertAdmission: () => {
+        if (failure) throw new Error(failure);
+      },
+    });
+    const verify = f.store.verifyApprovedDocumentSnapshot.bind(f.store);
+    const spy = vi.spyOn(f.store, 'verifyApprovedDocumentSnapshot').mockImplementation((input) => {
+      const result = verify(input);
+      if (input.boundary === 'specialist.snapshot_start') failure = code;
+      return result;
+    });
+    try {
+      await f.runtime.runOnce();
+      expect(failure).toBe(code);
+      expect(f.launches.some((args) => args[0] === 'create')).toBe(true);
+      expect(f.launches.some((args) => args[0] === 'start')).toBe(false);
+      expect(f.journal.interruptions().list('run')).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
+  },
+);
+
+it.each(['admission', 'preflight'])(
+  'settles a create rejected at %s before Docker was invoked',
+  async (boundary) => {
+    const current: { value?: Awaited<ReturnType<typeof setup>> } = {};
+    const f = await setup({
+      assertAdmission: () => {
+        const execution = current.value?.store.listActiveSchedulerExecutions(
+          current.value.contract.workspaceId,
+        )[0];
+        if (
+          boundary === 'admission' &&
+          execution &&
+          current.value?.store.getSchedulerContainer(execution.id)?.status === 'create_pending'
+        )
+          throw new Error('topology_stale');
+      },
+    });
+    current.value = f;
+    const verify = f.store.verifyPlanningDocuments.bind(f.store);
+    const spy = vi.spyOn(f.store, 'verifyPlanningDocuments').mockImplementation((input) => {
+      const execution = f.store.listActiveSchedulerExecutions(f.contract.workspaceId)[0];
+      if (
+        boundary === 'preflight' &&
+        input.boundary === 'specialist.lifecycle' &&
+        execution &&
+        f.store.getSchedulerContainer(execution.id)?.status === 'create_pending'
+      )
+        throw new Error('preflight_rejected');
+      return verify(input);
+    });
+    try {
+      await f.runtime.runOnce();
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(f.launches.some((args) => args[0] === 'create')).toBe(false);
+    const interrupted = f.journal.interruptions().list('run')[0]!;
+    expect(interrupted).toMatchObject({ state: 'settled', cancel: 1, revoke: 1, settle: 1 });
+    const observer = new Database(f.database, { readonly: true });
+    try {
+      expect(
+        observer
+          .prepare('SELECT status FROM scheduler_containers WHERE execution_id=?')
+          .get(interrupted.execution_id),
+      ).toEqual({ status: 'not_dispatched' });
+    } finally {
+      observer.close();
+    }
+  },
+);

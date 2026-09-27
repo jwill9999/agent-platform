@@ -1,3 +1,4 @@
+import { withinCleanupDeadline } from './executionInterruptions.js';
 import { modelGatewayConfigSchema } from './modelGatewayConfig.js';
 import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
@@ -37,11 +38,12 @@ export const phaseRuntimeConfigSchema = z
   .object({
     runId: z.string().min(1),
     sourceRoot: absolute,
+    gitBinary: absolute.default('/usr/bin/git'),
     credentialBrokerBinary: absolute,
     modelGateway: modelGatewayConfigSchema.optional(),
     image: z
       .string()
-      .regex(/^[^\s]+@sha256:[a-f0-9]{64}$/u, 'immutable specialist image digest required'),
+      .regex(/^(?:[^\s]+@)?sha256:[a-f0-9]{64}$/u, 'immutable specialist image digest required'),
     egressNetwork: z
       .string()
       .min(1)
@@ -110,10 +112,15 @@ export class StandalonePhaseRuntime {
   readonly #owner: string;
   readonly #process: ProcessIdentity;
   readonly #verifySource: (action: ExecutePhaseAction, paths: string[]) => Promise<void>;
+  readonly #admission: () => Promise<void>;
+  readonly #assertAdmission: () => void;
   #active: Promise<boolean> | undefined;
   #timer: ReturnType<typeof setInterval> | undefined;
   #closing: Promise<void> | undefined;
   #reservation: DockerSpecialistReservation | undefined;
+  #fatalAdmission = false;
+  readonly #onFatal?: () => void;
+  readonly #cleanup = new Map<string, Promise<void>>();
 
   private constructor(input: {
     store: WorkflowStore;
@@ -123,6 +130,9 @@ export class StandalonePhaseRuntime {
     owner: string;
     process: ProcessIdentity;
     verifySource: (action: ExecutePhaseAction, paths: string[]) => Promise<void>;
+    admission?: () => Promise<void>;
+    assertAdmission?: () => void;
+    onFatal?: () => void;
   }) {
     if (!(input.launcher instanceof DockerIsolatedSpecialistLauncher))
       throw new Error('isolated specialist launcher required');
@@ -131,8 +141,11 @@ export class StandalonePhaseRuntime {
     this.#launcher = input.launcher;
     this.#config = input.config;
     this.#owner = input.owner;
+    this.#onFatal = input.onFatal;
     this.#process = input.process;
     this.#verifySource = input.verifySource;
+    this.#admission = input.admission ?? (async () => undefined);
+    this.#assertAdmission = input.assertAdmission ?? (() => undefined);
     this.#contract = input.store.getExecutionContract(input.config.runId);
     this.#vault = new SecureEvidenceVault({
       store: input.store,
@@ -141,11 +154,18 @@ export class StandalonePhaseRuntime {
     });
   }
 
-  static async create(database: string, configInput: unknown): Promise<StandalonePhaseRuntime> {
+  static async create(
+    database: string,
+    configInput: unknown,
+    admission?: () => Promise<void>,
+    cleanupOnly = false,
+    onFatal?: () => void,
+    assertAdmission?: () => void,
+  ): Promise<StandalonePhaseRuntime> {
     const config = readPhaseRuntimeConfig(configInput);
     if (!(await stat(config.credentialBrokerBinary).catch(() => undefined))?.isFile())
       throw new Error('standalone_credential_broker_unavailable');
-    const sourceRoot = await realpath(config.sourceRoot);
+    const sourceRoot = cleanupOnly ? config.sourceRoot : await realpath(config.sourceRoot);
     const store = new WorkflowStore(database);
     const journal = new PhaseJobJournal(database);
     try {
@@ -153,18 +173,18 @@ export class StandalonePhaseRuntime {
         binary: config.credentialBrokerBinary,
         store,
       });
-      await broker.assertConformant();
-      for (const args of [
-        ['image', 'inspect', config.image],
-        ['network', 'inspect', config.egressNetwork],
-      ]) {
-        await execute('/usr/local/bin/docker', args, {
-          env: {},
-          timeout: 10_000,
-          maxBuffer: 1024 * 1024,
-        }).catch(() => {
-          throw new Error(`standalone_${args[0]}_unavailable`);
-        });
+
+      if (!cleanupOnly) {
+        await broker.assertConformant();
+        for (const args of [
+          ['image', 'inspect', config.image],
+          ['network', 'inspect', config.egressNetwork],
+        ])
+          await execute('/usr/local/bin/docker', args, {
+            env: {},
+            timeout: 10000,
+            maxBuffer: 1024 * 1024,
+          });
       }
       const processIdentity = {
         pid: process.pid,
@@ -180,6 +200,9 @@ export class StandalonePhaseRuntime {
         config,
         owner,
         process: processIdentity,
+        admission,
+        onFatal,
+        assertAdmission,
         launcher: DockerIsolatedSpecialistLauncher.create({
           store,
           ownerId: owner,
@@ -191,12 +214,13 @@ export class StandalonePhaseRuntime {
           modelGateway: config.modelGateway,
         }),
         verifySource: async (action, paths) => {
-          const head = await execute('/usr/bin/git', ['-C', sourceRoot, 'rev-parse', 'HEAD'], {
+          await realpath(sourceRoot);
+          const head = await execute(config.gitBinary, ['-C', sourceRoot, 'rev-parse', 'HEAD'], {
             env: {},
             timeout: 10_000,
           });
           const dirty = await execute(
-            '/usr/bin/git',
+            config.gitBinary,
             ['-C', sourceRoot, 'status', '--porcelain', '--untracked-files=all', '--', ...paths],
             { env: {}, timeout: 10_000 },
           );
@@ -219,21 +243,105 @@ export class StandalonePhaseRuntime {
     owner: string;
     process: ProcessIdentity;
     verifySource: (action: ExecutePhaseAction, paths: string[]) => Promise<void>;
+    admission?: () => Promise<void>;
+    assertAdmission?: () => void;
+    onFatal?: () => void;
   }): StandalonePhaseRuntime {
     if (process.env.NODE_ENV !== 'test') throw new Error('test phase runtime unavailable');
     return new StandalonePhaseRuntime(input);
+  }
+
+  cleanupStatus():
+    | 'settled'
+    | 'pending'
+    | 'exhausted'
+    | 'reconciliation_required'
+    | 'journal_unavailable' {
+    if (this.#fatalAdmission) return 'journal_unavailable';
+    const rows = this.#journal.interruptions().list(this.#config.runId);
+    if (rows.some((row) => row.state === 'exhausted')) return 'exhausted';
+    if (rows.some((row) => row.state === 'pending')) return 'pending';
+    if (
+      this.#journal
+        .list()
+        .some(
+          (job) =>
+            job.run_id === this.#config.runId &&
+            job.status === 'started' &&
+            job.lease_owner !== this.#owner,
+        )
+    )
+      return 'pending';
+    if (rows.some((row) => row.effects === 'uncertain')) return 'reconciliation_required';
+    return 'settled';
+  }
+
+  requestCleanupRecovery(): number {
+    return this.#journal.interruptions().requestRecovery(this.#config.runId);
+  }
+
+  async #recordInterruption(
+    job: PhaseJob,
+    reservation: DockerSpecialistReservation,
+    reason: string,
+  ): Promise<boolean> {
+    try {
+      if (this.#journal.get(job.id)?.status === 'blocked') return false;
+      if (
+        this.#journal
+          .interruptions()
+          .list(job.run_id)
+          .some((row) => row.execution_id === reservation.id)
+      )
+        return true;
+      return this.#journal.interrupt(job, reason, Date.now());
+    } catch (error) {
+      this.#fatalAdmission = true;
+      try {
+        this.#onFatal?.();
+      } catch {
+        /* Admission remains blocked even if reporting is unavailable. */
+      }
+      // Emergency containment is intentionally independent of durable retry accounting:
+      // persistence is unavailable, so do not claim a recorded/settled outcome.
+      await Promise.allSettled([
+        this.#launcher.stopContainer(reservation),
+        this.#launcher.revokeCredential(reservation.id),
+      ]);
+      throw error;
+    }
+  }
+  async interruptActive(reason: string): Promise<void> {
+    const reservation = this.#reservation;
+    if (!reservation) return;
+    const job = this.#journal
+      .list()
+      .find((item) => item.execution_id === reservation.id && item.status === 'started');
+    if (!job) return;
+    if (!(await this.#recordInterruption(job, reservation, reason))) return;
+    const execution = this.#store.getSchedulerExecution(reservation.id)!;
+    await this.#failExecution(
+      job,
+      reservation,
+      {
+        workspace: execution.workspaceLeaseEpoch,
+        run: execution.runLeaseEpoch,
+        task: execution.taskLeaseEpoch,
+      },
+      new Error(reason),
+    );
   }
 
   start(): void {
     if (this.#closing !== undefined) throw new Error('phase runtime is closing');
     if (this.#timer !== undefined) return;
     this.#timer = setInterval(() => {
-      void this.runOnce().catch((error: unknown) =>
-        process.stderr.write(`phase runtime: ${String(error)}\n`),
+      void this.runOnce().catch(() =>
+        process.stderr.write('phase runtime: background_tick_failed\n'),
       );
     }, this.#config.pollIntervalMs);
-    void this.runOnce().catch((error: unknown) =>
-      process.stderr.write(`phase runtime: ${String(error)}\n`),
+    void this.runOnce().catch(() =>
+      process.stderr.write('phase runtime: background_start_failed\n'),
     );
   }
   async close(): Promise<void> {
@@ -245,13 +353,23 @@ export class StandalonePhaseRuntime {
         let cancellationError: unknown;
         if (this.#reservation !== undefined) {
           try {
-            await this.#launcher.cancel(this.#reservation);
-            await this.#launcher.revokeCredential(this.#reservation.id);
+            await this.interruptActive('service_stopped');
           } catch (error) {
             cancellationError = error;
           }
         }
-        await this.#active;
+        if (this.#reservation) this.#launcher.abortTransport(this.#reservation.id);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            this.#active,
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(() => reject(new Error('cleanup_pending')), 5000);
+            }),
+          ]);
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
         if (cancellationError !== undefined) throw cancellationError;
       } finally {
         this.#journal.close();
@@ -332,6 +450,8 @@ export class StandalonePhaseRuntime {
       await this.#recover(recovery);
       return false;
     }
+    if (this.#fatalAdmission) throw new Error('journal_unavailable');
+    await this.#admission();
     const claim = this.#journal.claim(
       this.#owner,
       this.#config.leaseTtlMs,
@@ -351,8 +471,8 @@ export class StandalonePhaseRuntime {
     try {
       packet = this.#packet(action);
       await this.#verifySource(action, packet.allowedPaths);
-    } catch (error) {
-      this.#journal.block(claim, String(error), Date.now());
+    } catch {
+      this.#journal.block(claim, 'phase_source_or_packet_invalid', Date.now());
       return false;
     }
     if (this.#closing !== undefined) {
@@ -375,13 +495,11 @@ export class StandalonePhaseRuntime {
           this.#fences(action);
         } catch (error) {
           heartbeatError = error;
-          cancellation ??= (async () => {
-            await this.#launcher.cancel(reservation);
-            if (this.#store.getSchedulerExecution(reservation.id) !== undefined)
-              await this.#launcher.revokeCredential(reservation.id);
-          })().catch((cancellationError: unknown) => {
-            heartbeatError = cancellationError;
-          });
+          cancellation ??= this.interruptActive('execution_authority_lost').catch(
+            (error: unknown) => {
+              heartbeatError = error;
+            },
+          );
         }
       },
       Math.floor(this.#config.leaseTtlMs / 3),
@@ -403,6 +521,27 @@ export class StandalonePhaseRuntime {
       },
       task: packet,
     });
+    let healthCheck: Promise<void> | undefined;
+    const healthTimer = setInterval(() => {
+      if (healthCheck || heartbeatError !== undefined) return;
+      healthCheck = this.#launcher
+        .assertCredentialHealthy(reservation.id)
+        .catch(async (error: unknown) => {
+          heartbeatError = error;
+          cancellation ??= this.interruptActive(
+            error instanceof Error && error.message === 'broker_generation_changed'
+              ? 'broker_generation_changed'
+              : 'control_unavailable',
+          );
+          await cancellation;
+        })
+        .catch((error: unknown) => {
+          heartbeatError = error;
+        })
+        .finally(() => {
+          healthCheck = undefined;
+        });
+    }, 2000);
     let token: string | undefined;
     try {
       this.#store.verifyPlanningDocuments({
@@ -458,7 +597,20 @@ export class StandalonePhaseRuntime {
       });
       if (inputEvidence.reference.digest !== digestGovernedValue(inputEnvelope))
         throw new Error('phase_packet_evidence_redacted');
-      const raw = await this.#launcher.launchBound(inputEnvelope, reservation);
+      const raw = await this.#launcher.launchBound(inputEnvelope, reservation, {
+        assertAdmission: () => {
+          if (this.#fatalAdmission) throw new Error('journal_unavailable');
+          this.#assertAdmission();
+        },
+        admission: async () => {
+          if (this.#fatalAdmission) throw new Error('journal_unavailable');
+          await this.#admission();
+          await this.#launcher.assertCredentialHealthy(reservation.id);
+        },
+        interrupted: async () => {
+          await this.#recordInterruption(job, reservation, 'phase_execution_interrupted');
+        },
+      });
       await cancellation;
       if (heartbeatError !== undefined) throw heartbeatError;
       const terminal = specialistTerminalResult(raw);
@@ -529,6 +681,8 @@ export class StandalonePhaseRuntime {
       return false;
     } finally {
       clearInterval(heartbeat);
+      clearInterval(healthTimer);
+      await healthCheck;
       await cancellation;
       this.#reservation = undefined;
       if (token !== undefined) this.#capabilities.revoke(token);
@@ -538,39 +692,110 @@ export class StandalonePhaseRuntime {
   async #failExecution(
     job: PhaseJob,
     reservation: DockerSpecialistReservation,
-    fences: ResourceFences,
+    _fences: ResourceFences,
     error: unknown,
   ): Promise<void> {
-    await this.#launcher.cancel(reservation);
-    if (this.#store.getSchedulerExecution(reservation.id) !== undefined)
-      await this.#launcher.revokeCredential(reservation.id);
-    if (!(await this.#launcher.waitForSettlement(reservation)))
-      throw new Error('phase_specialist_settlement_unconfirmed');
-    const execution = this.#store.getSchedulerExecution(reservation.id);
-    if (execution?.status === 'active')
-      this.#store.finishSchedulerExecution({
-        id: reservation.id,
-        status: 'escalated',
-        ownerId: this.#owner,
-        workspaceLeaseEpoch: fences.workspace,
-        runLeaseEpoch: fences.run,
-        taskLeaseEpoch: fences.task,
-        result: { reason: String(error) },
-      });
-    this.#journal.block(job, String(error), Date.now());
+    const existing = this.#cleanup.get(reservation.id);
+    if (existing) return existing;
+    const operation = this.#cleanupExecution(job, reservation, error);
+    this.#cleanup.set(reservation.id, operation);
+    try {
+      await operation;
+    } finally {
+      this.#cleanup.delete(reservation.id);
+    }
   }
-
+  async #cleanupExecution(
+    job: PhaseJob,
+    reservation: DockerSpecialistReservation,
+    error: unknown,
+  ): Promise<void> {
+    const current = this.#journal.get(job.id);
+    if (
+      current?.status === 'blocked' ||
+      current?.lease_epoch !== job.lease_epoch ||
+      current.lease_until_ms <= Date.now()
+    )
+      return;
+    const reason =
+      error instanceof Error && error.message === 'broker_generation_changed'
+        ? 'broker_generation_changed'
+        : 'phase_execution_interrupted';
+    if (!(await this.#recordInterruption(job, reservation, reason))) return;
+    const cleanup = this.#journal.interruptions();
+    const settled = cleanup
+      .list(job.run_id)
+      .some((row) => row.execution_id === reservation.id && row.state === 'settled');
+    if (settled) {
+      this.#journal.finalizeInterrupted(job);
+      return;
+    }
+    const claimed = cleanup.claim(job.run_id, this.#owner, Date.now(), 30_000, reservation.id);
+    if (!claimed) {
+      this.#journal.deferInterrupted(job, Date.now());
+      return;
+    }
+    const attempt = cleanup.begin(claimed, Date.now());
+    this.#launcher.abortTransport(reservation.id);
+    await this.#performCleanup(attempt, reservation);
+    const outcome = cleanup.finishAttempt(attempt, Date.now());
+    if (outcome.state !== 'settled') {
+      this.#journal.deferInterrupted(job, Date.now());
+      return;
+    }
+    this.#journal.finalizeInterrupted(job);
+  }
+  async #performCleanup(
+    attempt: import('./executionInterruptions.js').ExecutionInterruption,
+    reservation: DockerSpecialistReservation,
+  ): Promise<void> {
+    this.#launcher.beginInterruptionCleanup(attempt);
+    try {
+      const exists = this.#store.getSchedulerExecution(reservation.id) !== undefined;
+      const results = await Promise.allSettled([
+        exists ? this.#launcher.stopContainer(reservation) : Promise.resolve(),
+        exists ? this.#launcher.revokeCredential(reservation.id) : Promise.resolve(),
+      ]);
+      await withinCleanupDeadline(
+        this.#confirmCleanup(attempt, results, exists, reservation),
+        attempt.attempt_deadline_ms,
+      );
+    } finally {
+      this.#launcher.endInterruptionCleanup(reservation.id);
+    }
+  }
+  async #confirmCleanup(
+    attempt: import('./executionInterruptions.js').ExecutionInterruption,
+    results: PromiseSettledResult<void>[],
+    exists: boolean,
+    reservation: DockerSpecialistReservation,
+  ): Promise<void> {
+    const cleanup = this.#journal.interruptions();
+    for (const [index, operation] of ['cancel', 'revoke'].entries()) {
+      if (results[index]?.status === 'fulfilled')
+        cleanup.confirm(attempt, operation as 'cancel' | 'revoke', Date.now());
+    }
+    if (!exists || this.#launcher.isContainerSettled(reservation.id)) {
+      try {
+        if (exists)
+          await withinCleanupDeadline(
+            this.#launcher.removeInterruptedCredentials(reservation.id),
+            Math.min(attempt.attempt_deadline_ms, Date.now() + 5000),
+          );
+        cleanup.confirm(attempt, 'settle', Date.now());
+      } catch {
+        /* Leave durable settlement pending if credential material could not be removed. */
+      }
+    }
+  }
   async #recover(job: PhaseJob): Promise<void> {
-    const action = this.#journal.action(job);
-    const fences = this.#fences(action);
-    let heartbeatError: unknown;
+    // Cleanup has its own narrow lease and cannot dispatch or advance the workflow.
     const heartbeat = setInterval(
       () => {
         try {
           this.#journal.renew(job, this.#config.leaseTtlMs, Date.now());
-          this.#fences(action);
-        } catch (error) {
-          heartbeatError = error;
+        } catch {
+          /* The next fenced write rejects stale ownership. */
         }
       },
       Math.floor(this.#config.leaseTtlMs / 3),
@@ -585,38 +810,33 @@ export class StandalonePhaseRuntime {
         );
         return;
       }
-      if (execution !== undefined) {
-        const adopted = this.#store.adoptSchedulerExecution({
-          id: execution.id,
-          ownerId: this.#owner,
-          workspaceLeaseEpoch: fences.workspace,
-          runLeaseTtlMs: this.#config.leaseTtlMs,
-          taskLeaseTtlMs: this.#config.leaseTtlMs,
-          nowMs: Date.now(),
-        });
-        await this.#launcher.cancelProcessIdentity(execution.processIdentity);
-        await this.#launcher.revokeCredential(execution.id);
-        if (
-          !(await this.#launcher.waitForSettlement({
-            id: execution.id,
-            role: execution.role,
-            deadlineMs: execution.deadlineMs,
-          }))
-        )
-          throw new Error('phase_specialist_settlement_unconfirmed');
-        if (heartbeatError !== undefined) throw heartbeatError;
-        if (adopted !== undefined)
-          this.#store.finishSchedulerExecution({
-            id: execution.id,
-            status: 'escalated',
-            ownerId: this.#owner,
-            workspaceLeaseEpoch: adopted.workspaceLeaseEpoch,
-            runLeaseEpoch: adopted.runLeaseEpoch,
-            taskLeaseEpoch: adopted.taskLeaseEpoch,
-            result: { reason: 'phase_restart_requires_new_authorized_attempt' },
-          });
-      }
-      this.#journal.block(job, 'phase_restart_requires_new_authorized_attempt', Date.now());
+      if (execution) {
+        await this.#failExecution(
+          job,
+          { id: execution.id, role: execution.role, deadlineMs: execution.deadlineMs },
+          {
+            workspace: execution.workspaceLeaseEpoch,
+            run: execution.runLeaseEpoch,
+            task: execution.taskLeaseEpoch,
+          },
+          new Error('phase_restart_requires_new_authorized_attempt'),
+        );
+      } else if (
+        this.#journal
+          .interruptions()
+          .list(job.run_id)
+          .some((row) => row.execution_id === job.execution_id)
+      ) {
+        await this.#cleanupExecution(
+          job,
+          {
+            id: job.execution_id!,
+            role: 'test_runner',
+            deadlineMs: Date.now() + 15000,
+          },
+          new Error('phase_restart_requires_new_authorized_attempt'),
+        );
+      } else this.#journal.block(job, 'phase_restart_requires_new_authorized_attempt', Date.now());
     } finally {
       clearInterval(heartbeat);
     }

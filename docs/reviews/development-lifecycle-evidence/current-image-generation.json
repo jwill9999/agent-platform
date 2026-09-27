@@ -1,0 +1,64 @@
+{
+  "brokerImage": "sha256:7f8671d5961c4f9957057fa4f2d1d537266de30102f1234f6ec9771f7c265ea2",
+  "workerImage": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+  "purpose": "Current deployed broker image real generation compatibility; not autonomous pilot",
+  "passed": true,
+  "events": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a0e08f-edeb-77c0-9437-1ca20102b186"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "error",
+        "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+      }
+    },
+    {
+      "type": "turn.started"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_1",
+        "type": "agent_message",
+        "text": "LIFECYCLE_IMAGE_VERIFIED"
+      }
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 7809,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 11,
+        "reasoning_output_tokens": 0
+      }
+    }
+  ],
+  "workerConfig": "model = \"gpt-6-astra\"\nmodel_provider = \"local_lease\"\napproval_policy = \"never\"\nsandbox_mode = \"read-only\"\nweb_search = \"disabled\"\n[agents]\nenabled=false\nmax_depth=0\n[features]\napps=false\nplugins=false\nshell_tool=false\nunified_exec=false\ncode_mode=false\ncode_mode_host=false\nmulti_agent=false\nmulti_agent_v2=false\n[model_providers.local_lease]\nname=\"Local lease compatibility\"\nwire_api=\"responses\"\nrequires_openai_auth=true\nsupports_websockets=false\nbase_url=\"http://model-gateway:18102\"\n",
+  "leaseId": "current-image-generation-09815b7e-b438-4cfe-8d22-217555eedf01",
+  "generation": "6af8838d-a27b-438d-bdcc-601cbf1ec585",
+  "revocation": {
+    "leaseId": "current-image-generation-09815b7e-b438-4cfe-8d22-217555eedf01",
+    "generation": "6af8838d-a27b-438d-bdcc-601cbf1ec585",
+    "status": "revoked"
+  },
+  "postRevocationStatus": 403,
+  "workerId": "e940b9c56c7f958b04d1de9bd1141dd669670c9f95457c5a3f51e2812dca823b",
+  "workerActualImage": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+  "workerNetworks": ["lifecycle-generation-acbxvylu-internal"],
+  "workerMounts": [
+    {
+      "destination": "/auth-input.json",
+      "readOnly": true
+    },
+    {
+      "destination": "/config-input.toml",
+      "readOnly": true
+    }
+  ],
+  "brokerId": "6af6c4a8ad2390da36305f5a12d5bce826cbb66d140fd243f97710893e74968f"
+}

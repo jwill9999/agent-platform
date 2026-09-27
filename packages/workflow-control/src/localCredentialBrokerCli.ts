@@ -64,6 +64,7 @@ function parseBrokerArguments(command: string | undefined, rest: string[]) {
     values.set(name, value);
   }
   const allowed: Record<string, string[]> = {
+    health: [],
     issue: ['--execution-id', '--lease-id', '--generation', '--output'],
     revoke: ['--lease-id', '--generation'],
     status: ['--lease-id', '--generation'],
@@ -99,7 +100,10 @@ export async function runLocalBrokerCli(args: string[]) {
     const control = createCredentialControlServer(leases, gateway, key);
     gateway.gateway.listen(config.gatewayPort, config.listenHost);
     control.listen(config.controlPort, config.listenHost);
+    let stopped = false;
     const stop = () => {
+      if (stopped) return;
+      stopped = true;
       control.close();
       control.closeAllConnections();
       gateway.gateway.close(() => {
@@ -107,13 +111,20 @@ export async function runLocalBrokerCli(args: string[]) {
       });
       gateway.gateway.closeAllConnections();
     };
+    const listenerFailure = () => {
+      process.stderr.write('broker_listener_failed\n');
+      process.exitCode = 1;
+      stop();
+    };
+    gateway.gateway.once('error', listenerFailure);
+    control.once('error', listenerFailure);
     process.once('SIGTERM', stop);
     process.once('SIGINT', stop);
     return;
   }
   const values = parseBrokerArguments(command, rest);
   const body =
-    command === 'conformance'
+    command === 'conformance' || command === 'health'
       ? { operation: command }
       : {
           operation: command,
@@ -125,7 +136,7 @@ export async function runLocalBrokerCli(args: string[]) {
     method: 'POST',
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(25_000),
+    signal: AbortSignal.timeout(command === 'health' ? 2500 : 25_000),
     redirect: 'error',
   });
   if (!response.ok) throw new Error('credential control request rejected');

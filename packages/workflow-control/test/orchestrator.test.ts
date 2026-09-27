@@ -26,7 +26,10 @@ import {
   type OfficialBeadsDoltClient,
   type SpecialistProcessExecutor,
 } from '../src/index.js';
-import { workflowContainerJournalCapability } from '../src/storage.js';
+import {
+  workflowCredentialJournalCapability,
+  workflowContainerJournalCapability,
+} from '../src/storage.js';
 import { schedulerDockerFixture } from './schedulerDockerFixture.js';
 
 const roots: string[] = [];
@@ -1429,4 +1432,59 @@ if (command === 'conformance') {
     ).toThrow('before credential revocation');
     store.close();
   });
+});
+
+it('recovers revocation after a crash between never-issued credential transitions', async () => {
+  const first = await setup('scheduling');
+  const workspaceLeaseEpoch = first.orchestrator.acquireWorkspace(100, 1000);
+  const runLeaseEpoch = first.orchestrator.acquireRun('run-schedule', 100, 1000);
+  const taskLeaseEpoch = first.orchestrator.acquireTask('schedule-feature.1', 100, 1000);
+  const executionId = '55555555-5555-4555-8555-555555555555';
+  first.store.createSchedulerExecution({
+    id: executionId,
+    workspaceId: contract.workspaceId,
+    runId: 'run-schedule',
+    taskId: 'schedule-feature.1',
+    role: 'implementation_worker',
+    mode: 'mutating',
+    deadlineMs: 1500,
+    ownerId: 'owner-1',
+    workspaceLeaseEpoch,
+    runLeaseEpoch,
+    taskLeaseEpoch,
+    processIdentity: `docker:workflow-specialist-${executionId}`,
+    credentialLeaseId: `specialist:${executionId}`,
+    packet: { taskId: 'schedule-feature.1' },
+    nowMs: 1000,
+  });
+  first.store.advanceSchedulerCredential(
+    { id: executionId, leaseId: `specialist:${executionId}`, from: ['pending'], to: 'revoking' },
+    workflowCredentialJournalCapability,
+  );
+  const path = join(first.root, 'workflow.sqlite');
+  first.store.close();
+  const store = new WorkflowStore(path);
+  let externalCalls = 0;
+  const broker = RevocableSpecialistCredentialBroker.createForTest({
+    store,
+    issue: async () => {
+      throw new Error('never issue');
+    },
+    revoke: async () => {
+      externalCalls++;
+    },
+    observe: async () => {
+      externalCalls++;
+      return 'revoked';
+    },
+    conformance: async () => 'unused',
+  });
+  try {
+    expect(store.getSchedulerExecution(executionId)?.credentialBrokerGeneration).toBeNull();
+    await broker.revoke(executionId);
+    expect(store.getSchedulerExecution(executionId)?.credentialStatus).toBe('revoked');
+    expect(externalCalls).toBe(0);
+  } finally {
+    store.close();
+  }
 });

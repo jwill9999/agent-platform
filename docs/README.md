@@ -57,3 +57,16 @@ retain prior findings and evidence rather than rewriting history as a success.
 Validate changed Markdown and local references; preserve existing links. Session-specific continuation
 belongs in the repository's `session.md`, pointing to durable task and review records. Skills link this
 guide rather than maintain competing folder maps. Do not move old documents simply to satisfy the new map.
+
+## Notion publication
+
+For substantive documentation changes, use the repository
+[Notion publishing skill](../.agents/skills/agent-platform-documentation/SKILL.md) alongside the
+[documentation skill](../.agents/skills/documentation/SKILL.md). Publish the complete changed documents
+to the Agent Platform Notion hub and verify the returned content. This includes plans, task specs,
+reviews, guides, skills and session handoffs outside this folder. Explicit local-only requests take
+precedence. Repository files remain canonical; Beads remains authoritative for task status.
+
+Preserve human Notion notes and branch-specific mirror identity. A missing connection or unauthorized
+managed-run publishing path leaves Notion publication pending; it does not justify broadening worker
+access or claiming sync. The skills guide agent actions; they do not install a background watcher.
