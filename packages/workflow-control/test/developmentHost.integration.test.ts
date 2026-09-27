@@ -439,11 +439,16 @@ it.skipIf(!supplied).each(['command', 'capability', 'security-option', 'pid-name
   30000,
 );
 
-it
-  .skipIf(!supplied)
-  .each(['none', 'capability', 'security-option', 'pid-namespace', 'source-write'])(
-  'enforces role-specific worker topology against Docker inspection: %s',
-  async (change) => {
+it.skipIf(!supplied).each(
+  ['code_reviewer', 'test_runner'].flatMap((role) =>
+    ['none', 'capability', 'security-option', 'pid-namespace', 'source-write'].map((change) => ({
+      role,
+      change,
+    })),
+  ),
+)(
+  'enforces role-specific worker topology against Docker inspection: $role $change',
+  async ({ role, change }) => {
     const { assertDevelopmentWorkerPolicy } = await import('../src/developmentHost.js');
     const { SPECIALIST_SECCOMP } = await import('../src/specialistSeccomp.js');
     const root = await mkdtemp(join(homedir(), '.codex/lifecycle-worker-policy-'));
@@ -452,8 +457,8 @@ it
     const paths = ['workspace', 'scratch', 'evidence', 'codex-home', 'approved-documents'];
     const mounts = [
       ['workspace', '/workspace', change === 'source-write'],
-      ['scratch', '/scratch', true],
-      ['evidence', '/evidence', true],
+      ['scratch', '/scratch', role === 'test_runner'],
+      ['evidence', '/evidence', role === 'test_runner'],
       ['codex-home', '/codex-home', true],
       ['codex-home/config.toml', '/codex-home/config.toml', false],
       ['codex-auth.json', '/codex-home/auth.json', false],
@@ -477,8 +482,11 @@ it
         'ALL',
         '--security-opt',
         'no-new-privileges',
-        '--security-opt',
-        change === 'security-option' ? 'seccomp=unconfined' : `seccomp=${seccomp}`,
+        ...(change === 'security-option'
+          ? ['--security-opt', 'seccomp=unconfined']
+          : role === 'test_runner'
+            ? ['--security-opt', `seccomp=${seccomp}`]
+            : []),
         '--user',
         config.containerUser,
         '--tmpfs',
@@ -497,8 +505,11 @@ it
       )[0];
       const check = () =>
         assertDevelopmentWorkerPolicy(member, root, {
-          assignedRole: 'code_reviewer',
-          allowedOperations: ['workspace.read', 'process.test', 'artifact.write'],
+          assignedRole: role,
+          allowedOperations:
+            role === 'test_runner'
+              ? ['workspace.read', 'process.test', 'artifact.write']
+              : ['workspace.read'],
         });
       if (change === 'none') expect(check).not.toThrow();
       else expect(check).toThrow();
