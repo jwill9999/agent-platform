@@ -110,8 +110,17 @@ export class DevelopmentHostJournal {
         CREATE TABLE IF NOT EXISTS development_events (
           sequence INTEGER PRIMARY KEY AUTOINCREMENT,code TEXT NOT NULL,observed_at_ms INTEGER NOT NULL);
       `);
-      migrateHostColumns(this.#db);
-      migrateProbeColumns(this.#db);
+      try {
+        this.#db
+          .transaction(() => {
+            migrateHostColumns(this.#db);
+            migrateProbeColumns(this.#db);
+          })
+          .immediate();
+      } catch (error) {
+        this.#db.close();
+        throw error;
+      }
     }
   }
   close(): void {

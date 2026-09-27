@@ -18,7 +18,15 @@ import { specialistInputEnvelopeSchema } from './specialistInput.js';
 import { specialistRoleProfile } from './specialistRoleProfile.js';
 import { SPECIALIST_SECCOMP } from './specialistSeccomp.js';
 import { runLocalBrokerCli } from './localCredentialBrokerCli.js';
-import { StandalonePhaseRuntime, readPhaseRuntimeConfig } from './phaseRuntime.js';
+import {
+  StandalonePhaseRuntime,
+  readPhaseRuntimeConfig,
+  phaseRuntimeConfigSchema,
+} from './phaseRuntime.js';
+const developmentRuntimeConfigSchema = phaseRuntimeConfigSchema.omit({
+  credentialBrokerBinary: true,
+  egressNetwork: true,
+});
 
 const execute = promisify(execFile);
 const absolute = z.string().refine(isAbsolute);
@@ -105,7 +113,8 @@ async function developmentFingerprint(config: Config, runtime?: string): Promise
   const runtimeBytes = config.workflow
     ? (runtime ?? (await privateFile(config.workflow.runtimeConfig)))
     : null;
-  if (runtimeBytes !== null) parseDevelopmentJson(runtimeBytes);
+  if (runtimeBytes !== null)
+    developmentRuntimeConfigSchema.parse(parseDevelopmentJson(runtimeBytes));
   return createHash('sha256')
     .update(
       JSON.stringify({
@@ -827,7 +836,7 @@ export class DevelopmentHost {
     const runtimeBytes = await privateFile(this.#config.workflow.runtimeConfig);
     if ((await developmentFingerprint(this.#config, runtimeBytes)) !== this.#owner.config_digest)
       throw new Error('service_identity_mismatch');
-    const supplied = parseDevelopmentJson(runtimeBytes) as Record<string, unknown>;
+    const supplied = developmentRuntimeConfigSchema.parse(parseDevelopmentJson(runtimeBytes));
     const adapterConfig = join(this.#directory, 'adapter.json');
     await writeDevelopmentFile(
       adapterConfig,
@@ -842,8 +851,6 @@ export class DevelopmentHost {
     const adapter = join(this.#directory, `broker-adapter-${this.#owner.epoch}.mjs`);
     await runLocalBrokerCli([adapterConfig, 'create-adapter', '--output', adapter]);
     // Runtime authority remains in the approved journal; these transport settings belong to this owner.
-    for (const key of ['credentialBrokerBinary', 'egressNetwork'])
-      if (key in supplied) throw new Error('invalid_configuration');
     const config = readPhaseRuntimeConfig({
       ...supplied,
       credentialBrokerBinary: adapter,

@@ -304,48 +304,67 @@ it('bounds the entire topology check rather than each individual inspection', as
   );
 });
 
-it.each(['permissions', 'uid', 'json', 'runtime-json'])(
-  'reports invalid private configuration through the CLI: %s',
-  (kind) => {
-    const root = mkdtempSync(join(tmpdir(), 'lifecycle-invalid-'));
-    cleanup.push(() => rmSync(root, { recursive: true, force: true }));
-    const accountFile = join(root, 'account.json');
-    writeFileSync(accountFile, '{}', { mode: 0o600 });
-    const config = join(root, 'config.json');
+it.each([
+  'permissions',
+  'uid',
+  'json',
+  'runtime-json',
+  'runtime-null',
+  'runtime-missing-image',
+  'runtime-array',
+])('reports invalid private configuration through the CLI: %s', (kind) => {
+  const root = mkdtempSync(join(tmpdir(), 'lifecycle-invalid-'));
+  cleanup.push(() => rmSync(root, { recursive: true, force: true }));
+  const accountFile = join(root, 'account.json');
+  writeFileSync(accountFile, '{}', { mode: 0o600 });
+  const config = join(root, 'config.json');
+  writeFileSync(
+    config,
+    JSON.stringify({
+      stateDirectory: join(root, 'state'),
+      accountFile,
+      brokerImage: 'sha256:' + 'a'.repeat(64),
+      workerImage: 'sha256:' + 'b'.repeat(64),
+      containerUser: `${(process.getuid?.() ?? 501) + (kind === 'uid' ? 1 : 0)}:20`,
+      controlPort: 19341,
+      clientVersion: 'fixture',
+    }),
+    { mode: kind === 'permissions' ? 0o644 : 0o600 },
+  );
+  if (kind === 'json') writeFileSync(config, '{');
+  if (kind.startsWith('runtime-')) {
+    const runtimeConfig = join(root, 'runtime.json'),
+      database = join(root, 'workflow.sqlite');
     writeFileSync(
-      config,
-      JSON.stringify({
-        stateDirectory: join(root, 'state'),
-        accountFile,
-        brokerImage: 'sha256:' + 'a'.repeat(64),
-        workerImage: 'sha256:' + 'b'.repeat(64),
-        containerUser: `${(process.getuid?.() ?? 501) + (kind === 'uid' ? 1 : 0)}:20`,
-        controlPort: 19341,
-        clientVersion: 'fixture',
-      }),
-      { mode: kind === 'permissions' ? 0o644 : 0o600 },
+      runtimeConfig,
+      kind === 'runtime-json'
+        ? '{'
+        : kind === 'runtime-null'
+          ? 'null'
+          : kind === 'runtime-array'
+            ? '[]'
+            : JSON.stringify({
+                runId: 'fixture',
+                sourceRoot: root,
+                containerUser: `${process.getuid?.() || 501}:20`,
+              }),
+      { mode: 0o600 },
     );
-    if (kind === 'json') writeFileSync(config, '{');
-    if (kind === 'runtime-json') {
-      const runtimeConfig = join(root, 'runtime.json'),
-        database = join(root, 'workflow.sqlite');
-      writeFileSync(runtimeConfig, '{', { mode: 0o600 });
-      writeFileSync(database, '');
-      const body = JSON.parse(readFileSync(config, 'utf8'));
-      body.workflow = { runtimeConfig, database };
-      writeFileSync(config, JSON.stringify(body));
-    }
+    writeFileSync(database, '');
+    const body = JSON.parse(readFileSync(config, 'utf8'));
+    body.workflow = { runtimeConfig, database };
+    writeFileSync(config, JSON.stringify(body));
+  }
 
-    const result = spawnSync(
-      process.execPath,
-      [fileURLToPath(new URL('../dist/cli.js', import.meta.url)), 'development-host', config],
-      { env: {}, encoding: 'utf8', timeout: 10000 },
-    );
-    expect(result.status).toBe(2);
-    expect(result.stdout + result.stderr).toContain('invalid_configuration');
-    expect(result.stdout + result.stderr).not.toContain('cleanup_pending');
-  },
-);
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('../dist/cli.js', import.meta.url)), 'development-host', config],
+    { env: {}, encoding: 'utf8', timeout: 10000 },
+  );
+  expect(result.status).toBe(2);
+  expect(result.stdout + result.stderr).toContain('invalid_configuration');
+  expect(result.stdout + result.stderr).not.toContain('cleanup_pending');
+});
 
 it('persists readiness expiry so status and admission agree while the owner lease is live', () => {
   const { journal, path } = fixture();
@@ -444,4 +463,62 @@ it('requires confirmed removal before reusing a probe intent for the revoked-tok
     container_id: null,
   });
   expect(() => journal.confirmProbeRemoval(owner, id, 'a'.repeat(64))).toThrow('cleanup_pending');
+});
+
+it('rolls back probe schema addition when legacy backfill fails and preserves uncertainty after reopen', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'probe-upgrade-'));
+  cleanup.push(() => rmSync(root, { recursive: true, force: true }));
+  const path = join(root, 'state.sqlite');
+  const legacy = new Database(path);
+  legacy.exec(`CREATE TABLE development_probes (
+    id TEXT PRIMARY KEY,generation TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending',
+    created_at_ms INTEGER NOT NULL,cancel INTEGER NOT NULL DEFAULT 0,revoke INTEGER NOT NULL DEFAULT 0,
+    container_id TEXT);
+    INSERT INTO development_probes(id,generation,created_at_ms) VALUES('legacy','generation',0);
+    CREATE TRIGGER interrupt_backfill BEFORE UPDATE ON development_probes BEGIN
+      SELECT RAISE(ABORT,'injected_migration_failure');
+    END;`);
+  legacy.close();
+  chmodSync(path, 0o600);
+  expect(() => new DevelopmentHostJournal(path)).toThrow('injected_migration_failure');
+  const inspect = new Database(path);
+  try {
+    expect(
+      (
+        inspect.prepare('PRAGMA table_info(development_probes)').all() as Array<{ name: string }>
+      ).map((row) => row.name),
+    ).not.toContain('create_state');
+    inspect.exec('DROP TRIGGER interrupt_backfill');
+  } finally {
+    inspect.close();
+  }
+  const reopened = new DevelopmentHostJournal(path);
+  try {
+    const owner = reopened.claim('one');
+    expect(reopened.probeContainer('legacy')).toEqual({
+      create_state: 'create_pending',
+      container_id: null,
+    });
+    await expect(
+      reconcileDevelopmentProbe(
+        reopened,
+        owner,
+        'legacy',
+        () =>
+          settleDevelopmentProbeContainer(
+            reopened,
+            owner,
+            'legacy',
+            async () => undefined,
+            async () => undefined,
+          ),
+        async () => undefined,
+      ),
+    ).rejects.toThrow('cleanup_pending');
+    expect(reopened.pendingProbes()).toHaveLength(1);
+    expect(reopened.state()?.code).toBe('starting');
+    reopened.release(owner);
+  } finally {
+    reopened.close();
+  }
 });

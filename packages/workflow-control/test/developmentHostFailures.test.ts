@@ -91,7 +91,13 @@ it('rejects changed runtime identity after release instead of adopting a differe
     runtimeConfig = join(root, 'runtime.json'),
     database = join(root, 'workflow.sqlite');
   await writeFile(accountFile, '{}', { mode: 0o600 });
-  await writeFile(runtimeConfig, JSON.stringify({ runId: 'run-a' }), { mode: 0o600 });
+  const runtime = {
+    runId: 'run-a',
+    sourceRoot: root,
+    image: 'sha256:' + 'b'.repeat(64),
+    containerUser: `${process.getuid?.() || 501}:20`,
+  };
+  await writeFile(runtimeConfig, JSON.stringify(runtime), { mode: 0o600 });
   const { WorkflowStore } = await import('../src/storage.js');
   new WorkflowStore(database).close();
   const config = {
@@ -105,8 +111,8 @@ it('rejects changed runtime identity after release instead of adopting a differe
     workflow: { database, runtimeConfig },
   };
   const host = await DevelopmentHost.create(config);
-  // Failing runtime parsing releases the owner without changing the bound input digest.
+  // Failing runtime attachment releases the owner without changing the bound input digest.
   await expect(host.run()).rejects.toThrow();
-  await writeFile(runtimeConfig, JSON.stringify({ runId: 'run-b' }), { mode: 0o600 });
+  await writeFile(runtimeConfig, JSON.stringify({ ...runtime, runId: 'run-b' }), { mode: 0o600 });
   await expect(DevelopmentHost.create(config, true)).rejects.toThrow('service_identity_mismatch');
 });

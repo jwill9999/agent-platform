@@ -550,7 +550,7 @@ it.skipIf(!supplied)(
           (await execute('/usr/local/bin/docker', ['inspect', known ?? name])).stdout,
         )[0].Id as string;
       } catch (error) {
-        if ((error as { stderr?: string }).stderr?.includes('No such object')) return undefined;
+        if (/no such object/iu.test((error as { stderr?: string }).stderr ?? '')) return undefined;
         throw error;
       }
     };
