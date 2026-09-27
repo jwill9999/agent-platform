@@ -105,6 +105,36 @@ export class JournaledMutationBroker {
     return transition;
   }
 
+  #adoptRecovery(
+    prepared: TransitionRecord,
+    input: Parameters<JournaledMutationBroker['reconcilePrepared']>[0],
+  ): TransitionRecord {
+    if (
+      prepared.transitionContext.closeoutLeaseEpoch !== undefined &&
+      input.recoveryCloseoutLeaseEpoch === undefined
+    ) {
+      throw new Error('recovery closeout lease is required');
+    }
+    return prepared.leaseOwnerId === input.recoveryOwnerId &&
+      prepared.leaseEpoch === input.recoveryLeaseEpoch
+      ? prepared
+      : this.#store.adoptPreparedTransition(
+          prepared.id,
+          input.recoveryOwnerId,
+          input.recoveryLeaseEpoch,
+          this.#clock(),
+          {
+            ...prepared.transitionContext,
+            workspaceLeaseEpoch: input.recoveryWorkspaceLeaseEpoch,
+            taskLeaseEpoch: recoveryTaskLeaseEpoch(prepared, input.recoveryTaskLeaseEpochs),
+            closeoutLeaseEpoch:
+              prepared.transitionContext.closeoutLeaseEpoch === undefined
+                ? undefined
+                : input.recoveryCloseoutLeaseEpoch,
+          },
+        );
+  }
+
   async reconcilePrepared(input: {
     runId: string;
     recoveryOwnerId: string;
@@ -125,31 +155,7 @@ export class JournaledMutationBroker {
           input.operations === undefined || input.operations.includes(transition.operation),
       );
     for (const prepared of preparedTransitions) {
-      if (
-        prepared.transitionContext.closeoutLeaseEpoch !== undefined &&
-        input.recoveryCloseoutLeaseEpoch === undefined
-      ) {
-        throw new Error('recovery closeout lease is required');
-      }
-      const transition =
-        prepared.leaseOwnerId === input.recoveryOwnerId &&
-        prepared.leaseEpoch === input.recoveryLeaseEpoch
-          ? prepared
-          : this.#store.adoptPreparedTransition(
-              prepared.id,
-              input.recoveryOwnerId,
-              input.recoveryLeaseEpoch,
-              this.#clock(),
-              {
-                ...prepared.transitionContext,
-                workspaceLeaseEpoch: input.recoveryWorkspaceLeaseEpoch,
-                taskLeaseEpoch: recoveryTaskLeaseEpoch(prepared, input.recoveryTaskLeaseEpochs),
-                closeoutLeaseEpoch:
-                  prepared.transitionContext.closeoutLeaseEpoch === undefined
-                    ? undefined
-                    : input.recoveryCloseoutLeaseEpoch,
-              },
-            );
+      const transition = this.#adoptRecovery(prepared, input);
       // The same still-live owner can reconcile an uncertain effect without inventing a takeover.
       // This also rejects stale resource epochs before observing or replaying any external effect.
       this.#store.assertTransitionLeases(

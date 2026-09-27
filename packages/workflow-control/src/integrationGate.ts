@@ -1,3 +1,4 @@
+import type { WorkflowStore } from './storage.js';
 import { executeCoordinatorProcess } from './coordinatorProcess.js';
 import { TrustedSourceGit } from './sourceGit.js';
 import { execFile } from 'node:child_process';
@@ -31,9 +32,11 @@ export class LocalExactHeadIntegrationGate {
   readonly #artifacts: JournaledArtifactRecorder;
   readonly #checkCommands: Readonly<Record<string, readonly [string, ...string[]]>>;
   readonly #executor: GateCommandExecutor;
+  readonly #store?: WorkflowStore;
   readonly #approvedParentShas?: Readonly<Record<string, string>>;
 
   private constructor(input: {
+    store?: WorkflowStore;
     workspaceRoot: string;
     approvedParentShas?: Readonly<Record<string, string>>;
     artifacts: JournaledArtifactRecorder;
@@ -45,6 +48,7 @@ export class LocalExactHeadIntegrationGate {
     if (!(input.artifacts instanceof JournaledArtifactRecorder)) {
       throw new Error('exact-head gate requires the journaled artifact recorder');
     }
+    this.#store = input.store;
     this.#workspaceRoot = input.workspaceRoot;
     this.#approvedParentShas = input.approvedParentShas;
     this.#artifacts = input.artifacts;
@@ -77,6 +81,7 @@ export class LocalExactHeadIntegrationGate {
   }
 
   static create(input: {
+    store?: WorkflowStore;
     gitPin?: { path: string; digest: string };
     admission?: { assertAuthority: () => void; signal: AbortSignal };
     workspaceRoot: string;
@@ -114,7 +119,10 @@ export class LocalExactHeadIntegrationGate {
     });
     const headSha = head.stdout.trim();
     if (!/^[a-f0-9]{40,64}$/u.test(headSha)) throw new Error('Git returned an invalid head SHA');
-    const task = input.contract.tasks.find((candidate) => candidate.id === input.taskId);
+    this.#store?.assertRunUsesContract(input.runId, input.contract);
+    const task = this.#store
+      ? this.#store.getEffectiveTask(input.runId, input.taskId)
+      : input.contract.tasks.find((candidate) => candidate.id === input.taskId);
     if (task === undefined) throw new Error('integration gate task is outside the contract');
     const parent = await this.#executor('git', ['rev-parse', task.branchParent], {
       cwd: workspaceRoot,
@@ -122,7 +130,12 @@ export class LocalExactHeadIntegrationGate {
       maxBuffer: 64 * 1024,
     });
     const baseSha = parent.stdout.trim();
-    if (this.#approvedParentShas && this.#approvedParentShas[input.taskId] !== baseSha)
+    const repair = this.#store?.getRepairChildIntent(input.taskId);
+    const approvedParent =
+      repair?.status === 'committed' && repair.runId === input.runId
+        ? (repair.request as { branchParentSha: string }).branchParentSha
+        : this.#approvedParentShas?.[input.taskId];
+    if ((this.#approvedParentShas || repair) && approvedParent !== baseSha)
       throw new Error('integration parent differs from approved SHA');
     if (!/^[a-f0-9]{40,64}$/u.test(baseSha)) {
       throw new Error('Git returned an invalid branch-parent SHA');

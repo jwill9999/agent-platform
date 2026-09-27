@@ -1,3 +1,5 @@
+import { repairChildForCallback } from './repairPlanningJournal.js';
+import { resolveEffectiveTask } from './effectiveTaskAuthority.js';
 import { coordinatorProofSchema, verifyCoordinatorProof } from './coordinatorReceipts.js';
 import {
   initializeInterruptionSchema,
@@ -73,14 +75,19 @@ export const executePhaseActionSchema = z
   );
 export type ExecutePhaseAction = z.infer<typeof executePhaseActionSchema>;
 
-export function phaseActionForCallback(input: unknown): ExecutePhaseAction {
+export function phaseActionForCallback(
+  input: unknown,
+  database?: Database.Database,
+): ExecutePhaseAction {
   const callback = delegateCallbackSchema.parse(input);
+  const repair =
+    callback.parentState === 'repair_planning' && callback.terminalStatus === 'continue';
   return executePhaseActionSchema.parse({
     kind: 'execute_phase',
     callbackId: callback.callbackId,
     workspaceId: callback.workspaceId,
     runId: callback.parentRunId,
-    taskId: callback.parentTaskId,
+    taskId: repair && database ? repairChildForCallback(database, callback) : callback.parentTaskId,
     runVersion: callback.parentRunVersion + 1,
     contractVersion: callback.contractVersion,
     policyDigest: callback.policyDigest,
@@ -157,7 +164,7 @@ export function assertPhaseJobAuthority(
       .get(action.callbackId!) as { callback_json: string } | undefined;
     if (
       !record ||
-      JSON.stringify(phaseActionForCallback(JSON.parse(record.callback_json))) !==
+      JSON.stringify(phaseActionForCallback(JSON.parse(record.callback_json), database)) !==
         JSON.stringify(action)
     )
       throw new Error('phase callback binding rejected');
@@ -180,9 +187,12 @@ export function assertPhaseJobAuthority(
     throw new Error('phase contract material is stale');
   if (
     !contract.authority.allowedActions.includes('workflow.delegate_callback') ||
-    !contract.tasks
-      .find((task) => task.id === action.taskId)
-      ?.allowedOperations.includes('workflow.delegate_callback')
+    !resolveEffectiveTask(
+      database,
+      contract,
+      action.runId,
+      action.taskId,
+    )?.task.allowedOperations.includes('workflow.delegate_callback')
   )
     throw new Error('phase callback authority unavailable');
   const approval = database
@@ -540,7 +550,13 @@ export class PhaseJobJournal {
     if (
       !Number.isSafeInteger(maximum) ||
       maximum < 0 ||
-      !PHASE_JOB_DISPATCH[this.action(job).phase].endsWith('_coordinator')
+      (!PHASE_JOB_DISPATCH[this.action(job).phase].endsWith('_coordinator') &&
+        !(
+          this.action(job).phase === 'repair_planning' &&
+          this.#database
+            .prepare('SELECT 1 FROM repair_planning_handoffs WHERE execution_id=?')
+            .get(job.execution_id)
+        ))
     )
       throw new Error('invalid coordinator recovery policy');
     this.#database
@@ -552,7 +568,10 @@ export class PhaseJobJournal {
           throw new Error('coordinator recovery budget changed');
         const attempts = (previous?.attempts ?? 0) + 1;
         if (attempts > maximum) {
-          this.block(job, 'phase_coordinator_recovery_exhausted', nowMs);
+          if (this.action(job).phase === 'repair_planning') {
+            this.interrupt(job, 'phase_coordinator_recovery_exhausted', nowMs);
+            this.deferInterrupted(job, nowMs);
+          } else this.block(job, 'phase_coordinator_recovery_exhausted', nowMs);
         } else {
           this.#update(
             job,

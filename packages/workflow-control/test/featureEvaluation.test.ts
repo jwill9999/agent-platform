@@ -23,6 +23,7 @@ import {
   type RepairChildMutationPort,
   type RepairChildRequest,
 } from '../src/index.js';
+import { workflowEvaluationMutationCapability } from '../src/storage.js';
 import { createProductionBeadsDoltPort } from '../src/reconciliation.js';
 
 const roots: string[] = [];
@@ -323,7 +324,7 @@ function repairRequest(overrides: Partial<RepairChildRequest> = {}): RepairChild
 }
 
 async function repairSetup(port = new MemoryRepairPort()) {
-  const { store, vault } = await setup();
+  const { store, vault, root } = await setup();
   const references = await Promise.all([
     evidence(vault, 'behavior'),
     evidence(vault, 'security failure'),
@@ -382,7 +383,7 @@ async function repairSetup(port = new MemoryRepairPort()) {
     finding,
     findingDigest: deriveEvaluationDigest(finding),
   });
-  return { store, port, fence, broker, request };
+  return { store, port, fence, broker, request, root };
 }
 
 describe('DurableRepairChildBroker', () => {
@@ -396,6 +397,17 @@ describe('DurableRepairChildBroker', () => {
     await expect(broker.execute(request, fence)).resolves.toMatchObject({
       status: 'committed',
     });
+    expect(port.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let an execution identity overwrite the child identity through an extended fence', async () => {
+    const { broker, port, fence, request, store } = await repairSetup();
+    const executionAuthority = { ...fence, id: 'unrelated-execution' };
+    await expect(broker.execute(request, executionAuthority)).resolves.toMatchObject({
+      id: request.id,
+      status: 'committed',
+    });
+    expect(store.getRepairChildIntent('unrelated-execution')).toBeUndefined();
     expect(port.mutate).toHaveBeenCalledTimes(1);
   });
 
@@ -950,4 +962,38 @@ describe('OfficialRepairChildPort', () => {
     expect(refSha).toBe('2'.repeat(40));
     await expect(port.observe(request)).resolves.toMatchObject({ kind: 'conflict' });
   });
+});
+
+it('charges child verifier retries with new finding IDs against the feature reservation budget', async () => {
+  const { store, broker, request, fence, root } = await repairSetup();
+  await broker.execute(request, fence);
+  const db = new Database(join(root, 'workflow.sqlite'));
+  try {
+    db.prepare(
+      `INSERT INTO repair_dispatches
+      (id,run_id,task_id,finding_id,task_attempt,finding_attempt,owner_role,finding_digest,
+       failure_head_sha,change_digest,packet_json,status,created_at_ms,updated_at_ms)
+      VALUES('child-retry','run-evaluation',?,'new-verifier-finding',2,1,'implementation_worker',?,?,?,'{}','dispatched',2200,2200)`,
+    ).run(request.id, request.findingDigest, headSha, request.findingDigest);
+    const input = {
+      runId: request.runId,
+      featureId: request.featureId,
+      childId: request.id,
+      findingId: request.finding.id,
+      policy: contract.retryPolicy,
+    };
+    expect(
+      store.remainingRepairBudgetForChild(input, workflowEvaluationMutationCapability)
+        .findingAttempts,
+    ).toBe(0);
+    expect(() =>
+      store.remainingRepairBudgetForChild(
+        { ...input, childId: 'feature-evaluation.repair.2', findingId: 'another-finding' },
+        workflowEvaluationMutationCapability,
+      ),
+    ).toThrow('retry budget is exhausted');
+  } finally {
+    db.close();
+    store.close();
+  }
 });

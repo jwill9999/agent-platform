@@ -441,6 +441,34 @@ function monotonicClock(clock: () => number): () => number {
   };
 }
 
+function pipelineCheckResult(
+  operation: DeliveryOperationRecord,
+  request: Extract<DeliveryRequest, { kind: 'github.checks' }>,
+) {
+  const result = operation.result as Record<string, unknown> | null;
+  const checks = result?.checks;
+  const eventIdentity = result?.eventIdentity;
+  if (
+    typeof checks !== 'object' ||
+    checks === null ||
+    Array.isArray(checks) ||
+    typeof eventIdentity !== 'string' ||
+    eventIdentity === ''
+  ) {
+    throw new Error('GitHub checks result has invalid durable wait evidence');
+  }
+  const checkRecord = checks as Record<string, unknown>;
+  if (
+    !sameOrderedSet(Object.keys(checkRecord), request.requiredChecks) ||
+    Object.values(checkRecord).some(
+      (value) => value !== 'pending' && value !== 'success' && value !== 'failure',
+    )
+  ) {
+    throw new Error('GitHub checks result changes the approved check set');
+  }
+  return { checkRecord, eventIdentity };
+}
+
 export class DurableDeliveryBroker {
   readonly #store: WorkflowStore;
   readonly #contract: ExecutionContract;
@@ -732,27 +760,7 @@ export class DurableDeliveryBroker {
       },
       workflowDeliveryMutationCapability,
     );
-    const result = operation.result as Record<string, unknown> | null;
-    const checks = result?.checks;
-    const eventIdentity = result?.eventIdentity;
-    if (
-      typeof checks !== 'object' ||
-      checks === null ||
-      Array.isArray(checks) ||
-      typeof eventIdentity !== 'string' ||
-      eventIdentity === ''
-    ) {
-      throw new Error('GitHub checks result has invalid durable wait evidence');
-    }
-    const checkRecord = checks as Record<string, unknown>;
-    if (
-      !sameOrderedSet(Object.keys(checkRecord), request.requiredChecks) ||
-      Object.values(checkRecord).some(
-        (value) => value !== 'pending' && value !== 'success' && value !== 'failure',
-      )
-    ) {
-      throw new Error('GitHub checks result changes the approved check set');
-    }
+    const { checkRecord, eventIdentity } = pipelineCheckResult(operation, request);
     const checkId = deriveDeliveryRequestDigest([
       request.repository,
       request.pullRequestNumber,
@@ -767,6 +775,12 @@ export class DurableDeliveryBroker {
         : undefined;
     if (this.#store.getDeliveryWaitEscalation(request.runId, checkId) !== undefined) {
       throw new Error('pipeline wait is already terminally escalated');
+    }
+    const qualification = this.#store.getPassedPipelineObservation(operation.id);
+    if (qualification) {
+      if (qualification.checkId !== checkId || existing !== undefined)
+        throw new Error('pipeline qualification replay conflicts with durable wait');
+      return { kind: 'passed', checkId };
     }
     const effectiveDeadline = Math.min(
       existing?.absoluteDeadlineMs ?? input.absoluteDeadlineMs,
@@ -808,7 +822,11 @@ export class DurableDeliveryBroker {
       return { kind: 'failed', checkId, failedChecks };
     }
     if (request.requiredChecks.every((check) => checkRecord[check] === 'success')) {
-      if (existing !== undefined) this.#completeWait(request, checkId, input.fence);
+      this.#store.recordPassedPipelineObservation(
+        { operationId: operation.id, checkId, deadlineMs: effectiveDeadline, ...input.fence },
+        this.#clock,
+        workflowDeliveryMutationCapability,
+      );
       return { kind: 'passed', checkId };
     }
     const nowMs = this.#clock();

@@ -66,7 +66,7 @@ export const featureEvaluationRequestSchema = z
   })
   .strict();
 
-const persistedEvaluationResultSchema = featureEvaluationRequestSchema
+export const persistedEvaluationResultSchema = featureEvaluationRequestSchema
   .extend({
     verdict: z.enum(['passed', 'needs_repair']),
     failedCriteria: z.array(z.string()),
@@ -504,7 +504,15 @@ export class DurableRepairChildBroker {
     return new DurableRepairChildBroker({ ...input, clock: Date.now });
   }
 
-  async execute(input: unknown, fence: RepairChildFence): Promise<RepairChildIntentRecord> {
+  async execute(input: unknown, authority: RepairChildFence): Promise<RepairChildIntentRecord> {
+    // Copy only fence fields: structural callers may carry an execution id that must
+    // never overwrite the immutable child id when preparing an intent.
+    const fence: RepairChildFence = {
+      ownerId: authority.ownerId,
+      workspaceLeaseEpoch: authority.workspaceLeaseEpoch,
+      runLeaseEpoch: authority.runLeaseEpoch,
+      taskLeaseEpoch: authority.taskLeaseEpoch,
+    };
     const request = repairChildRequestSchema.parse(input);
     this.#store.assertRunUsesContract(request.runId, this.#contract);
     const replay = this.#store.getRepairChildIntent(request.id);

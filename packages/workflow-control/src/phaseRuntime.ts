@@ -1,3 +1,4 @@
+import { assertRepairPlanningResult, repairChildContext } from './repairPlanning.js';
 import {
   StandaloneCoordinators,
   standaloneCoordinatorConfigSchema,
@@ -22,7 +23,7 @@ import {
 } from './authorization.js';
 import {
   assertAgentResultAccepted,
-  assertTaskPacketWithinContract,
+  assertExactCriterionPartition,
   type AgentResult,
   type ExecutionContract,
   type TaskPacket,
@@ -104,6 +105,22 @@ function phaseTerminalStatus(
     terminal.remainingRisks.length > 0
   ) {
     return 'blocked';
+  }
+  if (phase === 'repair_planning') {
+    try {
+      if (!packet.repairPlanningContext) return 'blocked';
+      assertRepairPlanningResult(terminal, packet.repairPlanningContext);
+      return 'continue';
+    } catch {
+      return 'blocked';
+    }
+  }
+  if (phase === 'feature_evaluation') {
+    try {
+      assertExactCriterionPartition(terminal, packet.acceptanceCriteria);
+    } catch {
+      return 'blocked';
+    }
   }
   try {
     assertAgentResultAccepted(
@@ -468,10 +485,11 @@ export class StandalonePhaseRuntime {
       action.phase !== 'implementing' &&
       action.phase !== 'task_verification' &&
       action.phase !== 'task_review' &&
-      action.phase !== 'feature_evaluation'
+      action.phase !== 'feature_evaluation' &&
+      action.phase !== 'repair_planning'
     )
       throw new Error('phase_executor_unavailable');
-    const task = this.#contract.tasks.find((item) => item.id === action.taskId);
+    const task = this.#store.getEffectiveTask(action.runId, action.taskId);
     const role =
       action.phase === 'implementing' ? task?.assignedRole : task?.phaseRoles?.[action.phase];
     if (task === undefined || role === undefined)
@@ -501,6 +519,19 @@ export class StandalonePhaseRuntime {
       retryBudget: this.#contract.retryPolicy,
       evidence: [],
     };
+    const child = this.#store.getRepairChildIntent(action.taskId);
+    if (child?.status === 'committed') {
+      const request = child.request as import('./featureEvaluation.js').RepairChildRequest;
+      packet.repairChildContext = repairChildContext(request);
+      packet.evidence = request.finding.evidence;
+    }
+    if (action.phase === 'repair_planning') {
+      if (!this.#coordinators) throw new Error('repair_planning_coordinator_unavailable');
+      packet.repairPlanningContext = this.#coordinators.repairPlanningContext(action);
+      packet.evidence = packet.repairPlanningContext.failedCriteria.flatMap(
+        (item) => item.evidence,
+      );
+    }
     this.#addRepairContext(action, packet);
     if (
       !packet.allowedOperations.includes('workspace.read') ||
@@ -512,8 +543,7 @@ export class StandalonePhaseRuntime {
       (role !== 'implementation_worker' || !packet.allowedOperations.includes('workspace.patch'))
     )
       throw new Error('phase_patch_authority_unavailable');
-    assertTaskPacketWithinContract(
-      this.#contract,
+    this.#store.assertTaskPacketAuthority(
       packet,
       action.phase === 'implementing' ? undefined : action.phase,
     );
@@ -598,14 +628,13 @@ export class StandalonePhaseRuntime {
     }
   }
 
-  #reserveAttempt(job: PhaseJob, action: ExecutePhaseAction): boolean {
-    if (action.phase !== 'implementing') return true;
+  #reserveAttempt(job: PhaseJob, action: ExecutePhaseAction): number | undefined {
+    if (action.phase !== 'implementing') return 1;
     try {
-      this.#journal.reserveImplementationAttempt(job, Date.now());
-      return true;
+      return this.#journal.reserveImplementationAttempt(job, Date.now());
     } catch {
       this.#journal.block(job, 'phase_implementation_attempt_rejected', Date.now());
-      return false;
+      return undefined;
     }
   }
 
@@ -627,7 +656,8 @@ export class StandalonePhaseRuntime {
       return false;
     }
     const job = this.#journal.start(claim, Date.now());
-    if (!this.#reserveAttempt(job, action)) return false;
+    const attemptNumber = this.#reserveAttempt(job, action);
+    if (attemptNumber === undefined) return false;
     let heartbeatError: unknown;
     let cancellation: Promise<void> | undefined;
     const heartbeat = setInterval(
@@ -714,6 +744,7 @@ export class StandalonePhaseRuntime {
       const evidenceCapability: EvidenceCapability = { token, observedProcess: this.#process };
       this.#store.createSchedulerExecution({
         id: reservation.id,
+        attemptNumber,
         workspaceId: action.workspaceId,
         runId: action.runId,
         taskId: action.taskId,
@@ -808,7 +839,18 @@ export class StandalonePhaseRuntime {
       });
       return true;
     } catch (error) {
-      await this.#failExecution(job, reservation, fences, error);
+      if (
+        action.phase === 'repair_planning' &&
+        this.#store.getRepairPlanningHandoff(reservation.id) &&
+        !this.#closing &&
+        heartbeatError === undefined
+      ) {
+        this.#journal.deferCoordinator(
+          job,
+          this.#contract.retryPolicy.infrastructureAttempts,
+          Date.now(),
+        );
+      } else await this.#failExecution(job, reservation, fences, error);
       return false;
     } finally {
       clearInterval(heartbeat);
@@ -960,13 +1002,26 @@ export class StandalonePhaseRuntime {
         summary: terminal.summary,
         criteria: packet.acceptanceCriteria.map((criterion) => ({
           criterion,
-          status:
-            terminalStatus === 'continue' && terminal.acceptanceCriteria.passed.includes(criterion)
-              ? 'passed'
-              : 'failed',
+          status: terminal.acceptanceCriteria.passed.includes(criterion) ? 'passed' : 'failed',
           summary: terminal.summary,
           evidence: [resultEvidence.reference],
         })),
+      });
+    }
+    if (action.phase === 'repair_planning' && terminalStatus === 'continue') {
+      if (!this.#coordinators) throw new Error('repair_planning_coordinator_unavailable');
+      await this.#coordinators.completeRepairPlanning({
+        job,
+        action,
+        terminal,
+        resultDigest: resultEvidence.reference.digest,
+        authority: {
+          id: executionId,
+          ownerId: this.#owner,
+          workspaceLeaseEpoch: fences.workspace,
+          runLeaseEpoch: fences.run,
+          taskLeaseEpoch: fences.task,
+        },
       });
     }
     const identity = {
@@ -1115,15 +1170,19 @@ export class StandalonePhaseRuntime {
     try {
       await this.#runCoordinator(job, action, this.#fences(action));
     } catch (error) {
-      if (error instanceof Error && error.message === 'resource lease is held by another owner')
-        this.#journal.deferCoordinatorAdmission(job, Date.now());
-      else
-        this.#journal.deferCoordinator(
-          job,
-          this.#contract.retryPolicy.infrastructureAttempts,
-          Date.now(),
-        );
+      this.#deferCoordinatorRecovery(job, error);
     }
+  }
+
+  #deferCoordinatorRecovery(job: PhaseJob, error: unknown): void {
+    if (error instanceof Error && error.message === 'resource lease is held by another owner')
+      this.#journal.deferCoordinatorAdmission(job, Date.now());
+    else
+      this.#journal.deferCoordinator(
+        job,
+        this.#contract.retryPolicy.infrastructureAttempts,
+        Date.now(),
+      );
   }
 
   async #recover(job: PhaseJob): Promise<void> {
@@ -1151,6 +1210,28 @@ export class StandalonePhaseRuntime {
           { executionId: execution.id, evidenceDigest: digestGovernedValue(execution.result) },
           Date.now(),
         );
+        return;
+      }
+      if (
+        execution &&
+        this.#journal
+          .interruptions()
+          .list(job.run_id)
+          .some((row) => row.execution_id === execution.id)
+      ) {
+        await this.#cleanupExecution(
+          job,
+          { id: execution.id, role: execution.role, deadlineMs: execution.deadlineMs },
+          new Error('phase_recovery_cleanup_required'),
+        );
+        return;
+      }
+      if (execution && this.#store.getRepairPlanningHandoff(execution.id)) {
+        try {
+          await this.#recoverRepairPlanning(job);
+        } catch (error) {
+          this.#deferCoordinatorRecovery(job, error);
+        }
         return;
       }
       if (execution && this.#store.getImplementationImport(execution.id)) {
@@ -1190,6 +1271,77 @@ export class StandalonePhaseRuntime {
       } else this.#journal.block(job, 'phase_restart_requires_new_authorized_attempt', Date.now());
     } finally {
       clearInterval(heartbeat);
+    }
+  }
+
+  async #recoverRepairPlanning(job: PhaseJob): Promise<void> {
+    if (this.#cleanupOnly || this.#fatalAdmission || this.#closing)
+      throw new Error('repair planning recovery unavailable');
+    await this.#admission();
+    this.#assertAdmission();
+    const action = this.#journal.action(job);
+    const fences = this.#fences(action);
+    const execution = this.#store.adoptRepairPlanningHandoff({
+      authority: {
+        id: job.execution_id!,
+        ownerId: this.#owner,
+        workspaceLeaseEpoch: fences.workspace,
+        runLeaseEpoch: fences.run,
+        taskLeaseEpoch: fences.task,
+      },
+      phaseLeaseEpoch: job.lease_epoch,
+      sourceRoot: this.#config.sourceRoot,
+    });
+    const envelope = specialistInputEnvelopeSchema.parse(execution.packet);
+    const handoff = this.#store.getRepairPlanningHandoff(execution.id)!;
+    await this.#verifySource(action, envelope.task.allowedPaths);
+    const capability = this.#capabilities.issue({
+      workspaceId: action.workspaceId,
+      runId: action.runId,
+      role: 'workflow_orchestrator',
+      contractVersion: action.contractVersion,
+      policyDigest: action.policyDigest,
+      operations: ['workspace.read', 'artifact.write'],
+      allowedPaths: envelope.task.allowedPaths,
+      expiresAtMs: execution.deadlineMs,
+      process: this.#process,
+    });
+    const heartbeat = setInterval(
+      () => {
+        try {
+          for (const [kind, id, epoch] of [
+            ['workspace', action.workspaceId, fences.workspace],
+            ['run', action.runId, fences.run],
+            ['task', action.taskId, fences.task],
+          ] as const)
+            this.#store.assertResourceLease(kind, id, this.#owner, epoch, Date.now());
+          this.#assertAdmission();
+          this.#fences(action);
+        } catch {
+          this.#coordinators?.cancelExecution();
+        }
+      },
+      Math.floor(this.#config.leaseTtlMs / 3),
+    );
+    try {
+      const inputDigest = digestGovernedValue(envelope);
+      const input = this.#store.getSecureEvidence(inputDigest, action.runId, action.taskId);
+      if (!input) throw new Error('repair planning original input evidence missing');
+      await this.#completeSpecialist({
+        job,
+        action,
+        packet: envelope.task,
+        fences,
+        executionId: execution.id,
+        terminal: handoff.terminal,
+        resultHead: action.headSha,
+        inputDigest,
+        evidenceCapability: { token: capability.token, observedProcess: this.#process },
+        inputProducer: input.producer,
+      });
+    } finally {
+      clearInterval(heartbeat);
+      this.#capabilities.revoke(capability.token);
     }
   }
 

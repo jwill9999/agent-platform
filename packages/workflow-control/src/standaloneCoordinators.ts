@@ -1,3 +1,14 @@
+import { buildRepairChildRequest, type RepairPlanningContext } from './repairPlanning.js';
+import { repairPlanningCapability } from './repairPlanningJournal.js';
+import {
+  DurableRepairChildBroker,
+  OfficialRepairChildPort,
+  persistedEvaluationResultSchema,
+} from './featureEvaluation.js';
+import {
+  workflowEvaluationMutationCapability,
+  type SchedulerContainerAuthority,
+} from './storage.js';
 import { setTimeout as wait } from 'node:timers/promises';
 import {
   repairFindingSchema,
@@ -196,6 +207,206 @@ export class StandaloneCoordinators {
     if (action.phase === 'finalizing') return this.#finalizing(action, fence, beadsBroker);
     throw new Error('coordinator_phase_unavailable');
   }
+  repairPlanningContext(action: ExecutePhaseAction): RepairPlanningContext {
+    const callbackRow = this.#db
+      .prepare(
+        "SELECT callback_json FROM delegate_callbacks WHERE callback_id=? AND status='committed'",
+      )
+      .get(action.callbackId) as { callback_json: string } | undefined;
+    if (!callbackRow) throw new Error('repair planning failed evaluation callback missing');
+    const callback = delegateCallbackSchema.parse(JSON.parse(callbackRow.callback_json));
+    if (
+      callback.parentState !== 'feature_evaluation' ||
+      callback.terminalStatus !== 'repair' ||
+      callback.parentRunId !== action.runId ||
+      callback.parentTaskId !== action.taskId ||
+      callback.headSha !== action.headSha
+    )
+      throw new Error('repair planning failed evaluation callback mismatch');
+    const rows = this.#db
+      .prepare('SELECT id,result_json FROM evaluations WHERE run_id=? AND task_id=? AND head_sha=?')
+      .all(action.runId, action.taskId, action.headSha) as { id: string; result_json: string }[];
+    const matches = rows
+      .map((row) => ({
+        id: row.id,
+        result: persistedEvaluationResultSchema.parse(JSON.parse(row.result_json)),
+      }))
+      .filter(
+        (row) =>
+          row.result.verdict === 'needs_repair' &&
+          row.result.criteria.every((criterion) =>
+            criterion.evidence.some(
+              (reference) => reference.digest === callback.resultArtifactDigest,
+            ),
+          ),
+      );
+    if (matches.length !== 1)
+      throw new Error('repair planning exact failed evaluation unavailable');
+    const matched = matches[0]!;
+    return {
+      evaluationId: matched.id,
+      headSha: action.headSha,
+      summary: matched.result.summary,
+      failedCriteria: matched.result.criteria
+        .filter((item) => item.status === 'failed')
+        .map(({ criterion, summary, evidence }) => ({ criterion, summary, evidence })),
+    };
+  }
+
+  async completeRepairPlanning(input: {
+    job: PhaseJob;
+    action: ExecutePhaseAction;
+    authority: SchedulerContainerAuthority;
+    terminal: import('./contracts.js').AgentResult;
+    resultDigest: string;
+  }): Promise<void> {
+    const { job, action, authority, terminal, resultDigest } = input;
+    if (this.#closed) throw new Error('coordinator_service_stopped');
+    const assertAuthority = () =>
+      this.#store.assertRepairPlanningExecution(
+        authority,
+        job.lease_epoch,
+        repairPlanningCapability,
+      );
+    assertAuthority();
+    if (this.#abort.signal.aborted) {
+      this.#abort = new AbortController();
+      this.#transport = new CoordinatorTransport(this.#config.transport);
+    }
+    let handoff = this.#store.getRepairPlanningHandoff(authority.id);
+    if (!handoff) {
+      const context = this.repairPlanningContext(action);
+      const sequence = this.#store.countRepairChildIntents(action.runId) + 1;
+      const parent = this.#store.getEffectiveTask(action.runId, action.taskId);
+      if (!parent) throw new Error('repair planning parent authority missing');
+      const childId = this.#contract.repairTaskPolicy.idPattern.replace(
+        '<sequence>',
+        String(sequence),
+      );
+      const findingId = terminal.findings[0]?.id;
+      if (!findingId) throw new Error('repair planning finding missing');
+      const request = buildRepairChildRequest({
+        contract: this.#contract,
+        parent,
+        runId: action.runId,
+        sequence,
+        context,
+        terminal,
+        remainingRetryBudget: this.#store.remainingRepairBudgetForChild(
+          {
+            runId: action.runId,
+            featureId: this.#contract.featureId,
+            childId,
+            findingId,
+            policy: this.#contract.retryPolicy,
+          },
+          workflowEvaluationMutationCapability,
+        ),
+      });
+      this.#store.prepareRepairPlanning(
+        { executionId: authority.id, request, terminal, resultDigest },
+        authority,
+        job.lease_epoch,
+      );
+      handoff = this.#store.getRepairPlanningHandoff(authority.id)!;
+    }
+    if (handoff.resultDigest !== resultDigest)
+      throw new Error('repair planning terminal result changed');
+    const call = <T>(method: string, args: unknown) =>
+      this.#transport.call<T>(method, args, assertAuthority);
+    const beads = createProductionBeadsDoltPort(this.#root, {
+      readIssue: (workspaceRoot, taskId) => call('beads.readIssue', { workspaceRoot, taskId }),
+      claimIssue: (workspaceRoot, taskId, idempotencyKey) =>
+        call('beads.claimIssue', { workspaceRoot, taskId, idempotencyKey }),
+      closeIssue: (workspaceRoot, taskId, reason, idempotencyKey) =>
+        call('beads.closeIssue', { workspaceRoot, taskId, reason, idempotencyKey }),
+      readDoltSync: (workspaceRoot, idempotencyKey) =>
+        call('beads.readDoltSync', { workspaceRoot, idempotencyKey }),
+      pushDolt: (workspaceRoot, idempotencyKey) =>
+        call('beads.pushDolt', { workspaceRoot, idempotencyKey }),
+      readRepairChild: (workspaceRoot, childId) =>
+        call('beads.readRepairChild', { workspaceRoot, childId }),
+      createRepairChild: (workspaceRoot, request, idempotencyKey) =>
+        call('beads.createRepairChild', { workspaceRoot, request, idempotencyKey }),
+    });
+    const git = LocalGitDeliveryPort.createForWorkflow({
+      store: this.#store,
+      runId: action.runId,
+      workspaceRoot: this.#root,
+      remoteName: this.#config.remoteName,
+      gitPin: this.#gitPin,
+      remote: {
+        observeRef: (input) => call('git.observeRef', input),
+        pushCas: (input) => call('git.pushCas', input),
+      },
+    });
+    const broker = DurableRepairChildBroker.create({
+      store: this.#store,
+      contract: this.#contract,
+      workspaceRoot: this.#root,
+      port: OfficialRepairChildPort.create({ workspaceRoot: this.#root, beads, git }),
+    });
+    const child = await broker.execute(handoff.request, {
+      ownerId: authority.ownerId,
+      workspaceLeaseEpoch: authority.workspaceLeaseEpoch,
+      runLeaseEpoch: authority.runLeaseEpoch,
+      taskLeaseEpoch: authority.taskLeaseEpoch,
+    });
+    if (child.status !== 'committed') throw new Error('repair planning child creation unresolved');
+    const snapshot = await call<{ status: string; blockingDependencies: string[] }>(
+      'beads.readIssue',
+      { workspaceRoot: this.#root, taskId: child.id },
+    );
+    if (snapshot.blockingDependencies.length)
+      throw new Error('repair child dependencies remain open');
+    if (snapshot.status === 'open') {
+      await this.#store.dispatchRepairPlanning(
+        authority,
+        job.lease_epoch,
+        () =>
+          call('beads.claimIssue', {
+            workspaceRoot: this.#root,
+            taskId: child.id,
+            idempotencyKey: `repair-planner:${authority.id}:claim`,
+          }),
+        repairPlanningCapability,
+      );
+    } else if (snapshot.status !== 'in_progress')
+      throw new Error('repair child claim state conflicts');
+    const claimed = await call<{ status: string; blockingDependencies: string[] }>(
+      'beads.readIssue',
+      { workspaceRoot: this.#root, taskId: child.id },
+    );
+    if (claimed.status !== 'in_progress' || claimed.blockingDependencies.length)
+      throw new Error('repair child claim not observed');
+    const ownedRoot = this.#store.getImplementationWorkspace(action.runId, this.#root);
+    if (ownedRoot === this.#root) throw new Error('repair child private workspace missing');
+    this.#store.dispatchRepairPlanning(
+      authority,
+      job.lease_epoch,
+      () => {
+        const repository = new TrustedSourceGit(
+          ownedRoot,
+          this.#gitPin.path,
+          this.#gitPin.digest,
+          assertAuthority,
+        );
+        repository.assertClean([]);
+        const ref = `refs/heads/task/${child.id}`;
+        const current = repository.run(['symbolic-ref', 'HEAD']).toString().trim();
+        if (
+          ![ref, `refs/heads/task/${action.taskId}`].includes(current) ||
+          repository.run(['rev-parse', 'HEAD']).toString().trim() !== action.headSha ||
+          repository.run(['rev-parse', ref]).toString().trim() !== action.headSha
+        )
+          throw new Error('repair child branch handoff conflicts');
+        repository.run(['symbolic-ref', 'HEAD', ref]);
+      },
+      repairPlanningCapability,
+    );
+    this.#store.activateRepairPlanning(authority, job.lease_epoch);
+  }
+
   #repair(
     job: PhaseJob,
     action: ExecutePhaseAction,
@@ -343,6 +554,7 @@ export class StandaloneCoordinators {
   ): Promise<CoordinatorProof> {
     const closer = new JournaledBeadsTaskCloser(beadsBroker, beads);
     const gate = LocalExactHeadIntegrationGate.create({
+      store: this.#store,
       workspaceRoot: this.#store.getImplementationWorkspace(action.runId, this.#root),
       gitPin: this.#gitPin,
       admission: { assertAuthority, signal: this.#abort.signal },
@@ -448,7 +660,7 @@ export class StandaloneCoordinators {
     // createTaskPacket is the planning handoff and requires planner-produced evidence.
     // Acceptance instead binds the approved task to this completed review; acceptAndCloseTask
     // independently validates packet containment, current documents, exact-head evidence and gates.
-    const task = this.#contract.tasks.find((candidate) => candidate.id === action.taskId);
+    const task = this.#store.getEffectiveTask(action.runId, action.taskId);
     if (!task) throw new Error('coordinator_task_outside_contract');
     const packet: TaskPacket = {
       documentBinding: this.#store.verifyPlanningDocuments({
@@ -560,25 +772,17 @@ export class StandaloneCoordinators {
     operationId: string,
   ): void {
     const outstanding = this.#store.getWait(action.runId, checkId);
-    if (outstanding) {
-      if (Date.now() >= outstanding.absoluteDeadlineMs) {
-        delivery.expirePipelineWait({
-          runId: action.runId,
-          taskId: action.taskId,
-          checkId,
-          eventIdentity: outstanding.eventIdentity,
-          fence,
-        });
-        throw new Error('coordinator_pipeline_deadline_exhausted');
-      }
-      const settled = delivery.recordPipelineObservation({
-        operationId: operationId,
-        fence,
-        nextPollAtMs: outstanding.nextPollAtMs,
-        absoluteDeadlineMs: outstanding.absoluteDeadlineMs,
-      });
-      if (settled.kind !== 'passed') throw new Error('coordinator_pipeline_replay_conflict');
-    }
+    const operation = this.#store.getDeliveryOperation(operationId)!;
+    const deadline =
+      outstanding?.absoluteDeadlineMs ??
+      operation.createdAtMs + this.#contract.retryPolicy.waitDeadlineSeconds * 1000;
+    const settled = delivery.recordPipelineObservation({
+      operationId,
+      fence,
+      nextPollAtMs: outstanding?.nextPollAtMs ?? Date.now() + 1,
+      absoluteDeadlineMs: deadline,
+    });
+    if (settled.kind !== 'passed') throw new Error('coordinator_pipeline_replay_conflict');
   }
 
   #settleRetainedChecks(

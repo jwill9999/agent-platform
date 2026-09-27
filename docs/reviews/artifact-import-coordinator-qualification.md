@@ -194,3 +194,38 @@ happy-path test uses that narrower route; it does not bypass an existing staging
 
 PR278 remains draft; final qualification, current-head detailed Sonar checks and independent review
 are outstanding. No live pilot or production delivery has been launched.
+
+## Feature-evaluation repair and recovery checkpoint
+
+The composed repair-planning path now passes a real-container controlled-response journey in
+130.40 seconds. The initial 90-second limit expired during the second feature evaluation; a
+180-second bound allows the longer nine-specialist journey to complete. Production runtime,
+credential lifecycle, private Git import and coordinator code run unchanged; model responses and
+external services are controlled substitutes. One child claim and three close effects are verified.
+See [connected evidence](evidence/artifact-import-coordinator/feature-repair-connected.txt).
+
+The durable handoff preserves parent callback identity while the successor action selects only a
+committed child. The child packet receives the exact proposal and evidence. Canonical and private
+approved document bytes are checked, and child reservation plus later verifier retries share the
+feature budget even when a new finding identifier appears.
+
+Independent [review 15](evidence/artifact-import-coordinator/review-15.json) identified async
+transaction handling, proposal delivery and recovery heartbeat issues, subsequently repaired.
+Approved repair-policy role changes remain intentional: a QA predecessor may lead to an explicitly
+approved implementation child. [Review 16](evidence/artifact-import-coordinator/review-16.json)
+confirmed those fixes and identified active scheduler capacity stranded after planner recovery
+exhaustion. The latest fix records an interruption, then uses durable cleanup before escalation;
+retained handoff bytes survive. Its [restart journal check](evidence/artifact-import-coordinator/planner-exhaustion-test.txt)
+passes; independent follow-up remains in progress.
+
+The initial broad run reported 1088 passing and 22 failing tests. Corrected child authority fixtures
+and a Git fallback, then reran the five affected files serially: [114 passed](evidence/artifact-import-coordinator/regression-recheck.txt).
+This does not replace the final full run. New [private document checks](evidence/artifact-import-coordinator/private-document-tests.txt)
+and [child budget check](evidence/artifact-import-coordinator/child-budget-test.txt) also pass.
+All-current-source connected qualification, independent review and hosted quality checks remain
+required. PR278 stays draft; Beads .17 stays in progress and .13 remains blocked.
+
+[Review 17](evidence/artifact-import-coordinator/review-17.json) additionally identified retry charging
+while a previous owner's resource leases are still valid. Coordinator and planner recovery now share
+the admission-wait decision. The [focused runtime check](evidence/artifact-import-coordinator/planner-owner-wait.txt)
+proves no worker launch, interruption or retry charge during this wait. Review 18 is pending.

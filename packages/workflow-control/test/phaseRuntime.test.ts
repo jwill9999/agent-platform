@@ -1525,3 +1525,36 @@ it.each(['admission', 'preflight'])(
     }
   },
 );
+
+it('waits for live predecessor leases without charging retained-handoff recovery or launching a worker', async () => {
+  const f = await setup();
+  const prior = f.journal.start(f.journal.claim('owner', 60000, Date.now())!, Date.now());
+  // A retained handoff selects the planner recovery path. Keep a real scheduler record
+  // but deliberately hold resource authority elsewhere; admission must stop before use.
+  f.db
+    .prepare("UPDATE phase_jobs SET execution_id='child',lease_until_ms=0 WHERE id=?")
+    .run(prior.id);
+  f.db
+    .prepare(
+      "UPDATE scheduler_executions SET status='active',role='feature_planner' WHERE id='child'",
+    )
+    .run();
+  f.db
+    .prepare(
+      "INSERT INTO repair_planning_handoffs VALUES('child','retained-child','{}','{}','retained-result',0)",
+    )
+    .run();
+  const until = Date.now() + 30000;
+  f.db.prepare("UPDATE leases SET owner_id='previous-runtime',expires_at_ms=?").run(until);
+  expect(await f.runtime.runOnce()).toBe(false);
+  expect(f.journal.get(prior.id)).toMatchObject({
+    status: 'started',
+    failure_code: 'phase_coordinator_waiting_for_owner',
+  });
+  expect(f.journal.get(prior.id)!.lease_until_ms).toBeGreaterThanOrEqual(until);
+  expect(f.db.prepare('SELECT COUNT(*) AS n FROM coordinator_recovery_attempts').get()).toEqual({
+    n: 0,
+  });
+  expect(f.journal.interruptions().list('run')).toEqual([]);
+  expect(f.launches).toEqual([]);
+});

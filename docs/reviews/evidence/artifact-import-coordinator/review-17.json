@@ -1,0 +1,7 @@
+{
+  "review": 17,
+  "messages": [
+    "I\u2019m checking the recovery ordering and lease timing in the supplied code, including whether temporary ownership conflicts can exhaust the planner\u2019s cleanup budget.",
+    "- **Medium \u2014 Planner recovery charges retries while another owner\u2019s leases remain live.**  \n  **Evidence:** `packages/workflow-control/src/phaseRuntime.ts`, `#recover` and `#recoverRepairPlanning`; `packages/workflow-control/src/phaseJobs.ts`, `deferCoordinator`.  \n  After a handoff failure, the phase becomes recoverable after one second, while resource leases can remain live for 30 seconds. If the supervisor restarts, `#fences` rejects the replacement owner. The planner recovery catch charges another retry, unlike `#recoverCoordinator`, which uses `deferCoordinatorAdmission`. With two infrastructure retries, this can exhaust recovery and interrupt a recoverable handoff before the previous resource leases expire.  \n  **Correction:** Defer planner recovery without charging a retry when resource acquisition reports another live owner. Preserve normal handling for expired execution authority and actual recovery failures.\n\n**Missing evidence:** A runtime restart test covering a retained planner handoff with unexpired resource leases and unchanged retry accounting. The supplied journal test exercises cleanup after exhaustion, but not this admission path.\n\nStatic review of supplied evidence only; no execution or state changes. This is not human approval."
+  ]
+}

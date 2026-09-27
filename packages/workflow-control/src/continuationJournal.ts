@@ -10,6 +10,7 @@ import { delegateCallbackSchema, delegateCallbackTarget } from './governedOperat
 import { runAcceptsWork } from './workCancellation.js';
 import {
   enqueuePhaseJob,
+  phaseActionForCallback,
   executePhaseActionSchema,
   initializePhaseJobSchema,
 } from './phaseJobs.js';
@@ -141,6 +142,9 @@ export class ContinuationJournal {
     this.#database.pragma('busy_timeout = 5000');
   }
 
+  phaseAction(callback: unknown) {
+    return phaseActionForCallback(callback, this.#database);
+  }
   close(): void {
     this.#database.close();
   }

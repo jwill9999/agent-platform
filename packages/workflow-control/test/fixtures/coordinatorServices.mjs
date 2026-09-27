@@ -1,5 +1,6 @@
 // Disposable external-service substitute. Production coordinator and brokers remain unchanged.
 import process from 'node:process';
+import { setTimeout as wait } from 'node:timers/promises';
 import { Buffer } from 'node:buffer';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -16,9 +17,41 @@ export async function serve(config) {
   switch (method) {
     case 'beads.readIssue':
       result = {
-        status: state.closed.includes(args.taskId) ? 'closed' : 'in_progress',
-        blockingDependencies: [],
+        status: state.closed.includes(args.taskId)
+          ? 'closed'
+          : (state.children?.[args.taskId]?.status ?? 'in_progress'),
+        blockingDependencies: (state.children?.[args.taskId]?.blockingDependencies ?? []).filter(
+          (id) => !state.closed.includes(id),
+        ),
       };
+      break;
+    case 'beads.readRepairChild':
+      result = state.children?.[args.childId] ?? null;
+      break;
+    case 'beads.createRepairChild': {
+      const request = args.request;
+      state.children ??= {};
+      if (!state.children[request.id])
+        state.children[request.id] = {
+          id: request.id,
+          issueType: 'task',
+          status: 'open',
+          specId: `docs/tasks/${request.id}.md`,
+          parentEpicId: request.parentEpicId,
+          blockingDependencies: [request.dependsOn],
+          assignedRole: request.assignedRole,
+          allowedPaths: request.allowedPaths,
+          allowedOperations: request.allowedOperations,
+          findingDigest: request.findingDigest,
+          remainingRetryBudget: request.remainingRetryBudget,
+        };
+      break;
+    }
+    case 'beads.claimIssue':
+      if (state.children?.[args.taskId]?.status === 'open') {
+        state.children[args.taskId].status = 'in_progress';
+        state.claimMutations = (state.claimMutations ?? 0) + 1;
+      }
       break;
     case 'beads.closeIssue':
       if (!state.closed.includes(args.taskId)) {
@@ -49,6 +82,10 @@ export async function serve(config) {
       ]);
       break;
     case 'github.findPullRequest':
+      if (state.pr && args.number && config.delayFirstChecksMs && !state.delayedChecks) {
+        state.delayedChecks = true;
+        await wait(config.delayFirstChecksMs);
+      }
       result = state.pr;
       break;
     case 'github.createPullRequest':
@@ -58,7 +95,7 @@ export async function serve(config) {
         state: 'open',
         protectionDigest: config.protectionDigest,
         reviewDecision: 'approved',
-        checks: { 'connected-check': 'success' },
+        checks: config.noHostedChecks ? {} : { 'connected-check': 'success' },
         mergeMethod: null,
         mergeSha: null,
         eventIdentity: 'fixture-pr',

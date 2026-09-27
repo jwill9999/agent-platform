@@ -242,6 +242,25 @@ export const executionContractSchema = z
     }
   });
 
+export const repairPlanningContextSchema = z
+  .object({
+    evaluationId: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    headSha: z.string().regex(/^[a-f0-9]{40}$/u),
+    summary: z.string().min(1),
+    failedCriteria: z
+      .array(
+        z
+          .object({
+            criterion: z.string().min(1),
+            summary: z.string().min(1),
+            evidence: z.array(evidenceReferenceSchema).min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+
 export const taskPacketSchema = z
   .object({
     runId: identifierSchema,
@@ -264,6 +283,18 @@ export const taskPacketSchema = z
     allowedOperations: z.array(workflowOperationSchema),
     retryBudget: retryBudgetSchema,
     evidence: z.array(evidenceReferenceSchema),
+    repairPlanningContext: repairPlanningContextSchema.optional(),
+    repairChildContext: z
+      .object({
+        childId: identifierSchema,
+        parentTaskId: identifierSchema,
+        evaluationId: digestSchema,
+        failedCriterion: z.string().min(1),
+        summary: z.string().min(1),
+        hypothesis: z.string().min(1),
+      })
+      .strict()
+      .optional(),
     repairContext: z
       .object({
         dispatchId: identifierSchema,
@@ -309,6 +340,20 @@ export type EvidenceReference = z.infer<typeof evidenceReferenceSchema>;
 export type WorkflowOperation = z.infer<typeof workflowOperationSchema>;
 export type WorkflowRole = z.infer<typeof workflowRoleSchema>;
 
+/** An evaluator must classify each approved criterion exactly once, including failed outcomes. */
+export function assertExactCriterionPartition(
+  result: AgentResult,
+  approved: readonly string[],
+): void {
+  const reported = [...result.acceptanceCriteria.passed, ...result.acceptanceCriteria.failed];
+  if (
+    new Set(reported).size !== reported.length ||
+    reported.length !== approved.length ||
+    reported.some((criterion) => !approved.includes(criterion))
+  )
+    throw new Error('evaluation must classify each approved criterion exactly once');
+}
+
 /** Shared acceptance semantics for phase results and final brokered task acceptance. */
 export function assertAgentResultAccepted(
   resultInput: unknown,
@@ -340,13 +385,25 @@ export function assertTaskPacketWithinContract(
 ): void {
   const contract = executionContractSchema.parse(contractInput);
   const packet = taskPacketSchema.parse(packetInput);
+  const task = contract.tasks.find((candidate) => candidate.id === packet.taskId);
+  if (task === undefined) throw new Error('task packet references an unknown task');
+  assertTaskPacketWithinTaskAuthority(contract, packet, task, phase);
+}
+
+/** Containment only. Dynamic task authority must be resolved from the committed journal by the caller. */
+export function assertTaskPacketWithinTaskAuthority(
+  contract: ExecutionContract,
+  packetInput: unknown,
+  task: ExecutionContract['tasks'][number],
+  phase?: 'task_verification' | 'task_review' | 'feature_evaluation' | 'repair_planning',
+): void {
+  const packet = taskPacketSchema.parse(packetInput);
+  if (task.id !== packet.taskId) throw new Error('task packet task authority mismatch');
   if (
     contract.planningDocuments &&
     packet.documentBinding?.manifestDigest !== planningDocumentsDigest(contract.planningDocuments)
   )
     throw new Error('task packet document binding mismatch');
-  const task = contract.tasks.find((candidate) => candidate.id === packet.taskId);
-  if (task === undefined) throw new Error('task packet references an unknown task');
   if (packet.contractVersion !== contract.contractVersion) throw new Error('stale task packet');
   if (packet.policyDigest !== contract.policyDigest) throw new Error('stale task packet policy');
   if (packet.assignedRole !== (phase === undefined ? task.assignedRole : task.phaseRoles?.[phase]))

@@ -127,6 +127,15 @@ describe('PipelineWaitRecoveryDriver', () => {
     const raw = new Database(database);
     const request = JSON.stringify({
       id: repairTaskId,
+      runId: 'run-wait',
+      workspaceId,
+      contractVersion: 1,
+      policyDigest,
+      sequence: 1,
+      chainTipTaskId: 'wait-feature.9',
+      dependsOn: 'wait-feature.9',
+      branchParent: 'task/wait-feature.9',
+      authorityExpanded: false,
       assignedRole: 'implementation_worker',
       allowedPaths: ['packages/workflow-control'],
       allowedOperations: ['github.read'],

@@ -381,7 +381,7 @@ export class SecureEvidenceVault {
       const terminal = specialistTerminalResult(
         JSON.parse(Buffer.from(input.content).toString('utf8')),
       );
-      const task = this.#contract.tasks.find((item) => item.id === execution.taskId);
+      const task = this.#store.getEffectiveTask(execution.runId, execution.taskId);
       for (const path of terminal?.changedFiles ?? []) {
         if (task?.allowedPaths.some((root) => path === root || path.startsWith(`${root}/`)))
           identifiers.push(path);

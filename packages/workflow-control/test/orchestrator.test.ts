@@ -178,7 +178,7 @@ async function setup(
           return { stdout: `${'a'.repeat(40)}\n`, stderr: '' };
         }
         if (executable === 'git' && args[0] === 'diff') {
-          return { stdout: 'packages/workflow-control/src/orchestrator.ts\n', stderr: '' };
+          return { stdout: 'packages/workflow-control/src/orchestrator.ts\0', stderr: '' };
         }
         if (executable === 'git') return { stdout: '', stderr: '' };
         if (args[0] === 'stop' || args[0] === 'rm') return { stdout: '', stderr: '' };

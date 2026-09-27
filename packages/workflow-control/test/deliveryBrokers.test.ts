@@ -1161,6 +1161,16 @@ describe('DurableDeliveryBroker', () => {
     ).toThrow('deadline expired');
     expect(f.store.listDueWaits(2000)).toEqual([]);
     expect(f.store.getRun(f.run.id)?.state).toBe('pipeline');
+    expect(f.store.getPassedPipelineObservation(observed.id)).toBeUndefined();
+    nowMs = 1300;
+    expect(() =>
+      f.broker.recordPipelineObservation({
+        operationId: observed.id,
+        fence: f.fence,
+        nextPollAtMs: 1350,
+        absoluteDeadlineMs: 1200,
+      }),
+    ).toThrow('deadline expired');
     f.store.close();
   });
 
@@ -1306,6 +1316,18 @@ describe('DurableDeliveryBroker', () => {
       }),
     ).toMatchObject({ kind: 'passed' });
     expect(pending.store.listDueWaits(2000)).toEqual([]);
+    expect(pending.store.getPassedPipelineObservation(passedObservation.id)).toMatchObject({
+      deadlineMs: 2200,
+    });
+    nowMs = 2250; // qualified success survives a later recovery; raw success does not.
+    expect(
+      recoveryBroker.recordPipelineObservation({
+        operationId: passedObservation.id,
+        fence: recoveryFence,
+        nextPollAtMs: 2300,
+        absoluteDeadlineMs: 2200,
+      }),
+    ).toMatchObject({ kind: 'passed' });
 
     nowMs = 1000;
     const expiring = await setup({ clock: () => nowMs });

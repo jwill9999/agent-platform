@@ -510,7 +510,17 @@ describe('JournaledMutationBroker recovery', () => {
             });
           } else pending = broker.execute(request);
           const failure = expect(pending).rejects.toThrow();
-          await observing;
+          await Promise.race([
+            observing,
+            pending.then(
+              () => {
+                throw new Error(`observation not reached: ${operation}/${recovery}/${change}`);
+              },
+              (error: unknown) => {
+                throw error;
+              },
+            ),
+          ]);
           if (change === 'documents')
             await writeFile(
               join(root, 'document-source/fixture-spec.md'),

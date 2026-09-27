@@ -34,13 +34,20 @@ it
     'coordinators',
     'repair-verifier',
     'repair-reviewer',
+    'repair-feature',
     'lost-close-ack',
+    'no-hosted-checks',
+    'late-first-checks',
   ] as const)(
   'qualifies %s through production runtime, Docker, credential broker and retained evidence',
   async (mode) => {
     const complete = !['import', 'verify-review'].includes(mode);
     const repair = mode.startsWith('repair-');
-    const f = await developmentWorkflowFixture(true, mode !== 'import', complete);
+    const f = await developmentWorkflowFixture(true, mode !== 'import', complete, {
+      noHostedChecks: mode === 'no-hosted-checks',
+      repairPlanning: mode === 'repair-feature',
+      ...(mode === 'late-first-checks' ? { waitDeadlineSeconds: 20 } : {}),
+    });
     const root = await realpath(await mkdtemp(join(tmpdir(), 'implementation-connected-')));
     const name = `r2-${randomUUID()}`;
     let broker: ChildProcess | undefined;
@@ -100,7 +107,7 @@ it
         ...(repair
           ? [
               '--env',
-              `WORKFLOW_FIXTURE_REPAIR=${mode === 'repair-verifier' ? 'test_runner' : 'code_reviewer'}`,
+              `WORKFLOW_FIXTURE_REPAIR=${mode === 'repair-feature' ? 'feature_evaluator' : mode === 'repair-verifier' ? 'test_runner' : 'code_reviewer'}`,
             ]
           : []),
         '--read-only',
@@ -150,6 +157,8 @@ it
               git,
               protectionDigest,
               loseCloseAcknowledgement: mode === 'lost-close-ack',
+              delayFirstChecksMs: mode === 'late-first-checks' ? 22000 : undefined,
+              noHostedChecks: mode === 'no-hosted-checks',
             }) +
             ');\n',
         );
@@ -168,7 +177,9 @@ it
             'connected-check': [
               process.execPath,
               '-e',
-              `const fs=require('node:fs');if(fs.readFileSync('packages/workflow-control/example.txt','utf8')!==${JSON.stringify(repair ? 'verified repaired change\n' : 'verified fixture change\n')})process.exit(1)`,
+              mode === 'repair-feature'
+                ? `const fs=require('node:fs');const initial=fs.readFileSync('.git/HEAD','utf8').trim()==='ref: refs/heads/task/task';const expected=initial?'verified fixture change\\n':'verified repaired change\\n';if(fs.readFileSync('packages/workflow-control/example.txt','utf8')!==expected)process.exit(1)`
+                : `const fs=require('node:fs');if(fs.readFileSync('packages/workflow-control/example.txt','utf8')!==${JSON.stringify(repair ? 'verified repaired change\n' : 'verified fixture change\n')})process.exit(1)`,
             ],
           },
           approvedParentShas: { task: parent },
@@ -214,7 +225,7 @@ it
           child.stderr!.on('data', (chunk: Buffer) => supervisorErrors.push(chunk.toString()));
           supervisors.push(child);
         }
-        const deadline = Date.now() + 90000;
+        const deadline = Date.now() + (mode === 'repair-feature' ? 180000 : 90000);
         while (Date.now() < deadline) {
           const run = db.prepare('SELECT state FROM runs WHERE id=?').get('run') as {
             state: string;
@@ -223,6 +234,25 @@ it
             break;
           if (db.prepare("SELECT 1 FROM phase_jobs WHERE status='blocked'").get()) break;
           await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if (mode === 'late-first-checks') {
+          expect(db.prepare('SELECT state FROM runs').get()).toEqual({ state: 'pipeline' });
+          expect(
+            db
+              .prepare(
+                "SELECT status,failure_code FROM phase_jobs WHERE json_extract(action_json,'$.phase')='pipeline'",
+              )
+              .get(),
+          ).toEqual({ status: 'blocked', failure_code: 'phase_coordinator_recovery_exhausted' });
+          expect(
+            db.prepare('SELECT COUNT(*) AS n FROM passed_pipeline_observations').get(),
+          ).toEqual({ n: 0 });
+          expect(
+            db
+              .prepare("SELECT COUNT(*) AS n FROM delivery_operations WHERE kind='github.merge'")
+              .get(),
+          ).toEqual({ n: 0 });
+          return;
         }
         expect(db.prepare('SELECT state FROM runs WHERE id=?').get('run')).toEqual({
           state: complete ? 'closed' : 'task_accepted',
@@ -244,16 +274,39 @@ it
           db.prepare('SELECT SUM(attempts) AS n FROM coordinator_recovery_attempts').get(),
         ).toEqual({ n: 1 });
       }
-      if (repair) {
+      if (repair && mode !== 'repair-feature') {
         expect(db.prepare('SELECT status,task_attempt FROM repair_dispatches').all()).toEqual([
           { status: 'accepted', task_attempt: 2 },
         ]);
         expect(
           db.prepare("SELECT attempt FROM attempts WHERE scope='task' ORDER BY attempt").all(),
         ).toEqual([{ attempt: 1 }, { attempt: 2 }]);
+        expect(
+          db
+            .prepare(
+              "SELECT attempt_number FROM scheduler_executions WHERE role='implementation_worker' ORDER BY created_at_ms",
+            )
+            .all(),
+        ).toEqual([{ attempt_number: 1 }, { attempt_number: 2 }]);
         expect(db.prepare('SELECT COUNT(*) AS n FROM implementation_phase_attempts').get()).toEqual(
           { n: 2 },
         );
+      }
+      if (mode === 'repair-feature') {
+        expect(db.prepare('SELECT status FROM repair_child_intents').all()).toEqual([
+          { status: 'committed' },
+        ]);
+        expect(db.prepare('SELECT activated FROM repair_planning_handoffs').all()).toEqual([
+          { activated: 1 },
+        ]);
+        expect(
+          db
+            .prepare("SELECT attempt FROM attempts WHERE scope='task' ORDER BY created_at_ms")
+            .all(),
+        ).toEqual([{ attempt: 1 }, { attempt: 1 }]);
+        const state = JSON.parse(await readFile(join(root, 'services.json'), 'utf8'));
+        expect(state.claimMutations).toBe(1);
+        expect(state.closeMutations).toBe(3);
       }
       const owned = db
         .prepare('SELECT workspace_root FROM implementation_workspaces WHERE run_id=?')
@@ -280,7 +333,9 @@ it
                 ? 11
                 : mode === 'repair-reviewer'
                   ? 12
-                  : 8
+                  : mode === 'repair-feature'
+                    ? 14
+                    : 8
               : 3,
       });
       const actual = db
@@ -297,7 +352,9 @@ it
                     ? 6
                     : mode === 'repair-reviewer'
                       ? 7
-                      : 4
+                      : mode === 'repair-feature'
+                        ? 9
+                        : 4
                   : 3,
           },
           () => ({
@@ -317,7 +374,9 @@ it
                 ? 7
                 : mode === 'repair-reviewer'
                   ? 8
-                  : 5
+                  : mode === 'repair-feature'
+                    ? 10
+                    : 5
               : 4,
       });
       expect(
@@ -365,5 +424,5 @@ it
       await rm(f.root, { recursive: true, force: true });
     }
   },
-  120000,
+  210000,
 );

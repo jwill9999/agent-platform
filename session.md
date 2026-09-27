@@ -7,28 +7,30 @@ Active checkout: `/Users/letuscode/projects/agent-platform-workflow-evaluation`;
 branch: `task/artifact-import-coordinator`; [draft PR278](https://github.com/jwill9999/agent-platform/pull/278).
 Supervised prerequisite mode applies. No pilot, merge or staging promotion is authorized here.
 
-Six real-Docker controlled-response journeys now pass: import; implementation → verification →
-review; full coordinator closeout; verifier repair; reviewer repair; and recovery from a lost Beads
-close acknowledgement. The latter proves one close effect per task/epic despite retry. Production
-CLI/runtime, real isolated Codex tool execution and private Git workspaces are exercised. Model
-responses, credentials and external GitHub/Beads services are disposable fixtures, not live service
-or pilot evidence. See the [qualification report](docs/reviews/artifact-import-coordinator-qualification.md).
+The controlled real-Docker feature-evaluation repair journey now passes end to end (130 seconds):
+failed evaluation → read-only planner → durable child creation/claim → child implementation,
+verification, review, acceptance and reevaluation → workflow closure. It records one child claim
+and three close effects (predecessor, child, epic). The existing eight shorter journeys are being
+rerun with it. Model responses, credentials and external GitHub/Beads remain disposable fixtures;
+this is not live pilot or production-service evidence.
 
-Review 13 findings are repaired locally: execution-bound repair identifiers survive evidence
-redaction; immutable check deadlines reject late success; renewed coordinator admission gets fresh
-cancellation state; Git filename parsing preserves whitespace and Unicode. The connected journeys
-also found and corrected acceptance evidence composition, nested document verification, same-owner
-uncertain-effect recovery and PR number extraction. Focused tests pass; fresh full regression and
-current-head hosted checks remain required. Hosted aggregate Sonar success did not mean no issues:
-critical complexity findings were refactored and need current-head reanalysis.
+Review 14's pipeline observation gap is fixed with a durable before-deadline qualification record.
+Review 15's async transaction, proposal context, recovery heartbeat and document ancestry findings
+are addressed; review 16 confirmed those corrections. Review 16 additionally found stranded active
+planner executions after recovery exhaustion. The latest patch routes exhaustion through durable
+interruption cleanup; its restart/journal test passes. Review 17 found live predecessor leases could consume recovery
+retries; both coordinator paths now wait without charging retries. The focused runtime test passes;
+review 18 is in progress.
 
-R3 remains incomplete. The independent design review identifies the remaining feature-evaluation
-repair route: approved planner → durable bounded child → authoritative task handoff → child
-implementation/verification/review/acceptance/reevaluation. Preserve parent callback identity,
-inherited document/role authority and durable remaining budgets. Existing child/document mechanisms
-provide a foundation but do not yet prove this composed route. Recovery coverage and final review
-also remain. Feature-to-staging delivery is required only when its contract or intent exists;
-feature-branch-only closure is legitimate without such an intent. No staging authority is implied.
+The broad regression attempt passed 1088 tests and failed 22. It exposed an obsolete repair-child
+fixture, a missing test Git fallback, and timing contention. After fixture corrections and serial
+rerun, all 114 tests in the five affected files passed. Separate new private-document checks (2),
+planner exhaustion (1), and cross-finding child-budget (1) pass. Current final-source full regression,
+connected tests, independent review and hosted detailed quality checks remain outstanding.
+
+R3 remains under qualification, not complete. Continue under the existing approved scope; preserve
+all failed evidence and exact source boundaries. Feature-to-staging delivery is required only when
+its approved intent/contract exists; no staging authority is implied by this work.
 
 Continue under existing owner authorization. PR278 stays draft, `.17` in progress, `.13` blocked.
 The separate Notion alignment task remains deferred. Preserve earlier failed evidence, and refresh

@@ -10,6 +10,11 @@ export async function developmentWorkflowFixture(
   implementation = false,
   review = false,
   coordinators = false,
+  qualification: {
+    noHostedChecks?: boolean;
+    waitDeadlineSeconds?: number;
+    repairPlanning?: boolean;
+  } = {},
 ) {
   const f = await continuationFixture(
     Date.now(),
@@ -44,8 +49,22 @@ export async function developmentWorkflowFixture(
       contract.authority.allowedActions.push(operation);
       contract.tasks[0]!.allowedOperations.push(operation);
     }
-    contract.authority.github.requiredChecks = ['connected-check'];
+    contract.authority.github.requiredChecks = qualification.noHostedChecks
+      ? []
+      : ['connected-check'];
+    if (qualification.waitDeadlineSeconds)
+      contract.retryPolicy.waitDeadlineSeconds = qualification.waitDeadlineSeconds;
     contract.qualityGates = ['connected-check'];
+  }
+  if (qualification.repairPlanning) {
+    contract.tasks[0]!.phaseRoles!.repair_planning = 'feature_planner';
+    contract.repairTaskPolicy = {
+      idPattern: `${contract.featureId}.repair.<sequence>`,
+      maxChildren: 2,
+      allowedRoles: ['implementation_worker'],
+      allowedPaths: contract.constraints.allowedPaths,
+      authorityMayExpand: false,
+    };
   }
   const materialDigest = deriveContractMaterialDigest(contract);
   db.prepare('UPDATE contracts SET body_json=?').run(JSON.stringify(contract));

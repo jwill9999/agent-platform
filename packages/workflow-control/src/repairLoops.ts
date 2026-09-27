@@ -408,7 +408,7 @@ export class DurableRepairCoordinator {
     const failureEvidenceBindings = observation.evidence.map((reference) =>
       evidenceCreatedAt(reference, [finding.producerRole]),
     );
-    if (failureEvidenceBindings.some((binding) => binding === undefined)) {
+    if (failureEvidenceBindings.includes(undefined)) {
       throw new Error('repair finding references unbound producer evidence');
     }
     const failureHeads = new Set(failureEvidenceBindings.map((binding) => binding!.headSha));
@@ -443,7 +443,7 @@ export class DurableRepairCoordinator {
     const changeEvidenceBindings = changedEvidence.map((reference) =>
       evidenceCreatedAt(reference, [ownerRole]),
     );
-    if (changeEvidenceBindings.some((binding) => binding === undefined)) {
+    if (changeEvidenceBindings.includes(undefined)) {
       throw new Error('repair change references unbound owner evidence');
     }
     const failureEvidenceAtMs = Math.max(
@@ -481,7 +481,7 @@ export class DurableRepairCoordinator {
     const finding = repairFindingSchema.parse(input.finding);
     const change = repairChangeSchema.parse(input.change);
     this.#store.assertRunUsesContract(finding.runId, this.#contract);
-    const task = this.#contract.tasks.find((candidate) => candidate.id === finding.taskId);
+    const task = this.#store.getEffectiveTask(finding.runId, finding.taskId);
     if (task === undefined) {
       throw new Error('repair finding references an unknown task');
     }
@@ -600,7 +600,7 @@ export class DurableRepairCoordinator {
     const dispatch = this.#store.getRepairDispatch(dispatchId);
     if (dispatch === undefined) throw new Error('repair dispatch not found');
     const packet = repairDispatchPacketSchema.parse(dispatch.packet);
-    const task = this.#contract.tasks.find((candidate) => candidate.id === packet.taskId);
+    const task = this.#store.getEffectiveTask(packet.runId, packet.taskId);
     if (task === undefined) throw new Error('repair dispatch task is no longer in the contract');
     if (
       result.status !== 'passed' ||

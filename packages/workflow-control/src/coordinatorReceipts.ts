@@ -247,13 +247,15 @@ function verifyPipeline(
   const observed = operation(db, action, proof.checksOperationId, 'github.checks');
   const checks = observed.result.checks as Record<string, unknown> | undefined;
   const required = observed.request.requiredChecks as string[];
-  if (
-    !checks ||
-    !Array.isArray(required) ||
-    required.length === 0 ||
-    required.some((check) => checks[check] !== 'success')
-  )
+  if (!checks || !Array.isArray(required) || required.some((check) => checks[check] !== 'success'))
     throw new Error('coordinator pipeline checks not passed');
+  const qualified = db
+    .prepare(
+      `SELECT 1 FROM passed_pipeline_observations
+    WHERE operation_id=? AND observed_at_ms < deadline_ms`,
+    )
+    .get(proof.checksOperationId);
+  if (!qualified) throw new Error('coordinator pipeline observation is unqualified');
   const moved = transition(
     db,
     action,

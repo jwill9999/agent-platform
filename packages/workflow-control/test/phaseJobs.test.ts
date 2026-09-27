@@ -700,6 +700,12 @@ it('finishes a coordinator from committed proof and atomically queues one typed 
     ),
   ).toThrow();
   expect(f.phases.get(job.id)?.status).toBe('started');
+  expect(() =>
+    f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now),
+  ).toThrow('pipeline observation is unqualified');
+  f.db
+    .prepare('INSERT INTO passed_pipeline_observations VALUES(?,?,?,?)')
+    .run('checks', 'fixture-check-id', f.now + 1000, f.now);
   f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now);
   f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now);
   const jobs = f.phases.list();
@@ -820,4 +826,62 @@ it('reserves the initial implementation exactly once and leaves no free repair a
   expect(f.db.prepare("SELECT max_attempts FROM attempts WHERE scope='task'").get()).toEqual({
     max_attempts: contract.retryPolicy.implementationAttempts,
   });
+});
+
+it('routes exhausted planner handoff recovery into durable cleanup before releasing capacity', async () => {
+  const f = await fixture('feature_evaluation', 'repair');
+  f.consume();
+  const job = f.phases.start(f.phases.claim('owner', 60000, f.now)!, f.now);
+  const action = f.phases.action(job);
+  f.store.seedDelegateCallbackAuthorizationForTest({
+    workspaceId: action.workspaceId,
+    runId: action.runId,
+    taskId: action.taskId,
+    delegationId: job.execution_id!,
+    delegateAgentId: 'planner-process',
+    delegateRole: 'feature_planner',
+    ownerId: 'owner',
+    workspaceLeaseEpoch: f.callback.workspaceLeaseEpoch,
+    runLeaseEpoch: f.callback.parentRunLeaseEpoch,
+    taskLeaseEpoch: f.callback.taskLeaseEpoch,
+    materialDigest: action.materialDigest,
+    headSha: action.headSha,
+    inputProducerIdentity: 'orchestrator',
+    input: { phaseJob: job.id },
+    result: terminalResult,
+    nowMs: f.now,
+  });
+  f.db
+    .prepare("UPDATE scheduler_executions SET status='active',deadline_ms=? WHERE id=?")
+    .run(f.now - 1, job.execution_id);
+  // Retained handoff bytes must survive failure; this test exercises the cleanup journal,
+  // not proposal validation (covered by repairPlanning.test.ts).
+  f.db
+    .prepare('INSERT INTO repair_planning_handoffs VALUES(?,?,?,?,?,1)')
+    .run(job.execution_id, 'retained-child', '{"retained":true}', '{}', 'retained-result');
+  f.phases.deferCoordinator(job, 0, f.now);
+  expect(f.phases.get(job.id)).toMatchObject({ status: 'started', lease_until_ms: 0 });
+  expect(f.phases.interruptions().list('run')[0]).toMatchObject({
+    state: 'pending',
+    reason: 'phase_coordinator_recovery_exhausted',
+  });
+  const reopened = new PhaseJobJournal(f.database);
+  try {
+    const recovery = reopened.claimRecovery('replacement', 60000, f.now + 1)!;
+    expect(recovery.execution_id).toBe(job.execution_id);
+    const cleanup = reopened.interruptions();
+    const lease = cleanup.claim('run', 'replacement', f.now + 1, 30000, job.execution_id!)!;
+    const attempt = cleanup.begin(lease, f.now + 1);
+    for (const operation of ['cancel', 'revoke', 'settle'] as const)
+      cleanup.confirm(attempt, operation, f.now + 2);
+    expect(cleanup.finishAttempt(attempt, f.now + 3).state).toBe('settled');
+    reopened.finalizeInterrupted(recovery, f.now + 4);
+    expect(f.store.getSchedulerExecution(job.execution_id!)?.status).toBe('escalated');
+    expect(reopened.get(job.id)?.status).toBe('blocked');
+    expect(f.db.prepare('SELECT request_json FROM repair_planning_handoffs').get()).toEqual({
+      request_json: '{"retained":true}',
+    });
+  } finally {
+    reopened.close();
+  }
 });
