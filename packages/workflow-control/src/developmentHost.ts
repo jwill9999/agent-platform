@@ -1044,7 +1044,14 @@ function developmentStatus(config: Config, state: DevelopmentHostState | undefin
 }
 
 export async function runDevelopmentCommand(command: string, path: string): Promise<unknown> {
-  const config = developmentHostConfigSchema.parse(JSON.parse(await privateFile(path)));
+  const bytes = await privateFile(path);
+  let supplied: unknown;
+  try {
+    supplied = JSON.parse(bytes);
+  } catch {
+    throw new Error('invalid_configuration');
+  }
+  const config = developmentHostConfigSchema.parse(supplied);
   await assertInputOutsideState(config.stateDirectory, path);
   if (command === 'development-host') {
     await (await DevelopmentHost.create(config)).run();

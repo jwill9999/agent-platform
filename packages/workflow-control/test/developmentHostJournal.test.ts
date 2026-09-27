@@ -302,7 +302,7 @@ it('bounds the entire topology check rather than each individual inspection', as
   );
 });
 
-it.each(['permissions', 'uid'])(
+it.each(['permissions', 'uid', 'json'])(
   'reports invalid private configuration through the CLI: %s',
   (kind) => {
     const root = mkdtempSync(join(tmpdir(), 'lifecycle-invalid-'));
@@ -323,6 +323,7 @@ it.each(['permissions', 'uid'])(
       }),
       { mode: kind === 'permissions' ? 0o644 : 0o600 },
     );
+    if (kind === 'json') writeFileSync(config, '{');
     const result = spawnSync(
       process.execPath,
       [fileURLToPath(new URL('../dist/cli.js', import.meta.url)), 'development-host', config],
