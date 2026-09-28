@@ -1,5 +1,23 @@
 # Standalone readiness checkpoint — 28 September 2026
 
+## Paused at the owner’s request
+
+Work is paused. [Draft PR279](https://github.com/jwill9999/agent-platform/pull/279) contains the
+readiness evidence and this handoff, targeting `feature/harness-backlog-review`; it remains unmerged.
+Repository documentation and its three Notion mirrors were saved and read back. Beads `.17` and
+`.12` were updated and Dolt push succeeded. No task was closed on the strength of host readiness alone.
+The iMessage notification failed with chat-not-found; no notification was delivered.
+
+On return, first refresh PR279/checks, Beads and the actual checkout. Review the narrow skill-evidence
+access repair before implementation: the isolated reviewer must read approved skill documents while
+ordinary worker restrictions remain intact. Then run the ten retained decision scenarios, reconcile
+skill-handoff gates and prepare the exact single-task pilot plan. Do not launch the pilot from this
+handoff. Required independent review, exact approval and fresh runtime readiness remain gates.
+
+The development host is stopped and temporary reviewer services were removed. No background
+implementation or pilot was left running. Existing feature branches remain in place; staging and
+Notion structural alignment are separate deferred work. Historical entries below are preserved.
+
 PR278 is integrated. Current branch: `task/standalone-readiness`, worktree
 `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
 [Readiness report](docs/reviews/standalone-host-readiness-2026-09-28.md) retains source and evidence.
