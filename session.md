@@ -1,4 +1,68 @@
-# R2/R3 qualification handoff — 27 September 2026
+# Standalone readiness checkpoint — 28 September 2026
+
+## Review comment addressed — 29 September 2026
+
+PR279 comment 1 requested auditable historical-row preservation evidence. A fresh read-only comparison
+of the retained pre-migration backup and canonical journal produced matching whole-table SHA-256
+digests for runs, contracts and leases. The report documents canonicalization, reproduction and the
+retrospective evidence boundary; no database contents are published. Same-count mutation, row-order,
+duplicate and type-distinction checks passed. This is documentation/evidence work only; the separate
+reviewer-access repair and pilot remain unstarted. Refresh PR279 checks before merge.
+
+## Paused at the owner’s request
+
+Work is paused. [Draft PR279](https://github.com/jwill9999/agent-platform/pull/279) contains the
+readiness evidence and this handoff, targeting `feature/harness-backlog-review`; it remains unmerged.
+Repository documentation and its three Notion mirrors were saved and read back. Beads `.17` and
+`.12` were updated and Dolt push succeeded. No task was closed on the strength of host readiness alone.
+The iMessage notification failed with chat-not-found; no notification was delivered.
+
+On return, first refresh PR279/checks, Beads and the actual checkout. Review the narrow skill-evidence
+access repair before implementation: the isolated reviewer must read approved skill documents while
+ordinary worker restrictions remain intact. Then run the ten retained decision scenarios, reconcile
+skill-handoff gates and prepare the exact single-task pilot plan. Do not launch the pilot from this
+handoff. Required independent review, exact approval and fresh runtime readiness remain gates.
+
+The development host is stopped and temporary reviewer services were removed. No background
+implementation or pilot was left running. Existing feature branches remain in place; staging and
+Notion structural alignment are separate deferred work. Historical entries below are preserved.
+
+PR278 is integrated. Current branch: `task/standalone-readiness`, worktree
+`/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+[Readiness report](docs/reviews/standalone-host-readiness-2026-09-28.md) retains source and evidence.
+
+Canonical journal migration succeeded after backup/rehearsal, preserving runs/contracts/leases.
+Discovery for `.17` reports no matching run. The configured development host reached `ready` using
+existing account discovery and was stopped cleanly; no managed pilot or model generation ran.
+Private operator configuration remains under the canonical workspace journal directory.
+
+Current blocker: `.12` skill scenario review cannot launch because the current snapshot loader rejects
+`.agents/skills/` evidence. The attempt made no model call. Its gateway/networks are cleaned up.
+Older procedural reviews are integrated but do not establish all required behavioral scenarios.
+Next: resolve the supported read-only skill evidence path without weakening worker permissions, run
+those scenarios and reconcile `.10`/`.11`/`.12`; then finalize `.17` and prepare exact `.13` pilot plan.
+No staging, pilot launch or new implementation authority is inferred. Notion alignment stays deferred.
+
+---
+
+## PR278 integration confirmed — 27 September 2026
+
+GitHub confirms PR278 merged into `feature/harness-backlog-review` at
+`c9729617759be0cb0d3c89f7cb3b18f914553914` on 27 September at 22:22 UTC.
+The merged packages and CI configuration match the qualified PR head `3ec6b1a`.
+All nine executed pre-merge checks passed; Sourcery and staging-only packaged VM checks were skipped.
+R2/R3 implementation is now integrated. The previous awaiting-merge statements below are historical.
+
+Next: reconcile the remaining `.17` readiness gate against this merged baseline, including explicit
+canonical journal identity provisioning and read-only discovery verification, then prepare the exact
+single-task pilot plan (`.13`). Keep `.17` open until that prerequisite reconciliation is complete;
+do not treat integration as authorization to launch the pilot. No pilot or staging promotion occurred.
+Notion alignment remains the separately deferred task. This post-merge handoff is saved on
+`task/artifact-import-coordinator`; it is not an additional feature-branch merge.
+
+---
+
+## R2/R3 qualification handoff — 27 September 2026
 
 Owner-approved R2 governed worker import and R3 standalone coordinator completion are implemented on
 `task/artifact-import-coordinator` in `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
