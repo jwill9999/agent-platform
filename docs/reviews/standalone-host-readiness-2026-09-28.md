@@ -44,9 +44,59 @@ canonical workspace. Read-only discovery for `.17` returned `absent`, with no ma
 terminal runs; an expired historical workspace lease remains visible. This task-specific result
 must not be interpreted as absence of every historical run or every possible broker grant.
 
-The post-migration integrity check returned `ok`. All four run rows, four contract rows and seven
-lease rows are unchanged from the backup. No run was created, resumed, cancelled or approved by this
-assessment. Private backups remain outside Git; no database or credential contents are published.
+The post-migration integrity check returned `ok`; the original comparison reported unchanged rows.
+The retained evidence initially contained only counts and a boolean. Review comment 1 correctly
+identified that these alone did not make the preservation claim auditable.
+
+On 29 September, a fresh read-only comparison of the retained pre-migration backup and canonical
+journal produced matching SHA-256 whole-table digests for all four run rows, four contract rows and
+seven lease rows. Separate before/after digests, column order, counts, capture time and source labels
+are retained under `preservationAudit` in the [host evidence](evidence/standalone-readiness/local-host.json).
+This is retrospective corroboration, not a contemporaneous migration digest or proof that no
+intermediate changes ever occurred. Git readers can compare the retained digests; independently
+recomputing them requires the private databases. No row contents or credentials are published.
+
+### Reproducing the preservation comparison
+
+Open the retained `readiness-20260928/before.sqlite` and canonical `workflow.sqlite` with SQLite URI
+`mode=ro`, start a read transaction on each, and select every column from each of `runs`, `contracts`
+and `leases`. Capture column names in cursor order and use this Python standard-library algorithm:
+
+```python
+import hashlib
+import json
+
+
+def canonical(value):
+    return json.dumps(value, ensure_ascii=True, separators=(",", ":"),
+                      allow_nan=False).encode("ascii")
+
+
+def cell(value):
+    if value is None:
+        return ["null"]
+    if isinstance(value, bytes):
+        return ["blob", value.hex()]
+    if isinstance(value, int):
+        return ["integer", str(value)]
+    if isinstance(value, float):
+        return ["real", value.hex()]
+    return ["text", value]
+
+
+def digest(columns, rows):
+    encoded = sorted(canonical([cell(v) for v in row]).decode("ascii")
+                     for row in rows)
+    return hashlib.sha256(canonical(["sqlite-table-v1", columns, encoded])).hexdigest()
+```
+
+The digest covers all column names and typed cell values, including IDs and timestamps. Sorting
+encoded rows removes retrieval-order dependence while preserving duplicates. Counts and column lists
+must also match. Roll back the read transactions and close both connections; do not migrate or write.
+The recorded algorithm checks confirmed row-order invariance, detection of a same-count row mutation,
+preservation of duplicate multiplicity and distinction between an integer and its text representation.
+No run was created, resumed, cancelled or approved by either comparison. Private backups remain
+outside Git. This review correction changes evidence and documentation only.
 
 ## Development service qualification
 

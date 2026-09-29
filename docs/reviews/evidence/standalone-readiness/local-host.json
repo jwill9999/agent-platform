@@ -86,5 +86,103 @@
       "sha256": "cd8f7b04ed3743c3d08538a1364459c1ee5f98d92e6c163c75eab401bd12068f"
     }
   ],
-  "workflowConfigured": false
+  "workflowConfigured": false,
+  "preservationAudit": {
+    "capturedAt": "2026-09-29T15:39:28.787713+00:00",
+    "timing": "Retrospective read-only comparison on 29 September; not a digest captured during the 28 September migration.",
+    "algorithm": "sqlite-table-v1 / SHA-256; canonicalization in linked report",
+    "beforeSource": "readiness-20260928/before.sqlite (retained pre-migration backup)",
+    "afterSource": "workflow.sqlite (canonical journal at capturedAt)",
+    "algorithmChecks": {
+      "rowOrderInvariant": true,
+      "sameCountMutationDetected": true,
+      "duplicateMultiplicityPreserved": true,
+      "typeDistinctionPreserved": true
+    },
+    "tables": {
+      "runs": {
+        "before": {
+          "rowCount": 4,
+          "columns": [
+            "id",
+            "contract_id",
+            "state",
+            "version",
+            "merge_verified",
+            "created_at_ms",
+            "updated_at_ms"
+          ],
+          "sha256": "4b97956dd397a4ebb9157e8fa096f9e327821868f69b996a51066cb563384d0c"
+        },
+        "after": {
+          "rowCount": 4,
+          "columns": [
+            "id",
+            "contract_id",
+            "state",
+            "version",
+            "merge_verified",
+            "created_at_ms",
+            "updated_at_ms"
+          ],
+          "sha256": "4b97956dd397a4ebb9157e8fa096f9e327821868f69b996a51066cb563384d0c"
+        },
+        "match": true
+      },
+      "contracts": {
+        "before": {
+          "rowCount": 4,
+          "columns": [
+            "id",
+            "feature_id",
+            "contract_version",
+            "policy_digest",
+            "workspace_id",
+            "body_json",
+            "created_at_ms"
+          ],
+          "sha256": "522b91cf4a558889c0e084433c4b1f012aab844f9a0dfe8d12da9ecc71c1605e"
+        },
+        "after": {
+          "rowCount": 4,
+          "columns": [
+            "id",
+            "feature_id",
+            "contract_version",
+            "policy_digest",
+            "workspace_id",
+            "body_json",
+            "created_at_ms"
+          ],
+          "sha256": "522b91cf4a558889c0e084433c4b1f012aab844f9a0dfe8d12da9ecc71c1605e"
+        },
+        "match": true
+      },
+      "leases": {
+        "before": {
+          "rowCount": 7,
+          "columns": [
+            "resource_type",
+            "resource_id",
+            "owner_id",
+            "epoch",
+            "expires_at_ms"
+          ],
+          "sha256": "818b73fed19cbe4d87930c5a3802b49837973fde7b1dc2dff69ab229772ff0b9"
+        },
+        "after": {
+          "rowCount": 7,
+          "columns": [
+            "resource_type",
+            "resource_id",
+            "owner_id",
+            "epoch",
+            "expires_at_ms"
+          ],
+          "sha256": "818b73fed19cbe4d87930c5a3802b49837973fde7b1dc2dff69ab229772ff0b9"
+        },
+        "match": true
+      }
+    }
+  }
 }

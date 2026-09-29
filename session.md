@@ -1,5 +1,14 @@
 # Standalone readiness checkpoint — 28 September 2026
 
+## Review comment addressed — 29 September 2026
+
+PR279 comment 1 requested auditable historical-row preservation evidence. A fresh read-only comparison
+of the retained pre-migration backup and canonical journal produced matching whole-table SHA-256
+digests for runs, contracts and leases. The report documents canonicalization, reproduction and the
+retrospective evidence boundary; no database contents are published. Same-count mutation, row-order,
+duplicate and type-distinction checks passed. This is documentation/evidence work only; the separate
+reviewer-access repair and pilot remain unstarted. Refresh PR279 checks before merge.
+
 ## Paused at the owner’s request
 
 Work is paused. [Draft PR279](https://github.com/jwill9999/agent-platform/pull/279) contains the
