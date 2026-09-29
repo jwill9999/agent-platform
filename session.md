@@ -31,7 +31,7 @@ Historical handoff entries below are preserved and may describe superseded PR st
 
 ---
 
-# Standalone readiness checkpoint — 28 September 2026
+## Standalone readiness checkpoint — 28 September 2026
 
 ## Review comment addressed — 29 September 2026
 
