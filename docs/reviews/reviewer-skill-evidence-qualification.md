@@ -92,3 +92,19 @@ phase-specific acceptance evidence, actual role-policy binding and enforceable r
 now records external dependencies, a precise dispatch/approval denial oracle and proposed ceilings.
 These are planning findings, not silently authorized runtime repairs. P4.1 remains open and blocked
 by `.13`; task creation does not grant execution authority.
+
+The [draft recheck](evidence/reviewer-skill-evidence/pilot-draft-recheck.json) finds no further
+contradictions in retaining the plan as **blocked**. The [validation receipt](evidence/reviewer-skill-evidence/pilot-draft-validation.txt)
+binds six committed document files and validates contract v1. It is not persisted execution approval,
+installed policy qualification or evidence that the managed pilot can run. The child task's creation
+was explicitly owner-approved; implementation was not started.
+
+## Final independent repair review
+
+The [final evidence review](evidence/reviewer-skill-evidence/code-review-final.json) found no remaining
+actionable code/security blocker and reconciled the retained test counts, transport fix and isolation
+probes. It noted some prior/input artifacts were omitted from that individual review packet. They are
+retained in this repository; the [input verification index](evidence/reviewer-skill-evidence/scenario-input-verification.json)
+rechecks original committed skill bytes and referenced scenario/document hashes against each response
+manifest. The final critic did not independently re-read every linked historical artifact. No broader
+pilot acceptance is inferred. Local repair quality gate: **PASS**; hosted integration gates pending.

@@ -7,7 +7,7 @@ Canonical Beads stays `/Users/letuscode/projects/agent-platform`.
 
 The reviewer can now receive exact committed skill files as inert, revision-bound evidence without
 widening ordinary worker `.agents` access. Independent review found a partial-clone Git transport
-risk, fixed with transport-denying local reads and a regression sentinel. Real-container checks pass.
+risk, fixed with transport-denying local reads and a regression sentinel. Full serial regression: 1,140 passed/77 gated skipped; real-container suite: 20 passed. Final independent repair review reports no code/security blocker. The first parallel run had timing/lease failures and is retained.
 See [qualification and findings](docs/reviews/reviewer-skill-evidence-qualification.md) for test/review
 results and limits. Ten decision scenarios ran: nine passed the specified decisions; S1 safely stopped
 but did not establish the exact configured admission-to-scheduling route. No pilot was launched.

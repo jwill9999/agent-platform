@@ -1,0 +1,152 @@
+{
+  "purpose": "Reproduction index for original scenario inputs; immutable skill blobs verified from Git and ordinary referenced files from this checkout. No live-run claim.",
+  "files": [
+    {
+      "review": "skill-scenarios.json",
+      "path": ".agents/skills/documentation/SKILL.md",
+      "sourceRevision": "dd13d3b8cb2429f11add7377a0d32045b9b16822",
+      "sha256": "d9a48a2d61bb42937940504f4a360cba14b0b6e5075dd16857f87642e2a6d6c3",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios.json",
+      "path": ".agents/skills/feature-implementation/SKILL.md",
+      "sourceRevision": "dd13d3b8cb2429f11add7377a0d32045b9b16822",
+      "sha256": "1565a4919c819e5697385ac280f54aad6b78d994730f27320ad589163668bb37",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios.json",
+      "path": ".agents/skills/feature-planning/SKILL.md",
+      "sourceRevision": "dd13d3b8cb2429f11add7377a0d32045b9b16822",
+      "sha256": "8f695a7916c72287a2e1f014e0beef27cca3af1f4e33e89aeee2bf430b04ad5a",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios.json",
+      "path": ".agents/skills/orchestration/SKILL.md",
+      "sourceRevision": "dd13d3b8cb2429f11add7377a0d32045b9b16822",
+      "sha256": "c62477c6a112fca077807f4b1f03497b5fbf9cd4870c236ad64750787005f010",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios.json",
+      "path": ".agents/skills/plan-critique/SKILL.md",
+      "sourceRevision": "dd13d3b8cb2429f11add7377a0d32045b9b16822",
+      "sha256": "17d3a1de5e7e6f3d07fdb2c21ae6f1bb05d5e41eca44dfe7520a79e93bcddbd9",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios.json",
+      "path": "docs/reviews/evidence/standalone-readiness/scenarios.txt",
+      "sourceRevision": null,
+      "sha256": "e03ac16c72d109c5c710fea05bb03470e7bede6438ea568416cc3cc1d5f61254",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios.json",
+      "path": "docs/workflow-control-orchestrator.md",
+      "sourceRevision": null,
+      "sha256": "5a97939629424eba5dace221e3100daa1c3471456da08d1c6cdadca7b6fa501a",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios.json",
+      "path": "docs/workflow-control-planning.md",
+      "sourceRevision": null,
+      "sha256": "8abfe2cdb6c5a8e4006638b49123df057f856d4396d786c756d0b4ac8086200d",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": ".agents/skills/documentation/SKILL.md",
+      "sourceRevision": "dd13d3b8cb2429f11add7377a0d32045b9b16822",
+      "sha256": "d9a48a2d61bb42937940504f4a360cba14b0b6e5075dd16857f87642e2a6d6c3",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": ".agents/skills/feature-implementation/SKILL.md",
+      "sourceRevision": "dd13d3b8cb2429f11add7377a0d32045b9b16822",
+      "sha256": "1565a4919c819e5697385ac280f54aad6b78d994730f27320ad589163668bb37",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": ".agents/skills/feature-planning/SKILL.md",
+      "sourceRevision": "dd13d3b8cb2429f11add7377a0d32045b9b16822",
+      "sha256": "8f695a7916c72287a2e1f014e0beef27cca3af1f4e33e89aeee2bf430b04ad5a",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": ".agents/skills/orchestration/SKILL.md",
+      "sourceRevision": "dd13d3b8cb2429f11add7377a0d32045b9b16822",
+      "sha256": "c62477c6a112fca077807f4b1f03497b5fbf9cd4870c236ad64750787005f010",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": ".agents/skills/plan-critique/SKILL.md",
+      "sourceRevision": "dd13d3b8cb2429f11add7377a0d32045b9b16822",
+      "sha256": "17d3a1de5e7e6f3d07fdb2c21ae6f1bb05d5e41eca44dfe7520a79e93bcddbd9",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": "docs/adr/0004-codex-development-orchestration-control-plane.md",
+      "sourceRevision": null,
+      "sha256": "1c90f6d5ff79f5d27f5bb3d3376df012914901e2bb9737252ad9512a9cc9582c",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": "docs/reviews/artifact-import-coordinator-qualification.md",
+      "sourceRevision": null,
+      "sha256": "13ba6fae37154bae57a1ee72dd1ae4981c77080e8349fb797e1126d5a0b36c07",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": "docs/reviews/evidence/standalone-readiness/scenarios.txt",
+      "sourceRevision": null,
+      "sha256": "e03ac16c72d109c5c710fea05bb03470e7bede6438ea568416cc3cc1d5f61254",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": "docs/reviews/run-discovery-qualification.md",
+      "sourceRevision": null,
+      "sha256": "3fd4ba1617a33ff8e6becd80ef69923dfb83a34b4c0f9c8615ec815bce188607",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": "docs/workflow-control-orchestrator.md",
+      "sourceRevision": null,
+      "sha256": "5a97939629424eba5dace221e3100daa1c3471456da08d1c6cdadca7b6fa501a",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": "docs/workflow-control-planning.md",
+      "sourceRevision": null,
+      "sha256": "8abfe2cdb6c5a8e4006638b49123df057f856d4396d786c756d0b4ac8086200d",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": "packages/workflow-control/src/cli.ts",
+      "sourceRevision": null,
+      "sha256": "b483251c4e32de63be154d803c0713f2faa6321396740733938850dca2fad37c",
+      "verified": true
+    },
+    {
+      "review": "skill-scenarios-supplement.json",
+      "path": "packages/workflow-control/src/runDiscovery.ts",
+      "sourceRevision": null,
+      "sha256": "830c3ee8f7b5d4c93e2d9a0b11c8e86de0b87046c34820196ee4fdab4ceff58a",
+      "verified": true
+    }
+  ]
+}
