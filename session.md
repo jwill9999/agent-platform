@@ -4,6 +4,9 @@ PR279 is merged into `feature/harness-backlog-review` at `43157a8c`. Owner autho
 reviewer repair, ten non-launch skill scenarios and pilot planning. Current branch:
 `task/reviewer-skill-evidence`, in `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
 Canonical Beads stays `/Users/letuscode/projects/agent-platform`.
+[Draft PR280](https://github.com/jwill9999/agent-platform/pull/280) publishes the repair and blocked
+pilot draft; hosted checks remain required before merge. Beads updates and Dolt push succeeded.
+Temporary review gateway/networks were removed; no pilot or review process remains running.
 
 The reviewer can now receive exact committed skill files as inert, revision-bound evidence without
 widening ordinary worker `.agents` access. Independent review found a partial-clone Git transport
