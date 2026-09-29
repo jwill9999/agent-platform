@@ -1,0 +1,165 @@
+{
+  "featureId": "agent-platform-pilot-zero.13",
+  "contractVersion": 1,
+  "policyDigest": "sha256:34a088ea99a303b311cd4e1dca93b427f48e39a209fe4883a78cae60d8cddf82",
+  "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+  "objective": "DRAFT ONLY: proposed single-task P4 post-approval hard-path test slice. Scoped P4.1 identity allocated; managed test feasibility unresolved; no launch authority.",
+  "requirements": [
+    "PP1 legitimate approved write succeeds",
+    "PP2 subsequent escape denied without effect or reused approval",
+    "PP3 backend regression and connected Electron evidence",
+    "PP4 managed cycle and handoff evidence",
+    "PP5 reviewable delivery only; broader P4 remains open"
+  ],
+  "nonGoals": [
+    "Live launch under this draft",
+    "Close all of P4",
+    "Product or permission-policy changes",
+    "Dependency changes",
+    "Merge or staging",
+    "Two-task pilot",
+    "Paid API experimentation"
+  ],
+  "acceptanceCriteria": [
+    "PP1 approved in-project write has matching terminal approval and successful effect evidence",
+    "PP2 fresh out-of-project request reaches real dispatch and is denied without effect or transferred approval",
+    "PP3 backend regression and connected Electron assertions are implemented with declared fixture boundaries"
+  ],
+  "constraints": {
+    "architecture": ["Preserve current application and orchestration implementations; tests only"],
+    "security": [
+      "No source writes for reviewers",
+      "Explicit task/role tools; no MCP or credential inheritance",
+      "No source mount widening to make tests work"
+    ],
+    "allowedPaths": [
+      "packages/harness/test/toolDispatch.test.ts",
+      "apps/desktop/e2e/packaged-vm-command.e2e.ts",
+      "docs/reviews/single-task-permission-pilot-results.md"
+    ]
+  },
+  "authority": {
+    "deliveryTarget": "feature/harness-backlog-review",
+    "allowedActions": [
+      "workspace.read",
+      "workspace.patch",
+      "process.test",
+      "artifact.write",
+      "beads.read",
+      "git.read"
+    ],
+    "github": {
+      "repository": "jwill9999/agent-platform",
+      "base": "feature/harness-backlog-review",
+      "mergeMethod": "merge",
+      "requiredChecks": ["verify", "desktop-e2e"]
+    }
+  },
+  "tasks": [
+    {
+      "id": "agent-platform-harness-baseline-p4.1",
+      "dependsOn": [],
+      "risk": "standard",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer",
+        "feature_evaluation": "feature_evaluator"
+      },
+      "branchParent": "feature/harness-backlog-review",
+      "allowedPaths": [
+        "packages/harness/test/toolDispatch.test.ts",
+        "apps/desktop/e2e/packaged-vm-command.e2e.ts",
+        "docs/reviews/single-task-permission-pilot-results.md"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "beads.read",
+        "git.read"
+      ]
+    }
+  ],
+  "qualityGates": [
+    "PP-U1",
+    "PP-E1",
+    "PP-O1",
+    "PP-G1",
+    "Independent critique and exact persisted approval before launch"
+  ],
+  "retryPolicy": {
+    "implementationAttempts": 2,
+    "findingAttempts": 2,
+    "infrastructureAttempts": 2,
+    "waitDeadlineSeconds": 300
+  },
+  "repairTaskPolicy": {
+    "idPattern": "agent-platform-pilot-zero.13.repair.<sequence>",
+    "maxChildren": 0,
+    "allowedRoles": ["implementation_worker"],
+    "allowedPaths": [
+      "packages/harness/test/toolDispatch.test.ts",
+      "apps/desktop/e2e/packaged-vm-command.e2e.ts",
+      "docs/reviews/single-task-permission-pilot-results.md"
+    ],
+    "authorityMayExpand": false
+  },
+  "escalationPolicy": [
+    "No launch: proposed policy is not installed authority",
+    "Stop for unresolved execution identity, dependencies, runtime feasibility or source/material drift",
+    "Stop on reproduced application defect; no product repair authority",
+    "Coordinator delivery/closure authority must be bound in revised contract; none granted by draft"
+  ],
+  "planningDocuments": {
+    "version": 1,
+    "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+    "repository": "jwill9999/agent-platform",
+    "sourceRevision": "81357d5b7e4e6bc1813a00f0db3280418a3ea6d7",
+    "files": [
+      {
+        "path": "docs/tasks/agent-platform-harness-baseline-p4.1.md",
+        "kind": "specification",
+        "taskIds": ["agent-platform-harness-baseline-p4.1"],
+        "sizeBytes": 2452,
+        "digest": "sha256:c08dda955f5a0b225b25546dd3cfe142c58fa44378ca2f1c08cad38a64f554f4"
+      },
+      {
+        "path": "docs/tasks/agent-platform-harness-baseline-p4.md",
+        "kind": "reference",
+        "taskIds": ["agent-platform-harness-baseline-p4.1"],
+        "sizeBytes": 4380,
+        "digest": "sha256:287fa92b58b4b41a26fbc2c0a4184fefc6b98615a397e3c54bf633c45675e9b4"
+      },
+      {
+        "path": "docs/tasks/agent-platform-pilot-zero.13.md",
+        "kind": "reference",
+        "taskIds": ["agent-platform-harness-baseline-p4.1"],
+        "sizeBytes": 4270,
+        "digest": "sha256:4f031e8d2666ebf77a986244895194c8f8dc8d741af4c2dfdcf8f76c38474198"
+      },
+      {
+        "path": "docs/planning/single-task-permission-pilot/plan.md",
+        "kind": "design",
+        "taskIds": ["agent-platform-harness-baseline-p4.1"],
+        "sizeBytes": 10210,
+        "digest": "sha256:37d802d1ad361fe1d5023363afdc31194347bee33dda43bd22bc88c9a63ccee4"
+      },
+      {
+        "path": "docs/planning/single-task-permission-pilot/planning-policy.md",
+        "kind": "reference",
+        "taskIds": ["agent-platform-harness-baseline-p4.1"],
+        "sizeBytes": 719,
+        "digest": "sha256:34a088ea99a303b311cd4e1dca93b427f48e39a209fe4883a78cae60d8cddf82"
+      },
+      {
+        "path": "docs/testing/single-task-permission-pilot.md",
+        "kind": "verification",
+        "taskIds": ["agent-platform-harness-baseline-p4.1"],
+        "sizeBytes": 5654,
+        "digest": "sha256:2413e6546705493c570809e7d9787fe5bffb9a3bde7659f8a854044b988beff8"
+      }
+    ]
+  }
+}
