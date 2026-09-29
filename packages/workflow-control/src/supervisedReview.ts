@@ -1,8 +1,24 @@
 import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { copyFile, lstat, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
+import {
+  copyFile,
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import {
+  captureCommittedReviewSkills,
+  createSkillReviewWorkspace,
+  isReviewSkillPath,
+  REVIEW_SKILL_NAMESPACE,
+  validateReviewText,
+} from './reviewSkillEvidence.js';
 
 import {
   buildDockerSpecialistLaunch,
@@ -15,7 +31,7 @@ export interface ReviewSnapshot {
   root: string;
   codexHome: string;
   materialDigest: string;
-  manifest: { path: string; digest: string }[];
+  manifest: { path: string; digest: string; stagedPath?: string; sourceRevision?: string }[];
 }
 
 const forbidden = new Set(['.git', '.beads', '.codex', '.ssh', 'node_modules']);
@@ -29,6 +45,10 @@ export async function prepareReviewSnapshot(
   for (const path of paths) {
     if (
       path === '.' ||
+      path === '' ||
+      path.split('/').some((part) => part === '' || part === '.') ||
+      path.split('/').includes(REVIEW_SKILL_NAMESPACE) ||
+      (path.split('/').includes('.agents') && !isReviewSkillPath(path)) ||
       isAbsolute(path) ||
       path.split('/').includes('..') ||
       path.split('/').some((part) => forbidden.has(part) || part.startsWith('.env'))
@@ -46,12 +66,21 @@ export async function prepareReviewSnapshot(
       throw new Error('resolved review evidence includes a forbidden path');
     }
   }
-  const staged = await prepareSpecialistWorkspace(sourceRoot, paths);
+  const skills = captureCommittedReviewSkills(canonicalRoot, paths.filter(isReviewSkillPath));
+  const ordinaryPaths = paths.filter((path) => !isReviewSkillPath(path));
+  const staged = ordinaryPaths.length
+    ? await prepareSpecialistWorkspace(sourceRoot, ordinaryPaths)
+    : await createSkillReviewWorkspace();
   try {
     const manifest: ReviewSnapshot['manifest'] = [];
     const visit = async (directory: string, prefix: string): Promise<void> => {
       for (const name of (await readdir(directory)).sort()) {
-        if (forbidden.has(name) || name.startsWith('.env')) {
+        if (
+          forbidden.has(name) ||
+          name === REVIEW_SKILL_NAMESPACE ||
+          name === '.agents' ||
+          name.startsWith('.env')
+        ) {
           throw new Error('review evidence includes a forbidden path');
         }
         const path = join(directory, name);
@@ -68,6 +97,18 @@ export async function prepareReviewSnapshot(
       }
     };
     await visit(staged.root, '');
+    if (skills.length) await mkdir(join(staged.root, REVIEW_SKILL_NAMESPACE), { mode: 0o700 });
+    for (const { bytes, ...identity } of skills) {
+      await writeFile(join(staged.root, identity.stagedPath), bytes, { mode: 0o600, flag: 'wx' });
+      manifest.push({ ...identity, digest: createHash('sha256').update(bytes).digest('hex') });
+    }
+    manifest.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+    let total = 0;
+    for (const item of manifest) {
+      const bytes = await readFile(join(staged.root, item.stagedPath ?? item.path));
+      total += bytes.length;
+      validateReviewText(bytes, total);
+    }
     if (manifest.length === 0)
       throw new Error('review evidence is empty or contains only forbidden paths');
     await writeFile(
@@ -134,20 +175,20 @@ export async function prepareSupervisedReview(
       throw new Error('review proxy must be an HTTP origin without credentials');
     }
   }
-  const authStat = await lstat(request.modelAuthFile);
-  if (!authStat.isFile() || authStat.isSymbolicLink()) {
-    throw new Error('review authentication must be a dedicated regular file');
-  }
   const snapshot = await prepareReviewSnapshot(request.sourceRoot, request.evidencePaths);
   const privateRoot = dirname(snapshot.root);
   try {
+    const authStat = await lstat(request.modelAuthFile);
+    if (!authStat.isFile() || authStat.isSymbolicLink()) {
+      throw new Error('review authentication must be a dedicated regular file');
+    }
     const authFile = join(privateRoot, 'review-auth.json');
     await writeFile(authFile, '', { mode: 0o600, flag: 'wx' });
     await copyFile(request.modelAuthFile, authFile);
     let evidenceBytes = 0;
     const evidence = [];
     for (const item of snapshot.manifest) {
-      const bytes = await readFile(join(snapshot.root, item.path));
+      const bytes = await readFile(join(snapshot.root, item.stagedPath ?? item.path));
       evidenceBytes += bytes.length;
       const content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
       if (content.includes('\0') || evidenceBytes > 2_000_000) {

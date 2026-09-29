@@ -1,0 +1,1 @@
+PASS: 6 changed Markdown documents (explicit paths, repository rules, no ignores)
