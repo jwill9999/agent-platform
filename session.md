@@ -1,4 +1,37 @@
-# Standalone readiness checkpoint — 28 September 2026
+# Reviewer evidence repair and pilot planning — 29 September 2026
+
+PR279 is merged into `feature/harness-backlog-review` at `43157a8c`. Owner authorized the narrow
+reviewer repair, ten non-launch skill scenarios and pilot planning. Current branch:
+`task/reviewer-skill-evidence`, in `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+Canonical Beads stays `/Users/letuscode/projects/agent-platform`.
+[Draft PR280](https://github.com/jwill9999/agent-platform/pull/280) publishes the repair and blocked
+pilot draft; hosted checks remain required before merge. Beads updates and Dolt push succeeded.
+Temporary review gateway/networks were removed; no pilot or review process remains running.
+
+The reviewer can now receive exact committed skill files as inert, revision-bound evidence without
+widening ordinary worker `.agents` access. Independent review found a partial-clone Git transport
+risk, fixed with transport-denying local reads and a regression sentinel. Full serial regression: 1,140 passed/77 gated skipped; real-container suite: 20 passed. Final independent repair review reports no code/security blocker. The first parallel run had timing/lease failures and is retained.
+See [qualification and findings](docs/reviews/reviewer-skill-evidence-qualification.md) for test/review
+results and limits. Ten decision scenarios ran: nine passed the specified decisions; S1 safely stopped
+but did not establish the exact configured admission-to-scheduling route. No pilot was launched.
+
+Owner approved scoped child `agent-platform-harness-baseline-p4.1`; it is open, blocked by `.13` and
+has [its own specification](docs/tasks/agent-platform-harness-baseline-p4.1.md). Wider P4 remains open.
+The [pilot draft](docs/planning/single-task-permission-pilot/plan.md) and linked verification plan define
+approved-write then fresh hard-path-denial coverage across backend and connected Electron UI.
+Independent draft critique exposes managed test-dependency feasibility, phase acceptance, actual
+role-policy and coordinator/start bindings, and enforceable run limits. These must be resolved before
+final plan agreement and persisted approval. Task creation/planning is not execution authorization.
+
+Next: review/integrate this repair after hosted checks; reconcile `.12`/`.17`; establish the exact
+managed runner and operator plan with evidence, resolve critique findings, bind documents and actual
+policy, then obtain approval for the single-task pilot. Do not close P4 or promote to staging.
+Notion structural alignment, the two-task pilot and wider feature integration remain separate.
+Historical handoff entries below are preserved and may describe superseded PR states.
+
+---
+
+## Standalone readiness checkpoint — 28 September 2026
 
 ## Review comment addressed — 29 September 2026
 
