@@ -22,7 +22,9 @@ Beads .8/.9/skills-gate/.10/.11 closed in dependency order after independent rec
 retained delivery and the recorded September24 scope. No force override. .12 awaits latest
 publication/integration; .17/.13/P4.1
 remain gated. Existing .16 delivery isclosed. Preserve dirtyprimary/unrelatedworktrees and archive tags.
-Local test-only repair validation passes; hosted PR283 gates apply to its final pushedhead.
+Local test-only repair validation and push hook pass, including112desktopunit tests; hosted PR283
+gates apply to its final pushedhead. Notion report/session/plan/proposal/field mirrors published and
+read back. Candidate image and all failed/successful probes are retained outside the repository.
 
 Historical checkpoints below retain older PR/task states.
 

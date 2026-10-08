@@ -57,12 +57,24 @@ Use a separate final Docker stage so provisioning scripts/caches are absent from
 base/platform, every manifest/helper digest, resulting image ID, installed dpkg package versions, and
 resolved Electron/native dependency versions. Inspect final image for forbidden source/private files.
 
-Backend command after recursive package build: `pnpm --filter @agent-platform/harness exec vitest run
-test/toolDispatch.test.ts`; require nonzero tests and zero failures. Electron: build backend, renderer
-and desktop as CI does; run `xvfb-run -a pnpm exec playwright test -c
-apps/desktop/e2e/playwright.electron.config.ts apps/desktop/e2e/packaged-vm-command.e2e.ts
---grep '^Project Chat disposable edit: approve with backend evidence \(provider-http\)$'`.
+Backend command after recursive package build; require nonzero tests and zero failures:
+
+```bash
+pnpm --filter @agent-platform/harness exec vitest run test/toolDispatch.test.ts
+```
+
+Electron: build backend, renderer and desktop as CI does, then run the exact title suffix below.
+Playwright's full title includes its filename, so do not anchor the start of the title.
 Require exactly one executed test and original file/approval/audit/provider assertions passing.
+
+```bash
+xvfb-run -a pnpm exec playwright test \
+  -c apps/desktop/e2e/playwright.electron.config.ts \
+  apps/desktop/e2e/packaged-vm-command.e2e.ts \
+  --grep 'Project Chat disposable edit: approve with backend evidence \(provider-http\)$' \
+  --retries=0 --reporter=json
+```
+
 Set process-local TMPDIR, XDG_CACHE_HOME and evidence/report paths within scratch/evidence, leaving
 container /tmp noexec unchanged. These are qualified test commands, not production launcher env overrides.
 Codex HOME and generated config remain as the launcher defines for later role-path checks.

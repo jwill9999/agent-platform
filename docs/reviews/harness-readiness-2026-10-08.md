@@ -9,7 +9,7 @@ and `agent-platform-pilot-zero.17`; pilot plan `.13` remains blocked. Source int
 PR280 reviewer repair and PR282 cleanup are merged into the harness feature. PR281 documentation
 is delivered to staging. Prior source/CI evidence remains historical evidence; this assessment does
 not rerun the 1,140-test serial or 20-container suite and does not claim a managed execution cycle.
-Live Beads `.10`, `.11`, `.12`, `.17` remain in progress. `.12` can report a blocked assessment but
+At the initial checkpoint Beads `.10`, `.11`, `.12`, `.17` remained in progress. `.12` can report a blocked assessment but
 must reconcile its upstream skill acceptance/evidence before closing. S2–S10 retained decision cases
 pass their bounded scenarios; S1 safely stopped but did not establish configured admission/scheduling.
 
@@ -43,15 +43,15 @@ application-test environment. Existing source snapshot construction excludes `no
 
 ## Initial checkpoint dispositions
 
-| Requirement | Disposition | Evidence and remaining work |
-| --- | --- | --- |
-| Reviewer skill evidence | Integrated | PR280 retains inert skill evidence and ordinary-worker restrictions. |
-| Docker daemon and pinned images | Available now | Local offline probe; not perpetual host health. |
-| Managed application test environment | Blocked | Configured worker lacks required PATH tools/dependencies; no qualified provisioned replacement or scratch-build route. |
-| Configured admission and initial scheduling | Unproven | S1 gap retained; operator has no workflow field. No run admission was attempted. |
-| Role/coordinator policy and phase acceptance | Unbound for this pilot | Existing implementation/fixture qualification must be bound to actual emitted packets, configuration and phases. |
-| Execution ceilings | Unqualified for proposed ceilings | Runtime derives an attempt deadline from waitDeadlineSeconds; proposed ten-minute attempts and sixty-minute aggregate require explicit supported mapping. |
-| Canonical discovery and approval | Not refreshed in this checkpoint | Earlier binding evidence retained; no absence/approval claim is made from direct config inspection. |
+| Requirement                                  | Disposition                       | Evidence and remaining work                                                                                                                               |
+| -------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reviewer skill evidence                      | Integrated                        | PR280 retains inert skill evidence and ordinary-worker restrictions.                                                                                      |
+| Docker daemon and pinned images              | Available now                     | Local offline probe; not perpetual host health.                                                                                                           |
+| Managed application test environment         | Blocked                           | Configured worker lacks required PATH tools/dependencies; no qualified provisioned replacement or scratch-build route.                                    |
+| Configured admission and initial scheduling  | Unproven                          | S1 gap retained; operator has no workflow field. No run admission was attempted.                                                                          |
+| Role/coordinator policy and phase acceptance | Unbound for this pilot            | Existing implementation/fixture qualification must be bound to actual emitted packets, configuration and phases.                                          |
+| Execution ceilings                           | Unqualified for proposed ceilings | Runtime derives an attempt deadline from waitDeadlineSeconds; proposed ten-minute attempts and sixty-minute aggregate require explicit supported mapping. |
+| Canonical discovery and approval             | Not refreshed in this checkpoint  | Earlier binding evidence retained; no absence/approval claim is made from direct config inspection.                                                       |
 
 ## Original bounded qualification proposal
 
@@ -165,7 +165,8 @@ retries/skips. All 829 source-file hashes remained unchanged. No application run
 
 Actual Codex application-tool attempt 1 used generated test_runner policy, fixed command/session
 fixture responses and the production launcher. Build, 79 backend controls and static checks passed,
-but Electron failed with listen EPERM on 127.0.0.1. Under the generated test-runner policy, the selected fixture failed binding 127.0.0.1 with EPERM.
+but under the generated test-runner policy the selected Electron fixture failed binding 127.0.0.1
+with EPERM.
 All 832 staged source/helper hashes were unchanged and owned-container absence/evidence retention
 were verified before cleanup. A repeated identical attempt would not resolve this policy blocker.
 See [public evidence summary](evidence/runner-qualification-2026-10-08/summary.json); complete logs,
@@ -184,3 +185,17 @@ September24 bounded skill decision. .8, .9, skills-gate, .10 and .11 closed in d
 .12 retains its blocked assessment pending latest publication/integration; .17
 and .13 remain in progress with the new local-test repair gate open. Assessment closure never grants
 pilot launch authority.
+
+### Publication and local repair checks
+
+The push hook passed desktop build/typecheck and all 112 desktop unit tests on Node24.14.0.
+Its cycle check completed with no detected cycle among 776 inspected files and 85 resolution warnings;
+that warning count is disclosed, not claimed as full graph coverage. Modified-file lint, explicit
+E2E typing, direct connected control, Markdown/link/format/diff checks and independent source review
+passed. The test-only repair's local gate passes; the managed environment/pilot gate remains blocked.
+Hosted checks are evaluated against PR283's current head; no final hosted pass is claimed here.
+
+Report/session, qualification plan, repair proposal and field-evaluation mirrors were published and
+read back with source digests and complete visible-content checks. Existing Notion notes were preserved.
+The proposed network repair still has no implementation contract or execution approval because the
+owner scope choice is unresolved. No complete implementation handoff is claimed.
