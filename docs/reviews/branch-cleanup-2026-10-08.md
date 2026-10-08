@@ -132,10 +132,10 @@ continues to contain the later test/permission/approval/discovery/import/reviewe
 ## Remaining remote branches
 
 ```text
-5fbdff228c836c753bb0aeef32ba442bf8559c8e	refs/heads/feature/harness-backlog-review
-0dc0d475faf535911a20fcabb9bfd0262b2bbad4	refs/heads/main
-a5a1641c3d2a5ef317c05fa45c6190e7189c1915	refs/heads/staging
-d0b9ad06c7ed31d17f39f110bca737c8e0f889e6	refs/heads/task/notion-alignment-backlog
+5fbdff228c836c753bb0aeef32ba442bf8559c8e refs/heads/feature/harness-backlog-review
+0dc0d475faf535911a20fcabb9bfd0262b2bbad4 refs/heads/main
+a5a1641c3d2a5ef317c05fa45c6190e7189c1915 refs/heads/staging
+d0b9ad06c7ed31d17f39f110bca737c8e0f889e6 refs/heads/task/notion-alignment-backlog
 ```
 
 The cleanup publication branch is added after this snapshot. No open PR existed before publication.
