@@ -1,6 +1,6 @@
 # Harness readiness iteration — 8 October 2026
 
-Worktree: task/pilot-active-budget, chained from pushed readiness tip 5b796b74; PR283 retains
+Worktree: task/test-runner-offline-adapter, chained from pushed budget tip ee3a160f; PR283 retains
 the earlier readiness segment. Budget plan and verification passed version1 validation and distinct evidence-only critique.
 Implementation adds durable fenced full work/cleanup allocations and deadline enforcement.
 [Budget result](docs/reviews/pilot-active-budget.md) retains bindings, C01 correction and local
@@ -10,7 +10,7 @@ Independent patch recheck approved with no remaining findings. Budget code/repor
 and one Vitest worker. Xcode hook PATH symlink failure is reproduced/retained. Source/task stays
 open until cumulative feature integration. Branch-specific Notion sync is being completed; final
 publication receipts belong to canonical Beads. Next: chain task/test-runner-offline-adapter from
-this pushed tip, prepare complete source-backed version1 material and required independent critique,
+this pushed tip (branch now created), prepare complete source-backed version1 material and required independent critique,
 then implement/qualify the governed offline application adapter. Do not repeat failed proxy probes. Canonical CLI discovery for this task returned absent; no run launched.
 The owner authorized supervised prerequisites until pilot-ready. No live pilot or paid model ran.
 

@@ -155,3 +155,17 @@ absence of tool access is required, use the isolated launcher; this exception is
 - Related epic: [Autonomous Multi-Agent Feature Delivery](../tasks/agent-platform-multi-agent.md)
 - Review gate: [Critique multi-agent orchestration design](../tasks/agent-platform-multi-agent-review.md)
 - Shared workflow rules: [Agent Instructions](../agent-instructions-shared.md)
+
+### Proposed governed deterministic verification adapter — 8 October 2026
+
+Owner-authorized prerequisite scope permits the narrowly reviewed offline adapter described in
+[the adapter plan](../planning/test-runner-offline-adapter/plan.md). Its implementation/qualification
+remain pending. It is deterministic computation for an explicitly contract-selected test_runner
+verification phase, not a model specialist or inherited host-tool route. All model specialists still
+use the Codex launch boundary above. The adapter runs only a fixed versioned suite, with contract-bound
+image/entrypoint/input/source/material identities, journaled admission/settlement, per-run budget and
+independently validated typed evidence. No arbitrary commands, model auth/config mounts, egress
+attachment, host sockets or permission widening for ordinary agents. Missing/changed material,
+unsupported image, timeout or uncertain cleanup fails closed. No automatic fallback or pilot approval.
+A future accepted status requires the plan's independent reviews, real connected permitted/denied
+journeys and feature integration; this proposal does not establish those results.

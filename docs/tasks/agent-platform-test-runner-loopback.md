@@ -102,3 +102,32 @@ root runner-qualification-20261008 under role-loopback-feasibility-1, -2 and -3.
 establish gateway denial, external/private containment, UNIX socket compatibility or Electron success.
 The next contract must resolve those requirements or select the governed offline adapter. Admission,
 coordinator bindings, authenticated gateway access and the aggregate cap remain separately gated.
+
+## Selected adapter implementation handoff
+
+The owner-delegated alternative is a deterministic offline application verification adapter for
+exactly selected contract-bound test_runner verification phases. It retains command networking
+denial for Codex roles and uses a separate credential-free offline container namespace for fixed
+tests. [Complete plan](../planning/test-runner-offline-adapter/plan.md) and
+[verification scenarios](../testing/test-runner-offline-adapter.md) define exact limits, source/evidence
+bindings, exclusions and final cumulative feature delivery. Implementation remains gated on version1
+validation and independent critique. Planning/fixture approval is not production pilot approval.
+
+## Gherkin E2E Strategy
+
+```gherkin
+Feature: Governed offline application verification
+  Scenario: Approved Project Chat edit reaches the real backend
+    Given a disposable desktop, backend and provider HTTP fixture in the governed offline adapter
+    When the user approves the selected Project Chat edit
+    Then the visible result and independent persisted tool effect agree
+    And exactly one selected Electron test passes without retry or skip
+  Scenario: Verification timeout prevents late acceptance
+    Given the same contract-bound adapter exceeds its persisted work allowance
+    When the supervisor interrupts and cleans its owned container
+    Then no late result advances the workflow
+    And cleanup absence and credential revocation are independently confirmed or remain blocking
+```
+
+The existing UI journey is retained; no UI behaviour is changed. L-T02 tests adjacent role/filesystem
+regression and gateway/network denial. Fixture provider and journal/approval boundaries are disclosed.
