@@ -1,0 +1,226 @@
+{
+  "featureId": "agent-platform-test-runner-loopback",
+  "planningDocuments": {
+    "version": 1,
+    "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+    "repository": "jwill9999/agent-platform",
+    "sourceRevision": "a94a414740446ece7cb3f0a96c0e70cb93616f4b",
+    "files": [
+      {
+        "path": "docs/adr/0004-codex-development-orchestration-control-plane.md",
+        "kind": "reference",
+        "taskIds": ["agent-platform-test-runner-loopback"],
+        "sizeBytes": 11593,
+        "digest": "sha256:6e111644db50ba46cb966b2949a7bb301f086d1c86a8c9f23043dab2378cabca"
+      },
+      {
+        "path": "docs/planning/test-runner-offline-adapter/plan.md",
+        "kind": "design",
+        "taskIds": ["agent-platform-test-runner-loopback"],
+        "sizeBytes": 10360,
+        "digest": "sha256:97454f4ff42c2c383dd2d1d997119c81dbf7eb1b6f816e6bb6aff9e4c5027e55"
+      },
+      {
+        "path": "docs/tasks/agent-platform-test-runner-loopback.md",
+        "kind": "specification",
+        "taskIds": ["agent-platform-test-runner-loopback"],
+        "sizeBytes": 9192,
+        "digest": "sha256:e7bbafd0547f45d534f8b1db876bda7b49addd5f624fd2045e435b0239df96f2"
+      },
+      {
+        "path": "docs/testing/test-runner-offline-adapter.md",
+        "kind": "verification",
+        "taskIds": ["agent-platform-test-runner-loopback"],
+        "sizeBytes": 4137,
+        "digest": "sha256:91ea06d16acf33f7d40b30fdff006be4853db61cf2b4478b966c1a7de354045b"
+      }
+    ]
+  },
+  "contractVersion": 1,
+  "policyDigest": "sha256:97454f4ff42c2c383dd2d1d997119c81dbf7eb1b6f816e6bb6aff9e4c5027e55",
+  "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+  "objective": "Supervised prerequisite repair: qualify fixed contract-bound offline application verification adapter without widening Codex command networking or launching the pilot.",
+  "requirements": [
+    "L1 explicit contract-bound deterministic test_runner verification adapter, strict immutable suite/image/entrypoint selection",
+    "L2 offline network namespace/no credential or host mounts; fixed permitted local application tests and external/gateway/filesystem denials",
+    "L3 preserve all prior role policies, journal/fence/budget/deadline/settlement/restart safeguards",
+    "L4 typed independently validated bound evidence and actual governed connected application qualification"
+  ],
+  "nonGoals": [
+    "Live pilot or persisted production approval",
+    "Paid model call or primary credential access",
+    "Arbitrary worker commands or networking expansion",
+    "Application UI/backend/dependency/lockfile edits",
+    "Staging/main promotion"
+  ],
+  "acceptanceCriteria": [
+    "L1 schema/material/packet binding and authority-expansion checks pass; no automatic fallback",
+    "L2 actual adapter permits only its isolated fixture journey, protected external gateway untouched and original source unchanged",
+    "L3 admission/deadline/cleanup/exhaustion/recovery/other-role regression passes or remains blocking",
+    "L4 L-T01 through L-T04 qualify actual production governed launcher with backend/Electron/evidence assertions; fixtures disclosed"
+  ],
+  "constraints": {
+    "architecture": [
+      "Deterministic test adapter is an explicit reviewed exception; all model specialists retain Codex launcher boundaries",
+      "Reuse production phase runtime, packet, scheduler container journal and aggregate budget; no replacement coordinator"
+    ],
+    "security": [
+      "No Codex networking widening; offline adapter never mounts auth/model gateway/host sockets or attaches egress",
+      "Retain existing unused broker lease issue/revoke outside adapter; no model call",
+      "Unknown source/input/image/fences/cleanup blocks result and further dispatch",
+      "Supervised direct repair and required evidence-only independent critique, not a managed pilot"
+    ],
+    "allowedPaths": [
+      "packages/workflow-control/src/contracts.ts",
+      "packages/workflow-control/src/lifecycle.ts",
+      "packages/workflow-control/src/phaseRuntime.ts",
+      "packages/workflow-control/src/specialistLauncher.ts",
+      "packages/workflow-control/src/specialistTerminalResult.ts",
+      "packages/workflow-control/src/offlineTestAdapter.ts",
+      "packages/workflow-control/src/storage.ts",
+      "packages/workflow-control/src/specialistInput.ts",
+      "packages/workflow-control/src/index.ts",
+      "packages/workflow-control/test/contracts.test.ts",
+      "packages/workflow-control/test/lifecycle.test.ts",
+      "packages/workflow-control/test/phaseRuntime.test.ts",
+      "packages/workflow-control/test/specialistLauncher.test.ts",
+      "packages/workflow-control/test/specialistTerminalResult.test.ts",
+      "packages/workflow-control/test/offlineTestAdapter.test.ts",
+      "packages/workflow-control/test/specialistContainerLifecycle.integration.test.ts",
+      "docs/tasks/agent-platform-test-runner-loopback.md",
+      "docs/planning/test-runner-offline-adapter",
+      "docs/testing/test-runner-offline-adapter.md",
+      "docs/reviews/test-runner-offline-adapter.md",
+      "docs/reviews/evidence/test-runner-offline-adapter",
+      "docs/adr/0004-codex-development-orchestration-control-plane.md",
+      "session.md"
+    ]
+  },
+  "authority": {
+    "deliveryTarget": "feature/harness-backlog-review",
+    "allowedActions": [
+      "workspace.read",
+      "workspace.patch",
+      "process.test",
+      "artifact.write",
+      "beads.read",
+      "git.read"
+    ],
+    "github": {
+      "repository": "jwill9999/agent-platform",
+      "base": "feature/harness-backlog-review",
+      "mergeMethod": "merge",
+      "requiredChecks": [
+        "verify",
+        "desktop-e2e",
+        "e2e",
+        "docker",
+        "deps:check-cycles",
+        "markdownlint",
+        "lychee",
+        "GitGuardian Security Checks",
+        "SonarCloud Code Analysis"
+      ]
+    }
+  },
+  "tasks": [
+    {
+      "id": "agent-platform-test-runner-loopback",
+      "dependsOn": [],
+      "risk": "high",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer",
+        "feature_evaluation": "feature_evaluator"
+      },
+      "branchParent": "task/pilot-active-budget",
+      "allowedPaths": [
+        "packages/workflow-control/src/contracts.ts",
+        "packages/workflow-control/src/lifecycle.ts",
+        "packages/workflow-control/src/phaseRuntime.ts",
+        "packages/workflow-control/src/specialistLauncher.ts",
+        "packages/workflow-control/src/specialistTerminalResult.ts",
+        "packages/workflow-control/src/offlineTestAdapter.ts",
+        "packages/workflow-control/src/storage.ts",
+        "packages/workflow-control/src/specialistInput.ts",
+        "packages/workflow-control/src/index.ts",
+        "packages/workflow-control/test/contracts.test.ts",
+        "packages/workflow-control/test/lifecycle.test.ts",
+        "packages/workflow-control/test/phaseRuntime.test.ts",
+        "packages/workflow-control/test/specialistLauncher.test.ts",
+        "packages/workflow-control/test/specialistTerminalResult.test.ts",
+        "packages/workflow-control/test/offlineTestAdapter.test.ts",
+        "packages/workflow-control/test/specialistContainerLifecycle.integration.test.ts",
+        "docs/tasks/agent-platform-test-runner-loopback.md",
+        "docs/planning/test-runner-offline-adapter",
+        "docs/testing/test-runner-offline-adapter.md",
+        "docs/reviews/test-runner-offline-adapter.md",
+        "docs/reviews/evidence/test-runner-offline-adapter",
+        "docs/adr/0004-codex-development-orchestration-control-plane.md",
+        "session.md"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "beads.read",
+        "git.read"
+      ]
+    }
+  ],
+  "qualityGates": [
+    "L-T01",
+    "L-T02",
+    "L-T03",
+    "L-T04",
+    "Workflow package build/typecheck/lint/relevant and full regression tests",
+    "Formatting and SonarQube or documented Problems fallback",
+    "Independent pre-code critique and post-code review",
+    "Final cumulative segment hosted checks and feature integration; no task closure before integration"
+  ],
+  "retryPolicy": {
+    "implementationAttempts": 2,
+    "findingAttempts": 2,
+    "infrastructureAttempts": 2,
+    "waitDeadlineSeconds": 300
+  },
+  "repairTaskPolicy": {
+    "idPattern": "agent-platform-test-runner-loopback.repair.<sequence>",
+    "maxChildren": 0,
+    "allowedRoles": ["implementation_worker"],
+    "allowedPaths": [
+      "packages/workflow-control/src/contracts.ts",
+      "packages/workflow-control/src/lifecycle.ts",
+      "packages/workflow-control/src/phaseRuntime.ts",
+      "packages/workflow-control/src/specialistLauncher.ts",
+      "packages/workflow-control/src/specialistTerminalResult.ts",
+      "packages/workflow-control/src/offlineTestAdapter.ts",
+      "packages/workflow-control/src/storage.ts",
+      "packages/workflow-control/src/specialistInput.ts",
+      "packages/workflow-control/src/index.ts",
+      "packages/workflow-control/test/contracts.test.ts",
+      "packages/workflow-control/test/lifecycle.test.ts",
+      "packages/workflow-control/test/phaseRuntime.test.ts",
+      "packages/workflow-control/test/specialistLauncher.test.ts",
+      "packages/workflow-control/test/specialistTerminalResult.test.ts",
+      "packages/workflow-control/test/offlineTestAdapter.test.ts",
+      "packages/workflow-control/test/specialistContainerLifecycle.integration.test.ts",
+      "docs/tasks/agent-platform-test-runner-loopback.md",
+      "docs/planning/test-runner-offline-adapter",
+      "docs/testing/test-runner-offline-adapter.md",
+      "docs/reviews/test-runner-offline-adapter.md",
+      "docs/reviews/evidence/test-runner-offline-adapter",
+      "docs/adr/0004-codex-development-orchestration-control-plane.md",
+      "session.md"
+    ],
+    "authorityMayExpand": false
+  },
+  "escalationPolicy": [
+    "Stop on authority/destination/source/material drift",
+    "Preserve all failures; no unchanged retries beyond bounded attempts",
+    "Stop and report external blockers or uncertain cleanup",
+    "No launch from general prerequisite authorization"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "sourceRevision": "a94a414740446ece7cb3f0a96c0e70cb93616f4b",
+  "materialDigest": "sha256:ba518a9f854a9bed3f9a3f367b7d9b8495b15c2f572d2965f9f441f7ec6f463b",
+  "documents": [
+    {
+      "path": "docs/adr/0004-codex-development-orchestration-control-plane.md",
+      "kind": "reference",
+      "taskIds": ["agent-platform-test-runner-loopback"],
+      "sizeBytes": 11593,
+      "digest": "sha256:6e111644db50ba46cb966b2949a7bb301f086d1c86a8c9f23043dab2378cabca"
+    },
+    {
+      "path": "docs/planning/test-runner-offline-adapter/plan.md",
+      "kind": "design",
+      "taskIds": ["agent-platform-test-runner-loopback"],
+      "sizeBytes": 10360,
+      "digest": "sha256:97454f4ff42c2c383dd2d1d997119c81dbf7eb1b6f816e6bb6aff9e4c5027e55"
+    },
+    {
+      "path": "docs/tasks/agent-platform-test-runner-loopback.md",
+      "kind": "specification",
+      "taskIds": ["agent-platform-test-runner-loopback"],
+      "sizeBytes": 9192,
+      "digest": "sha256:e7bbafd0547f45d534f8b1db876bda7b49addd5f624fd2045e435b0239df96f2"
+    },
+    {
+      "path": "docs/testing/test-runner-offline-adapter.md",
+      "kind": "verification",
+      "taskIds": ["agent-platform-test-runner-loopback"],
+      "sizeBytes": 4137,
+      "digest": "sha256:91ea06d16acf33f7d40b30fdff006be4853db61cf2b4478b966c1a7de354045b"
+    }
+  ]
+}

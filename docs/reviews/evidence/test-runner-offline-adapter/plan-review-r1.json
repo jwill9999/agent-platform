@@ -1,0 +1,39 @@
+{
+  "reviewId": "test-runner-offline-adapter-plan-r1",
+  "runId": "supervised:agent-platform-test-runner-loopback",
+  "plannerId": "/root",
+  "criticId": "/root/runner_plan_critic",
+  "contractVersion": 1,
+  "policyDigest": "sha256:97454f4ff42c2c383dd2d1d997119c81dbf7eb1b6f816e6bb6aff9e4c5027e55",
+  "materialDigest": "sha256:ba518a9f854a9bed3f9a3f367b7d9b8495b15c2f572d2965f9f441f7ec6f463b",
+  "verdict": "approved",
+  "summary": "No actionable planning findings in the supplied complete material. The adapter is explicitly selected by approved task-verification material, restricted to a fixed suite and immutable image/entrypoint, and preserves ordinary Codex networking restrictions. Production admission, source/document binding, budget, container identity, deadlines, settlement and unused credential revocation remain mandatory. Actual connected application controls, adjacent denials, malformed-result rejection and restart qualification are required before acceptance; prior direct-container success is not substituted. Dependency/source closure must be permitted by the actual verification packet and missing inputs fail closed. Feature integration and separate pilot admission/gateway/coordinator/approval gates remain explicit. This is an unpersisted supervised evidence-only review based on supplied revision-bound material. No tools were used; inherited tools were not technically disabled. The runId is a nonexecuting carrier label, not a managed run or production approval. This object has not been machine validated here. Approval covers the prerequisite implementation plan only.",
+  "evidence": [
+    {
+      "digest": "sha256:97454f4ff42c2c383dd2d1d997119c81dbf7eb1b6f816e6bb6aff9e4c5027e55",
+      "mediaType": "text/markdown",
+      "sizeBytes": 10360,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:91ea06d16acf33f7d40b30fdff006be4853db61cf2b4478b966c1a7de354045b",
+      "mediaType": "text/markdown",
+      "sizeBytes": 4137,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:e7bbafd0547f45d534f8b1db876bda7b49addd5f624fd2045e435b0239df96f2",
+      "mediaType": "text/markdown",
+      "sizeBytes": 9192,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:6e111644db50ba46cb966b2949a7bb301f086d1c86a8c9f23043dab2378cabca",
+      "mediaType": "text/markdown",
+      "sizeBytes": 11593,
+      "kind": "artifact"
+    }
+  ],
+  "findings": [],
+  "humanDecision": null
+}
