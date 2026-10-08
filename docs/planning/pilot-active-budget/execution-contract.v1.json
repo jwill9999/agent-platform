@@ -1,0 +1,216 @@
+{
+  "featureId": "agent-platform-pilot-active-budget",
+  "planningDocuments": {
+    "version": 1,
+    "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+    "repository": "jwill9999/agent-platform",
+    "sourceRevision": "969072f4333d78e6474d9e789a1d35039c54349a",
+    "files": [
+      {
+        "path": "docs/planning/pilot-active-budget/plan.md",
+        "kind": "design",
+        "taskIds": ["agent-platform-pilot-active-budget"],
+        "sizeBytes": 7370,
+        "digest": "sha256:d40a5ed5f821895042f7a09ce1f223608a281ffc5cd825b19f3c30c7ab7d6601"
+      },
+      {
+        "path": "docs/tasks/agent-platform-pilot-active-budget.md",
+        "kind": "specification",
+        "taskIds": ["agent-platform-pilot-active-budget"],
+        "sizeBytes": 6448,
+        "digest": "sha256:f02fbd212453e686ef51c7ada9c195cc7f977b0ec79d31674962e27f0d86f066"
+      },
+      {
+        "path": "docs/testing/pilot-active-budget.md",
+        "kind": "verification",
+        "taskIds": ["agent-platform-pilot-active-budget"],
+        "sizeBytes": 3722,
+        "digest": "sha256:cd6aa5505db55effd1ef039cb590a2a8513f70f9e142e347e7948cd537d8500e"
+      }
+    ]
+  },
+  "contractVersion": 1,
+  "policyDigest": "sha256:d40a5ed5f821895042f7a09ce1f223608a281ffc5cd825b19f3c30c7ab7d6601",
+  "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+  "objective": "Supervised prerequisite repair: enforce durable per-run aggregate execution allowances and deadline cleanup; no live pilot launch.",
+  "requirements": [
+    "B1 contract-bound aggregate/attempt/cleanup limits with approval invalidation and authority narrowing",
+    "B2 atomic fenced immutable charged reservations across specialist/coordinator/repair/retry/recovery",
+    "B3 work deadlines, bounded cleanup, durable exhaustion and restart/clock/journal failure containment",
+    "B4 independently persisted reservation and composed child-process evidence"
+  ],
+  "nonGoals": [
+    "Pilot launch or persisted managed approval",
+    "Paid model call or primary credentials",
+    "Product/UI/dependency changes",
+    "Network permission changes",
+    "Staging/main promotion"
+  ],
+  "acceptanceCriteria": [
+    "B1 validated optional execution limits preserve legacy behavior and reject removal/increase without revised authority",
+    "B2 total durable reserved work-plus-cleanup allowance never exceeds approved aggregate and replay never replenishes",
+    "B3 expired/fenced/unknown authority cannot dispatch or accept results; owned cancellation and revocation are independently verified or reported blocked",
+    "B4 B-T01 through B-T05 pass with exact source/material evidence and disclosed mocked/unverified boundaries"
+  ],
+  "constraints": {
+    "architecture": [
+      "Existing workflow SQLite writer lock, phase runtime and cancellation journal; no replacement coordinator",
+      "Final pilot requires3600-second aggregate policy; repairs share the same run total"
+    ],
+    "security": [
+      "No permissions/credential/network expansion",
+      "Containment cleanup may run after work budget fence but cannot progress; uncertain physical absence blocks readiness",
+      "Supervised direct repair and instruction-constrained independent no-tool critique, not active managed execution"
+    ],
+    "allowedPaths": [
+      "packages/workflow-control/src/contracts.ts",
+      "packages/workflow-control/src/lifecycle.ts",
+      "packages/workflow-control/src/runExecutionBudget.ts",
+      "packages/workflow-control/src/storage.ts",
+      "packages/workflow-control/src/phaseRuntime.ts",
+      "packages/workflow-control/src/phaseJobs.ts",
+      "packages/workflow-control/src/standaloneCoordinators.ts",
+      "packages/workflow-control/src/coordinatorTransport.ts",
+      "packages/workflow-control/src/workCancellation.ts",
+      "packages/workflow-control/src/executionInterruptions.ts",
+      "packages/workflow-control/src/specialistLauncher.ts",
+      "packages/workflow-control/test/contracts.test.ts",
+      "packages/workflow-control/test/lifecycle.test.ts",
+      "packages/workflow-control/test/runExecutionBudget.test.ts",
+      "packages/workflow-control/test/phaseRuntime.test.ts",
+      "packages/workflow-control/test/coordinatorTransport.test.ts",
+      "docs/tasks/agent-platform-pilot-active-budget.md",
+      "docs/planning/pilot-active-budget",
+      "docs/testing/pilot-active-budget.md",
+      "docs/reviews/pilot-active-budget.md",
+      "docs/reviews/evidence/pilot-active-budget",
+      "session.md"
+    ]
+  },
+  "authority": {
+    "deliveryTarget": "feature/harness-backlog-review",
+    "allowedActions": [
+      "workspace.read",
+      "workspace.patch",
+      "process.test",
+      "artifact.write",
+      "beads.read",
+      "git.read"
+    ],
+    "github": {
+      "repository": "jwill9999/agent-platform",
+      "base": "feature/harness-backlog-review",
+      "mergeMethod": "merge",
+      "requiredChecks": [
+        "verify",
+        "desktop-e2e",
+        "e2e",
+        "docker",
+        "deps:check-cycles",
+        "markdownlint",
+        "lychee",
+        "GitGuardian Security Checks",
+        "SonarCloud Code Analysis"
+      ]
+    }
+  },
+  "tasks": [
+    {
+      "id": "agent-platform-pilot-active-budget",
+      "dependsOn": [],
+      "risk": "high",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer",
+        "feature_evaluation": "feature_evaluator"
+      },
+      "branchParent": "task/harness-readiness-reconciliation",
+      "allowedPaths": [
+        "packages/workflow-control/src/contracts.ts",
+        "packages/workflow-control/src/lifecycle.ts",
+        "packages/workflow-control/src/runExecutionBudget.ts",
+        "packages/workflow-control/src/storage.ts",
+        "packages/workflow-control/src/phaseRuntime.ts",
+        "packages/workflow-control/src/phaseJobs.ts",
+        "packages/workflow-control/src/standaloneCoordinators.ts",
+        "packages/workflow-control/src/coordinatorTransport.ts",
+        "packages/workflow-control/src/workCancellation.ts",
+        "packages/workflow-control/src/executionInterruptions.ts",
+        "packages/workflow-control/src/specialistLauncher.ts",
+        "packages/workflow-control/test/contracts.test.ts",
+        "packages/workflow-control/test/lifecycle.test.ts",
+        "packages/workflow-control/test/runExecutionBudget.test.ts",
+        "packages/workflow-control/test/phaseRuntime.test.ts",
+        "packages/workflow-control/test/coordinatorTransport.test.ts",
+        "docs/tasks/agent-platform-pilot-active-budget.md",
+        "docs/planning/pilot-active-budget",
+        "docs/testing/pilot-active-budget.md",
+        "docs/reviews/pilot-active-budget.md",
+        "docs/reviews/evidence/pilot-active-budget",
+        "session.md"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "beads.read",
+        "git.read"
+      ]
+    }
+  ],
+  "qualityGates": [
+    "B-T01",
+    "B-T02",
+    "B-T03",
+    "B-T04",
+    "B-T05",
+    "Workflow package build/typecheck/lint/relevant and full regression tests",
+    "Formatting and SonarQube or documented Problems fallback",
+    "Independent pre-code critique and post-code review",
+    "Final cumulative segment hosted checks and feature integration; no task closure before integration"
+  ],
+  "retryPolicy": {
+    "implementationAttempts": 2,
+    "findingAttempts": 2,
+    "infrastructureAttempts": 2,
+    "waitDeadlineSeconds": 300
+  },
+  "repairTaskPolicy": {
+    "idPattern": "agent-platform-pilot-active-budget.repair.<sequence>",
+    "maxChildren": 0,
+    "allowedRoles": ["implementation_worker"],
+    "allowedPaths": [
+      "packages/workflow-control/src/contracts.ts",
+      "packages/workflow-control/src/lifecycle.ts",
+      "packages/workflow-control/src/runExecutionBudget.ts",
+      "packages/workflow-control/src/storage.ts",
+      "packages/workflow-control/src/phaseRuntime.ts",
+      "packages/workflow-control/src/phaseJobs.ts",
+      "packages/workflow-control/src/standaloneCoordinators.ts",
+      "packages/workflow-control/src/coordinatorTransport.ts",
+      "packages/workflow-control/src/workCancellation.ts",
+      "packages/workflow-control/src/executionInterruptions.ts",
+      "packages/workflow-control/src/specialistLauncher.ts",
+      "packages/workflow-control/test/contracts.test.ts",
+      "packages/workflow-control/test/lifecycle.test.ts",
+      "packages/workflow-control/test/runExecutionBudget.test.ts",
+      "packages/workflow-control/test/phaseRuntime.test.ts",
+      "packages/workflow-control/test/coordinatorTransport.test.ts",
+      "docs/tasks/agent-platform-pilot-active-budget.md",
+      "docs/planning/pilot-active-budget",
+      "docs/testing/pilot-active-budget.md",
+      "docs/reviews/pilot-active-budget.md",
+      "docs/reviews/evidence/pilot-active-budget",
+      "session.md"
+    ],
+    "authorityMayExpand": false
+  },
+  "escalationPolicy": [
+    "Stop on authority/destination/source/material drift",
+    "Preserve all failures; no unchanged retries beyond bounded attempts",
+    "Stop and report external blockers or uncertain cleanup",
+    "No launch from general prerequisite authorization"
+  ]
+}

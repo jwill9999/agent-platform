@@ -625,7 +625,11 @@ export class RevocableSpecialistCredentialBroker {
         throw issueError;
       }
       try {
-        await this.#revokeAndConfirm(leaseId, generation);
+        await this.#revokeAndConfirm(
+          leaseId,
+          generation,
+          this.#store.getExecutionBudgetReservation(executionId)?.cleanup_deadline_ms,
+        );
         const execution = this.#store.getSchedulerExecution(executionId);
         if (execution?.status === 'active' && execution.credentialLeaseId === leaseId) {
           this.#store.advanceSchedulerCredential(
@@ -694,7 +698,14 @@ export class RevocableSpecialistCredentialBroker {
       );
       return;
     }
-    await this.#revokeAndConfirm(leaseId, generation);
+    await this.#revokeAndConfirm(
+      leaseId,
+      generation,
+      Math.min(
+        cleanup?.attempt_deadline_ms ?? Infinity,
+        this.#store.getExecutionBudgetReservation(executionId)?.cleanup_deadline_ms ?? Infinity,
+      ),
+    );
     this.#store.advanceSchedulerCredential(
       { id: executionId, leaseId, from: ['revoking'], to: 'revoked', cleanup },
       workflowCredentialJournalCapability,
@@ -714,8 +725,13 @@ export class RevocableSpecialistCredentialBroker {
       throw new Error('issued credential is missing its broker generation');
     return execution;
   }
-  async #revokeAndConfirm(leaseId: string, generation: string): Promise<void> {
-    const deadlineMs = Date.now() + 5000;
+  async #revokeAndConfirm(
+    leaseId: string,
+    generation: string,
+    maximumDeadlineMs = Infinity,
+  ): Promise<void> {
+    const deadlineMs = Math.min(Date.now() + 5000, maximumDeadlineMs);
+    if (Date.now() >= deadlineMs) throw new Error('credential_cleanup_timed_out');
     await this.#revoke(leaseId, generation, deadlineMs);
     if (Date.now() >= deadlineMs) throw new Error('credential_cleanup_timed_out');
     if ((await this.#observe(leaseId, generation, deadlineMs)) !== 'revoked') {
@@ -1350,7 +1366,12 @@ export class DockerIsolatedSpecialistLauncher {
   async #settle(
     authority: SchedulerContainerAuthority & { cleanup?: ExecutionInterruption },
   ): Promise<void> {
-    const deadlineMs = Date.now() + 5000;
+    const deadlineMs = Math.min(
+      Date.now() + 5000,
+      authority.cleanup?.attempt_deadline_ms ?? Infinity,
+      this.#options.store.getExecutionBudgetReservation(authority.id)?.cleanup_deadline_ms ??
+        Infinity,
+    );
     return withinCleanupDeadline(
       this.#withContainerLock(authority.id, () => this.#settleOwned(authority, deadlineMs)),
       deadlineMs,
@@ -1373,7 +1394,14 @@ export class DockerIsolatedSpecialistLauncher {
         new Promise<never>((_resolve, reject) => {
           timer = setTimeout(
             () => reject(new Error('specialist settlement wait timed out')),
-            this.#options.cancellationSettleMs ?? 5000,
+            Math.max(
+              1,
+              Math.min(
+                this.#options.cancellationSettleMs ?? 5000,
+                (this.#options.store.getExecutionBudgetReservation(authority.id)
+                  ?.cleanup_deadline_ms ?? Infinity) - Date.now(),
+              ),
+            ),
           );
         }),
       ]);

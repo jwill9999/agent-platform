@@ -225,6 +225,16 @@ export function assertContractRevisionIsNotAuthorityExpansion(
   const previousActions = new Set(previous.authority.allowedActions);
   const previousPaths = new Set(previous.constraints.allowedPaths);
 
+  if (
+    previous.executionLimits &&
+    (!next.executionLimits ||
+      next.executionLimits.aggregateActiveSeconds >
+        previous.executionLimits.aggregateActiveSeconds ||
+      next.executionLimits.attemptSeconds > previous.executionLimits.attemptSeconds ||
+      next.executionLimits.cleanupSeconds > previous.executionLimits.cleanupSeconds)
+  )
+    throw new Error('contract revision expands execution limits');
+
   if (next.authority.deliveryTarget !== previous.authority.deliveryTarget) {
     throw new Error('contract revision changes the approved delivery target');
   }

@@ -1,0 +1,27 @@
+{
+  "sourceRevision": "969072f4333d78e6474d9e789a1d35039c54349a",
+  "materialDigest": "sha256:de58ff4aed721750559885f2400c7dfec66c1e0e2828831fea7b36f89e2115cf",
+  "documents": [
+    {
+      "path": "docs/planning/pilot-active-budget/plan.md",
+      "kind": "design",
+      "taskIds": ["agent-platform-pilot-active-budget"],
+      "sizeBytes": 7370,
+      "digest": "sha256:d40a5ed5f821895042f7a09ce1f223608a281ffc5cd825b19f3c30c7ab7d6601"
+    },
+    {
+      "path": "docs/tasks/agent-platform-pilot-active-budget.md",
+      "kind": "specification",
+      "taskIds": ["agent-platform-pilot-active-budget"],
+      "sizeBytes": 6448,
+      "digest": "sha256:f02fbd212453e686ef51c7ada9c195cc7f977b0ec79d31674962e27f0d86f066"
+    },
+    {
+      "path": "docs/testing/pilot-active-budget.md",
+      "kind": "verification",
+      "taskIds": ["agent-platform-pilot-active-budget"],
+      "sizeBytes": 3722,
+      "digest": "sha256:cd6aa5505db55effd1ef039cb590a2a8513f70f9e142e347e7948cd537d8500e"
+    }
+  ]
+}

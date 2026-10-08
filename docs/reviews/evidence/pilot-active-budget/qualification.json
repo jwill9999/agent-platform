@@ -1,0 +1,35 @@
+{
+  "mode": "supervised prerequisite repair; no managed run or pilot",
+  "branch": "task/pilot-active-budget",
+  "baseRevision": "969072f4333d78e6474d9e789a1d35039c54349a",
+  "patchDigest": "sha256:2e86bdafe3437cb453157af38faac07bf169674036d5e48767ae759e68151d2f",
+  "patchSizeBytes": 51255,
+  "commands": [
+    "pnpm --filter @agent-platform/workflow-control typecheck",
+    "pnpm --filter @agent-platform/workflow-control lint",
+    "pnpm --filter @agent-platform/workflow-control build",
+    "pnpm --filter @agent-platform/workflow-control exec vitest run --maxWorkers=2 --minWorkers=1"
+  ],
+  "results": {
+    "typecheck": "passed",
+    "lint": "passed; zero warnings",
+    "build": "passed",
+    "testFilesPassed": 63,
+    "testFilesSkipped": 9,
+    "testsPassed": 1154,
+    "testsSkipped": 77,
+    "durationSeconds": 227.25
+  },
+  "log": {
+    "localPath": "/Users/letuscode/.codex/runner-qualification-20261008/budget-package-regression-final.log",
+    "sha256": "50bfdee6234982c54494f1ca5abdf707d897eed111ef4ce2258b796a30ddec7e",
+    "sizeBytes": 48652
+  },
+  "boundaries": [
+    "Real child processes and production SQLite/runtime are exercised.",
+    "Docker, provider, approval and owner responses in these tests are fixtures.",
+    "77 platform-gated integration tests skipped; no live container/model/pilot qualification.",
+    "SonarQube and IDE Problems connectors unavailable; terminal typecheck/lint/test fallback executed.",
+    "Initial push hooks failed first on missing built dependencies then four lease/timing tests under higher concurrency; neither bypassed. Full build and subsequent controlled regression passed."
+  ]
+}

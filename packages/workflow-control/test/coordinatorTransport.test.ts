@@ -5,6 +5,13 @@ import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CoordinatorTransport } from '../src/coordinatorTransport.js';
 const roots: string[] = [];
+it('uses the remaining reserved deadline and never dispatches an expired coordinator command', async () => {
+  const { port } = transport('setInterval(()=>{},1000)');
+  await expect(port.call('fixture', {}, () => {}, Date.now() + 100)).rejects.toThrow('unavailable');
+  await expect(port.call('fixture', {}, () => {}, Date.now() - 1)).rejects.toThrow(
+    'deadline_expired',
+  );
+});
 afterEach(() => {
   vi.unstubAllEnvs();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });

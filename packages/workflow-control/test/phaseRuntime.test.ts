@@ -61,6 +61,7 @@ async function setup(
     assertAdmission?: () => void;
     onFatal?: () => void;
     verifySource?: () => Promise<void>;
+    executionLimits?: ExecutionContract['executionLimits'];
   } = {},
 ) {
   const f = await continuationFixture(
@@ -72,6 +73,7 @@ async function setup(
   const db = new Database(f.database);
   const row = db.prepare('SELECT body_json FROM contracts').get() as { body_json: string };
   const contract: ExecutionContract = executionContractSchema.parse(JSON.parse(row.body_json));
+  if (options.executionLimits) contract.executionLimits = options.executionLimits;
   contract.authority.allowedActions.push('artifact.write', 'workspace.read', 'process.test');
   contract.tasks[0]!.allowedOperations.push('artifact.write', 'workspace.read', 'process.test');
   if (options.implementation) {
@@ -314,6 +316,79 @@ async function setup(
 }
 
 describe('standalone phase runtime production orchestration with fixture launcher transport', () => {
+  it('charges governed child execution and reports settlement separately from reserved allowance', async () => {
+    const f = await setup({
+      executionLimits: { aggregateActiveSeconds: 3600, attemptSeconds: 5, cleanupSeconds: 15 },
+    });
+    expect(await f.runtime.runOnce()).toBe(true);
+    expect(f.store.getRunExecutionBudget('run')).toMatchObject({
+      charged_ms: 20000,
+      status: 'active',
+    });
+    const rows = f.db.prepare('SELECT * FROM run_execution_reservations').all() as Array<{
+      work_deadline_ms: number;
+      reserved_at_ms: number;
+      settled_at_ms: number;
+      measured_elapsed_ms: number;
+    }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.work_deadline_ms - rows[0]!.reserved_at_ms).toBe(5000);
+    expect(rows[0]!.settled_at_ms).toBeGreaterThanOrEqual(rows[0]!.reserved_at_ms);
+    expect(rows[0]!.measured_elapsed_ms).toBeLessThan(20000);
+    expect(f.launches.some((args) => args[0] === 'start')).toBe(true);
+  });
+
+  it('consumes startup allowance without creating a container after delayed credential issue', async () => {
+    const f = await setup({
+      issueDelayMs: 1400,
+      executionLimits: { aggregateActiveSeconds: 3600, attemptSeconds: 1, cleanupSeconds: 15 },
+    });
+    expect(await f.runtime.runOnce()).toBe(false);
+    expect(f.launches.some((args) => args[0] === 'create')).toBe(false);
+    expect(f.store.getRunExecutionBudget('run')?.charged_ms).toBe(16000);
+    expect([...f.credentials.values()].every((status) => status === 'revoked')).toBe(true);
+  });
+
+  it('interrupts the actual child transport at its persisted work deadline and rejects late results', async () => {
+    const f = await setup({
+      delayMs: 4000,
+      executionLimits: { aggregateActiveSeconds: 3600, attemptSeconds: 1, cleanupSeconds: 15 },
+    });
+    expect(await f.runtime.runOnce()).toBe(false);
+    expect(f.revocationSawInterruption).toContain(true);
+    const child = f.db
+      .prepare("SELECT status,credential_status FROM scheduler_executions WHERE role='test_runner'")
+      .get();
+    expect(child).toMatchObject({ credential_status: 'revoked' });
+    expect(f.store.getRunExecutionBudget('run')?.charged_ms).toBe(16000);
+    expect(
+      f.journal
+        .interruptions()
+        .list('run')
+        .every((row) => row.state === 'settled'),
+    ).toBe(true);
+  });
+
+  it('persists an exhaustion fence before a second governed phase can launch', async () => {
+    const f = await setup({
+      executionLimits: { aggregateActiveSeconds: 16, attemptSeconds: 1, cleanupSeconds: 15 },
+    });
+    expect(await f.runtime.runOnce()).toBe(true);
+    const nextParent = f.continuation.claim('host', 60000, Date.now())!;
+    runParentContinuation([
+      f.database,
+      nextParent.id,
+      nextParent.host_execution_id!,
+      String(nextParent.lease_epoch),
+    ]);
+    const before = f.launches.filter((args) => args[0] === 'create').length;
+    await f.runtime.runOnce();
+    expect(f.launches.filter((args) => args[0] === 'create')).toHaveLength(before);
+    expect(f.store.getRunExecutionBudget('run')).toMatchObject({
+      charged_ms: 16000,
+      status: 'exhausted',
+    });
+  });
   it.each(['resume', 'expired'] as const)(
     'reconciles retained import %s under a new owner without relaunching the worker',
     async (mode) => {

@@ -133,7 +133,30 @@ export class InterruptionCleanupJournal {
       .immediate();
   }
 
-  begin(row: ExecutionInterruption, now: number): ExecutionInterruption {
+  begin(
+    row: ExecutionInterruption,
+    now: number,
+    maximumDeadlineMs?: number,
+  ): ExecutionInterruption {
+    const hasBudget = this.db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_execution_reservations'",
+      )
+      .get();
+    const allocation = hasBudget
+      ? (this.db
+          .prepare(
+            `SELECT cleanup_deadline_ms FROM run_execution_reservations WHERE execution_id=?`,
+          )
+          .get(row.execution_id) as { cleanup_deadline_ms: number } | undefined)
+      : undefined;
+    const deadline = Math.min(
+      now + 15_000,
+      maximumDeadlineMs ?? Infinity,
+      allocation?.cleanup_deadline_ms ?? Infinity,
+    );
+    if (!Number.isSafeInteger(deadline) || deadline <= now)
+      throw new Error('cleanup_budget_exhausted');
     return this.db
       .transaction(() => {
         this.assertOwner(row, now);
@@ -149,7 +172,7 @@ export class InterruptionCleanupJournal {
             `UPDATE execution_interruptions SET attempt=attempt+1,attempt_deadline_ms=?
         WHERE execution_id=?`,
           )
-          .run(now + 15_000, row.execution_id);
+          .run(deadline, row.execution_id);
         return getInterruption(this.db, row.execution_id)!;
       })
       .immediate();

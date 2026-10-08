@@ -10,6 +10,17 @@ import {
 import { assertRepairPlanningResult, repairChildContext } from './repairPlanning.js';
 import { queryRunInventory } from './runDiscovery.js';
 import {
+  initializeRunExecutionBudget,
+  reserveRunBudget,
+  assertRunBudgetWork,
+  settleRunBudget,
+  readRunBudget,
+  readRunReservation,
+  fenceRunBudget,
+  type RunBudgetBinding,
+  type RunBudgetReservation,
+} from './runExecutionBudget.js';
+import {
   initializeImplementationImports,
   importImplementationOutput,
   implementationWorkspace,
@@ -769,6 +780,7 @@ export class WorkflowStore {
     this.#database.pragma('foreign_keys = ON');
     this.#database.pragma('journal_mode = WAL');
     this.#migrate();
+    initializeRunExecutionBudget(this.#database);
     this.#database.exec(
       'CREATE TABLE IF NOT EXISTS workflow_journal_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), workspace_id TEXT NOT NULL)',
     );
@@ -789,6 +801,77 @@ export class WorkflowStore {
 
   close(): void {
     this.#database.close();
+  }
+
+  getRunExecutionBudget(runId: string) {
+    return readRunBudget(this.#database, runId);
+  }
+
+  getRunExecutionReservation(dispatchId: string) {
+    return readRunReservation(this.#database, dispatchId);
+  }
+
+  getExecutionBudgetReservation(executionId: string): RunBudgetReservation | undefined {
+    return this.#database
+      .prepare(`SELECT * FROM run_execution_reservations WHERE execution_id=?`)
+      .get(executionId) as RunBudgetReservation | undefined;
+  }
+
+  reserveRunExecutionBudget(binding: RunBudgetBinding, nowMs = Date.now()) {
+    const contract = this.#contractForRun(binding.runId);
+    if (!contract.executionLimits) return undefined;
+    return reserveRunBudget(this.#database, contract, binding, nowMs, () => {
+      if (!runAcceptsWork(this.#database, binding.runId))
+        throw new Error('run_execution_budget_run_fenced');
+      for (const [resource, id, epoch] of [
+        ['workspace', contract.workspaceId, binding.workspaceLeaseEpoch],
+        ['run', binding.runId, binding.runLeaseEpoch],
+        ['task', binding.taskId, binding.taskLeaseEpoch],
+      ] as const)
+        this.assertResourceLease(resource, id, binding.ownerId, epoch, nowMs);
+      const phase = this.#database
+        .prepare(
+          `SELECT * FROM phase_jobs
+        WHERE execution_id=? AND run_id=?`,
+        )
+        .get(binding.phaseExecutionId ?? binding.executionId, binding.runId) as
+        | {
+            lease_owner: string;
+            lease_epoch: number;
+            lease_until_ms: number;
+            status: string;
+            action_json: string;
+          }
+        | undefined;
+      if (
+        !phase ||
+        phase.status !== 'started' ||
+        phase.lease_owner !== binding.ownerId ||
+        phase.lease_epoch !== binding.phaseLeaseEpoch ||
+        phase.lease_until_ms <= nowMs ||
+        (JSON.parse(phase.action_json) as { taskId: string }).taskId !== binding.taskId
+      )
+        throw new Error('run_execution_budget_phase_fenced');
+    });
+  }
+
+  assertRunExecutionBudget(runId: string, dispatchId: string, nowMs = Date.now()) {
+    if (!this.#contractForRun(runId).executionLimits) return undefined;
+    return assertRunBudgetWork(this.#database, runId, dispatchId, nowMs);
+  }
+
+  settleRunExecutionBudget(
+    runId: string,
+    dispatchId: string,
+    absenceVerified: boolean,
+    nowMs = Date.now(),
+  ): void {
+    if (!this.#contractForRun(runId).executionLimits) return;
+    settleRunBudget(this.#database, runId, dispatchId, nowMs, absenceVerified);
+  }
+
+  blockRunExecutionBudget(runId: string, reason: string): void {
+    fenceRunBudget(this.#database, runId, reason);
   }
 
   recordPlanningDocumentPublication(input: {
@@ -3563,6 +3646,18 @@ export class WorkflowStore {
     nowMs?: number;
   }): SchedulerExecutionRecord {
     const nowMs = input.nowMs ?? Date.now();
+    if (this.#contractForRun(input.runId).executionLimits) {
+      const reservation = this.getExecutionBudgetReservation(input.id);
+      if (
+        !reservation ||
+        reservation.run_id !== input.runId ||
+        reservation.task_id !== input.taskId ||
+        reservation.role !== input.role ||
+        reservation.work_deadline_ms !== input.deadlineMs
+      )
+        throw new Error('run_execution_budget_scheduler_unbound');
+      this.assertRunExecutionBudget(input.runId, reservation.dispatch_id, nowMs);
+    }
     if (input.deadlineMs <= nowMs) throw new Error('specialist deadline has elapsed');
     const assertDocuments = this.#documentAuthority({
       runId: input.runId,
@@ -3901,6 +3996,11 @@ export class WorkflowStore {
     const execution = this.getSchedulerExecution(id);
     if (!execution || !runAcceptsWork(this.#database, execution.runId))
       throw new Error('specialist run is cancelled or closed');
+    if (this.#contractForRun(execution.runId).executionLimits) {
+      const reservation = this.getExecutionBudgetReservation(id);
+      if (!reservation) throw new Error('run_execution_budget_scheduler_unbound');
+      this.assertRunExecutionBudget(execution.runId, reservation.dispatch_id);
+    }
   }
 
   importImplementation(input: {

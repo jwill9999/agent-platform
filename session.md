@@ -1,8 +1,12 @@
 # Harness readiness iteration — 8 October 2026
 
 Worktree: task/pilot-active-budget, chained from pushed readiness tip 5b796b74; PR283 retains
-the earlier readiness segment. Budget plan and verification are being bound and independently
-reviewed before implementation. Canonical CLI discovery for this task returned absent; no run launched.
+the earlier readiness segment. Budget plan and verification passed version1 validation and distinct evidence-only critique.
+Implementation adds durable fenced full work/cleanup allocations and deadline enforcement.
+[Budget result](docs/reviews/pilot-active-budget.md) retains bindings, C01 correction and local
+qualification: typecheck/lint/build passed; final regression1154passed/77platform-gatedskips.
+Independent patch recheck approved with no remaining findings; publication/push and final segment
+integration remain required. Canonical CLI discovery for this task returned absent; no run launched.
 The owner authorized supervised prerequisites until pilot-ready. No live pilot or paid model ran.
 
 [Readiness evidence](docs/reviews/harness-readiness-2026-10-08.md) and

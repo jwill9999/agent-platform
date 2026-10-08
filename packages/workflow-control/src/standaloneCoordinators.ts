@@ -112,6 +112,7 @@ export class StandaloneCoordinators {
     fence: DeliveryFence,
     assertAuthority: () => void,
     assertDispatchAuthority: () => void,
+    workDeadlineMs?: number,
   ): Promise<CoordinatorProof> {
     if (this.#closed) throw new Error('coordinator_service_stopped');
     assertAuthority();
@@ -148,7 +149,7 @@ export class StandaloneCoordinators {
     // durable approval inside it. Transport checks live fences only: starting another document
     // verification transaction here would invalidate the broker's atomic dispatch boundary.
     const call = <T>(method: string, args: unknown) =>
-      this.#transport.call<T>(method, args, assertDispatchAuthority);
+      this.#transport.call<T>(method, args, assertDispatchAuthority, workDeadlineMs);
     const beads = createProductionBeadsDoltPort(this.#root, {
       readIssue: (workspaceRoot, taskId) => call('beads.readIssue', { workspaceRoot, taskId }),
       claimIssue: (workspaceRoot, taskId, idempotencyKey) =>

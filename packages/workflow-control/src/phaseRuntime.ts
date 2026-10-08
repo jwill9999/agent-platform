@@ -46,6 +46,7 @@ import { implementationOutputSchema } from './implementationOutput.js';
 import { assertBootstrapExecutablePin } from './bootstrapAdapterRuntime.js';
 import { specialistInputEnvelopeSchema } from './specialistInput.js';
 import { WorkflowStore } from './storage.js';
+import type { RunBudgetReservation } from './runExecutionBudget.js';
 
 const execute = promisify(execFile);
 const absolute = z.string().min(1).refine(isAbsolute, 'runtime path must be absolute');
@@ -480,6 +481,35 @@ export class StandalonePhaseRuntime {
     };
   }
 
+  #reserveBudget(job: PhaseJob, action: ExecutePhaseAction, fences: ResourceFences, role: string) {
+    const dispatchId = `${job.execution_id!}:phase:${job.lease_epoch}`;
+    return this.#store.reserveRunExecutionBudget({
+      dispatchId,
+      executionId: role === 'workflow_orchestrator' ? dispatchId : job.execution_id!,
+      phaseExecutionId: job.execution_id!,
+      runId: action.runId,
+      taskId: action.taskId,
+      role,
+      ownerId: this.#owner,
+      workspaceLeaseEpoch: fences.workspace,
+      runLeaseEpoch: fences.run,
+      taskLeaseEpoch: fences.task,
+      phaseLeaseEpoch: job.lease_epoch,
+    });
+  }
+
+  #assertBudget(budget: RunBudgetReservation | undefined): void {
+    if (!budget) return;
+    try {
+      this.#store.assertRunExecutionBudget(budget.run_id, budget.dispatch_id);
+    } catch (error) {
+      // Broker rollback must not erase a detected authority failure in the supervisor.
+      if (!(error instanceof Error) || error.message !== 'run_execution_budget_work_expired')
+        this.#fatalAdmission = true;
+      throw error;
+    }
+  }
+
   #packet(action: ExecutePhaseAction): TaskPacket {
     if (
       action.phase !== 'implementing' &&
@@ -658,6 +688,17 @@ export class StandalonePhaseRuntime {
     const job = this.#journal.start(claim, Date.now());
     const attemptNumber = this.#reserveAttempt(job, action);
     if (attemptNumber === undefined) return false;
+    let budget: RunBudgetReservation | undefined;
+    try {
+      budget = this.#reserveBudget(job, action, fences, packet.assignedRole);
+    } catch (error) {
+      this.#journal.block(
+        job,
+        error instanceof Error ? error.message : 'run_execution_budget_unavailable',
+        Date.now(),
+      );
+      return false;
+    }
     let heartbeatError: unknown;
     let cancellation: Promise<void> | undefined;
     const heartbeat = setInterval(
@@ -682,8 +723,24 @@ export class StandalonePhaseRuntime {
       },
       Math.floor(this.#config.leaseTtlMs / 3),
     );
-    const deadlineMs = Date.now() + this.#contract.retryPolicy.waitDeadlineSeconds * 1000;
+    const deadlineMs =
+      budget?.work_deadline_ms ??
+      Date.now() + this.#contract.retryPolicy.waitDeadlineSeconds * 1000;
     const reservation = { id: job.execution_id!, role: packet.assignedRole, deadlineMs };
+    const budgetTimer = budget
+      ? setInterval(() => {
+          try {
+            this.#assertBudget(budget);
+          } catch (error) {
+            heartbeatError = error;
+            cancellation ??= this.interruptActive('run_execution_budget_authority_lost').catch(
+              (failure: unknown) => {
+                heartbeatError = failure;
+              },
+            );
+          }
+        }, 100)
+      : undefined;
     const inputEnvelope = specialistInputEnvelopeSchema.parse({
       kind: 'specialist_input',
       binding: {
@@ -722,6 +779,7 @@ export class StandalonePhaseRuntime {
     }, 2000);
     let token: string | undefined;
     try {
+      this.#assertBudget(budget);
       this.#store.verifyPlanningDocuments({
         runId: action.runId,
         taskId: action.taskId,
@@ -770,10 +828,12 @@ export class StandalonePhaseRuntime {
         assertAdmission: () => {
           if (this.#fatalAdmission) throw new Error('journal_unavailable');
           this.#assertAdmission();
+          this.#assertBudget(budget);
         },
         admission: async () => {
           if (this.#fatalAdmission) throw new Error('journal_unavailable');
           await this.#admission();
+          this.#assertBudget(budget);
           await this.#launcher.assertCredentialHealthy(reservation.id);
         },
         interrupted: async () => {
@@ -782,6 +842,7 @@ export class StandalonePhaseRuntime {
       });
       await cancellation;
       if (heartbeatError !== undefined) throw heartbeatError;
+      this.#assertBudget(budget);
       const terminal = specialistTerminalResult(raw);
       if (terminal === undefined) throw new Error('invalid_specialist_terminal_result');
       await this.#verifySource(action, packet.allowedPaths);
@@ -819,12 +880,33 @@ export class StandalonePhaseRuntime {
       } else await this.#failExecution(job, reservation, fences, error);
       return false;
     } finally {
+      if (budgetTimer) clearInterval(budgetTimer);
       clearInterval(heartbeat);
       clearInterval(healthTimer);
       await healthCheck;
       await cancellation;
       this.#reservation = undefined;
       if (token !== undefined) this.#capabilities.revoke(token);
+      if (budget) {
+        if (this.#fatalAdmission)
+          this.#store.blockRunExecutionBudget(
+            action.runId,
+            'run_execution_budget_authority_uncertain',
+          );
+        try {
+          this.#store.settleRunExecutionBudget(
+            action.runId,
+            budget.dispatch_id,
+            !this.#store.getSchedulerExecution(reservation.id) ||
+              this.#launcher.isContainerSettled(reservation.id),
+          );
+        } catch {
+          this.#store.blockRunExecutionBudget(
+            action.runId,
+            'run_execution_budget_cleanup_unconfirmed',
+          );
+        }
+      }
     }
   }
 
@@ -897,7 +979,9 @@ export class StandalonePhaseRuntime {
     if (this.#cleanupOnly || this.#fatalAdmission || !this.#coordinators)
       throw new Error('coordinator_admission_unavailable');
     await this.#admission();
+    const budget = this.#reserveBudget(job, action, fences, 'workflow_orchestrator');
     const assertDispatchAuthority = () => {
+      this.#assertBudget(budget);
       this.#assertAdmission();
       if (this.#closing || this.#fatalAdmission)
         throw new Error('coordinator_admission_unavailable');
@@ -941,6 +1025,15 @@ export class StandalonePhaseRuntime {
       },
       Math.floor(this.#config.leaseTtlMs / 3),
     );
+    const budgetTimer = budget
+      ? setInterval(() => {
+          try {
+            this.#assertBudget(budget);
+          } catch {
+            this.#coordinators?.cancelExecution();
+          }
+        }, 100)
+      : undefined;
     try {
       const proof = await this.#coordinators.execute(
         job,
@@ -953,11 +1046,20 @@ export class StandalonePhaseRuntime {
         },
         assertAuthority,
         assertDispatchAuthority,
+        budget?.work_deadline_ms,
       );
+      this.#assertBudget(budget);
       this.#journal.completeCoordinator(job, proof, fences, Date.now());
       return true;
     } finally {
       clearInterval(heartbeat);
+      if (budgetTimer) clearInterval(budgetTimer);
+      if (budget && this.#fatalAdmission)
+        this.#store.blockRunExecutionBudget(
+          action.runId,
+          'run_execution_budget_authority_uncertain',
+        );
+      if (budget) this.#store.settleRunExecutionBudget(action.runId, budget.dispatch_id, true);
     }
   }
 
@@ -1140,7 +1242,13 @@ export class StandalonePhaseRuntime {
       this.#journal.deferInterrupted(job, Date.now());
       return;
     }
-    const attempt = cleanup.begin(claimed, Date.now());
+    const budget = this.#store.getExecutionBudgetReservation(reservation.id);
+    if (budget && Date.now() >= budget.cleanup_deadline_ms) {
+      this.#store.blockRunExecutionBudget(job.run_id, 'run_execution_budget_cleanup_expired');
+      this.#journal.deferInterrupted(job, Date.now());
+      return;
+    }
+    const attempt = cleanup.begin(claimed, Date.now(), budget?.cleanup_deadline_ms);
     this.#launcher.abortTransport(reservation.id);
     await this.#performCleanup(attempt, reservation);
     const outcome = cleanup.finishAttempt(attempt, Date.now());

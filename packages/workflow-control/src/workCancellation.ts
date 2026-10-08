@@ -8,6 +8,9 @@ export function runAcceptsWork(database: Database.Database, runId: string): bool
   return (
     run !== undefined &&
     !['cancelling', 'cancelled', 'closed'].includes(run.state) &&
+    database
+      .prepare(`SELECT 1 FROM run_execution_budgets WHERE run_id=? AND status!='active'`)
+      .get(runId) === undefined &&
     database.prepare('SELECT 1 FROM workflow_cancellations WHERE run_id = ?').get(runId) ===
       undefined
   );

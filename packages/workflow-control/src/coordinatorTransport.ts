@@ -18,15 +18,23 @@ export class CoordinatorTransport {
     coordinatorTransportSchema.parse(pin);
     assertBootstrapExecutablePin(pin);
   }
-  async call<T>(method: string, arguments_: unknown, assertAuthority: () => void): Promise<T> {
+  async call<T>(
+    method: string,
+    arguments_: unknown,
+    assertAuthority: () => void,
+    deadlineMs?: number,
+  ): Promise<T> {
     if (this.#abort.signal.aborted) throw new Error('coordinator_service_stopped');
     assertBootstrapExecutablePin(this.pin);
     assertAuthority();
+    const timeout = Math.min(30000, (deadlineMs ?? Infinity) - Date.now());
+    if (timeout <= 0 || !Number.isFinite(timeout))
+      throw new Error('coordinator_execution_deadline_expired');
     const result = await executeCoordinatorProcess({
       executable: this.pin.path,
       args: ['workflow-coordinator-v1', method],
       env: {},
-      timeout: 30000,
+      timeout,
       maxBuffer: 2 * 1024 * 1024,
       signal: this.#abort.signal,
       stdin: JSON.stringify(arguments_),

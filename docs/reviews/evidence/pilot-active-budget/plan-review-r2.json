@@ -1,0 +1,33 @@
+{
+  "reviewId": "pilot-budget-plan-r2",
+  "runId": "supervised:agent-platform-pilot-active-budget",
+  "plannerId": "/root",
+  "criticId": "/root/runner_plan_critic",
+  "contractVersion": 1,
+  "policyDigest": "sha256:d40a5ed5f821895042f7a09ce1f223608a281ffc5cd825b19f3c30c7ab7d6601",
+  "materialDigest": "sha256:de58ff4aed721750559885f2400c7dfec66c1e0e2828831fea7b36f89e2115cf",
+  "verdict": "approved",
+  "summary": "No remaining actionable planning findings in the supplied corrected contract. Reservation-time deadlines consume startup allowance; the single persisted cleanup deadline propagates through launcher and interruption operations; shared budget ownership is explicitly limited to same-run repairs. Emergency containment beyond the allocated deadline is disclosed and cannot establish readiness while absence remains uncertain. This is an unpersisted supervised review: runId is a nonexecuting carrier label, not a managed run or approval. No tools were used, and the returned object has not been machine validated here. Approval covers the bounded prerequisite implementation plan, not pilot launch.",
+  "evidence": [
+    {
+      "digest": "sha256:d40a5ed5f821895042f7a09ce1f223608a281ffc5cd825b19f3c30c7ab7d6601",
+      "mediaType": "text/markdown",
+      "sizeBytes": 7370,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:cd6aa5505db55effd1ef039cb590a2a8513f70f9e142e347e7948cd537d8500e",
+      "mediaType": "text/markdown",
+      "sizeBytes": 3722,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:f02fbd212453e686ef51c7ada9c195cc7f977b0ec79d31674962e27f0d86f066",
+      "mediaType": "text/markdown",
+      "sizeBytes": 6448,
+      "kind": "artifact"
+    }
+  ],
+  "findings": [],
+  "humanDecision": null
+}

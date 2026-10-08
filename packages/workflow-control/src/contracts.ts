@@ -68,6 +68,18 @@ export const retryBudgetSchema = z
   })
   .strict();
 
+/** Conservative charged allocation ceiling, not a measurement of model CPU time. */
+export const executionLimitsSchema = z
+  .object({
+    aggregateActiveSeconds: z.number().int().min(16).max(86_400),
+    attemptSeconds: z.number().int().positive().max(3600),
+    cleanupSeconds: z.number().int().min(15).max(300),
+  })
+  .strict()
+  .refine((value) => value.attemptSeconds + value.cleanupSeconds <= value.aggregateActiveSeconds, {
+    message: 'execution and cleanup allowance exceeds aggregate budget',
+  });
+
 export const taskContractSchema = z
   .object({
     id: identifierSchema,
@@ -135,6 +147,7 @@ export const executionContractSchema = z
     tasks: z.array(taskContractSchema).min(1),
     qualityGates: z.array(z.string().min(1)),
     retryPolicy: retryBudgetSchema,
+    executionLimits: executionLimitsSchema.optional(),
     repairTaskPolicy: z
       .object({
         idPattern: z.string().min(1),
