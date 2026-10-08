@@ -15,6 +15,9 @@ then implement/qualify the governed offline application adapter. Do not repeat f
 Adapter complete four-document material at a94a414 passed supported version1 validation,
 material ba518a9f; distinct evidence-only critic approved with zero findings. Review receipt and
 [adapter result register](docs/reviews/test-runner-offline-adapter.md) retain the exact handoff.
+Source review identified generic criterion classification risk; adapter descriptor now requires
+exact reviewed criterion-to-command mapping with no default or unsupported semantic claims.
+Rebind and independently recheck this correction before code.
 No adapter code or runtime qualification yet; continue implementation within its contract after
 checking document/source bindings. Planning snapshots retain proposal labels; no production approval. Canonical CLI discovery for this task returned absent; no run launched.
 The owner authorized supervised prerequisites until pilot-ready. No live pilot or paid model ran.

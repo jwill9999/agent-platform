@@ -32,7 +32,10 @@ original source. Existing non-adapter role generation must remain byte-identical
 Reject unknown adapter/suite, wrong role/phase, image/entrypoint/packet/head/material substitution,
 changed dependency manifests, unsupported image and omitted required authority/planning bindings.
 Fail on empty/skipped/flaky test selection, nonzero command, malformed/oversized/spoofed receipts,
-wrong source/execution binding or symlinked evidence. Interrupted/expired work cannot start a late
+wrong source/execution binding or symlinked evidence. Reject missing/duplicate/added criterion
+mappings, an unknown command ID, changed packet mapping and any implicit all-criteria pass. Fixture
+criteria must explicitly describe fixed suite outcomes. Independent final pilot review must map
+required semantic claims to tests that actually prove them; unsupported criteria block approval. Interrupted/expired work cannot start a late
 container or accept its result. Actual owned container absence/revocation is checked independently;
 unknown cleanup remains blocked. Persist logs/artifacts before staging removal. Budget exhaustion
 must stop any fresh adapter dispatch and cannot buy a new allowance on replay/restart.

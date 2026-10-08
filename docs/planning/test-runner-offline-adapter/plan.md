@@ -86,6 +86,16 @@ execution/input/material/source/manifest bindings, exact command results and tim
 backend/UI counts, failure/cleanup outcome. Validate against trusted expected input after exit and
 before result acceptance; reject unexpected/oversized/noncanonical output, wrong execution/head,
 symlinked evidence or substituted source. Raw stdout or self-reported success alone cannot pass.
+Criterion classification must be an explicit approved descriptor mapping from each exact contract
+acceptance criterion to a fixed suite command ID (build, backend_tool_dispatch or electron_approval).
+Reject missing, duplicate, added or unmapped criteria and packet substitution. No default mapping,
+no inference from prose and no blanket copying of packet criteria into passed results. The receipt
+attests fixed command outcomes; the trusted result carries only their exact declared mapping. Final
+pilot review must independently confirm the mapped tests actually establish each criterion; this
+adapter cannot establish arbitrary semantic requirements or real upstream-model conformance. A
+criterion requiring evidence absent from the fixed suite remains unsupported and blocks approval
+or requires a separately reviewed adapter version, never a label-only coverage substitution.
+
 Retain real logs in content-addressed evidence, not only paths into deleted staging. Host verifies
 source equality, known container absence and broker revocation independently. No fabricated Codex
 agent result or production approval. Deterministic verification is labelled explicitly in results.
