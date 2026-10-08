@@ -1,27 +1,33 @@
-# Harness readiness iteration — 8 October 2026
+# Harness readiness iteration — 9 October 2026
 
-Worktree: task/test-runner-offline-adapter, chained from pushed budget tip ee3a160f; PR283 retains
-the earlier readiness segment. Budget plan and verification passed version1 validation and distinct evidence-only critique.
-Implementation adds durable fenced full work/cleanup allocations and deadline enforcement.
-[Budget result](docs/reviews/pilot-active-budget.md) retains bindings, C01 correction and local
-qualification: typecheck/lint/build passed; final regression1154passed/77platform-gatedskips.
-Independent patch recheck approved with no remaining findings. Budget code/report pushed at
-8224d25; complete seven-package push hook passed using canonical WORKFLOW_GIT_BINARY=/usr/bin/git
-and one Vitest worker. Xcode hook PATH symlink failure is reproduced/retained. Source/task stays
-open until cumulative feature integration. Branch-specific Notion sync is being completed; final
-publication receipts belong to canonical Beads. Next: chain task/test-runner-offline-adapter from
-this pushed tip (branch now created), prepare complete source-backed version1 material and required independent critique,
-then implement/qualify the governed offline application adapter. Do not repeat failed proxy probes.
-Adapter complete four-document material at a94a414 passed supported version1 validation,
-material ba518a9f; distinct evidence-only critic approved with zero findings. Review receipt and
-[adapter result register](docs/reviews/test-runner-offline-adapter.md) retain the exact handoff.
-Source review identified generic criterion classification risk; adapter descriptor now requires
-exact reviewed criterion-to-command mapping with no default or unsupported semantic claims.
-Correction rebound at00eda68 and independently approved r2 materialc84f4593, zero findings;
-publisher machine validation covers exact contract/review/document bytes.
-No adapter code or runtime qualification yet; continue implementation within its contract after
-checking document/source bindings. Planning snapshots retain proposal labels; no production approval. Canonical CLI discovery for this task returned absent; no run launched.
-The owner authorized supervised prerequisites until pilot-ready. No live pilot or paid model ran.
+Current worktree `task/test-runner-offline-adapter`, cumulative destination
+`feature/harness-backlog-review`; preserve dirty primary and unrelated worktrees. Owner authorizes
+all routine prerequisite repairs targeting 9 October; no pilot or paid call launch is authorized.
+Execution is supervised direct repair after canonical discovery found no active matching run.
+
+Budget code and full qualification are pushed at `ee3a160f`; close only after cumulative feature
+integration. PR283 earlier head `5b796b74` had nine executed checks successful and staging-only VM
+skipped; those checks do not validate new budget/adapter source.
+
+Adapter R3 normative source `ea1ccd55006e3b61a4b70294caa42477ad5fffe3`, material
+`sha256:c7db34dc1e8de51d8e8e4198f846112dedd600ae3423d9ad28c75d63a5ea3230` is independently
+approved and machine validated with all four exact document bytes. R3 adds only typed vault source
+and tests to the prior allowlist; current implementation changes are uncommitted and must be
+preserved. R1/R2 reviews remain historical. No production approval was fabricated.
+
+[Adapter checkpoint](docs/reviews/test-runner-offline-adapter.md) retains actual full build,
+79 backend tests and one Electron approve/provider-http pass under governed container launch with
+network none, source hashes/typed receipts and denial checks. HTTP provider and application command
+runner are fixtures; no real VM/upstream-model conformance is asserted. The phase still blocked at
+evidence ingestion. Typed API now preserves secret checks and redacts unknown entropy with counts;
+actual qualification attempt9 is running with pre-start container inspection and forged/input/
+credential/absence negative controls. Final code review, regression, hosted checks and integration
+remain required. Do not repeat unchanged Codex proxy probes or enable blanket network.
+
+After adapter acceptance, complete .17/.12/.13 configured admission/scheduling, authenticated gateway
+and coordinator/evidence bindings. Primary operator configuration remains unchanged and has no
+workflow field. Publish exact final reviewed pilot material and ask owner launch approval only when
+ready. No main/staging promotion or automatic pilot. Canonical Beads root remains the primary repo.
 
 [Readiness evidence](docs/reviews/harness-readiness-2026-10-08.md) and
 [qualification plan](docs/planning/single-task-permission-pilot/runner-qualification.md) retain all

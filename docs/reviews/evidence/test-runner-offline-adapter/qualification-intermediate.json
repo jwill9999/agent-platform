@@ -1,0 +1,178 @@
+{
+  "qualification": "intermediate-failed-phase-not-acceptance",
+  "fixtureOnly": true,
+  "sourceRevision": "67207ec3cc86f519edaa2ab63631e19c55733282",
+  "executionId": "06e1c9fa-b31c-87de-88e9-57612e5b5713",
+  "sourceDigest": "sha256:18b479e7dfc17f876d77985b8844f6e9727b47c1ca656ccfdb445fea59bad0c3",
+  "backendTests": 79,
+  "electronTests": 1,
+  "mappedCriteria": [
+    {
+      "criterion": "Fixed build passes",
+      "command": "build"
+    },
+    {
+      "criterion": "Fixed backend dispatch passes",
+      "command": "backend_tool_dispatch"
+    },
+    {
+      "criterion": "Fixed Electron approval passes",
+      "command": "electron_approval"
+    }
+  ],
+  "boundary": {
+    "ownLoopback": true,
+    "denials": [
+      {
+        "host": "172.30.99.2",
+        "port": 9900,
+        "outcome": "ENETUNREACH"
+      },
+      {
+        "host": "127.0.0.1",
+        "port": 9900,
+        "outcome": "ECONNREFUSED"
+      },
+      {
+        "host": "::1",
+        "port": 9900,
+        "outcome": "ECONNREFUSED"
+      },
+      {
+        "host": "10.0.0.1",
+        "port": 443,
+        "outcome": "ENETUNREACH"
+      },
+      {
+        "host": "169.254.169.254",
+        "port": 80,
+        "outcome": "ENETUNREACH"
+      },
+      {
+        "host": "203.0.113.1",
+        "port": 443,
+        "outcome": "ENETUNREACH"
+      },
+      {
+        "host": "fd00::1",
+        "port": 443,
+        "outcome": "ENETUNREACH"
+      },
+      {
+        "host": "example.com",
+        "port": 443,
+        "outcome": "EAI_AGAIN"
+      }
+    ],
+    "writesDenied": [
+      "/workspace/.offline-write-denied",
+      "/run/offline/input.json",
+      "/run/offline/entrypoint.mjs",
+      "/offline-root-write-denied"
+    ],
+    "absent": [
+      "/codex-home/auth.json",
+      "/codex-home/config.toml",
+      "/var/run/docker.sock",
+      "/run/docker.sock"
+    ]
+  },
+  "journey": {
+    "passed": true,
+    "decision": "approve",
+    "reasoning": "provider-http",
+    "executionMode": "provider-http-fixture-runner",
+    "sourceRevisionKind": "declared-snapshot-base",
+    "limitations": [
+      "Real provider factory, SDK and reasoning; HTTP responses scripted. Ordinary chat excludes evaluator nodes.",
+      "Default runner is a fixed-command test double, not VM isolation evidence.",
+      "Internal harness graph trace is not exported as a complete durable span timeline.",
+      "Resume may use a new run identifier; approval/session identifiers link the phases."
+    ]
+  },
+  "phaseCompleted": false,
+  "failure": "Error: evidence failed residual secret scanning",
+  "containerAndCredentialOutcome": "revoked",
+  "rawArtifactDigests": [
+    {
+      "name": "receipt.json",
+      "digest": "sha256:042b2307f348425cbede9561de8c08b76108b25c25af55819b4ef6eb366862c0",
+      "sizeBytes": 4159
+    },
+    {
+      "name": "build.log",
+      "digest": "sha256:5858b4c31a7ffedb202cf480fafa02e3658942bd2f7709f6a6fd2aa4ee8db515",
+      "sizeBytes": 4442
+    },
+    {
+      "name": "build.log.stderr",
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    },
+    {
+      "name": "backend.log",
+      "digest": "sha256:f84d1367acaf711e25275aae1031b93c3ca147c1fbb6894b8370a9eb4f0ac7b5",
+      "sizeBytes": 46
+    },
+    {
+      "name": "backend.log.stderr",
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    },
+    {
+      "name": "desktop-lint.log",
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    },
+    {
+      "name": "desktop-lint.log.stderr",
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    },
+    {
+      "name": "desktop-types.log",
+      "digest": "sha256:3837700a302c43344286ffe202a8b2490c7e87c57c279672cd978b62e54a766a",
+      "sizeBytes": 107
+    },
+    {
+      "name": "desktop-types.log.stderr",
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    },
+    {
+      "name": "e2e-types.log",
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    },
+    {
+      "name": "e2e-types.log.stderr",
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    },
+    {
+      "name": "electron.log",
+      "digest": "sha256:650459946a4c6efc7af635b60d5ec1e6ab315f8214fc9a60a69e0e533e4aa174",
+      "sizeBytes": 13443
+    },
+    {
+      "name": "electron.log.stderr",
+      "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sizeBytes": 0
+    },
+    {
+      "name": "boundaries.json",
+      "digest": "sha256:8f7243c2a66c07aa0cfc236c14391d67fbbf2f6f62198988c75bef2340248bea",
+      "sizeBytes": 725
+    },
+    {
+      "name": "backend.json",
+      "digest": "sha256:4f47afe90769d85ee3754bf06db9f1aec86a15546a07a0ff49d0112d5417424d",
+      "sizeBytes": 24785
+    },
+    {
+      "name": "journey-evaluation.json",
+      "digest": "sha256:212684bfae4c02a1f6aa1caa87b1289bce606dfbf63aa1cce5354b4dbf8c6485",
+      "sizeBytes": 164099
+    }
+  ]
+}

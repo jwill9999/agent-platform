@@ -1,0 +1,39 @@
+{
+  "reviewId": "test-runner-offline-adapter-plan-r3",
+  "runId": "supervised:agent-platform-test-runner-loopback",
+  "plannerId": "/root",
+  "criticId": "/root/runner_plan_critic",
+  "contractVersion": 1,
+  "policyDigest": "sha256:3e655fdd2170f3d3be9015b3631d433983619180457c828af7b2ee67d634bf7c",
+  "materialDigest": "sha256:c7db34dc1e8de51d8e8e4198f846112dedd600ae3423d9ad28c75d63a5ea3230",
+  "verdict": "approved",
+  "summary": "No actionable planning findings after reassessing retained r2 material and the complete r3 correction. The dedicated evidence API accepts privately retained validated artifacts rather than arbitrary content, independently checks durable execution/input/descriptor authority and confirmed container absence/revocation, and preserves direct-secret scanning. Canonical verified metadata is distinguished from free-form log content; unknown entropy is conservatively redacted with counts and separate original/sanitized hashes. Generic ingestion remains unchanged. Positive typed-vault persistence, forged/mutated/unsafe-state rejection and actual governed qualification are mandatory before implementation acceptance. The earlier implementation review remains unapproved pending its complete corrected source and qualification evidence. This is an unpersisted supervised evidence-only review; no tools were used and inherited tools were not technically disabled. The runId is a nonexecuting carrier label, not a managed run or production approval. This object has not been machine validated here. Approval covers prerequisite implementation scope only, not pilot launch.",
+  "evidence": [
+    {
+      "digest": "sha256:3e655fdd2170f3d3be9015b3631d433983619180457c828af7b2ee67d634bf7c",
+      "mediaType": "text/markdown",
+      "sizeBytes": 13707,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:0a51b3c03f198e50f376f5a5376fdba138b12fa68a80c3eb26aed500bd71fc84",
+      "mediaType": "text/markdown",
+      "sizeBytes": 5399,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:03aeef2287702f980378d2e0e6ebbd591436654c2ae49356f03191abdda756cf",
+      "mediaType": "text/markdown",
+      "sizeBytes": 9913,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:177c1d9f34ae63cd9ecef15baea2bdf39b9a3eb1a0fdc329f0e39e115fd7a852",
+      "mediaType": "text/markdown",
+      "sizeBytes": 12087,
+      "kind": "artifact"
+    }
+  ],
+  "findings": [],
+  "humanDecision": null
+}

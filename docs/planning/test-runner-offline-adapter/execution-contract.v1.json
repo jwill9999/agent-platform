@@ -4,40 +4,40 @@
     "version": 1,
     "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
     "repository": "jwill9999/agent-platform",
-    "sourceRevision": "00eda68ffd0b77a109bbae1cbdaeddc70ee65b24",
+    "sourceRevision": "ea1ccd55006e3b61a4b70294caa42477ad5fffe3",
     "files": [
       {
         "path": "docs/adr/0004-codex-development-orchestration-control-plane.md",
         "kind": "reference",
         "taskIds": ["agent-platform-test-runner-loopback"],
-        "sizeBytes": 11593,
-        "digest": "sha256:6e111644db50ba46cb966b2949a7bb301f086d1c86a8c9f23043dab2378cabca"
+        "sizeBytes": 12087,
+        "digest": "sha256:177c1d9f34ae63cd9ecef15baea2bdf39b9a3eb1a0fdc329f0e39e115fd7a852"
       },
       {
         "path": "docs/planning/test-runner-offline-adapter/plan.md",
         "kind": "design",
         "taskIds": ["agent-platform-test-runner-loopback"],
-        "sizeBytes": 11241,
-        "digest": "sha256:195b0343c7b114cb5f0f75d7e094b63302aa45e1db34685f84cb6edb0b755c02"
+        "sizeBytes": 13707,
+        "digest": "sha256:3e655fdd2170f3d3be9015b3631d433983619180457c828af7b2ee67d634bf7c"
       },
       {
         "path": "docs/tasks/agent-platform-test-runner-loopback.md",
         "kind": "specification",
         "taskIds": ["agent-platform-test-runner-loopback"],
-        "sizeBytes": 9192,
-        "digest": "sha256:e7bbafd0547f45d534f8b1db876bda7b49addd5f624fd2045e435b0239df96f2"
+        "sizeBytes": 9913,
+        "digest": "sha256:03aeef2287702f980378d2e0e6ebbd591436654c2ae49356f03191abdda756cf"
       },
       {
         "path": "docs/testing/test-runner-offline-adapter.md",
         "kind": "verification",
         "taskIds": ["agent-platform-test-runner-loopback"],
-        "sizeBytes": 4471,
-        "digest": "sha256:16eade859712d465c9d0d66d95a543850d115371ebe3370b21cfe19980145b90"
+        "sizeBytes": 5399,
+        "digest": "sha256:0a51b3c03f198e50f376f5a5376fdba138b12fa68a80c3eb26aed500bd71fc84"
       }
     ]
   },
   "contractVersion": 1,
-  "policyDigest": "sha256:195b0343c7b114cb5f0f75d7e094b63302aa45e1db34685f84cb6edb0b755c02",
+  "policyDigest": "sha256:3e655fdd2170f3d3be9015b3631d433983619180457c828af7b2ee67d634bf7c",
   "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
   "objective": "Supervised prerequisite repair: qualify fixed contract-bound offline application verification adapter without widening Codex command networking or launching the pilot.",
   "requirements": [
@@ -77,6 +77,7 @@
       "packages/workflow-control/src/specialistLauncher.ts",
       "packages/workflow-control/src/specialistTerminalResult.ts",
       "packages/workflow-control/src/offlineTestAdapter.ts",
+      "packages/workflow-control/src/secureEvidence.ts",
       "packages/workflow-control/src/storage.ts",
       "packages/workflow-control/src/specialistInput.ts",
       "packages/workflow-control/src/index.ts",
@@ -86,6 +87,7 @@
       "packages/workflow-control/test/specialistLauncher.test.ts",
       "packages/workflow-control/test/specialistTerminalResult.test.ts",
       "packages/workflow-control/test/offlineTestAdapter.test.ts",
+      "packages/workflow-control/test/secureEvidence.test.ts",
       "packages/workflow-control/test/specialistContainerLifecycle.integration.test.ts",
       "docs/tasks/agent-platform-test-runner-loopback.md",
       "docs/planning/test-runner-offline-adapter",
@@ -142,6 +144,7 @@
         "packages/workflow-control/src/specialistLauncher.ts",
         "packages/workflow-control/src/specialistTerminalResult.ts",
         "packages/workflow-control/src/offlineTestAdapter.ts",
+        "packages/workflow-control/src/secureEvidence.ts",
         "packages/workflow-control/src/storage.ts",
         "packages/workflow-control/src/specialistInput.ts",
         "packages/workflow-control/src/index.ts",
@@ -151,6 +154,7 @@
         "packages/workflow-control/test/specialistLauncher.test.ts",
         "packages/workflow-control/test/specialistTerminalResult.test.ts",
         "packages/workflow-control/test/offlineTestAdapter.test.ts",
+        "packages/workflow-control/test/secureEvidence.test.ts",
         "packages/workflow-control/test/specialistContainerLifecycle.integration.test.ts",
         "docs/tasks/agent-platform-test-runner-loopback.md",
         "docs/planning/test-runner-offline-adapter",
@@ -197,6 +201,7 @@
       "packages/workflow-control/src/specialistLauncher.ts",
       "packages/workflow-control/src/specialistTerminalResult.ts",
       "packages/workflow-control/src/offlineTestAdapter.ts",
+      "packages/workflow-control/src/secureEvidence.ts",
       "packages/workflow-control/src/storage.ts",
       "packages/workflow-control/src/specialistInput.ts",
       "packages/workflow-control/src/index.ts",
@@ -206,6 +211,7 @@
       "packages/workflow-control/test/specialistLauncher.test.ts",
       "packages/workflow-control/test/specialistTerminalResult.test.ts",
       "packages/workflow-control/test/offlineTestAdapter.test.ts",
+      "packages/workflow-control/test/secureEvidence.test.ts",
       "packages/workflow-control/test/specialistContainerLifecycle.integration.test.ts",
       "docs/tasks/agent-platform-test-runner-loopback.md",
       "docs/planning/test-runner-offline-adapter",
