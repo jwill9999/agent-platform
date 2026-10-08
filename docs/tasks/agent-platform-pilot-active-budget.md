@@ -43,6 +43,30 @@ credential mounts or process authority. Preserve existing clients/contracts when
 is configured; require the aggregate policy for the final pilot admission. Bound schema validation,
 policy identity and deadline calculations; detect invalid clocks and journal failure conservatively.
 
+## Independent planning critique dispositions
+
+The separate evidence-only critic requires these additions before executable material approval.
+The proposal incorporates them; no implemented budget is claimed.
+
+- The 3,600-second total applies to one approved run including its repair children and coordinator
+  executions. A distinct subrun needs separate exact approval and cannot replenish this run. Pilot
+  admission rejects missing/legacy aggregate policy; limit and accounting semantics are material.
+- Enumerate every specialist/coordinator/recovery/continuation dispatch before implementation.
+  Reserve before external effects using a unique fenced execution identity; crash-before-launch
+  retains the charge. Replay rejects changed role, run, allowance or deadline.
+- Split each reservation into startup/work and bounded cleanup allowances. Stop work early enough
+  for cleanup; deadline overrun or uncertain absence blocks further launch and retains evidence.
+  This bounds authorized exposure; it cannot physically guarantee an uncontrollable process stopped.
+- Persist absolute deadlines without renewal across restart. Backward/forward clock discontinuity or
+  unknown elapsed-time state blocks admission and triggers conservative containment. Restart cannot
+  replenish expired or charged allowance.
+- Exhaustion creates durable escalation and prevents phase progression/new dispatch across every
+  coordinator/continuation/recovery path. Interrupt active owned executions, revoke credentials and
+  independently verify process/container absence; cleanup uncertainty remains blocking.
+- Report charged reservations separately from measured durations, including failed/cancelled/uncertain
+  launches. Test simultaneous exhaustion versus completion/recovery, failed reservation commit before
+  dispatch, interruption failure and previously started execution discovered after restart.
+
 ## Git workflow
 
 Continue from pushed task/harness-readiness-reconciliation tip, chaining runtime repair task branches
