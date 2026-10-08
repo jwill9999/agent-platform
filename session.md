@@ -5,8 +5,13 @@ the earlier readiness segment. Budget plan and verification passed version1 vali
 Implementation adds durable fenced full work/cleanup allocations and deadline enforcement.
 [Budget result](docs/reviews/pilot-active-budget.md) retains bindings, C01 correction and local
 qualification: typecheck/lint/build passed; final regression1154passed/77platform-gatedskips.
-Independent patch recheck approved with no remaining findings; publication/push and final segment
-integration remain required. Canonical CLI discovery for this task returned absent; no run launched.
+Independent patch recheck approved with no remaining findings. Budget code/report pushed at
+8224d25; complete seven-package push hook passed using canonical WORKFLOW_GIT_BINARY=/usr/bin/git
+and one Vitest worker. Xcode hook PATH symlink failure is reproduced/retained. Source/task stays
+open until cumulative feature integration. Branch-specific Notion sync is being completed; final
+publication receipts belong to canonical Beads. Next: chain task/test-runner-offline-adapter from
+this pushed tip, prepare complete source-backed version1 material and required independent critique,
+then implement/qualify the governed offline application adapter. Do not repeat failed proxy probes. Canonical CLI discovery for this task returned absent; no run launched.
 The owner authorized supervised prerequisites until pilot-ready. No live pilot or paid model ran.
 
 [Readiness evidence](docs/reviews/harness-readiness-2026-10-08.md) and
@@ -35,7 +40,7 @@ retained delivery and the recorded September24 scope. No force override. .12 awa
 publication/integration; .17/.13/P4.1
 remain gated. Existing .16 delivery isclosed. Preserve dirtyprimary/unrelatedworktrees and archive tags.
 Local test-only repair validation and push hook pass, including112desktopunit tests; hosted PR283
-at 25e034b9: all nine executed hosted checks passed, staging-only macOS skipped as expected.
+at 5b796b74: all nine executed hosted checks passed, staging-only macOS skipped as expected.
 Further changes need their own current-head checks. Notion report/session/plan/proposal/field mirrors published and
 read back. Candidate image and all failed/successful probes are retained outside the repository.
 

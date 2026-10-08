@@ -38,5 +38,20 @@
     "positiveControl": "Same PATH with supported WORKFLOW_GIT_BINARY=/usr/bin/git passes.",
     "repair": "Retry push with explicit canonical Git binary and one Vitest worker; no test/source/protection/hook changes.",
     "failedHookLogSha256": "2df84b016dd1b72ff4e9ece9dbcd2a886a26a97934f012a59e4a95b49e27a1db"
+  },
+  "remoteDelivery": {
+    "pushedRevision": "8224d25",
+    "branch": "task/pilot-active-budget",
+    "hook": "all7affected packages build/typecheck/tests and cycles passed; no bypass",
+    "testSummaries": [
+      ["packages/contracts", "72 passed (72)"],
+      ["packages/workflow-control", "1154 passed | 77 skipped (1231)"],
+      ["apps/desktop", "112 passed (112)"],
+      ["packages/db", "104 passed (104)"],
+      ["apps/web", "187 passed (187)"],
+      ["packages/harness", "679 passed (679)"],
+      ["apps/api", "201 passed (201)"]
+    ],
+    "logSha256": "63ba4411fcba39f48733a8dd76f24dc0986e310e2249fe0ede8b99bd0d307db8"
   }
 }

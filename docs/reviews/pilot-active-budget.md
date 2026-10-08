@@ -74,7 +74,9 @@ A subsequent serial hook passed 1,153 tests but failed one coordinator fixture b
 prepends Xcode git-core to hook PATH: the fixture discovered a symlink and executable pinning
 correctly rejected it. The exact PATH reproduced that failure; the supported explicit
 `WORKFLOW_GIT_BINARY=/usr/bin/git` made the same test pass. Push retry uses that canonical binary
-and one Vitest worker, retaining every hook. Remote delivery remains pending.
+and one Vitest worker, retaining every hook. The complete retry passed: all seven affected packages built, typechecked and passed tests,
+including 1,154 workflow tests and 112 desktop tests; dependency cycles passed. Branch
+`task/pilot-active-budget` was pushed at `8224d25`. No hook or protection was bypassed.
 
 ## Remaining gates
 
