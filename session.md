@@ -1,4 +1,43 @@
-# Branch cleanup handoff — 8 October 2026
+# Harness readiness iteration — 8 October 2026
+
+Worktree: task/harness-readiness-reconciliation, from merged feature f8112b14; draft PR283.
+The owner authorized supervised prerequisites until pilot-ready. No live pilot or paid model ran.
+
+[Readiness evidence](docs/reviews/harness-readiness-2026-10-08.md) and
+[qualification plan](docs/planning/single-task-permission-pilot/runner-qualification.md) retain all
+failures and independent review dispositions. Candidate image90dd34f0 has locked Linux dependencies.
+Direct attempt8 passed build,79backendtests,lint,desktop/E2Etypes and exactlyoneElectronjourney without
+retries/skips;829source hashes unchanged. RealCodex primitive role denials and cleanup passed.
+Actual application-tool route passed build/backend/static checks but failed listenEPERM127.0.0.1
+under generatedtest_runnerpolicy.832staged hashes unchanged; ownedcontainer cleanup verified.
+
+[Local-test route proposal](docs/tasks/agent-platform-test-runner-loopback.md) is open and explicitly
+blocks .17/.13. The owner now authorizes completing all prerequisite issues, targeting 9 October; prior Slack/chat
+scope questions are superseded. Prefer restricted loopback; use a governed adapter if required.
+[Aggregate budget repair](docs/tasks/agent-platform-pilot-active-budget.md) retains the 60-minute cap
+and blocks .17/.13. Complete validated contracts and independent critique before runtime repair.
+Budget proposal now incorporates independent critique: per-run repair/coordinator coverage, fenced
+reservations, work/cleanup split, clock/restart handling, durable exhaustion and uncertain cleanup.
+Three disposable proxy feasibility probes failed safely: inactive proxy with network false; invalid
+wildcard deny; then active policy rejected 127.0.0.1 with local binding false. Each preserved 832 source
+files and verified container cleanup. No production networking changed; unchanged probes stop here.
+Configured admission/scheduling, productiongateway/coordinatorbindings and exactpilotapproval remain
+unexercised. Primaryoperator config is unchanged and still has no workflow field.
+
+Beads .8/.9/skills-gate/.10/.11 closed in dependency order after independent reconciliation of
+retained delivery and the recorded September24 scope. No force override. .12 awaits latest
+publication/integration; .17/.13/P4.1
+remain gated. Existing .16 delivery isclosed. Preserve dirtyprimary/unrelatedworktrees and archive tags.
+Local test-only repair validation and push hook pass, including112desktopunit tests; hosted PR283
+at 25e034b9: all nine executed hosted checks passed, staging-only macOS skipped as expected.
+Further changes need their own current-head checks. Notion report/session/plan/proposal/field mirrors published and
+read back. Candidate image and all failed/successful probes are retained outside the repository.
+
+Historical checkpoints below retain older PR/task states.
+
+---
+
+## Branch cleanup handoff — 8 October 2026
 
 Cleanup removed 28 remote and 36 local branch names, with all 64 tips retained as pushed archive
 tags and a verified recovery bundle. See [complete branch audit](docs/reviews/branch-cleanup-2026-10-08.md)

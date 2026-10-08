@@ -1,0 +1,63 @@
+{
+  "status": "blocked at actual role local HTTP fixture bind",
+  "declaredSnapshotBase": "f8112b142ecad7d8fa5963484a0ed28235b04c3b",
+  "snapshotEqualsBase": false,
+  "imageId": "sha256:90dd34f0f6c35fd108d0beec015802a392124d74b106009777bcdef5a1c1ede9",
+  "versions": {
+    "node": "24.21.0",
+    "pnpm": "9.15.4",
+    "codex": "0.156.1",
+    "electron": "42.0.1",
+    "better-sqlite3": "13.0.3",
+    "node-pty": "1.1.0"
+  },
+  "directAttempt8": {
+    "exitCode": 0,
+    "backendTests": 79,
+    "electronExpected": 1,
+    "electronUnexpected": 0,
+    "electronSkipped": 0,
+    "electronFlaky": 0,
+    "sourceFilesUnchanged": 829,
+    "build": "pass",
+    "lint": "pass",
+    "desktopTypecheck": "pass",
+    "e2eTypecheck": "pass"
+  },
+  "primitiveCodexRoleProbe": "allowed/denied assertions passed and owned cleanup verified",
+  "applicationToolProbe": {
+    "build": "pass",
+    "backendTests": 79,
+    "lint": "pass",
+    "desktopTypecheck": "pass",
+    "e2eTypecheck": "pass",
+    "electron": "failed listen EPERM 127.0.0.1",
+    "sourceFilesUnchanged": 832,
+    "ownedCleanupVerified": true,
+    "paidModel": false,
+    "productionGateway": "not exercised",
+    "admissionScheduling": "not exercised"
+  },
+  "retainedArtifactSHA256": {
+    "build-attempt-1.log": "9d3700471ae407da30cbec43155e1fb690095494ef0bef4f78852accb296681e",
+    "build-attempt-2.log": "6002dec900b4f7f5b081ae2f5135d30edf9b64db99085b958845219e1036fe31",
+    "image-inspection.log": "0b4d0f332acf2b32e02f26bcf6a079f5b4252a064ef642464d8cdfc5e26ca42a",
+    "source-manifest.json": "f98813849c7737fcffb8462a733be5ca2c7e7d16fd0ecd2541e6388bc7e565b1",
+    "patch-provenance.json": "d4de7436d2fd7a8502861fdae52a94ec94571d7d46b3a64265d3afe2599bcf17",
+    "offline-attempt-1.log": "425be953ce366c86a1f96a312c08147e94f929a65115f350f0269228298b375c",
+    "offline-attempt-2.log": "99339845313a2c7861696dd6e08b2ee114ea70837a9c6a6d46fc8d1651970d2b",
+    "offline-attempt-3.log": "26dd2b21d07da3a47a7441824adf54ae754c77722fcdbe8f1f09ce10393e2b3c",
+    "offline-attempt-4.log": "26dd2b21d07da3a47a7441824adf54ae754c77722fcdbe8f1f09ce10393e2b3c",
+    "offline-attempt-5.log": "26dd2b21d07da3a47a7441824adf54ae754c77722fcdbe8f1f09ce10393e2b3c",
+    "offline-attempt-6.log": "26dd2b21d07da3a47a7441824adf54ae754c77722fcdbe8f1f09ce10393e2b3c",
+    "offline-attempt-7.log": "26dd2b21d07da3a47a7441824adf54ae754c77722fcdbe8f1f09ce10393e2b3c",
+    "offline-attempt-8.log": "9041c7753aa4a8de4eead2db99f56902757d03cc896b552d62b0f80ffa12a060",
+    "role-application-attempt-1/evidence/application-tool-transcript.json": "ad23c2672694f5397682cb7b8195130c99ebd15fd3af0d5a38beb83517ea6d44",
+    "role-application-attempt-1/evidence/electron-control.json": "d8e569f03432c4427ee40b5e60fd1d441646cb54c9582bd6695326fc0669bdc1",
+    "role-application-attempt-1/cleanup.json": "350d4486e7e633b1b0e5e7618254f0fc012fef4a51c122a353036ae8b2835a3a",
+    "role-application-attempt-1/source-postcheck.json": "5113382db327f8c58220a1fcc15ed1e57531f90af138bcda0144abae06b9f0df"
+  },
+  "patchedFiles": {
+    "apps/desktop/e2e/packaged-vm-command.e2e.ts": "75427c3c744f6be728cab3733acefcdbd30d8efc163f43ea9df33c121148585f"
+  }
+}

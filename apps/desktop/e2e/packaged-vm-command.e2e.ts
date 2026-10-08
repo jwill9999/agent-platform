@@ -2,6 +2,9 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
+  closeSync,
+  openSync,
+  readSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -22,6 +25,15 @@ import { getOpenPort } from './support/runtime.js';
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
 const GIT_BINARY = process.env.AGENT_PLATFORM_E2E_GIT_BINARY ?? '/usr/bin/git';
+const declaredSourceRevision = process.env.AGENT_PLATFORM_E2E_SOURCE_REVISION;
+if (declaredSourceRevision !== undefined && !/^[a-f0-9]{40}$/i.test(declaredSourceRevision)) {
+  throw new Error(
+    'AGENT_PLATFORM_E2E_SOURCE_REVISION must contain exactly 40 hexadecimal characters',
+  );
+}
+const sourceRevision =
+  declaredSourceRevision ??
+  execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim();
 const HOST_ONLY_CANARY_ENV = 'HOST_ONLY_CANARY';
 const HOST_ONLY_CANARY_VALUE = ['host', 'only', 'packaged', 'vm', 'e2e', 'canary'].join('-');
 const VM_E2E_MARKER_COMMAND = 'pwd';
@@ -141,6 +153,7 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
         ? await startJourneyProvider(JOURNEY_COMMAND, JOURNEY_FINAL, { failFirst })
         : undefined;
     let app: ElectronApplication | undefined;
+    let captureStartupDiagnostics = async () => {};
     let approval: ApprovalEvidence | undefined;
     let audits: AuditEvidence[] = [];
     const duplicateResumes: Array<{ status: number; body: unknown }> = [];
@@ -156,6 +169,7 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
         finalText: JOURNEY_FINAL,
         providerURL: provider?.baseURL,
       });
+      captureStartupDiagnostics = captureFixtureStartupDiagnostics(app, fixture);
       if (provider) await configureJourneyModel(fixture);
       await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
       tracing = true;
@@ -338,6 +352,9 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
       }
       mark('turn_settled_file_and_audit_verified');
     } finally {
+      await captureStartupDiagnostics().catch(() => {
+        console.warn('Startup diagnostics could not be attached; original test result retained');
+      });
       // Snapshot durable evidence even when a UI assertion fails; never repair or manufacture it.
       approval =
         (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests').catch(() => [])).find(
@@ -365,10 +382,9 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
           reasoning,
           reload,
           duplicateResumes,
-          sourceRevision: execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], {
-            cwd: repoRoot,
-            encoding: 'utf8',
-          }).trim(),
+          sourceRevision,
+          sourceRevisionKind:
+            declaredSourceRevision === undefined ? 'git-head' : 'declared-snapshot-base',
           providerRequests: provider?.requests,
           providerErrors: provider?.errors,
           providerAttempts: provider?.attempts,
@@ -640,10 +656,9 @@ for (const { policy, unavailableFiles, action } of [
             providerRequests: provider.requests,
             providerErrors: provider.errors,
             backendEvents: readBackendEvents(fixture),
-            sourceRevision: execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], {
-              cwd: repoRoot,
-              encoding: 'utf8',
-            }).trim(),
+            sourceRevision,
+            sourceRevisionKind:
+              declaredSourceRevision === undefined ? 'git-head' : 'declared-snapshot-base',
             limitations: [
               'External HTTP provider and fixed-command runner fixtures; no live-model or real VM claim.',
               'Direct file modes test the write-policy scope; shell Auto retains explicit high-risk approval precedence.',
@@ -672,6 +687,62 @@ type ApprovalEvidence = {
   resumedAtMs?: number | null;
 };
 type AuditEvidence = { id: string; sessionId: string; toolName: string; status: string };
+
+function captureFixtureStartupDiagnostics(app: ElectronApplication, fixture: VmFixture) {
+  const limit = 64 * 1024;
+  const captures = [app.process().stdout, app.process().stderr].map((stream, index) => {
+    let data: Buffer = Buffer.alloc(0);
+    let truncated = false;
+    const listener = (chunk: Buffer | string) => {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      const remaining = limit - data.length;
+      if (bytes.length > remaining) truncated = true;
+      if (remaining > 0) data = Buffer.concat([data, bytes.subarray(0, remaining)]);
+    };
+    stream?.on('data', listener);
+    return () => {
+      stream?.off('data', listener);
+      return {
+        name: `electron.${index === 0 ? 'stdout' : 'stderr'}`,
+        data: data.toString(),
+        truncated,
+        missing: !stream,
+      };
+    };
+  });
+  return async () => {
+    const records = captures.map((capture) => capture());
+    for (const name of [
+      'backend.stdout.log',
+      'backend.stderr.log',
+      'renderer.stdout.log',
+      'renderer.stderr.log',
+    ]) {
+      let fd: number | undefined;
+      try {
+        fd = openSync(join(fixture.runtimeDir, 'logs', name), 'r');
+        const bytes = Buffer.alloc(limit + 1);
+        const length = readSync(fd, bytes, 0, bytes.length, 0);
+        records.push({
+          name,
+          data: bytes.subarray(0, Math.min(length, limit)).toString(),
+          truncated: length > limit,
+          missing: false,
+        });
+      } catch {
+        records.push({ name, data: '', truncated: false, missing: true });
+      } finally {
+        if (fd !== undefined) closeSync(fd);
+      }
+    }
+    await test.info().attach('startup-diagnostics', {
+      body: Buffer.from(
+        JSON.stringify(records, null, 2).replaceAll(fixture.tempRoot, '<disposable-root>'),
+      ),
+      contentType: 'application/json',
+    });
+  };
+}
 
 async function configureJourneyModel(fixture: VmFixture): Promise<void> {
   await expect
@@ -757,17 +828,28 @@ async function createVmFixture(options: { health: VmFixtureHealth }): Promise<Vm
 
   mkdirSync(projectDir, { recursive: true });
   writeFileSync(join(projectDir, 'README.md'), '# Packaged VM E2E Project\n');
-  execFileSync(GIT_BINARY, ['init', '-b', 'main'], { cwd: projectDir, stdio: 'ignore' });
-  execFileSync(GIT_BINARY, ['config', 'user.email', 'e2e@example.com'], {
+  // Trust only this freshly created disposable fixture when Docker reports host UID mappings.
+  const fixtureGitOptions = ['-c', `safe.directory=${projectDir}`];
+  execFileSync(GIT_BINARY, [...fixtureGitOptions, 'init', '-b', 'main'], {
     cwd: projectDir,
     stdio: 'ignore',
   });
-  execFileSync(GIT_BINARY, ['config', 'user.name', 'Electron E2E'], {
+  execFileSync(GIT_BINARY, [...fixtureGitOptions, 'config', 'user.email', 'e2e@example.com'], {
     cwd: projectDir,
     stdio: 'ignore',
   });
-  execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: projectDir, stdio: 'ignore' });
-  execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: projectDir, stdio: 'ignore' });
+  execFileSync(GIT_BINARY, [...fixtureGitOptions, 'config', 'user.name', 'Electron E2E'], {
+    cwd: projectDir,
+    stdio: 'ignore',
+  });
+  execFileSync(GIT_BINARY, [...fixtureGitOptions, 'add', 'README.md'], {
+    cwd: projectDir,
+    stdio: 'ignore',
+  });
+  execFileSync(GIT_BINARY, [...fixtureGitOptions, 'commit', '-m', 'initial'], {
+    cwd: projectDir,
+    stdio: 'ignore',
+  });
 
   if (realPackagedResourcesDir) {
     assertPackagedResources(realPackagedResourcesDir);
