@@ -23,7 +23,9 @@ delay, cancellation and cleanup deadline overrun. This fixture uses simulated Do
 it proves composed supervisor control but does not claim real Codex/container or hostile-agent isolation.
 
 B-T04 / B2+B3: Retries and repair children consume the same run total; idle waits do not replenish it;
-simultaneous exhaustion/completion/recovery cannot dispatch after the durable fence. Cleanup remains
+same-run repair dispatches share the durable run-ID budget root; another run cannot reuse a bound
+reservation. This task does not combine independently approved runs. Simultaneous
+exhaustion/completion/recovery cannot dispatch after the durable fence. Cleanup remains
 permitted for containment only. No returned result or coordinator transition after expiration.
 
 B-T05 / B4: Existing connected phase fixtures return typed evidence from a real child process through

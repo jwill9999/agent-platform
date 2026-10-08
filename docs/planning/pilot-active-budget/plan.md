@@ -28,12 +28,17 @@ cleanupSeconds. Validate safe bounded positive integers, cleanup at least 15 sec
 plus cleanup within the aggregate. Keep legacy contracts unchanged when absent; final pilot material
 must include 3600 aggregate seconds. Increasing or removing an existing limit is authority expansion.
 All limit changes alter the contract material digest and invalidate old approval. Repair children
-share their existing run total. A distinct run requires separate exact approved material.
+share their existing run total. This repair covers same-run repair dispatches only, not aggregate
+accounting across separately approved runs. The durable budget root is the existing run ID; requests
+for another run cannot reuse its reservation identity. A distinct run requires separate exact approved
+material through the existing admission/approval gates; this task does not grant new-run approval.
 
 B2: Use the workflow SQLite writer lock to reserve each full work-plus-cleanup allowance atomically,
 before credential issue, container dispatch, coordinator process or recovery dispatch. Bind run,
 execution/phase identity, role, immutable contract/policy, resource fences, reservation time and
-absolute work/cleanup deadlines. Retain every charge, including crash-before-dispatch and failed
+absolute work/cleanup deadlines computed from reservation time. Startup consumes the work allowance;
+if credential issue or staging exhausts it, do not create/start a process. Never calculate a fresh full
+attempt deadline at delayed dispatch. Retain every charge, including crash-before-dispatch and failed
 attempts; no refunds. Replay may observe the same exact reservation but never replenish or extend it.
 Recovery that launches a new coordinator attempt must get a fresh bounded reservation; do not reuse
 expired execution authority. Count parallel reservations cumulatively. Keep charged and measured
@@ -41,7 +46,11 @@ values distinct. Legacy no-limit runs retain their current behavior.
 
 B3: Enforce deadlines at dispatch, credential/lease heartbeat, returned-result acceptance and every
 coordinator mutation boundary. Use a separate short timer to cancel active work at its work deadline;
-allow existing owned cleanup only until the allocated cleanup deadline. On unavailable journal,
+allow existing owned cleanup only until the allocated cleanup deadline. Cap every interruption
+retry and nested container inspection/removal, broker revoke/observe and filesystem settlement at
+that same persisted deadline. Add specialistLauncher to scope for propagation. After deadline overrun,
+fence further workflow work; trusted emergency containment may continue, but report it outside the
+allocated execution ceiling and never claim task readiness while physical absence is uncertain. On unavailable journal,
 rollback, deadline mismatch or uncertain cleanup, persist or report a durable blocked state and deny
 new work. Restart cannot renew deadlines or charged allowances. Cleanup may still run after a budget
 fence solely for containment; it cannot dispatch or advance the workflow. Physical process absence is
@@ -66,7 +75,8 @@ docs/reviews/pilot-active-budget.md and its content-addressed evidence. Approval
 recorded delegated prerequisite authorization; no persisted managed approval is invented.
 
 Allowed source: contracts, lifecycle, runExecutionBudget, storage, phaseRuntime, phaseJobs,
-standaloneCoordinators, coordinatorTransport, workCancellation and executionInterruptions within
+standaloneCoordinators, coordinatorTransport, workCancellation, executionInterruptions and
+specialistLauncher within
 packages/workflow-control/src, plus their named relevant tests. Allow only the declared planning,
 specification, verification, review and session documents. No product/UI changes, dependency changes,
 operator credentials/config changes, network widening, staging/main promotion or live pilot.
