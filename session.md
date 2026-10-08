@@ -1,4 +1,18 @@
-# Branch cleanup handoff — 8 October 2026
+# Harness readiness checkpoint — 8 October 2026
+
+Work resumed on `task/harness-readiness-reconciliation` from merged feature f8112b14.
+See [readiness report](docs/reviews/harness-readiness-2026-10-08.md). Docker access is restored;
+both configured pinned images are available. Offline worker probe finds Node24 but no pnpm,
+Electron, Chromium, Xvfb or Git on PATH and no workspace node_modules. Operator has no workflow
+configuration. `.12`/`.17` remain in progress and `.13`/P4.1 remain blocked. No pilot launched.
+
+Next: bounded managed test-image/dependency/scratch-build qualification plan, then configured
+admission/scheduling, role/coordinator bindings and enforceable limits before exact pilot approval.
+Historical checkpoints below retain older PR/task states.
+
+---
+
+## Branch cleanup handoff — 8 October 2026
 
 Cleanup removed 28 remote and 36 local branch names, with all 64 tips retained as pushed archive
 tags and a verified recovery bundle. See [complete branch audit](docs/reviews/branch-cleanup-2026-10-08.md)
