@@ -70,7 +70,11 @@ checks pass locally; real configured coordinator/repair/restart composition rema
 
 Initial push hooks failed first on missing built workspace dependencies, then four lease/timing
 failures under higher package/test concurrency. The full build and controlled final regression passed.
-Hook retry and remote delivery are pending; no hook was bypassed.
+A subsequent serial hook passed 1,153 tests but failed one coordinator fixture because Git
+prepends Xcode git-core to hook PATH: the fixture discovered a symlink and executable pinning
+correctly rejected it. The exact PATH reproduced that failure; the supported explicit
+`WORKFLOW_GIT_BINARY=/usr/bin/git` made the same test pass. Push retry uses that canonical binary
+and one Vitest worker, retaining every hook. Remote delivery remains pending.
 
 ## Remaining gates
 

@@ -31,5 +31,12 @@
     "77 platform-gated integration tests skipped; no live container/model/pilot qualification.",
     "SonarQube and IDE Problems connectors unavailable; terminal typecheck/lint/test fallback executed.",
     "Initial push hooks failed first on missing built dependencies then four lease/timing tests under higher concurrency; neither bypassed. Full build and subsequent controlled regression passed."
-  ]
+  ],
+  "pushHookEnvironmentFinding": {
+    "reproduced": "Git prepends its Xcode git-core directory to hook PATH. which git returns a symlink; production executable pin correctly rejects noncanonical paths.",
+    "negativeControl": "Standalone coordinator test reproduced the exact rejection with Xcode git-core prepended to PATH.",
+    "positiveControl": "Same PATH with supported WORKFLOW_GIT_BINARY=/usr/bin/git passes.",
+    "repair": "Retry push with explicit canonical Git binary and one Vitest worker; no test/source/protection/hook changes.",
+    "failedHookLogSha256": "2df84b016dd1b72ff4e9ece9dbcd2a886a26a97934f012a59e4a95b49e27a1db"
+  }
 }
