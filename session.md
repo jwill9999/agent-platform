@@ -1,4 +1,18 @@
-# Reviewer evidence repair and pilot planning — 29 September 2026
+# Branch cleanup handoff — 8 October 2026
+
+Cleanup removed 28 remote and 36 local branch names, with all 64 tips retained as pushed archive
+tags and a verified recovery bundle. See [complete branch audit](docs/reviews/branch-cleanup-2026-10-08.md)
+for every original SHA, retained scope and recovery instructions. Main/staging promotion, stashes,
+dirty primary files and other worktree ownership are unchanged. The missing deferred Notion task
+specification is retained in this documentation PR; its source branch remains until integration.
+
+PR281 is merged into staging at a5a1641c. PR280 is integrated into the retained harness feature at
+5fbdff22. Next: integrate this documentation handoff, then resume .12/.17 readiness assessment.
+The older session entries below are historical, including obsolete PR280 pending-merge statements.
+
+---
+
+## Reviewer evidence repair and pilot planning — 29 September 2026
 
 PR279 is merged into `feature/harness-backlog-review` at `43157a8c`. Owner authorized the narrow
 reviewer repair, ten non-launch skill scenarios and pilot planning. Current branch:
