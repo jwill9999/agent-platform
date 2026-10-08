@@ -135,3 +135,35 @@ desktop-e2e/e2e/docker/cycles/docs/security/Sonar gates and clear independent re
 merge; staging-only Mac skip does not establish pilot acceptance. Close adapter/budget tasks only
 after declared feature integration. Then .17/.12/.13 still require configured admission/scheduling,
 authenticated gateway/coordinator evidence and exact final pilot material/owner launch approval.
+
+## R3 typed evidence ingestion correction
+
+Source-backed implementation qualification reached the host result-ingestion boundary but blocked
+before its first durable receipt. Preserve this failure; launcher success does not establish a
+completed phase. Extend the implementation allowlist by exactly
+`packages/workflow-control/src/secureEvidence.ts` and
+`packages/workflow-control/test/secureEvidence.test.ts` in addition to the existing paths.
+No dependency, model-gateway, application or operator-policy authority is added.
+
+Add a dedicated typed adapter evidence method, accepting the private host-validated result and a
+fixed artifact index rather than arbitrary caller content. Independently verify exact durable
+execution ID, role, bound scheduler envelope, deadline and selected descriptor, plus confirmed
+container absence and credential revocation. Recheck source and run/fences through existing authority
+at ingestion. The private brand is not a claim that all log content is metadata or secret-free.
+
+Keep direct secret redaction and residual scanning on all bytes. Whitelist only canonical fixed
+protocol identifiers and durable verified UUID/digest/path metadata; do not exempt arbitrary log
+content from entropy treatment. Conservatively redact unapproved high-entropy free-form content and
+count those redactions before residual scanning, while leaving generic artifact ingestion unchanged.
+Bind validated original receipt/log hashes to their separately hashed sanitized durable artifacts;
+report redaction and any lost detail. Do not encode, split or disguise values to bypass the scanner.
+Any wrong execution/input/descriptor, unbranded or mutated result, live/uncertain container, active
+credential, oversized artifact or residual secret blocks ingestion and phase completion. Freeze or
+privately retain validated artifact data so a returned public lookup cannot replace it before write.
+
+Extend L-T03 with actual typed-vault positive ingestion, forged/changed/missing-settlement rejection,
+known-metadata compatibility, unknown high-entropy log redaction, direct-secret redaction and
+unchanged generic artifact rejection. Fixture criteria must name all three exact fixed outcomes
+(build, backend dispatch and Electron approval), rather than a generic durable-success label.
+Final code review and actual governed qualification are required after this correction; neither the
+earlier planning approval nor a container-only success closes the task.

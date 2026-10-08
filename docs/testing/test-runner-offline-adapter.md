@@ -57,3 +57,15 @@ Record passed/failed/skipped/blocked/not-run per scenario, exact revision and li
 required terminal quality gates, hosted links and owned cleanup proof. Preserve previous failed proxy
 probes. Publish complete branch-specific Notion mirrors and read them back. Unit tests alone, old
 source images, fixture-only frontends or direct-shell passes cannot close this task or the pilot.
+
+## R3 / L-T03: typed secure evidence boundary
+
+Exercise the dedicated adapter-evidence API with the privately validated fixed-suite result and
+exact durable scheduler envelope. Actual receipt and logs must persist after independently confirmed
+container absence/revocation and before phase completion/staging disposal. Reject unbranded or
+mutated output, substituted execution/role/input/deadline/descriptor, live or uncertain container,
+active credential, oversized content and residual secrets. Verify canonical metadata remains bound,
+unknown high-entropy free-form log content is conservatively redacted and counted, direct secrets
+are redacted on every byte, and the generic artifact API still rejects unapproved content. Report
+original validated hashes separately from sanitized durable artifact hashes and any lost detail.
+The three fixture criteria must explicitly name the fixed build, backend and Electron outcomes.

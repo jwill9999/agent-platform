@@ -169,3 +169,9 @@ attachment, host sockets or permission widening for ordinary agents. Missing/cha
 unsupported image, timeout or uncertain cleanup fails closed. No automatic fallback or pilot approval.
 A future accepted status requires the plan's independent reviews, real connected permitted/denied
 journeys and feature integration; this proposal does not establish those results.
+
+The proposed deterministic adapter exception also requires a typed secure-evidence boundary bound
+to the durable execution and confirmed absence/revocation. Canonical protocol metadata may be
+recognized; free-form logs retain direct-secret scanning and conservative unknown-entropy redaction.
+Original validated hashes and sanitized durable hashes are distinct. The generic evidence path and
+all model-specialist permissions remain unchanged; qualification and integration are still required.

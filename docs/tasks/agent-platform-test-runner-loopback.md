@@ -131,3 +131,13 @@ Feature: Governed offline application verification
 
 The existing UI journey is retained; no UI behaviour is changed. L-T02 tests adjacent role/filesystem
 regression and gateway/network denial. Fixture provider and journal/approval boundaries are disclosed.
+
+### R3 evidence-ingestion prerequisite
+
+The deterministic adapter must use a typed, independently execution-bound secure evidence API.
+Its host-validated receipt brand does not make stdout/stderr metadata or secret-free. Preserve
+all-byte direct-secret scanning, conservative unknown-entropy redaction with counts and distinct
+original/sanitized hashes; generic evidence authority stays unchanged. Missing known container
+absence or credential revocation, forged input or incomplete durable evidence blocks progression.
+See the reviewed plan and L-T03 verification correction for the two additional vault implementation
+paths and actual qualification obligations. This remains a prerequisite repair, not pilot approval.
