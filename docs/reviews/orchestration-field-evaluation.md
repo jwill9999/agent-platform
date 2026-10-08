@@ -253,3 +253,18 @@ resume and inherited paths require a shared enforcement design. Independent isol
 identified a failed-invalidation/restart gap; the proposed durable attempt/recovery protocol and
 compound tests address it at design level. [Review record](approved-document-binding-plan.md) retains
 findings and exact snapshot evidence. No managed pilot, implementation or new execution approval.
+
+## 8 October — managed test-environment planning observation
+
+Direct container feasibility and actual worker-tool feasibility diverged. The qualified candidate
+built the application, passed 79 backend tests and one Electron approval journey, but the real Codex
+test_runner tool route failed binding its local HTTP fixture (listen EPERM on 127.0.0.1). Generated
+worker policy disables command networking. Passing shell capability probes did not cover local test
+servers; the pilot remains blocked. See [readiness evidence](harness-readiness-2026-10-08.md) and
+[bounded repair proposal](../tasks/agent-platform-test-runner-loopback.md).
+
+Manual supplementation included dependency image provisioning/relocation, complete source-resource
+selection and test evidence/fixture portability repairs. Future planning feasibility should explicitly
+map required local bind/connect operations to the actual role policy, protected model-service boundary,
+source manifests and evidence return. This is a scoped planning-to-runnable gap, not proof that the
+planning skill or a particular network repair has been qualified. No live pilot or paid model ran.

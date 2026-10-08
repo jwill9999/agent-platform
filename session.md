@@ -1,13 +1,29 @@
-# Harness readiness checkpoint — 8 October 2026
+# Harness readiness iteration — 8 October 2026
 
-Work resumed on `task/harness-readiness-reconciliation` from merged feature f8112b14.
-See [readiness report](docs/reviews/harness-readiness-2026-10-08.md). Docker access is restored;
-both configured pinned images are available. Offline worker probe finds Node24 but no pnpm,
-Electron, Chromium, Xvfb or Git on PATH and no workspace node_modules. Operator has no workflow
-configuration. `.12`/`.17` remain in progress and `.13`/P4.1 remain blocked. No pilot launched.
+Worktree: task/harness-readiness-reconciliation, from merged feature f8112b14; draft PR283.
+The owner authorized supervised prerequisites until pilot-ready. No live pilot or paid model ran.
 
-Next: bounded managed test-image/dependency/scratch-build qualification plan, then configured
-admission/scheduling, role/coordinator bindings and enforceable limits before exact pilot approval.
+[Readiness evidence](docs/reviews/harness-readiness-2026-10-08.md) and
+[qualification plan](docs/planning/single-task-permission-pilot/runner-qualification.md) retain all
+failures and independent review dispositions. Candidate image90dd34f0 has locked Linux dependencies.
+Direct attempt8 passed build,79backendtests,lint,desktop/E2Etypes and exactlyoneElectronjourney without
+retries/skips;829source hashes unchanged. RealCodex primitive role denials and cleanup passed.
+Actual application-tool route passed build/backend/static checks but failed listenEPERM127.0.0.1
+under generatedtest_runnerpolicy.832staged hashes unchanged; ownedcontainer cleanup verified.
+
+[Local-test route proposal](docs/tasks/agent-platform-test-runner-loopback.md) is open and explicitly
+blocks .17/.13. No permission change is approved. The owner must select a scoped loopback policy or
+governed offline-test adapter before the final implementation contract/review; broader permissions
+remain a distinct decision. The60minuteaggregate ceiling choice is also pending in Slack and chat.
+Configured admission/scheduling, productiongateway/coordinatorbindings and exactpilotapproval remain
+unexercised. Primaryoperator config is unchanged and still has no workflow field.
+
+Beads .8/.9/skills-gate/.10/.11 closed in dependency order after independent reconciliation of
+retained delivery and the recorded September24 scope. No force override. .12 awaits latest
+publication/integration; .17/.13/P4.1
+remain gated. Existing .16 delivery isclosed. Preserve dirtyprimary/unrelatedworktrees and archive tags.
+Local test-only repair validation passes; hosted PR283 gates apply to its final pushedhead.
+
 Historical checkpoints below retain older PR/task states.
 
 ---
