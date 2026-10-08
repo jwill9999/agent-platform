@@ -254,8 +254,18 @@ access does not authorize dependency installation/upgrades, provider changes or 
 Preserve the current baseline-testing priority and existing approval boundaries.
 
 The project Codex configuration also exposes the LangChain documentation MCP as `langchain_docs`.
-Use it for LangChain/LangGraph documentation when connected. AI SDK documentation is accessed directly
-through the official URLs above; no Vercel deployment/account MCP connection is required.
+Use it for LangChain/LangGraph documentation when connected. Claude Code, Copilot and any other
+agent without that connection must use the official HTTP documentation directly:
+
+- Agent index: <https://docs.langchain.com/llms.txt>. Follow its nested indexes to find topic pages.
+- LangChain TypeScript: <https://docs.langchain.com/oss/javascript/langchain/overview>.
+- LangGraph TypeScript: <https://docs.langchain.com/oss/javascript/langgraph/overview>.
+
+Fetch targeted pages as Markdown by appending `.md` to their documentation URLs. Check resolved
+`@langchain/*` versions in `pnpm-lock.yaml` and installed package docs/source before applying APIs;
+latest docs may describe a newer version. Direct HTTP lookup requires no configured documentation
+MCP connection. AI SDK documentation is accessed through the official URLs above; no Vercel
+deployment/account MCP connection is required.
 
 ---
 

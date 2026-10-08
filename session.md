@@ -73,3 +73,9 @@ PR281 link checking identified that the AI SDK search API now returns HTTP 404.
 Shared instructions now use the official agent index to find topic URLs and fetch their Markdown
 content. The reference index and installed-version safeguards remain. Fresh staging checks are
 required on the corrected head; no staging merge or harness pilot is authorized by this repair.
+
+## 8 October: documentation access across agent surfaces
+
+PR281 review identified that shared LangChain guidance only named the Codex MCP connection.
+Added official agent-index and TypeScript LangChain/LangGraph URLs, Markdown retrieval guidance,
+and installed-version checks for Claude Code, Copilot and other agents without that connection.
