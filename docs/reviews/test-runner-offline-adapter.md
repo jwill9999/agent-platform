@@ -8,14 +8,14 @@ integration destination `feature/harness-backlog-review`. Owner delegated prereq
 [Plan](../planning/test-runner-offline-adapter/plan.md),
 [specification](../tasks/agent-platform-test-runner-loopback.md),
 [verification](../testing/test-runner-offline-adapter.md) and
-[ADR proposal](../adr/0004-codex-development-orchestration-control-plane.md) are planning snapshots at
-`a94a414740446ece7cb3f0a96c0e70cb93616f4b`. Their proposal labels retain publication-time status.
+[ADR proposal](../adr/0004-codex-development-orchestration-control-plane.md) are current planning snapshots at
+`00eda68ffd0b77a109bbae1cbdaeddc70ee65b24`. Their proposal labels retain publication-time status.
 [Version 1 contract](../planning/test-runner-offline-adapter/execution-contract.v1.json) passed
 supported document-object publication and production schema validation.
-[Manifest bindings](evidence/test-runner-offline-adapter/planning-validation.json) retain exact hashes.
+[Manifest bindings](evidence/test-runner-offline-adapter/planning-validation-r2.json) retain exact hashes.
 
-[Independent review](evidence/test-runner-offline-adapter/plan-review-r1.json) approved material
-`sha256:ba518a9f854a9bed3f9a3f367b7d9b8495b15c2f572d2965f9f441f7ec6f463b` with zero findings.
+[Independent review](evidence/test-runner-offline-adapter/plan-review-r2.json) approved material
+`sha256:c84f459388bb66774d6da14554f29417d8070c0d3c5c4b5163561d364462ede2` with zero findings.
 The distinct critic reviewed supplied revision-bound material/source semantics without tools, under
 the supervised procedural exception; inherited tools were not technically disabled. This is not
 managed isolated-worker evidence, a production approval or a pilot result. Publisher machine
@@ -26,3 +26,9 @@ remain unexecuted. Old direct image success establishes feasibility only. Actual
 qualification must restage current source and demonstrate connected backend/Electron, adjacent
 denials, receipt integrity, resource/budget/deadline and restart/cleanup controls with fixture
 boundaries disclosed. No task or readiness closure from this planning review.
+
+Initial r1 material/review at a94a414 remain in Git and retained evidence. Before code, source
+review identified the risk of treating a fixed suite as proof of arbitrary criteria. Current r2
+requires exact approved criterion-to-fixed-command mappings, no default classification and an
+independent final coverage assessment; unsupported semantic claims remain blocking. The distinct
+critic approved r2 with zero findings after receiving the complete prior material and exact delta.

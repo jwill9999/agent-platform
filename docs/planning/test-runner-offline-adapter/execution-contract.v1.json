@@ -4,7 +4,7 @@
     "version": 1,
     "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
     "repository": "jwill9999/agent-platform",
-    "sourceRevision": "a94a414740446ece7cb3f0a96c0e70cb93616f4b",
+    "sourceRevision": "00eda68ffd0b77a109bbae1cbdaeddc70ee65b24",
     "files": [
       {
         "path": "docs/adr/0004-codex-development-orchestration-control-plane.md",
@@ -17,8 +17,8 @@
         "path": "docs/planning/test-runner-offline-adapter/plan.md",
         "kind": "design",
         "taskIds": ["agent-platform-test-runner-loopback"],
-        "sizeBytes": 10360,
-        "digest": "sha256:97454f4ff42c2c383dd2d1d997119c81dbf7eb1b6f816e6bb6aff9e4c5027e55"
+        "sizeBytes": 11241,
+        "digest": "sha256:195b0343c7b114cb5f0f75d7e094b63302aa45e1db34685f84cb6edb0b755c02"
       },
       {
         "path": "docs/tasks/agent-platform-test-runner-loopback.md",
@@ -31,13 +31,13 @@
         "path": "docs/testing/test-runner-offline-adapter.md",
         "kind": "verification",
         "taskIds": ["agent-platform-test-runner-loopback"],
-        "sizeBytes": 4137,
-        "digest": "sha256:91ea06d16acf33f7d40b30fdff006be4853db61cf2b4478b966c1a7de354045b"
+        "sizeBytes": 4471,
+        "digest": "sha256:16eade859712d465c9d0d66d95a543850d115371ebe3370b21cfe19980145b90"
       }
     ]
   },
   "contractVersion": 1,
-  "policyDigest": "sha256:97454f4ff42c2c383dd2d1d997119c81dbf7eb1b6f816e6bb6aff9e4c5027e55",
+  "policyDigest": "sha256:195b0343c7b114cb5f0f75d7e094b63302aa45e1db34685f84cb6edb0b755c02",
   "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
   "objective": "Supervised prerequisite repair: qualify fixed contract-bound offline application verification adapter without widening Codex command networking or launching the pilot.",
   "requirements": [

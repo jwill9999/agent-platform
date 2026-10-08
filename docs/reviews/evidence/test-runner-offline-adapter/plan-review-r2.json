@@ -1,0 +1,39 @@
+{
+  "reviewId": "test-runner-offline-adapter-plan-r2",
+  "runId": "supervised:agent-platform-test-runner-loopback",
+  "plannerId": "/root",
+  "criticId": "/root/runner_plan_critic",
+  "contractVersion": 1,
+  "policyDigest": "sha256:195b0343c7b114cb5f0f75d7e094b63302aa45e1db34685f84cb6edb0b755c02",
+  "materialDigest": "sha256:c84f459388bb66774d6da14554f29417d8070c0d3c5c4b5163561d364462ede2",
+  "verdict": "approved",
+  "summary": "No actionable planning findings after reassessing the complete retained material and explicit criterion-mapping correction. Approved descriptor mappings bind each exact criterion to a supported fixed command; missing, duplicate, added, unknown or substituted mappings fail closed. Command success does not establish arbitrary semantic requirements or upstream-model conformance. Independent final pilot review must verify actual test coverage; unsupported criteria remain blocking. Existing namespace, source, credential, budget, deadline, settlement, replay and feature-delivery safeguards remain mandatory, with actual connected controls required before acceptance. This is an unpersisted supervised evidence-only review of supplied revision-bound material; no tools were used and inherited tools were not technically disabled. The runId is a nonexecuting carrier label, not a managed run or production approval. This object has not been machine validated here. Approval covers prerequisite implementation only, not pilot launch.",
+  "evidence": [
+    {
+      "digest": "sha256:195b0343c7b114cb5f0f75d7e094b63302aa45e1db34685f84cb6edb0b755c02",
+      "mediaType": "text/markdown",
+      "sizeBytes": 11241,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:16eade859712d465c9d0d66d95a543850d115371ebe3370b21cfe19980145b90",
+      "mediaType": "text/markdown",
+      "sizeBytes": 4471,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:e7bbafd0547f45d534f8b1db876bda7b49addd5f624fd2045e435b0239df96f2",
+      "mediaType": "text/markdown",
+      "sizeBytes": 9192,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:6e111644db50ba46cb966b2949a7bb301f086d1c86a8c9f23043dab2378cabca",
+      "mediaType": "text/markdown",
+      "sizeBytes": 11593,
+      "kind": "artifact"
+    }
+  ],
+  "findings": [],
+  "humanDecision": null
+}
