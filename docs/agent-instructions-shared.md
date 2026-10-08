@@ -243,8 +243,8 @@ check resolved versions of `ai` and `@ai-sdk/*` in `pnpm-lock.yaml` before choos
 Use bundled package docs/source when available to establish installed-version behavior.
 
 - Official agent index: <https://ai-sdk.dev/llms.txt>.
-- Search: <https://ai-sdk.dev/api/search-docs?q=streamText> (replace the query with the topic).
-- Fetch targeted documentation URLs returned by search with `.md` appended.
+- Find the relevant topic and documentation URL in the agent index above.
+- Fetch targeted documentation URLs from that index with `.md` appended.
 - Reference index: <https://ai-sdk.dev/docs/reference.md>.
 
 Fetch these sources when needed rather than retaining a stale copy of the entire docs bundle.
