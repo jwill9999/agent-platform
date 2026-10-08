@@ -6,7 +6,10 @@
 
 ## Task requirements
 
-Status: proposed bounded repair planning; implementation and permission changes are not approved.
+Status: owner-authorized prerequisite repair as of 8 October 2026; technical design and implementation
+qualification remain incomplete. The owner authorized completing all issues preventing the pilot,
+targeting 9 October. This supersedes the earlier unanswered scope questions. Keep independent
+critique and executable material validation; pilot launch still needs its exact final approval.
 The direct offline image passed the required Electron journey, but the actual Codex test-runner tool
 route failed with listen EPERM on 127.0.0.1. Its generated policy disables command networking.
 
@@ -22,27 +25,28 @@ No new upstream blocking task is required for drafting. Reuse .17's image/source
 Downstream: agent-platform-pilot-zero.17 and the exact pilot plan agent-platform-pilot-zero.13.
 Publish both blocking edges in Beads; do not close this task on a proposed design or direct-shell pass.
 
-## Implementation plan and unresolved decision
+## Implementation plan and technical qualification
 
-Two alternatives require an owner scope decision before a complete implementation contract:
+The owner delegated prerequisite repair choices. Prefer restricted loopback; use the governed
+offline adapter if the pinned client cannot enforce the required boundary:
 
 1. A narrowly scoped test-runner network policy using the pinned client's supported permission/proxy
    interfaces, exact local destinations and explicit protected model-gateway denial. Do not infer
    that enabling networking or an allowlist alone enforces the boundary. New permissions require
-   explicit owner approval after a complete contract and independent critique.
+   the owner-authorized prerequisite scope, a complete contract and independent critique.
 2. Keep worker command networking denied and qualify a governed offline test-execution adapter that
    runs the already passing controls and returns bound typed evidence. This requires a separately
    reviewed runtime scope; a manual external test launch does not satisfy managed execution.
 
 Current OpenAI [permission documentation](https://learn.chatgpt.com/docs/permissions) describes active
 proxy requirements and incompatibility between profiles and legacy sandbox settings. The repository
-uses legacy sandbox_mode/network_access=false and launcher --sandbox. Documentation is design input,
+uses legacy sandbox*mode/network_access=false and launcher --sandbox. Documentation is design input,
 not proof that the pinned client or a particular profile supports the required local-server boundary.
-No unreviewed all-host allowlist, network_access=true-only shortcut or dangerously_* setting.
+No unreviewed all-host allowlist, network_access=true-only shortcut or dangerously*\* setting.
 
-After scope selection: produce the feature/document manifest, version1 executable contract through
+Before implementation: produce the feature/document manifest, version1 executable contract through
 the existing workflow-control schema/document-binding interfaces, verification plan, independent
-critique and exact owner approval. Unsupported port/namespace or gateway isolation remains blocking.
+critique, retaining the recorded owner authorization. Unsupported port/namespace or gateway isolation remains blocking.
 No persisted approval/run may be fabricated to exercise the proposed policy.
 
 ## Git workflow and proposed ownership
@@ -75,3 +79,26 @@ reviewed, verified through permitted/denied real-client boundaries and delivered
 Publish actual passed/failed/skipped/blocked results and exact source/image/policy hashes. .17/.13
 remain open until their additional admission, coordinator, gateway, limits and approval gates pass.
 This task does not authorize a live pilot, paid service, staging or production promotion.
+
+## Bounded proxy feasibility evidence — 8 October
+
+Three separately reviewed disposable probes used Codex 0.156.1 and immutable candidate image
+90dd34f0, Docker network none, empty fixture auth, unchanged filesystem/resource/seccomp controls,
+one fixed command and five-minute host/four-minute fixture bounds. No paid call or production policy
+change occurred. Each source postcheck verified 832 unchanged files; owned container absence and
+evidence preservation passed. The independent critic reviewed supplied revision-bound material
+without tools under the supervised procedural exception; inherited tools were not technically disabled.
+
+1. Managed proxy enabled with legacy network access false: local bind failed EPERM. Tagged client
+   configuration only activates the configured proxy when the network permission bit is enabled.
+2. Disposable network bit enabled plus wildcard deny: strict configuration rejected the global deny
+   wildcard before tools ran. This was a failed proposal, not a qualified policy.
+3. Empty domain table, active proxy and local binding false: tool creation was rejected because
+   127.0.0.1 is a blocked local/private address. This establishes proxy policy activation, not a passing
+   loopback route. Do not repeat the unchanged configuration or enable broad local access.
+
+Exact scripts/configuration/transcripts and cleanup records are retained in the operator evidence
+root runner-qualification-20261008 under role-loopback-feasibility-1, -2 and -3. These probes do not
+establish gateway denial, external/private containment, UNIX socket compatibility or Electron success.
+The next contract must resolve those requirements or select the governed offline adapter. Admission,
+coordinator bindings, authenticated gateway access and the aggregate cap remain separately gated.

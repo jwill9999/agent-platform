@@ -12,9 +12,13 @@ Actual application-tool route passed build/backend/static checks but failed list
 under generatedtest_runnerpolicy.832staged hashes unchanged; ownedcontainer cleanup verified.
 
 [Local-test route proposal](docs/tasks/agent-platform-test-runner-loopback.md) is open and explicitly
-blocks .17/.13. No permission change is approved. The owner must select a scoped loopback policy or
-governed offline-test adapter before the final implementation contract/review; broader permissions
-remain a distinct decision. The60minuteaggregate ceiling choice is also pending in Slack and chat.
+blocks .17/.13. The owner now authorizes completing all prerequisite issues, targeting 9 October; prior Slack/chat
+scope questions are superseded. Prefer restricted loopback; use a governed adapter if required.
+[Aggregate budget repair](docs/tasks/agent-platform-pilot-active-budget.md) retains the 60-minute cap
+and blocks .17/.13. Complete validated contracts and independent critique before runtime repair.
+Three disposable proxy feasibility probes failed safely: inactive proxy with network false; invalid
+wildcard deny; then active policy rejected 127.0.0.1 with local binding false. Each preserved 832 source
+files and verified container cleanup. No production networking changed; unchanged probes stop here.
 Configured admission/scheduling, productiongateway/coordinatorbindings and exactpilotapproval remain
 unexercised. Primaryoperator config is unchanged and still has no workflow field.
 
@@ -23,7 +27,8 @@ retained delivery and the recorded September24 scope. No force override. .12 awa
 publication/integration; .17/.13/P4.1
 remain gated. Existing .16 delivery isclosed. Preserve dirtyprimary/unrelatedworktrees and archive tags.
 Local test-only repair validation and push hook pass, including112desktopunit tests; hosted PR283
-gates apply to its final pushedhead. Notion report/session/plan/proposal/field mirrors published and
+at 25e034b9: all nine executed hosted checks passed, staging-only macOS skipped as expected.
+Further changes need their own current-head checks. Notion report/session/plan/proposal/field mirrors published and
 read back. Candidate image and all failed/successful probes are retained outside the repository.
 
 Historical checkpoints below retain older PR/task states.
