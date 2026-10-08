@@ -16,6 +16,8 @@ blocks .17/.13. The owner now authorizes completing all prerequisite issues, tar
 scope questions are superseded. Prefer restricted loopback; use a governed adapter if required.
 [Aggregate budget repair](docs/tasks/agent-platform-pilot-active-budget.md) retains the 60-minute cap
 and blocks .17/.13. Complete validated contracts and independent critique before runtime repair.
+Budget proposal now incorporates independent critique: per-run repair/coordinator coverage, fenced
+reservations, work/cleanup split, clock/restart handling, durable exhaustion and uncertain cleanup.
 Three disposable proxy feasibility probes failed safely: inactive proxy with network false; invalid
 wildcard deny; then active policy rejected 127.0.0.1 with local binding false. Each preserved 832 source
 files and verified container cleanup. No production networking changed; unchanged probes stop here.
