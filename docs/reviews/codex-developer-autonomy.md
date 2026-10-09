@@ -26,3 +26,12 @@ four supporting copies, returning `approved` with zero remaining findings.
 [Final review](evidence/codex-autonomy/detailed-plan-review-r3.json). The critic used read-only source
 and hash tools; no mutations/tests or technical isolation claim. Owner authorization already covers
 implementation/testing/review/CI; no new routine approval requested.
+
+## Policy intermediate handoff
+
+Independent native critic approved the shared policy, inherited six profiles/config and guide/ADR
+with zero actionable findings. [Review](evidence/codex-autonomy/policy-review.json). All seven TOML
+files parse; six sandbox overrides and the custom concurrency cap are absent. The 789 protected
+app/package/lock/workspace files still match the clean-source baseline. Build passed; 97 existing
+harness security tests and five API approval-router tests passed; workspace typecheck/lint/format
+checks passed. These are local results, not hosted CI or final owner acceptance.

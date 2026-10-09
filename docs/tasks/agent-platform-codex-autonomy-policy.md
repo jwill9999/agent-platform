@@ -6,7 +6,7 @@ Owner authorizes execution through tests/CI; no routine phase approval. Canonica
 
 ## Requirements and implementation plan
 
-Shared instructions, .codex/config.toml and six agent profiles; new native development guide.
+Shared instructions, .codex/config.toml and six agent profiles; new native development guide and ADR0005 (created here so guide links resolve; overall reviewed scope unchanged).
 Read AUT-01–08, supporting manifest and complete plan before changes. Primary Codex owns edits;
 independent native critic inspects sources without mutation. Preserve app/prototype/global/dirty bytes.
 Native Git/Beads/tools operate within owner scope. No managed qualification prerequisite.
