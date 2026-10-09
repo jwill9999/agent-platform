@@ -4,7 +4,7 @@
 
 **Priority:** P1
 
-**Status:** In progress, owned by Codex. Owner now authorizes detailed planning followed by implementation/testing/CI without renewed routine approval; no merge.
+**Status:** Open, unassigned planning task; removal implementation has not started.
 
 **Parent epic:** None; standalone developer-workflow planning.
 
@@ -85,7 +85,7 @@ independently deletable files.
 
 ## Dependency order
 
-There are no hard upstream dependencies. Real downstream chain: `agent-platform-codex-autonomy-policy` → `agent-platform-codex-autonomy-guidance` → `agent-platform-codex-autonomy-acceptance`. See [detailed plan](../planning/codex-developer-autonomy/plan.md).
+There are no hard upstream dependencies for this planning task and no child tasks have been created.
 Paused runner, pilot and admission qualification issues do not block preparation of this plan.
 
 The planning outputs must propose bounded implementation tasks in this order: verified inventory
@@ -148,7 +148,7 @@ linked verified publications. Beads and specifications agree. Planned tests are 
 from executed evidence. The owner can review one concrete end-to-end proposal.
 
 This task is not done merely because this initial specification or its outline review exists.
-Planning has explicitly started under the latest owner authorization. Initial task-creation exclusions below are historical; current scoped cleanup authorization is recorded in the detailed plan. No product or prototype
+Keep it open and unassigned until planning work is explicitly started. No product or prototype
 implementation, global edits, main/staging promotion, paid gateway call, pilot or automation
 resumption is included in creating this issue.
 
