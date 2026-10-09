@@ -18,7 +18,7 @@ This convention applies only to `https://github.com/jwill9999/agent-platform` an
    Reuse these instructions when already loaded; the documentation skill delegates publication here,
    so do not recursively restart either workflow.
    Follow their linked rules when applicable. This skill supplements them; it does not replace their
-   folder map, critique requirements, approval bindings, or task schema.
+   folder map, independent review, current native-development policy or task schema.
 2. Use the user's active branch. The initial reference supplied on 2026-09-27 was
    `feature/harness-backlog-review`; do not switch branches or assume it stays current.
    If the checkout lacks the documentation skill or guide, fetch them from the requested ref through
@@ -29,8 +29,9 @@ This convention applies only to `https://github.com/jwill9999/agent-platform` an
 4. Include every substantive document created or updated by this documentation task in the Notion
    publication set, even if stored outside `docs/`. Do not bulk-import unrelated existing docs merely
    because this skill ran. Read-only planners/critics provide intended paths and Notion destinations
-   to the authorized publisher. During a managed run, route publication through its authorized broker;
-   if it lacks Notion support, report the pending mirror rather than bypassing the broker.
+   to the authorized publisher. Native developer work publishes directly within owner authorization. Only publication operations
+   deliberately owned by an explicit prototype run use its broker; missing prototype publication
+   support remains that run's gap, not a default developer gate.
 
 ## Publish to Notion
 

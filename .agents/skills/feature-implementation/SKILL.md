@@ -1,63 +1,40 @@
 ---
 name: feature-implementation
-description: Begin or continue Agent Platform feature or task implementation from an approved plan, checking scope and choosing orchestration or an explicitly permitted direct path before changes.
+description: Carry an owner-authorized Agent Platform task through native implementation testing repair review and CI to final acceptance.
 ---
 
 # Feature implementation
 
-Use the [documentation skill](../documentation/SKILL.md) and its canonical folder guide for artifact
-locations, publication responsibility and cross-document consistency.
+Use [documentation](../documentation/SKILL.md) and
+[native development](../../../docs/development/codex-development.md).
 
-This is the handoff from planning to execution. Use before implementing a feature, repair, or planned
-test slice; explanations and ordinary read-only inspection do not require an execution workflow.
+## Resolve and execute the task
 
-## Select and announce the task
+1. Resolve the owner's objective/task against canonical Beads, specs and the agreed requirements,
+   definition of done and tests. Read dependencies, source, branches/delivery and owner authorization.
+   Preserve dirty/unrelated work. State the selected task and destination; do not invent identity.
+2. Complete missing planning and independent source-aware critique using
+   [feature planning](../feature-planning/SKILL.md) and [plan critique](../plan-critique/SKILL.md).
+   Reuse recorded owner decisions. End-to-end authorization covers reviewed planning-to-implementation
+   and routine file/subtask refinements; do not repeat approval solely at a phase transition.
+3. Execute with native tools under actual session permissions. No mandatory orchestration assessment,
+   run discovery, sandboxed child, gateway/budget/admission qualification, broker-only publication
+   or exact-document machine approval applies to ordinary developer work.
+4. Implement, run meaningful affected tests, diagnose and repair, retry when evidence supports it,
+   and obtain independent source-aware code review. Delegate with clear responsibility when useful;
+   reviewers may inspect source using native tools. Preserve others' edits and real failure evidence.
+5. Follow existing quality, security and [connected QA](../playwright-quality-gate/SKILL.md) gates.
+   Check independent backend state/effects for product journeys and disclose fixtures/limits.
+   Fix actionable findings within authorized scope; re-review changed semantics as needed.
+6. Update/read back Beads, session and full documentation mirrors. Commit/push only scoped work,
+   open the appropriate segment-tip PR and inspect all latest exact-head hosted checks/review findings.
+   Continue normal repairs through green required tests/pipelines without another routine grant.
+7. Return concrete tested revision/diff/checks/limitations for final owner acceptance. Passing CI or
+   implementation authorization does not grant merge/deploy/release authority. Ask only when owner
+   intent, agreed behavior/delivery, an expressly reserved action or required unavailable input needs
+   a decision; report a real external/tool blocker rather than creating a custom prerequisite.
 
-Resolve the owner's supplied task name, description, ID or branch against Beads and the approved
-plan's task-to-spec/branch mapping. The current checkout or a similarly named file is not sufficient
-proof of task identity. Read the matched record, its dependencies and existing claim before work;
-do not overwrite another worker's claim. If no task was named, follow the approved ready-task sequence
-only when it clearly determines the next authorized task. Otherwise ask a focused selection question.
-
-Before changing files, state the selected readable task title and Beads ID, the specification link,
-repository/worktree, task branch and integration destination, plus why it is next. In voice, describe
-the task naturally and show exact IDs, paths and branches visually. This is an announcement, not a
-new approval request when scope is already authorized. Stop to clarify mismatched identity, missing
-branch mapping or ambiguous candidates; never invent an association or silently switch tasks.
-
-## Execute the approved handoff
-
-1. Read [shared instructions](../../../docs/agent-instructions-shared.md), the relevant Beads task/spec,
-   and the approved plan. Resolve objective, acceptance criteria, non-goals, dependencies, source and
-   branch, allowed files/actions, roles, tests, retry/budget limits and delivery boundary. Inspect the
-   working tree and preserve unrelated changes. Do not infer implementation approval from planning
-   approval or a merged document.
-2. Verify required critique and the owner's actual scoped authorization against current material.
-   Reuse valid existing authorization; do not ask again merely because another phase starts. If
-   material is missing, use [feature planning](../feature-planning/SKILL.md) and
-   [plan critique](../plan-critique/SKILL.md) to resolve it. A read-only planning skill does not itself
-   authorize edits, launch, publication or promotion.
-3. Make the execution mode visible before mutations. For code changes, multi-step work, independent
-   review or recovery, assess orchestration first. Load and follow
-   [orchestration](../orchestration/SKILL.md). Do not use the absence of a run as a reason to skip it.
-   A direct path is permitted only when the existing scoped authorization and repository policy
-   allow it, with no active managed run owning the work. Record that mode and its reason; do not
-   count direct execution as orchestration evidence. Do not silently switch when managed execution
-   is required but unavailable.
-4. Resolve technical facts from source and task evidence. Ask the owner only for an unresolved choice
-   that changes scope, authority, intended behavior or destination. Report a missing skill/tool or
-   runtime blocker specifically. Do not invent a confidence percentage, approval, launch interface
-   or independent review to force progression.
-5. Execute within the selected authorized path. Workers inherit its boundaries and do not choose
-   their own bypass. Apply meaningful checks for the changed behavior, preserve failed evidence,
-   and distinguish frontend/backend outcomes from mocks. Use the existing
-   [quality gate](../playwright-quality-gate/SKILL.md) for browser journeys. If a repair expands the
-   approved behavior or authority, surface that change before doing dependent work.
-6. Deliver evidence and required task/session updates through the applicable broker or direct
-   workflow. Honor the exact integration destination; feature approval does not imply staging or
-   production. State remaining checks, review and merge obligations honestly.
-
-Record missing planning inputs, routing ambiguity, repeated approval friction and manual interventions
-in the [orchestration evaluation](../../../docs/reviews/orchestration-field-evaluation.md).
-Skills guide decisions; runtime controls enforce permissions. Creating these skills does not start a
-pilot or establish that their handoff works unattended.
+The [orchestration skill](../orchestration/SKILL.md) applies only to an explicitly selected PAUSED
+workflow-control prototype, not default native development. Its enforcement remains intact; no
+prototype or old automation resumption is implied. Product security and runtime permissions remain
+separate from developer authority. Historical approvals/reviews must not be fabricated or relabeled.

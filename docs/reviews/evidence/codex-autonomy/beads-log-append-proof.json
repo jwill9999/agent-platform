@@ -1,0 +1,8 @@
+{
+  "path": "/Users/letuscode/projects/agent-platform/.beads/interactions.jsonl",
+  "originalSHA256": "10004dc4d47291059a64d6d2d941ea468909048cfbb1706e1e3a4ee83e5e40a4",
+  "originalPrefixBytes": 111694,
+  "appendedBytes": 964,
+  "originalPrefixPreserved": true,
+  "reason": "Authorized canonical Beads/MCP task tracking appends; not source/code or global modification"
+}

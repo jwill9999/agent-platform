@@ -1,5 +1,11 @@
 # Workflow-control planning and approval
 
+> **Scope: PAUSED explicit workflow-control prototype.** This guide describes prototype enforcement,
+> APIs and historical qualification only. Ordinary Codex developer tasks use
+> [native development](development/codex-development.md); discovery, isolation, gateway, budgets,
+> admission, brokers and persisted exact-material approval are not their prerequisites.
+> Do not start/resume the prototype or pilot from this guide. Existing runtime controls remain intact.
+
 Feature planning is a maker-checker workflow. A read-only feature planner drafts execution-contract
 version `1` from repository and Beads evidence. A distinct read-only critic returns a machine-valid
 review with one of four verdicts: approved, correction required, rejected, or human decision required.

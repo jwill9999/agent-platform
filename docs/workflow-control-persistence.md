@@ -1,5 +1,11 @@
 # Workflow-control persistence and recovery
 
+> **Scope: PAUSED explicit workflow-control prototype.** This guide describes prototype enforcement,
+> APIs and historical qualification only. Ordinary Codex developer tasks use
+> [native development](development/codex-development.md); discovery, isolation, gateway, budgets,
+> admission, brokers and persisted exact-material approval are not their prerequisites.
+> Do not start/resume the prototype or pilot from this guide. Existing runtime controls remain intact.
+
 Workflow control stores repository-development orchestration state outside Git. The canonical
 workspace path is SHA-256 hashed and mapped to:
 

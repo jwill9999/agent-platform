@@ -1,9 +1,17 @@
 # ADR-0004: Codex development orchestration uses a repository-local control plane
 
-- **Status:** Accepted
+- **Status:** Superseded as default developer policy by [ADR-0005](0005-native-codex-development.md); retained PAUSED prototype design
 - **Date:** 2026-08-30
 - **Deciders:** Human owner and primary orchestration agent
 - **Related:** `agent-platform-multi-agent`, `agent-platform-multi-agent-review`
+
+## Supersession — 9 October 2026
+
+The decisions below are historical prototype policy, not default native Codex authority.
+[ADR-0005](0005-native-codex-development.md) replaces mandatory managed routing, sandbox/profile
+restrictions, no-tool review and persisted exact-material approval for ordinary development.
+Prototype code/enforcement/history is retained and PAUSED; its operations still obey its own controls.
+Native reviewers may use source tools; no prompt-based isolation claim. Product security is unchanged.
 
 ## Context
 

@@ -28,7 +28,7 @@ linked by the required Beads description prefix. Beads acceptance criteria and t
 definition of done must agree. Link existing records instead of copying detailed requirements.
 
 Each feature plan includes a document manifest: exact task/spec links, design/ADR references where
-applicable, verification plan, review/findings, execution-contract location and approval evidence.
+applicable, verification plan, review/findings, recorded owner authorization and review evidence. Execution contracts belong only to explicit prototype runs.
 Use stable requirement and scenario identifiers to connect these documents. For a new document use a
 clear feature-based filename; reuse a current relevant document when that avoids duplicate authority.
 If ownership or location is unclear, inspect existing references and ask the human before final agreement.
@@ -46,13 +46,16 @@ Use the [planning procedure](../.agents/skills/feature-planning/SKILL.md) for de
 
 ## Publication and maintenance
 
-Read-only planners and critics return drafts/findings with intended paths. An authorized coordinating
-agent publishes through journaled brokers during an active managed run, or permitted direct tools
-otherwise. Publication does not approve implementation, execution, merge or release.
+Native developer tasks use authorized direct publication tools. A planning-only or read-only review
+assignment returns material to its coordinator; those responsibilities do not attest tool isolation.
+Only publication owned by an explicitly selected prototype run uses its journaled broker.
+Publication alone is not implementation/merge/release authority.
 
-Read back saved documents and Beads links/dependencies. Keep drafts, reviewed material and approval
-bindings distinguishable. Material changes require the appropriate renewed critique and approval;
-retain prior findings and evidence rather than rewriting history as a success.
+Read back documents and Beads dependencies. Preserve source/review/owner-authorization provenance.
+An agreed end-to-end task permits routine planning refinements and implementation phases without
+renewed grants; re-review changed semantics and clarify material owner-intent/behavior/delivery
+changes or reserved actions. Keep prior findings and real failures instead of rewriting history.
+See [native development](development/codex-development.md).
 
 Validate changed Markdown and local references; preserve existing links. Session-specific continuation
 belongs in the repository's `session.md`, pointing to durable task and review records. Skills link this
@@ -68,5 +71,5 @@ reviews, guides, skills and session handoffs outside this folder. Explicit local
 precedence. Repository files remain canonical; Beads remains authoritative for task status.
 
 Preserve human Notion notes and branch-specific mirror identity. A missing connection or unauthorized
-managed-run publishing path leaves Notion publication pending; it does not justify broadening worker
+explicit-prototype publishing path leaves Notion publication pending; it does not justify broadening worker
 access or claiming sync. The skills guide agent actions; they do not install a background watcher.

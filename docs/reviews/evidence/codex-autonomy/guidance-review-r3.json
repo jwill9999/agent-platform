@@ -1,0 +1,9 @@
+{
+  "reviewer": "/root/runner_plan_critic",
+  "verdict": "approved",
+  "scope": "Guidance handoff; native source-reading independent review",
+  "findings": [],
+  "resolved": ["G01", "G02"],
+  "evidence": "Planning asks limited to material decisions; allidentifiedreleaseclausesactualownerauthority; nativeadoption report examined",
+  "limitations": "Final preservation/publication/security/CI/owner acceptance remain; no technical isolation claim"
+}

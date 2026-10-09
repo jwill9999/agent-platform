@@ -1,0 +1,30 @@
+{
+  "verdict": "correction_required",
+  "reviewer": "/root/runner_plan_critic",
+  "scope": "Detailed native source-reading plan review; not R1 outline",
+  "findings": [
+    {
+      "id": "C01",
+      "severity": "medium",
+      "requirement": "AUT-02/08",
+      "finding": "Initial spec manifest pointed at subsequently amended canonical task; copied hash did not match.",
+      "disposition": "Copied exact initial-spec.md; updated copiedPath; mutable task separate."
+    },
+    {
+      "id": "C02",
+      "severity": "medium",
+      "requirement": "AUT-07/08,V-02",
+      "finding": "Six-file baseline omitted global AGENTS.md and identified memory guidance.",
+      "disposition": "Supplemental baseline includes global AGENTS and all identified memory files; plan references before/after."
+    },
+    {
+      "id": "C03",
+      "severity": "low",
+      "requirement": "AUT-02",
+      "finding": "AGENTS dispositions conflicted.",
+      "disposition": "Single rewrite disposition aligned to guidance task."
+    }
+  ],
+  "tools": "read-only shell/files/hash/Git status; no mutations/tests/subagents",
+  "limitations": "Procedural role boundary; no technical tool isolation claim."
+}

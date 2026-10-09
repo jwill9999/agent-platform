@@ -1,5 +1,11 @@
 # Development service supervisor
 
+> **Scope: PAUSED explicit workflow-control prototype.** This guide describes prototype enforcement,
+> APIs and historical qualification only. Ordinary Codex developer tasks use
+> [native development](development/codex-development.md); discovery, isolation, gateway, budgets,
+> admission, brokers and persisted exact-material approval are not their prerequisites.
+> Do not start/resume the prototype or pilot from this guide. Existing runtime controls remain intact.
+
 The development supervisor owns its configured broker containers and networks. It does not create an
 approved workflow, implement a feature, grant MCP access, or promote a branch. Keep it running in the
 foreground while using its services. Docker Desktop alone is not a readiness check.
