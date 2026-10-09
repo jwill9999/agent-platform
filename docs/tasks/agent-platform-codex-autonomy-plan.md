@@ -58,9 +58,11 @@ it is not approval of a completed execution plan or removal implementation.
 
 ## Initial restriction inventory
 
-Use the [9 October session inventory](../../session.md#codex-development-restriction-inventory--9-october-2026)
-as a starting point; refresh the relevant evidence before proposing edits. Its matched paths are an
-audit surface, not a list of independently deletable files.
+Use the [R1 review](../reviews/codex-autonomy-removal-review-2026-10-09.md) and the local 9 October
+inventory appended to `session.md` in the paused source worktree as starting evidence. That session
+checkpoint is uncommitted; the published base file does not contain the new inventory. Refresh the
+relevant evidence before proposing edits. Its matched paths are an audit surface, not a list of
+independently deletable files.
 
 - [Shared instructions](../agent-instructions-shared.md): managed-run Beads/Git exclusivity and
   notification boundaries; preserve ordinary quality, secret-handling and delivery hygiene.
