@@ -7,7 +7,7 @@ no merge/deployment/global edit/paid gateway call/prototype or pilot resumption.
 Worktree: `/Users/letuscode/.codex/worktrees/codex-developer-autonomy/agent-platform`.
 Native task chain: planning → policy → guidance → acceptance; cumulative target
 `feature/harness-backlog-review`. Planning and policy checkpoints passed independent reviews and
-full branch-specific Notion readback; guidance source review is approved; publication/final acceptance checks are next. Source provenance and AUT/V maps:
+full branch-specific Notion readback; guidance review and all 30 full mirrors passed; acceptance branch is assembling final CI/review evidence. Source provenance and AUT/V maps:
 [plan](docs/planning/codex-developer-autonomy/plan.md),
 [results](docs/reviews/codex-developer-autonomy.md).
 
@@ -18,9 +18,10 @@ The copied [pause checkpoint](docs/reviews/evidence/codex-autonomy/paused-checkp
 snapshot provenance; prior remote links did not contain them. All other dirty worktrees and global
 configuration/skills/memories are preserved. Relevant orchestration/merge monitors remain paused.
 
-Next within this authorized task: finish guidance review/validation/publication, verify native
-adoption and security preservation, open tip PR, repair required CI failures and request owner code
-review when green. Never infer merge/pilot authority from CI. On later owner-approved integration,
+Next within this authorized task: finish current-tip publication, open/inspect the tip PR, repair required CI failures and request owner code review when
+green. Final independent source acceptance is approved. Native fresh-child smoke and 102 unchanged product
+security regressions passed; standalone
+profile-loader activation/full product-ticket journey remain unverified. Never infer merge/pilot authority from CI. On later owner-approved integration,
 new sessions follow native developer policy; old loaded/global guidance can be stale and its exact
 follow-up proposals await owner discussion. Historical pilot instructions below are inactive records.
 

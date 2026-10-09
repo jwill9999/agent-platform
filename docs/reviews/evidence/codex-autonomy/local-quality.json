@@ -1,0 +1,40 @@
+{
+  "sourceBase": "f8112b142ecad7d8fa5963484a0ed28235b04c3b",
+  "protectedApplicationAndPrototypeBytesUnchanged": true,
+  "commands": [
+    {
+      "command": "pnpm build",
+      "exit": 0,
+      "logSHA256": "ddf554950b51e53934efe436680d29e0c32d6331364f16ca450f7339d77d4c8f"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exit": 0,
+      "logSHA256": "897bde113ac624955833610399ae2feecfb107443e820012e31f4c0036dc9284"
+    },
+    {
+      "command": "pnpm lint",
+      "exit": 0,
+      "logSHA256": "3aa74260894f40c83a09cd8f5c52fbf4c1b2bd21e89b7db14696e6206bc43daa"
+    },
+    {
+      "command": "pnpm format:check",
+      "exit": 0,
+      "logSHA256": "7ab8e7f2aa0d7e4c4f756b55dbc17985a4fd0db3c843aea3bb257aa531f8fc22"
+    },
+    {
+      "command": "harness vitest approvalPolicy/pathJail/toolDispatch serial",
+      "exit": 0,
+      "passed": 97,
+      "logSHA256": "65204b254560cb8575b52a1757fc3374b47fd0ff8673ee34322d3fdbec39bfb1"
+    },
+    {
+      "command": "API vitest approvalRequestsRouter serial",
+      "exit": 0,
+      "passed": 5,
+      "logSHA256": "09ca3d0e17010c2073ae306b509dbc52154d6f0ba90f725ad37e7e124d32779a"
+    }
+  ],
+  "localSonarIDE": "unavailable; no analysis claim; docs/profile-only change",
+  "hosted": "pending exact final tip; older checks not used as acceptance"
+}

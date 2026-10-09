@@ -30,3 +30,9 @@ reviewed, appropriate local gates and preservation checks pass, full changed-doc
 back, scoped branch pushed. Required executed current-head CI passes and owner gets concrete code-review material. This segment tip remains open pending owner acceptance and merge; no merge is authorized.
 Record exact head, findings/dispositions, checks and gaps in [results](../reviews/codex-developer-autonomy.md).
 No pilot/paid gateway/automation/global edits. Completion is not claimed in advance.
+
+## Current checkpoint
+
+Native bounded smoke passed with observed inherited session defaults; standalone profile activation
+and full future product-ticket delivery are disclosed as not tested. Final cumulative hosted gates,
+owner code review and integration remain; this task is not closed. No merge is authorized.
