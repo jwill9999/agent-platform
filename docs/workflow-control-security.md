@@ -1,5 +1,11 @@
 # Workflow-control specialist security boundary
 
+> **Scope: PAUSED explicit workflow-control prototype.** This guide describes prototype enforcement,
+> APIs and historical qualification only. Ordinary Codex developer tasks use
+> [native development](development/codex-development.md); discovery, isolation, gateway, budgets,
+> admission, brokers and persisted exact-material approval are not their prerequisites.
+> Do not start/resume the prototype or pilot from this guide. Existing runtime controls remain intact.
+
 Active workflow-control runs launch every specialist as an external `codex exec` process in a
 dedicated container or VM. Built-in collaboration agents are permitted only while no privileged
 capability is active and the primary session exposes no mutation-capable tools, except for the

@@ -1,6 +1,6 @@
 ---
 name: feature-planning
-description: Draft or revise complete Agent Platform planning material, task specifications, verification strategy and execution contract from owner requirements before implementation approval.
+description: Draft or revise Agent Platform requirements, task dependencies, definition of done and verification before authorized native development.
 ---
 
 # Feature planning
@@ -8,9 +8,11 @@ description: Draft or revise complete Agent Platform planning material, task spe
 Use the [documentation skill](../documentation/SKILL.md) and its canonical folder guide for artifact
 locations, publication responsibility and cross-document consistency.
 
-Produce a complete proposed handoff for implementation. Remain read-only: do not approve the plan or
-mutate repository, Beads or workflow state. An authorized coordinator publishes the drafts below.
-Planning/publication approval does not authorize application implementation or a live workflow.
+Produce a complete reviewable native-development plan from owner requirements. A planning-only
+assignment stays within planning; an authorized coordinator may save documents/Beads within scope.
+Reuse existing owner end-to-end authorization. It permits progressing from reviewed planning through
+implementation/tests/repairs/review/CI without another routine phase grant. Read-only planning and
+review assignments are responsibilities, not evidence that tools are technically disabled.
 
 ## Establish requirements and feasibility
 
@@ -20,16 +22,15 @@ Follow [task documentation rules](../../../docs/tasks/README.md) and the
 [task template](../../../docs/tasks/_template.md); reuse existing records rather than duplicate them.
 
 Resolve objective, requirements with stable identifiers, non-goals, testable acceptance criteria,
-task dependencies, exact source/branch, allowed paths/actions, roles, delivery destination, quality
+task dependencies, exact source/branch, expected file/action areas, responsibilities, delivery destination, quality
 gates, retries, spend limits and escalation policy. Ask only for unresolved choices that materially
-change scope, behavior, authority, destination or policy. Preserve valid decisions already made.
-Before presenting the plan for agreement, review it for unresolved ambiguity, conflicting requirements
-and unsupported assumptions. If anything remains unclear after checking available evidence, ask the
-human in the loop a focused question explaining the uncertainty and its impact. Record the answer in
-the relevant requirements or decision record and update affected tasks and tests. Do not silently
-choose an interpretation, treat silence as agreement, or label the plan agreed while questions remain
-unresolved. Continue independent drafting where possible; wait for the answer before finalizing the
-affected scope. Preserve and reuse answers already provided rather than asking for repeated approval.
+change scope, behavior, owner intent, agreed behavior/delivery or explicitly reserved actions. Preserve valid decisions already made.
+Before presenting the plan, check conflicting requirements and unsupported assumptions. Resolve
+ordinary technical/file/subtask choices from available evidence within owner scope. Ask and wait
+only when unresolved owner intent, agreed behavior/delivery, an explicitly reserved action or a
+required unavailable input needs the owner's decision. Explain the concrete impact and record the
+answer; do not treat silence as agreement on that material question. Continue independent work
+where possible and reuse earlier decisions without repeated approval.
 
 Establish test feasibility before promising coverage: Docker/services, supported browser or desktop
 host, test data/reset strategy, provider access, credentials availability without reading secrets,
@@ -56,15 +57,15 @@ Return drafts with explicit intended paths and task links. Use existing feature 
 present; otherwise propose stable names under the following directories and include them in scope.
 The table defines planning outputs, not permission for the read-only planner to write them.
 
-| Output                                     | Location and required content                                                                                                                             |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Feature plan and document manifest         | `docs/planning/`: objective, requirements, exclusions, task/dependency map, decisions, and links to every handoff artifact                                |
-| Task specifications                        | `docs/tasks/<issue-id>.md`, using the task template: detailed requirements, implementation boundary, dependencies, tests, definition of done and sign-off |
-| Task tracking                              | Beads: parent/children, acceptance criteria and real blocking edges; each description starts with `Spec: docs/tasks/<issue-id>.md`                        |
-| Verification plan                          | `docs/testing/`: requirement-to-scenario mapping, environments, expected outcomes, evidence and task/feature completion gates                             |
-| Review and verification results            | `docs/reviews/`: critique findings/dispositions and, after execution, actual results linked to the verification plan and tested revision                  |
-| Architecture decisions                     | Applicable existing `docs/adr/` or `docs/architecture/` documents; propose changes only when the feature changes architecture                             |
-| Execution contract and approval references | Exact artifact location supported by workflow control, identified in the manifest; never invent a persisted approval or storage interface                 |
+| Output                              | Location and required content                                                                                                                             |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Feature plan and document manifest  | `docs/planning/`: objective, requirements, exclusions, task/dependency map, decisions, and links to every handoff artifact                                |
+| Task specifications                 | `docs/tasks/<issue-id>.md`, using the task template: detailed requirements, implementation boundary, dependencies, tests, definition of done and sign-off |
+| Task tracking                       | Beads: parent/children, acceptance criteria and real blocking edges; each description starts with `Spec: docs/tasks/<issue-id>.md`                        |
+| Verification plan                   | `docs/testing/`: requirement-to-scenario mapping, environments, expected outcomes, evidence and task/feature completion gates                             |
+| Review and verification results     | `docs/reviews/`: critique findings/dispositions and, after execution, actual results linked to the verification plan and tested revision                  |
+| Architecture decisions              | Applicable existing `docs/adr/` or `docs/architecture/` documents; propose changes only when the feature changes architecture                             |
+| Authorization and review references | Recorded owner scope, source revision and independent findings/dispositions; prototype contracts only when explicitly selected                            |
 
 Beads is authoritative for scheduling; linked specifications carry detailed requirements. Every child
 task links to the feature plan and relevant verification scenarios. Keep acceptance criteria and
@@ -96,40 +97,24 @@ revision, with logs/artifacts and remaining gaps. Required failed or unexecuted 
 completion; green unit tests cannot substitute for required E2E evidence. Any proposed change to
 required coverage must be explicit and reviewed, never silently marked not applicable.
 
-A contract digest alone does not bind externally linked document bytes. Require the supported
-content-addressed document manifest and verify its approval/handoff binding for the actual task.
-The document-binding mechanism was integrated in PR273; see the
-[implementation and verification report](../../../docs/reviews/approved-document-binding-implementation.md).
-That implementation does not establish that a particular plan has a valid approval. Missing, changed,
-or unverifiable material remains a blocker; never fabricate bindings or reuse stale approval.
-
 ## Validate, critique, publish and hand off
 
-1. Produce execution-contract version `1` matching
-   [contracts](../../../packages/workflow-control/src/contracts.ts). Bind requirements, tasks, paths,
-   operations, delivery and gates consistently with all drafts. Do not invent evidence or permissions.
-2. Validate through a supported workflow-control validation path. If unavailable, identify the missing
-   interface; manual inspection is not machine validation or approval.
-3. Require independent critique for both orchestrated and explicitly permitted direct implementation;
-   no active orchestration run is needed for this review obligation. Submit the contract and complete
-   document manifest to a distinct critic using
-   [plan critique](../plan-critique/SKILL.md) through a permitted reviewer path. Check documentation
-   completeness, traceability, feasibility and test/sign-off gates as well as contract authority.
-   Record every finding and disposition; unresolved findings or missing review block final readiness.
-4. The authorized coordinator saves the drafts and links Beads through the applicable publication
-   path: journaled brokers exclusively during an active managed run, permitted direct tools otherwise.
-   Publication must preserve the reviewed content. Read back files, links and dependency edges; any
-   material publication change returns to validation and critique. Draft publication is not approval.
-5. Present the concrete reviewed material for explicit human approval under
-   [planning and approval rules](../../../docs/workflow-control-planning.md). The authoritative approval
-   binds the exact version and material digest; a conversational statement alone does not fabricate
-   the persisted runtime record. Report missing persistence capability as a blocker.
-6. Hand the [implementation skill](../feature-implementation/SKILL.md) the manifest, exact source and
-   approved contract, task/spec links, verification plan, critique/dispositions, approval evidence and
-   remaining prerequisites. Implementation checks these bindings before work. Missing required
-   material leaves the handoff incomplete; it must not reconstruct requirements by assumption.
+1. Check that requirements, real Beads tasks/dependencies, tests/DoD, source/branches and delivery
+   are consistent, feasible and complete. Native developer tickets do not require a workflow-control
+   version1 contract, discovery, admission, gateway or exact-material persisted approval.
+2. Obtain a distinct source-aware independent critique for substantive plans using
+   [plan critique](../plan-critique/SKILL.md). The critic may use available native tools to inspect
+   source. Record actionable findings and correction evidence; recheck affected semantics after fixes.
+   No blanket no-tool procedure or managed launcher is required for normal review.
+3. Save/read back the plan/specs, real Beads links/dependencies and full Notion mirrors with reviewed
+   source provenance. Document publication alone grants no implementation authority.
+4. Check actual owner authorization. If it already covers end-to-end delivery, continue directly into
+   [implementation](../feature-implementation/SKILL.md) with the reviewed plan/test map; do not ask for
+   another routine handoff grant. Otherwise present the concrete proposed scope for agreement.
+5. Resolve ordinary file/subtask/retry refinements from evidence within the agreed objective. Re-review
+   substantive changed semantics and tests; seek owner clarification only when intent, agreed behavior/
+   delivery or a reserved action changes. Do not fabricate approvals or count planned tests as passed.
 
-Any later material contract or policy change invalidates approval and repeats critique and human
-approval. Record planning gaps and manual supplementation in the
-[field evaluation](../../../docs/reviews/orchestration-field-evaluation.md). Skills guide the workflow;
-they do not grant runtime authority or establish that unattended execution succeeds.
+The PAUSED [workflow-control prototype](../../../docs/workflow-control-planning.md) retains its own
+contracts/document binding/enforcement for explicitly selected prototype runs. Those controls do not
+apply as default native developer prerequisites. Product permission controls remain unchanged.

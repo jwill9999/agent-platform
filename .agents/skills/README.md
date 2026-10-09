@@ -37,3 +37,10 @@ Use [documentation](documentation/SKILL.md) for repository locations and authori
 material to Notion. The latter is bundled here with its destination map, so it does not depend on a
 personal skill installation. Planning, critique and implementation already enter through the
 documentation workflow; read-only roles return publication instructions to an authorized publisher.
+
+## Native development default
+
+[Feature planning](feature-planning/SKILL.md), [implementation](feature-implementation/SKILL.md)
+and [independent critique](plan-critique/SKILL.md) use native Codex tools within agreed task authority.
+[Orchestration](orchestration/SKILL.md) is a PAUSED explicit prototype route, never an ordinary
+product-ticket prerequisite. See [current developer policy](../../docs/development/codex-development.md).

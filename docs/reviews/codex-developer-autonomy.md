@@ -35,3 +35,20 @@ files parse; six sandbox overrides and the custom concurrency cap are absent. Th
 app/package/lock/workspace files still match the clean-source baseline. Build passed; 97 existing
 harness security tests and five API approval-router tests passed; workspace typecheck/lint/format
 checks passed. These are local results, not hosted CI or final owner acceptance.
+
+## Guidance review and preservation
+
+G01 (any-uncertainty escalation) and G02 (green gates implying staging merge) were corrected and
+independently rechecked. [Final guidance verdict](evidence/codex-autonomy/guidance-review-r3.json):
+approved, zero remaining findings. Initial failure and dispositions are retained. Active native
+skills no longer require discovery/managed qualification/exact-material approval/no-tool review;
+prototype APIs/history remain behind explicit PAUSED scope. Product/prototype source/tests unchanged.
+
+Preservation comparison passes for 789 protected files, 13 paused dirty files, 11 other worktrees'
+109 dirty status entries/110 regular files, ten global guidance files and four paused monitors.
+The existing canonical Beads interaction log prefix (111,694 bytes) remains exact; 964 authorized
+tracking bytes appended at this checkpoint, reported separately rather than claiming unchanged.
+No unrelated code/global/history was reset. Explicit scoped Markdown validation passed all 27
+changed guidance documents; 148 relative targets resolve, with two intentional template placeholders.
+No local Sonar/IDE diagnostics connector is available; ordinary terminal gates passed. Hosted
+quality/security check evidence will be inspected at the final tip; no unsupported analysis claim.

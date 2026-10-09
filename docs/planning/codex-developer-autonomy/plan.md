@@ -91,6 +91,8 @@ External before manifest `/Users/letuscode/.codex/autonomy-cleanup-20261009/pres
 binds 789 tracked app/package/lock/workspace files, 13 dirty source-worktree files, six global config/
 skill files and four paused automation files. Compare after; expose only hashes/counts, not credentials.
 Also verify all other registered worktree dirty files via a supplemental before/after manifest.
+Canonical `.beads/interactions.jsonl` may append authorized task-operation audit entries; verify the
+original prefix SHA-256 remains exact and report appended bytes separately, never overwrite history.
 The supplemental baseline covers 109 dirty status entries across 11 other worktrees, recursively binding 110 regular files and all directory/symlink/absent entry types plus global `AGENTS.md`,
 `MEMORY.md`, the identified review-gate memory skill and September13 note; hash-only preservation.
 Prototype source/tests remain byte-identical at the chosen base; it remains in recursive workspace gates.

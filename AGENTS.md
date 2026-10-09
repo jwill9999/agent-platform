@@ -20,6 +20,12 @@ Read that file first. The sections it covers:
 - **SonarQube / Problems Completion Gate** (mandatory before declaring done)
 - Session-completion protocol (push is mandatory)
 
+## Native development
+
+Follow the shared [native developer policy](docs/agent-instructions-shared.md#native-developer-workflow)
+and [guide](docs/development/codex-development.md). Agreed end-to-end task authority covers routine
+implementation/testing/repair/review/CI; workflow-control is a PAUSED explicit prototype.
+
 ## iMessage notifications
 
 Send the owner brief notifications for verified completion, actionable blockers and significant

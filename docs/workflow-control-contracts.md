@@ -1,5 +1,11 @@
 # Workflow-control contract versions
 
+> **Scope: PAUSED explicit workflow-control prototype.** This guide describes prototype enforcement,
+> APIs and historical qualification only. Ordinary Codex developer tasks use
+> [native development](development/codex-development.md); discovery, isolation, gateway, budgets,
+> admission, brokers and persisted exact-material approval are not their prerequisites.
+> Do not start/resume the prototype or pilot from this guide. Existing runtime controls remain intact.
+
 The repository-local workflow-control package owns the machine-valid execution contract and workflow
 lifecycle records used by Codex development orchestration. It does not import GitHub, Git, Beads, or
 product-runtime adapters.

@@ -1,12 +1,15 @@
 ---
 name: orchestration
-description: Assess readiness and start or resume an approved Agent Platform development workflow through supported workflow-control interfaces; surface missing authority or runtime capabilities before execution.
+description: Inspect the PAUSED explicit workflow-control prototype only when the owner selects that prototype; never a default native developer prerequisite.
 ---
 
 # Orchestration
 
-Use for managed development execution, continuation, or readiness assessment. This skill supplies a
-procedure, not a launcher, permission grant, or proof of unattended delivery.
+Use only for an explicitly selected workflow-control prototype assessment/run. The prototype is
+PAUSED; historical handoffs do not authorize resumption. Ordinary developer tickets follow
+[native development](../../../docs/development/codex-development.md) without loading this route.
+The procedures below describe prototype enforcement only. They are not developer sandbox defaults,
+platform grants, native task prerequisites or evidence that unattended delivery succeeds.
 
 ## Establish the execution boundary
 

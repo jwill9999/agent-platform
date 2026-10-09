@@ -42,15 +42,15 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 
 **Chained tasks:** **`feature/<feature-name>`** → **`task/<task-1>`** → **`task/<task-2>`** → … → **one PR** from **`task/<last>`** → **`feature/<feature-name>`**.
 
-| Rule                       | Detail                                                                                                                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **No `main`**              | Never push commits directly to **`main`**.                                                                                                             |
-| **First task in segment**  | Branch **`task/<task-name>`** from **`feature/<feature-name>`** (e.g. `feature/agent-platform-persistence`).                                           |
-| **Later tasks in segment** | Branch **`task/<task-name>`** from **`task/<previous-task-name>`** after the previous task’s work is pushed.                                           |
-| **Intermediate tasks**     | **No** separate PR to `feature`. Push your branch; complete sign-off; next developer checks out from your **`task/...`** branch.                       |
-| **Last task in segment**   | Open **one** PR **`task/<tip> → feature/<feature-name>`** to land the whole segment.                                                                   |
-| **Next segment**           | First task branches from **updated** **`feature/<feature-name>`** after the segment PR is merged.                                                      |
-| **Release**                | After approved gates, merge **`feature/<feature-name>` → protected `staging`** via PR. Merge **`staging` → `main`** only with explicit human approval. |
+| Rule                       | Detail                                                                                                                                                                                                                                 |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **No `main`**              | Never push commits directly to **`main`**.                                                                                                                                                                                             |
+| **First task in segment**  | Branch **`task/<task-name>`** from **`feature/<feature-name>`** (e.g. `feature/agent-platform-persistence`).                                                                                                                           |
+| **Later tasks in segment** | Branch **`task/<task-name>`** from **`task/<previous-task-name>`** after the previous task’s work is pushed.                                                                                                                           |
+| **Intermediate tasks**     | **No** separate PR to `feature`. Push your branch; complete sign-off; next developer checks out from your **`task/...`** branch.                                                                                                       |
+| **Last task in segment**   | Open **one** PR **`task/<tip> → feature/<feature-name>`** to land the whole segment.                                                                                                                                                   |
+| **Next segment**           | First task branches from **updated** **`feature/<feature-name>`** after the segment PR is merged.                                                                                                                                      |
+| **Release**                | After gates pass with actual owner-granted merge/destination authority, merge **`feature/<feature-name>` → protected `staging`** via PR; green gates alone grant none. Merge **`staging` → `main`** only with explicit human approval. |
 
 ## Tests (required before sign-off)
 
@@ -77,14 +77,15 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed
 
-The close operation happens **after** every pre-close checkbox passes. During an active autonomous
-workflow-control run, use its journaled Beads close broker; outside an active run, use the normal
-manual Beads MCP/CLI workflow.
+The close operation happens after the declared gates pass, using normal authorized Beads tools for
+native development. Only transitions owned by an explicitly selected prototype run use its broker.
+Existing end-to-end owner authorization covers routine repairs and phase transitions; final owner
+acceptance/merge authority stays separate.
 
 ## Post-close verification
 
 - [ ] Close transition id/reason recorded (broker transition for an active run; manual operation id otherwise)
 - [ ] Beads issue re-read as `closed`; downstream readiness reconciled
-- [ ] During an active run, broker journal and authoritative Beads state agree
+- [ ] If an explicit prototype run owns this transition, its journal and Beads agree
 
 **Reviewer / owner:** \***\*\*\*\*\***\_\***\*\*\*\*\*** **Date:** **\*\***\_**\*\***

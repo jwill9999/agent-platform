@@ -1,4 +1,32 @@
-# Branch cleanup handoff — 8 October 2026
+# Codex developer-autonomy cleanup — 9 October 2026
+
+Owner authorized this cleanup through planning, implementation, tests, repairs, independent review
+and exact-head hosted CI to a final owner code-review request. No repeated routine phase approval;
+no merge/deployment/global edit/paid gateway call/prototype or pilot resumption.
+
+Worktree: `/Users/letuscode/.codex/worktrees/codex-developer-autonomy/agent-platform`.
+Native task chain: planning → policy → guidance → acceptance; cumulative target
+`feature/harness-backlog-review`. Planning and policy checkpoints passed independent reviews and
+full branch-specific Notion readback; guidance source review is approved; publication/final acceptance checks are next. Source provenance and AUT/V maps:
+[plan](docs/planning/codex-developer-autonomy/plan.md),
+[results](docs/reviews/codex-developer-autonomy.md).
+
+Preserve all paused source work in `/Users/letuscode/.codex/worktrees/harness-readiness/agent-platform`:
+13 dirty files/unfinished offline adapter and its existing evidence, untouched by this cleanup.
+The copied [pause checkpoint](docs/reviews/evidence/codex-autonomy/paused-checkpoint.md) and
+[complete restriction audit](docs/reviews/evidence/codex-autonomy/supporting-audit.md) retain local
+snapshot provenance; prior remote links did not contain them. All other dirty worktrees and global
+configuration/skills/memories are preserved. Relevant orchestration/merge monitors remain paused.
+
+Next within this authorized task: finish guidance review/validation/publication, verify native
+adoption and security preservation, open tip PR, repair required CI failures and request owner code
+review when green. Never infer merge/pilot authority from CI. On later owner-approved integration,
+new sessions follow native developer policy; old loaded/global guidance can be stale and its exact
+follow-up proposals await owner discussion. Historical pilot instructions below are inactive records.
+
+---
+
+## Branch cleanup handoff — 8 October 2026
 
 Cleanup removed 28 remote and 36 local branch names, with all 64 tips retained as pushed archive
 tags and a verified recovery bundle. See [complete branch audit](docs/reviews/branch-cleanup-2026-10-08.md)

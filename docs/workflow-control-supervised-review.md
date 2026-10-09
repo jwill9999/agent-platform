@@ -1,5 +1,13 @@
 # Isolated supervised review entry point
 
+> **Scope: PAUSED explicit workflow-control prototype.** This guide describes prototype enforcement,
+> APIs and historical qualification only. Ordinary Codex developer tasks use
+> [native development](development/codex-development.md); discovery, isolation, gateway, budgets,
+> admission, brokers and persisted exact-material approval are not their prerequisites.
+> Do not start/resume the prototype or pilot from this guide. Existing runtime controls remain intact.
+
+## Retained prototype reference
+
 > Current status, 26 September 2026: document binding `.16` was integrated through PR273;
 > see the [repair evidence](reviews/approved-document-binding-implementation.md).
 > References below to that task being unimplemented/open describe earlier review snapshots.

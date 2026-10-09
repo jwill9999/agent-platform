@@ -212,7 +212,7 @@ Required branch lifecycle:
 2. Create the first **`task/<task-name>`** branch from that feature branch.
 3. Each subsequent task branch must be created from the previous task branch.
 4. The final task branch in the chain contains the cumulative task changes and opens the integration PR into **`feature/<feature-name>`**.
-5. After approved integration gates pass, merge **`feature/<feature-name>`** into protected **`staging`** via PR. An approved autonomous workflow may perform this merge.
+5. After integration gates pass, merge **`feature/<feature-name>`** into protected **`staging`** via PR only with actual owner-granted merge/destination authority; reuse an existing valid grant. Green gates alone do not authorize merging.
 6. Merge **`staging`** into **`main`** only with explicit human approval; production promotion is never implied by feature approval.
 
 ---

@@ -41,8 +41,8 @@ not regress adjacent flows.
 8. Fix failures until the task's required gates are green. Preserve the final connected feature-level
    integration gate; intermediate completion does not establish that the whole feature passes.
 9. Close an intermediate task only after its declared gates pass. Close a segment-tip task only after
-   the approved feature-branch merge and required hosted checks pass. Use the active workflow's
-   journaled broker for Beads/Git transitions, or the permitted direct route outside managed runs.
+   the approved feature-branch merge and required hosted checks pass. Native developer tasks use normal authorized Beads/Git tools; an explicitly selected prototype
+   uses its own broker only for operations it owns.
 
 ## Gherkin E2E Strategy Format
 
