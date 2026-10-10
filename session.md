@@ -21,10 +21,26 @@ Task branch `task/staging-evidence-primer` starts from `feature/staging-evidence
 staging `a5a1641c`. Selected evidence source is the reviewed feature at `6ca3cd1b`; exact path/blob/hash
 provenance is recorded in `docs/reviews/evidence/native-staging-evidence-selection.json`.
 
-Next: independent review, task-to-feature CI/integration, then protected evidence-feature-to-staging
-qualification. Every required/executed gate, including the actual packaged macOS VM journey, must
+PR287 merged into the evidence feature at `d46668e76d70bacaed338dd9813ac8ec361c1509` after
+all ten executed checks passed and review threads cleared. Its tree matches reviewed source `e51970a2`.
+PR288 now targets staging. Next: verify the exact current feature head and complete protected staging
+qualification; do not repeat the completed task-to-feature integration. Every required/executed gate, including the actual packaged macOS VM journey, must
 pass before staging merge. The `dev` self-hosted runner is offline and its job is queued; the owner
 has been asked to bring it online. Do not treat cancellation or a skipped VM test as success.
+
+PR288 security scan failed on 10 October with an internal model context-window overflow
+([run evidence](https://github.com/jwill9999/agent-platform/actions/runs/38064854986/job/114250324847)).
+This is a scanner failure, not a vulnerability finding or a passed scan. Regular CI, CodeQL and
+SonarCloud passed; staging remains blocked. Independently assess smaller complete-file batches and
+the provider constraint before another promotion attempt; do not truncate evidence, exclude scan
+coverage, change limits or claim byte estimates prove model compatibility.
+
+The installed scanner `0.124.1` also omits patches for three oversized archived JSON artifacts under
+its built-in limits; exact paths/reasons and versioned sources are recorded in the evidence task spec.
+No successful scan or analysis of those artifacts is claimed. A supported provider remedy or explicit
+owner policy disposition is needed; the macOS VM remains separately queued on the offline runner.
+After the handoff repair passes feature checks and is delivered, pause the integration monitor at this
+external blocker rather than keep rerunning unchanged scans or polling the same runner state.
 
 Preserve PR283, `task/pilot-active-budget` at `ee3a160f` and `task/test-runner-offline-adapter` at
 `e1222b19`, and all dirty primary/paused/unrelated worktrees. The paused checkout retains thirteen
