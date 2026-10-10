@@ -95,7 +95,8 @@ failure cleanup; no actionable findings. No runtime source or historical evidenc
 **Local evidence:** Node 24.14.0 build/typecheck/lint passed; five focused transport tests passed.
 First full package attempt: 1,139 passed, one failed, 77 skipped; 137.52 seconds. The unchanged
 `orchestrator.test.ts` credential-revocation test exceeded its specialist reservation deadline during
-parallel execution. This is retained as a failure, not waived or called green. Focused diagnosis passed all 23 orchestrator tests. First normal push then passed 1,139 tests but
+parallel execution. This is retained as a failure, not waived or called green. Focused diagnosis passed
+all 23 orchestrator tests. First normal push then passed 1,139 tests but
 failed the unchanged standalone coordinator executable-pin test; its focused rerun passed. The hook
 prepends Xcode's Git exec directory: `which git` selects a noncanonical symlink while the fixture pin
 requires an exact real path. The normal-hook retry supplied supported `WORKFLOW_GIT_BINARY=/usr/bin/git`

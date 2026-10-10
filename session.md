@@ -21,7 +21,9 @@ manual rerun, scan bypass/exclusion, artifact truncation or qualification claim.
 or concrete owner policy decision is still needed; smaller complete-file batches are unverified.
 
 The owner started runner `dev`: live status online/busy. PR286's actual packaged macOS VM job
-`114242452635` is running (started 18:46 UTC); PR288's job `114257513299` remains queued for capacity.
+`114242452635` is assigned/running (started 18:46 UTC) but still at GitHub's Set up job step; the
+packaged test itself has not started. The owner was asked for the runner-console setup/download error.
+PR288's job `114257513299` remains queued for capacity.
 Do not repeat the offline request or count queued/skipped/cancelled jobs as success.
 
 PR286 has an unresolved CodeQL `js/bad-code-sanitization` finding in the delivered coordinator
@@ -31,7 +33,8 @@ Its task branch `task/staging-codeql-repair` starts from the original full featu
 Independent plan and implementation source reviews approved without actionable findings. The test
 now writes static child source, passes unusual paths through JSON stdin/argv, preserves real descendant
 abort/late-marker checks and adds stopped-call denial. Only test/spec/session change; runtime unchanged.
-Five focused transport tests, package build/typecheck/lint passed on Node 24. Full normal push gates passed at `72411e80be45e9c29e98bc4d66b826c8b071613d`: all 1,140 package tests
+Five focused transport tests, package build/typecheck/lint passed on Node 24. Full normal push gates
+passed at `72411e80be45e9c29e98bc4d66b826c8b071613d`: all 1,140 package tests
 passed, 77 optional integration tests skipped. Initial scheduler timeout and hook-selected noncanonical
 Git pin failures were retained and diagnosed; focused reruns passed. Supported local canonical Git
 path plus four-worker execution passed every unchanged test/timeout through normal hooks. No runtime,
@@ -39,8 +42,8 @@ security or test coverage reduction. Hosted feature checks, source merge and Cod
 remain pending. Full spec/session Notion publication follows the pushed final documentation revision;
 Beads remains in progress and its current state was synced, not closed.
 
-Next: diagnose package results, finish normal hooks/full documentation mirrors, deliver repair task PR
-into the full feature when exact-head checks/reviews clear, then verify actual PR286 source before
+Next: finish full documentation mirrors, inspect repair task PR checks and review findings, merge
+into the full feature when exact-head gates clear, then verify actual PR286 source before
 resolving its thread. Continue supported scanner remedy investigation and actual VM qualification;
 protected staging merges stay gated. After full verified integration, audit delivered branches with
 recovery refs and SHA guards, preserving paused/unique/in-use/uncertain work and dirty checkouts.
