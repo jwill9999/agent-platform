@@ -11,6 +11,8 @@ checks. This first segment copies only reviewed inert evidence; application/pack
 security workflows remain unchanged. The final full feature promotion stays pending afterward.
 Scoped archived-JSON Prettier ignores preserve original evidence bytes; security scanning is unchanged.
 New manifest/documentation formatting and all original artifact hashes are explicitly verified.
+Primer PR287 caught the same historical Agent Zero HTTP503 already repaired in PR285; carry that
+one-line official raw-source URL correction so the older staging baseline passes link checking.
 
 Current task: `agent-platform-native-staging-evidence`, a prerequisite of
 `agent-platform-native-staging-integration`. See

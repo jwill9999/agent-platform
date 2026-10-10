@@ -9,7 +9,7 @@ External references used:
 - [OpenClaw Tools](https://openclaw.com.au/tools): native capability categories including filesystem, runtime, web research, browser automation, sessions/agents, memory, cron, messaging, and device nodes.
 - [OpenClaw Skills](https://www.open-claw-skills.com/): large skill registry with coding, browser automation, DevOps, data analysis, search/research, security/compliance, and content categories.
 - [Agent Zero](https://www.agent-zero.ai/p/index/): sandboxed agent environment plus host connector for working on real files.
-- [Agent Zero usage guide](https://github.com/agent0ai/agent-zero/blob/main/docs/guides/usage.md): project-scoped workspaces, scheduler, memory management, knowledge import, backups, and project secrets.
+- [Agent Zero usage guide](https://raw.githubusercontent.com/agent0ai/agent-zero/main/docs/guides/usage.md): project-scoped workspaces, scheduler, memory management, knowledge import, backups, and project secrets.
 
 The "pi" comparison remains ambiguous. If this means Raspberry Pi as a deployment target, it affects packaging and resource constraints more than harness capability. If it means another agent framework, add the exact project URL before using it as a formal benchmark.
 
