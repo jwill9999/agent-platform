@@ -20,8 +20,8 @@ dirty primary and paused worktrees remain outside integration and cleanup.
 The distinct source-aware plan critic approved version 1 archive-policy design and scoped CI
 concurrency repair without actionable findings. The automatic check plus independent protected
 dispatch/verifier is a mandatory operational trust boundary; existing context matching alone
-does not enforce workflow provenance. Implementation review and actual connected qualification
-are still required. No review, scan or VM outcome is manufactured.
+does not enforce workflow provenance. Implementation and independent source review are complete; actual hosted adoption and connected
+qualification remain required. No review, scan or VM outcome is manufactured.
 
 Verification: [scenario plan](../testing/native-staging-remedies.md).
 Actual results: [review and results](../reviews/native-staging-remedies.md).

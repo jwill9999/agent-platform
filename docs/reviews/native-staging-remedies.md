@@ -6,8 +6,8 @@ Distinct source-aware `staging_integration_review` approved archive-policy plan 
 the scoped CI concurrency change without actionable findings. Verified the original selection
 digest and default-main registered workflow path; confirmed current staging protections retain
 security-scan/app15368 and resolved-thread requirements. Mandatory independent protected dispatch
-provenance adds a gate; the ruleset's context alone does not enforce it. Actual implementation,
-scanner, dispatch and packaged VM qualification remain pending.
+provenance adds a gate; the ruleset's context alone does not enforce it. Implementation and independent source review are complete; actual hosted scanner, dispatch and
+packaged VM qualification remain pending.
 
 ## Runner diagnosis and setup
 
@@ -109,6 +109,15 @@ The final frozen complete archive suite, including the large-blob regression, pa
 zero failures, cancellations or skips, in 101.548 seconds. The independent scanner critic approved
 all nine owned source files; the verifier critic approved its full corrected scope. Reviews establish
 source delivery readiness only. Final actual hosted analysis/VM and protected provenance remain gates.
+
+## Push-hook discovery correction
+
+The first normal push hook passed affected build/typecheck and all 113 desktop Vitest assertions,
+then failed because Vitest also discovered the standalone Node test file and found no Vitest suite.
+Rename that file to `resolve-macos-vm-helper.node-test.mjs`, outside Vitest's default discovery
+pattern, while retaining its explicit `node --test` invocation in CI. No assertions, test runner,
+hooks or timeouts are disabled. Fresh affected Vitest passes 113 assertions in 17 files; the explicit Node invocation passes all
+12 resolver tests. Both test runners now select their intended suites.
 
 ## Pending delivery gates
 

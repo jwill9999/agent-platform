@@ -50,7 +50,7 @@ full scan and actual VM before protected trust. Existing PR288 includes authored
 that must be delivered through full scanning before archive-only qualification. Archive route
 requires exact 220 inert additions, protected-base immutable allowlist, independent data/security
 review, automatic check plus separate protected staging dispatch and trusted merge verification.
-Independent plan critique approved this boundary; implementation/connected qualification pending.
+Independent critiques approve implementation/source review; hosted adoption and connected qualification remain pending.
 
 All 220 artifact bytes remain retained:3,958,506 bytes from original6ca3cd1b; all 139 JSON parse.
 Independent data review found no confirmed credentials, disclosed local path/email metadata and

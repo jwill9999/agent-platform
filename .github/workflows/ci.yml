@@ -33,7 +33,7 @@ jobs:
           cache: pnpm
 
       - name: Test macOS VM build-output discovery
-        run: node --test apps/desktop/scripts/resolve-macos-vm-helper.test.mjs
+        run: node --test apps/desktop/scripts/resolve-macos-vm-helper.node-test.mjs
 
       - name: Test historical archive trust boundaries
         run: >-
