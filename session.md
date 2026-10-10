@@ -1,6 +1,6 @@
 # Current handoff — native development and retained orchestration — 10 October 2026
 
-## Consolidation repair update — 10 October 2026, 19:10 UTC
+## Consolidation repair update — 10 October 2026
 
 This update supersedes the earlier pending-PR285 wording below. The owner resumed consolidation
 and reconfirmed conditional merge authority: evidence PR288 first, full baseline PR286 second,
@@ -31,9 +31,13 @@ Its task branch `task/staging-codeql-repair` starts from the original full featu
 Independent plan and implementation source reviews approved without actionable findings. The test
 now writes static child source, passes unusual paths through JSON stdin/argv, preserves real descendant
 abort/late-marker checks and adds stopped-call denial. Only test/spec/session change; runtime unchanged.
-Five focused transport tests, package build/typecheck/lint passed on Node 24. The full package suite is
-still running; one unrelated orchestrator failure needs diagnosis. Hosted feature checks, source merge,
-CodeQL finding resolution, mirrors and Beads sync are not yet complete at this snapshot.
+Five focused transport tests, package build/typecheck/lint passed on Node 24. Full normal push gates passed at `72411e80be45e9c29e98bc4d66b826c8b071613d`: all 1,140 package tests
+passed, 77 optional integration tests skipped. Initial scheduler timeout and hook-selected noncanonical
+Git pin failures were retained and diagnosed; focused reruns passed. Supported local canonical Git
+path plus four-worker execution passed every unchanged test/timeout through normal hooks. No runtime,
+security or test coverage reduction. Hosted feature checks, source merge and CodeQL finding resolution
+remain pending. Full spec/session Notion publication follows the pushed final documentation revision;
+Beads remains in progress and its current state was synced, not closed.
 
 Next: diagnose package results, finish normal hooks/full documentation mirrors, deliver repair task PR
 into the full feature when exact-head checks/reviews clear, then verify actual PR286 source before

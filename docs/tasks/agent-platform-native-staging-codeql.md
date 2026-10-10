@@ -95,8 +95,15 @@ failure cleanup; no actionable findings. No runtime source or historical evidenc
 **Local evidence:** Node 24.14.0 build/typecheck/lint passed; five focused transport tests passed.
 First full package attempt: 1,139 passed, one failed, 77 skipped; 137.52 seconds. The unchanged
 `orchestrator.test.ts` credential-revocation test exceeded its specialist reservation deadline during
-parallel execution. This is retained as a failure, not waived or called green. Focused diagnosis and
-normal full push gates remain pending. IDE Problems/SonarQube MCP unavailable as disclosed above.
+parallel execution. This is retained as a failure, not waived or called green. Focused diagnosis passed all 23 orchestrator tests. First normal push then passed 1,139 tests but
+failed the unchanged standalone coordinator executable-pin test; its focused rerun passed. The hook
+prepends Xcode's Git exec directory: `which git` selects a noncanonical symlink while the fixture pin
+requires an exact real path. The normal-hook retry supplied supported `WORKFLOW_GIT_BINARY=/usr/bin/git`
+and Vitest 2.1.9 `VITEST_MAX_FORKS=4`, `VITEST_MIN_FORKS=1`; all timeouts/tests remained unchanged.
+All 1,140 tests passed, 77 optional integration tests skipped, 62 files passed/9 skipped, 147.70 seconds.
+Normal circular-dependency/build/typecheck/test hooks and push passed at `72411e80be45e9c29e98bc4d66b826c8b071613d`.
+The test source is unchanged in subsequent documentation-only updates. IDE Problems/SonarQube MCP
+unavailable as disclosed above. Hosted SonarCloud/CodeQL results remain separate delivery gates.
 
 **Hosted delivery / PR286 thread / mirrors / Beads closure:** pending; task remains in progress.  
 **Owner authority:** existing end-to-end consolidation and conditional merge grant; no new pilot grant.
