@@ -13,7 +13,8 @@ No scanner-policy change or paused orchestration resumption is included.
 
 Base/source: `feature/harness-backlog-review` at `732806dc28754bc9176d507516d85e612eaaef5f`.
 Task branch: `task/staging-bash-guard-repair`; segment-tip PR into that same feature.
-[CodeQL alert 5](https://github.com/jwill9999/agent-platform/security/code-scanning/5),
+CodeQL alert 5 (authenticated repository security record on
+[PR286](https://github.com/jwill9999/agent-platform/pull/286)),
 `js/polynomial-redos`, high security severity, already exists on main and staging as well as
 the refreshed PR286 head. It was not introduced by PR290.
 
@@ -113,6 +114,15 @@ Changed-file Prettier and direct Markdown lint of all three documents pass. An a
 the full files directly, including task files omitted by the general docs glob. SonarQube MCP/IDE
 Problems unavailable as above; fresh hosted results remain required.
 
-**Normal push hooks / hosted / publication / feature merge / current PR286 finding:** pending.
+**Normal push hooks:** passed at `559276d2ac2061babda54ada8362fe64df0360bf`: dependency-cycle,
+harness build/typecheck and all 686 tests passed (6.24 seconds). No hooks/test/timeouts disabled.
+**Publication:** all three full branch-specific task/session mirrors read back at `559276d2`
+with source revision/hash and preserved historical pages. Refresh metadata after documentation repairs.
+**Hosted delivery:** [PR291](https://github.com/jwill9999/agent-platform/pull/291) targets the existing
+feature. Initial `559276d2` lychee failed because the authenticated CodeQL security-alert page returns
+HTTP404 to the public link checker; authenticated API verified alert 5 exists. This specification now
+uses the public owning PR link and explicit alert ID/access requirement; no link-check configuration
+or exclusion changes. Other current-head gates, final mirrors, feature merge and fresh PR286 finding
+qualification remain pending; prior failure is retained.
 Beads remains in progress; default/runtime security and scanner policy unchanged.  
 **Owner authority:** existing end-to-end consolidation repairs and conditional feature/staging merges.

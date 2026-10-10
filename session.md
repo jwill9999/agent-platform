@@ -18,8 +18,12 @@ is `agent-platform-native-staging-redos`, in progress, on `task/staging-bash-gua
 whitespace between non-whitespace tokens; independent implementation review also approved without actionable findings. Harness build/typecheck/
 lint and all 686 tests in 49 files passed, including strict operator/whitespace decisions and a bounded
 real compiled-validator regression. The baseline child timed out/killed at one second; the repaired
-child returned both expected outcomes in 29.62 milliseconds. Normal push/hosted delivery, mirrors,
-feature merge and fresh current-ref CodeQL qualification remain pending.
+child returned both expected outcomes in 29.62 milliseconds. Normal push hooks also passed
+all 686 tests. [PR291](https://github.com/jwill9999/agent-platform/pull/291) is open into the feature;
+full three-document mirrors read back at `559276d2`. Initial hosted lychee found the authenticated
+security-alert link unavailable to public CI; the spec now records the alert ID/access requirement
+and links its public owning PR. Final current-head CI/mirrors, feature merge and fresh CodeQL
+qualification remain pending; no checker/security-policy exclusions changed.
 Default product calls omit the explicit allowlist; the repair preserves default behavior and all
 permission/deny decisions, removing only quadratic separator matching.
 
