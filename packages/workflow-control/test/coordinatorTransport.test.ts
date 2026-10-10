@@ -69,25 +69,42 @@ it('stops an active direct adapter process and rejects subsequent dispatch', asy
 it('terminates forked descendants on abort before accepting another operation', async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'coordinator-descendant-')));
   roots.push(root);
-  const marker = join(root, 'late-effect');
-  const ready = join(root, 'ready');
-  const childProgram = `require('node:fs').writeFileSync(${JSON.stringify(ready)},'ready');setTimeout(()=>require('node:fs').writeFileSync(${JSON.stringify(marker)},'bad'),400);setInterval(()=>{},1000);`;
-  const { port } = transport(
-    `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(childProgram)}],{stdio:'ignore'});setInterval(()=>{},1000);`,
+  const marker = join(root, 'late-effect-\'"\n');
+  const ready = join(root, 'ready-\'"\n');
+  const childPath = join(root, 'child.cjs');
+  writeFileSync(
+    childPath,
+    `const [ready, marker] = process.argv.slice(2);
+require('node:fs').writeFileSync(ready, 'ready');
+setTimeout(() => require('node:fs').writeFileSync(marker, 'bad'), 400);
+setInterval(() => {}, 1000);`,
   );
-  const pending = port.call('beads.readIssue', {}, () => {});
+  const { port } = transport(
+    `let input = '';
+process.stdin.on('data', x => input += x);
+process.stdin.on('end', () => {
+  const { childPath, ready, marker } = JSON.parse(input);
+  require('node:child_process').spawn(process.execPath, [childPath, ready, marker], { stdio: 'ignore' });
+  setInterval(() => {}, 1000);
+});`,
+  );
+  const pending = port.call('beads.readIssue', { childPath, ready, marker }, () => {});
   const rejected = expect(pending).rejects.toThrow('unavailable');
-  for (let n = 0; n < 100; n++) {
-    try {
-      readFileSync(ready);
-      break;
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 10));
+  try {
+    for (let n = 0; n < 100; n++) {
+      try {
+        readFileSync(ready);
+        break;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
     }
+    expect(readFileSync(ready, 'utf8')).toBe('ready');
+  } finally {
+    port.abort();
+    await rejected;
   }
-  expect(readFileSync(ready, 'utf8')).toBe('ready');
-  port.abort();
-  await rejected;
   await new Promise((resolve) => setTimeout(resolve, 600));
   expect(() => readFileSync(marker)).toThrow();
+  await expect(port.call('beads.readIssue', {}, () => {})).rejects.toThrow('stopped');
 });
