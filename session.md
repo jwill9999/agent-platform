@@ -1,5 +1,50 @@
 # Current handoff — native development and retained orchestration — 10 October 2026
 
+## Consolidation repair update — 10 October 2026, 19:10 UTC
+
+This update supersedes the earlier pending-PR285 wording below. The owner resumed consolidation
+and reconfirmed conditional merge authority: evidence PR288 first, full baseline PR286 second,
+only after every actual current-head gate and actionable review clears. PR283 stays paused/unmerged.
+No next product priority, pilot, main promotion or decommissioning is selected.
+
+PR285 merged to the full feature at `6ca3cd1baf7ff13add1da57dc0ecc330d2ab2cec`. Evidence PR287
+and diagnostic PR289 merged to `feature/staging-evidence-primer`, now
+`2ad1a88a7bcf3978e9c02884e36c0cfae8ab11d0`. All 220 historical artifacts remain retained exactly.
+Staging remains `a5a1641c3d2a5ef317c05fa45c6190e7189c1915`; it is not the consolidated development baseline.
+The primer history/spec/mirrors are retained on their own source branch; refresh them before promotion.
+
+PR288 has 13 successful regular checks and failed security-scan at its actual head: provider model
+context-window overflow, run `38067326126` / job `114257510826`. PR286's prior full scan rejected
+1,400,512 tokens above the 1-million limit. Promptfoo 0.124.1 also omits three large evidence patches
+by built-in blob/patch limits; filesystem availability does not prove their analysis. No unchanged
+manual rerun, scan bypass/exclusion, artifact truncation or qualification claim. A supported remedy
+or concrete owner policy decision is still needed; smaller complete-file batches are unverified.
+
+The owner started runner `dev`: live status online/busy. PR286's actual packaged macOS VM job
+`114242452635` is running (started 18:46 UTC); PR288's job `114257513299` remains queued for capacity.
+Do not repeat the offline request or count queued/skipped/cancelled jobs as success.
+
+PR286 has an unresolved CodeQL `js/bad-code-sanitization` finding in the delivered coordinator
+subprocess test. [The bounded repair](docs/tasks/agent-platform-native-staging-codeql.md) is tracked by
+`agent-platform-native-staging-codeql`, in progress, upstream closed handoff, blocking parent integration.
+Its task branch `task/staging-codeql-repair` starts from the original full feature at `6ca3cd1b`.
+Independent plan and implementation source reviews approved without actionable findings. The test
+now writes static child source, passes unusual paths through JSON stdin/argv, preserves real descendant
+abort/late-marker checks and adds stopped-call denial. Only test/spec/session change; runtime unchanged.
+Five focused transport tests, package build/typecheck/lint passed on Node 24. The full package suite is
+still running; one unrelated orchestrator failure needs diagnosis. Hosted feature checks, source merge,
+CodeQL finding resolution, mirrors and Beads sync are not yet complete at this snapshot.
+
+Next: diagnose package results, finish normal hooks/full documentation mirrors, deliver repair task PR
+into the full feature when exact-head checks/reviews clear, then verify actual PR286 source before
+resolving its thread. Continue supported scanner remedy investigation and actual VM qualification;
+protected staging merges stay gated. After full verified integration, audit delivered branches with
+recovery refs and SHA guards, preserving paused/unique/in-use/uncertain work and dirty checkouts.
+Parent and evidence-child Beads stay in progress; do not close them for intermediate feature delivery.
+Next product planning remains an owner backlog review after consolidation.
+
+## Earlier handoff history (retained)
+
 **Current position:** cleanup is complete; the next product-development priority is **undecided**.
 The owner initially requested a pause after saving this handoff. On 10 October they authorized finishing
 PR285 and promoting `feature/harness-backlog-review` into protected `staging` once checks pass.
