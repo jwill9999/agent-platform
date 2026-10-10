@@ -1,4 +1,137 @@
-# Codex developer-autonomy cleanup — 9 October 2026
+# Current handoff — native development and retained orchestration — 10 October 2026
+
+**Current position:** cleanup is complete; the next product-development priority is **undecided**.
+The owner initially requested a pause after saving this handoff. On 10 October they authorized finishing
+PR285 and promoting `feature/harness-backlog-review` into protected `staging` once checks pass.
+That integration is tracked by `agent-platform-native-staging-integration` and
+[its specification](docs/tasks/agent-platform-native-staging-integration.md); consult Beads and exact
+remote refs for the live result. At this snapshot PR285 and staging promotion are not yet merged.
+This does not restart the paused prototype or select a new product implementation task.
+After integration: review the live Beads backlog with the owner and decide which work to take forward.
+Agree that task's objective, requirements, definition of done and meaningful tests before execution.
+
+This section supersedes the older execution/approval/status instructions below. Historical entries
+are retained as evidence; they do not reactivate old pilots, automation prompts or review gates.
+Beads remains authoritative for task state. This documentation snapshot is tracked by
+`agent-platform-native-development-handoff`; its specification is
+[the handoff task](docs/tasks/agent-platform-native-development-handoff.md).
+
+## Merged baseline and completed developer cleanup
+
+[PR284](https://github.com/jwill9999/agent-platform/pull/284), **Restore native Codex developer autonomy
+and retain runtime security**, is merged into `feature/harness-backlog-review` at
+`d77d64072034b7ab131386de9f9d2961896f6ce2`. The integrated tree matched reviewed source
+`a0e51e542aaf6a978ff240dddb1dc1451e6104fa`. Its nine executed exact-head checks passed;
+staging-packaged macOS VM and Sourcery were skipped. Earlier desktop retry/flaky evidence remains
+in the review records; the targeted rerun passed 28 tests without retries. No new staging/main
+promotion or live pilot followed this cleanup. Current remote staging is
+`a5a1641c3d2a5ef317c05fa45c6190e7189c1915`; refresh refs before future work.
+
+Native Codex is the development route. Existing end-to-end authorization covers routine planning,
+implementation, refinements, repairs/retries, independent source-aware review, documentation/Beads/Git
+work and CI through final owner acceptance. Ask about material changes to intent/behavior/delivery,
+required missing input or explicitly reserved actions. Actual session permissions still apply;
+green tests alone grant no merge, release, spend, global-edit or pilot-launch authority.
+See [native development](docs/development/codex-development.md) and
+[ADR-0005](docs/adr/0005-native-codex-development.md). Agent Platform runtime security is unchanged.
+`agent-platform-codex-autonomy-acceptance` is closed and its Beads completion record was synced.
+
+## Global follow-ups completed locally on 9 October
+
+The owner separately authorized all three corrections discussed in voice:
+
+- Installed global `beads-workflow` skill: removed prototype broker prerequisites; normal authorized
+  MCP/CLI task updates and syncing remain, along with task authority, dependencies and ownership.
+- Installed global `agent-platform-documentation` skill: removed obsolete managed-run publication
+  and approval wording; retained full Notion mirrors, identity/readback and preservation of human notes.
+- Saved additive memory correction: earlier review-gate/renewed-allocation guidance is historical;
+  routine phase/file/subtask changes within an agreed authorized task do not require renewed approval.
+  Historical registry/rollout/memory-skill files were preserved. Both skill validators and readbacks passed.
+
+These installed skills and saved memories are local to this Codex installation, outside repository
+Git. They do not need pushing to the feature branch; another installation needs equivalent updates.
+Global Codex configuration was not changed. The existing proposed-global-follow-ups document describes
+the earlier discussion checkpoint; these Beads notes and this handoff supersede its pending wording.
+Fresh sessions on the integrated branch are recommended; loaded historical context can remain stale.
+Saving a correction does not prove automatic ingestion by every future session.
+
+## Orchestration retained and paused; delivery audit recorded
+
+The owner chose to retain `packages/workflow-control` for now and decide later whether to decommission
+it. Its source, enforcement and tests remain intact; it is not a prerequisite for native development.
+Code already delivered to staging is retained there. No source deletion, branch deletion, prototype
+resumption, pilot launch or paid model call is authorized by this retention decision.
+
+All twelve previously discussed Beads records were audited. The shared-documentation and bounded
+standalone-reviewer tasks are now closed for their completed scopes. Ten remaining records are deferred.
+Each contains a delivery/acceptance audit stating implementation state, exact evidence/location and
+remaining scope; earlier blanket-deferral notes are superseded by those per-record dispositions.
+Staged code delivery is done where recorded, while unmet operational criteria remain distinct.
+
+| Beads record                           | Current status | Delivered work and remaining scope                                                                                                                |
+| -------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent-platform-pilot-zero.14`         | Closed         | Shared documentation guide/skill and callers delivered, reviewed and integrated into feature; no runtime acceptance implied.                      |
+| `agent-platform-pilot-zero.15`         | Closed         | Bounded standalone reviewer delivered and qualified for the recorded tested profile; broader connected/managed pilot acceptance remains separate. |
+| `agent-platform-multi-agent`           | Deferred       | Foundations delivered to staging; parent retains operational pilot learning/acceptance.                                                           |
+| `agent-platform-pilot-zero`            | Deferred       | Initial assessment foundations in staging, later prerequisite components in feature; overall qualification/acceptance incomplete.                 |
+| `agent-platform-multi-agent.10`        | Deferred       | Pilot candidate code delivered to staging; actual autonomous pilot, recovery and finalization evidence incomplete.                                |
+| `agent-platform-multi-agent.repair.4`  | Deferred       | Repair code delivery to staging done; exact bootstrap/lineage/brokered acceptance remains unverified.                                             |
+| `agent-platform-pilot-active-budget`   | Deferred       | Implemented/reviewed/pushed to task branches; feature integration and connected qualification incomplete.                                         |
+| `agent-platform-test-runner-loopback`  | Deferred       | Pushed checkpoints plus unfinished uncommitted offline-adapter code; evidence ingestion, final review/qualification/integration incomplete.       |
+| `agent-platform-pilot-zero.17`         | Deferred       | Discovery/import/coordinator/lifecycle components delivered to feature; full actual execution path not qualified.                                 |
+| `agent-platform-pilot-zero.13`         | Deferred       | Pilot draft/contract material exists; final launch-ready material and prerequisites incomplete.                                                   |
+| `agent-platform-pilot-zero.12`         | Deferred       | Earlier assessment/handoff delivered to feature; latest reconciliation update is pushed but PR283 remains open.                                   |
+| `agent-platform-orchestration-toolkit` | Deferred       | Backlog specification only; feasibility research/implementation not started.                                                                      |
+
+These statuses and notes were read back and Dolt synchronization succeeded. Closed scoped tasks do
+not establish unattended pilot success. The parent records overlap with their children; they are not
+twelve separate implementation jobs. Do not reimplement already-delivered code from an old status label.
+Unrelated product/harness tasks were not deferred or closed by this prototype disposition.
+
+## Exact retention locations and future decommissioning boundary
+
+Read-only ancestry checks established the following delivery split; refresh before later action:
+
+- Orchestration foundation `491518811ab53d003a2d2f90ed79dd6fb9d07d0e` and initial assessment staging
+  delivery `1be9301f6cbb8052f8d7eb56471fe50e35cbba4e` are ancestors of both current staging and feature.
+- Later reviewer/discovery/import/lifecycle work is integrated into the feature through PR271,
+  PR276, PR277 and PR278; those later delivery commits are not all in staging.
+- Active-budget source `ee3a160f9f3152ba16ed0ebbe376dc940c86dacf` is pushed on
+  `task/pilot-active-budget` and retained in `task/test-runner-offline-adapter`; neither current feature
+  nor staging contains it.
+- Runner checkpoint `4cbef34f6d1a90af0ffea3e352074337664780da` is pushed on the offline-adapter chain.
+  That remote branch tip is `e1222b1958b87ddc2cf371983fe5e56536fb5fe3`; it does not contain local edits.
+- Paused worktree `/Users/letuscode/.codex/worktrees/harness-readiness/agent-platform` still has
+  13 changed paths, including uncommitted `offlineTestAdapter` source/tests and supporting lifecycle,
+  contracts/evidence changes. Preserve this checkout; branch checkpoints do not back up those edits.
+- [PR283](https://github.com/jwill9999/agent-platform/pull/283), **test: qualify runner controls and
+  expose local-network blocker**, remains open on `task/harness-readiness-reconciliation` at
+  `5b796b74`, targeting the feature. Do not merge or resume it merely from this handoff.
+
+The owner explicitly requested a saved-memory retention/decommissioning note; it was saved and read
+back locally. Future removal requires reviewing source already in staging/feature, consumers/imports,
+workspace/build/configuration wiring, tests/docs, pushed branches and uncommitted work. Closing Beads
+or deleting a local checkout would not remove shipped code. Prepare a separately reviewed removal
+only after an actual decommissioning decision; preserve useful product security and recoverable history.
+
+## Continuation and pause
+
+**Next priority has not been selected.** Begin with `bd ready` and relevant `bd show` reads in canonical
+Beads root `/Users/letuscode/projects/agent-platform`, refresh dependencies and source/PR delivery,
+then discuss product backlog priorities with the owner. Older product notes can also lag integrated
+code; verify before allocating or changing task status. Do not invent a preferred next task or deadline.
+
+Documentation worktree: `/Users/letuscode/.codex/worktrees/codex-developer-autonomy/agent-platform`.
+This handoff is on `task/native-development-handoff`, based on the merged feature; source publication
+is separate from feature/staging integration. Preserve the dirty primary and other unrelated worktrees.
+Old orchestration automations remain paused; no prototype continuation or pilot is requested.
+Complete the newly authorized handoff/staging integration after checks pass, then stop until the
+owner selects the next product priority. Any integration-only monitor must not revive old pilot work.
+No product implementation or new tests were performed for this status-only documentation update.
+
+---
+
+## Historical developer-autonomy cleanup checkpoint — 9 October 2026
 
 Owner authorized this cleanup through planning, implementation, tests, repairs, independent review
 and exact-head hosted CI to a final owner code-review request. No repeated routine phase approval;
@@ -1056,3 +1189,27 @@ scenarios and 112 desktop unit tests passed, plus build/scoped lint/explicit E2E
 code or dependencies changed. X6 remains in progress for delivery and its wider untested cases;
 other baseline tasks remain open. Package comparison has not started. Work is supervised, no durable
 autonomous execution run is claimed. Preserve unrelated root-checkout Beads changes.
+
+---
+
+## Historical staging documentation-access handoff
+
+## 22 September: agent documentation access
+
+Added project Codex LangChain documentation MCP and shared guidance for current AI SDK documentation:
+official agent index, search and targeted Markdown pages, checked against installed package versions.
+Live endpoints and TOML verified. No dependencies, application behavior or baseline-test priorities
+changed. VS Code's existing MCP file and local Beads interaction changes are retained separately.
+
+## 8 October: staging documentation link repair
+
+PR281 link checking identified that the AI SDK search API now returns HTTP 404.
+Shared instructions now use the official agent index to find topic URLs and fetch their Markdown
+content. The reference index and installed-version safeguards remain. Fresh staging checks are
+required on the corrected head; no staging merge or harness pilot is authorized by this repair.
+
+## 8 October: documentation access across agent surfaces
+
+PR281 review identified that shared LangChain guidance only named the Codex MCP connection.
+Added official agent-index and TypeScript LangChain/LangGraph URLs, Markdown retrieval guidance,
+and installed-version checks for Claude Code, Copilot and other agents without that connection.

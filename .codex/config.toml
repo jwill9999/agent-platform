@@ -1,3 +1,6 @@
 [agents]
 enabled = true
 interrupt_message = true
+
+[mcp_servers.langchain_docs]
+url = "https://docs.langchain.com/mcp"
