@@ -1189,3 +1189,27 @@ scenarios and 112 desktop unit tests passed, plus build/scoped lint/explicit E2E
 code or dependencies changed. X6 remains in progress for delivery and its wider untested cases;
 other baseline tasks remain open. Package comparison has not started. Work is supervised, no durable
 autonomous execution run is claimed. Preserve unrelated root-checkout Beads changes.
+
+---
+
+## Historical staging documentation-access handoff
+
+## 22 September: agent documentation access
+
+Added project Codex LangChain documentation MCP and shared guidance for current AI SDK documentation:
+official agent index, search and targeted Markdown pages, checked against installed package versions.
+Live endpoints and TOML verified. No dependencies, application behavior or baseline-test priorities
+changed. VS Code's existing MCP file and local Beads interaction changes are retained separately.
+
+## 8 October: staging documentation link repair
+
+PR281 link checking identified that the AI SDK search API now returns HTTP 404.
+Shared instructions now use the official agent index to find topic URLs and fetch their Markdown
+content. The reference index and installed-version safeguards remain. Fresh staging checks are
+required on the corrected head; no staging merge or harness pilot is authorized by this repair.
+
+## 8 October: documentation access across agent surfaces
+
+PR281 review identified that shared LangChain guidance only named the Codex MCP connection.
+Added official agent-index and TypeScript LangChain/LangGraph URLs, Markdown retrieval guidance,
+and installed-version checks for Claude Code, Copilot and other agents without that connection.
