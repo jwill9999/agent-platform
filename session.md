@@ -1,6 +1,57 @@
 # Current handoff — native development and retained orchestration — 10 October 2026
 
-## Consolidation repair update — 10 October 2026
+## Security repair closeout and follow-up — 10 October 2026
+
+PR290 merged into `feature/harness-backlog-review` at
+`732806dc28754bc9176d507516d85e612eaaef5f` after all ten executed checks passed on reviewed
+`7c28c838a8f81bad78b76592dd6403977462a2f3`, approval and no unresolved review threads.
+The merge tree equals reviewed source. Fresh PR286 CodeQL/source verification confirms the
+coordinator test alert 10 fixed on its current PR ref and the original thread resolved;
+`agent-platform-native-staging-codeql` is closed for that bounded delivered scope.
+The previous local failures/diagnoses and optional skips remain recorded below and in its task spec.
+
+Fresh findings inspection also found existing high-severity `js/polynomial-redos` alert 5 in
+BashGuard's optional explicit compatibility-allowlist splitter. It already exists on staging/main;
+PR290 did not introduce it. [The bounded security repair](docs/tasks/agent-platform-native-staging-redos.md)
+is `agent-platform-native-staging-redos`, in progress, on `task/staging-bash-guard-repair` from
+`732806dc`. Independent plan review approved after correcting the regression input to embed long
+whitespace between non-whitespace tokens; independent implementation review also approved without actionable findings. Harness build/typecheck/
+lint and all 686 tests in 49 files passed, including strict operator/whitespace decisions and a bounded
+real compiled-validator regression. The baseline child timed out/killed at one second; the repaired
+child returned both expected outcomes in 29.62 milliseconds. Normal push hooks also passed
+all 686 tests. [PR291](https://github.com/jwill9999/agent-platform/pull/291) is open into the feature;
+full three-document mirrors read back at `559276d2`. Initial hosted lychee found the authenticated
+security-alert link unavailable to public CI; the spec now records the alert ID/access requirement
+and links its public owning PR. Final current-head CI/mirrors, feature merge and fresh CodeQL
+qualification remain pending; no checker/security-policy exclusions changed.
+Default product calls omit the explicit allowlist; the repair preserves default behavior and all
+permission/deny decisions, removing only quadratic separator matching.
+
+PR286's automatic scan on its genuinely changed `732806dc` head still failed before analysis:
+1,404,186 tokens exceed the one-million-token limit, run `38079857145` / job `114294354762`.
+No vulnerability qualification resulted. PR288 retains its separate provider context-overflow failure.
+A source-backed independently reviewed [scanner-policy decision packet](https://app.notion.com/p/3f5c07cdcbcf81359addc127d333abf1)
+is published/read back. The owner is asked to keep full policy and seek a provider remedy, or explicitly
+authorize narrowly scoped immutable historical-archive policy work. No answer or policy change is
+assumed; the full protected scanner and actual VM still gate staging. The alternative requires a
+separately fully scanned policy delivery, trusted exact archive pins, no authored-document exemption,
+independent archive review and all other protections; it does not guarantee final scan success.
+
+Runner `dev` is online/busy. The old `6ca3cd1b` PR286 job `114242452635` was cancelled while still
+at Set up job after the new feature head triggered fresh CI. It did not qualify the VM. PR288 job
+`114257513299` is now assigned but still Set up job; current PR286 job `114295343289` queued at
+this snapshot. The owner has already been asked for runner-console
+setup/download/connection errors; do not repeat the start/offline request or invent a cause.
+Fresh current-head checks/reviews/security findings must be inspected before each merge.
+
+Next: deliver and verify the BashGuard repair through the existing feature; obtain the pending
+scanner-policy decision and runner evidence, then qualify evidence PR288 and full baseline PR286.
+Neither staging promotion nor branch cleanup is complete. Parent/evidence Beads remain in progress;
+paused PR283, separate prototype refs/dirty checkouts and all historical source remain preserved.
+No main promotion, pilot, spend or product-priority selection; next product priority remains owner
+Beads backlog review after verified consolidation.
+
+## Earlier consolidation repair update — retained 10 October 2026
 
 This update supersedes the earlier pending-PR285 wording below. The owner resumed consolidation
 and reconfirmed conditional merge authority: evidence PR288 first, full baseline PR286 second,
