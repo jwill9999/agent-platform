@@ -19,6 +19,40 @@ promotion against the new staging baseline and validate its remaining diff. The 
 feature tree remains retained; new task/selection/handoff documentation is bookkeeping for this split.
 This is a routine integration repair under the recorded owner authorization, not a new product scope.
 
+PR287 delivered the evidence task to its feature at `d46668e7`; all ten executed checks passed.
+PR288 is the protected staging candidate. Its scan no longer reported the earlier service-size rejection; it instead
+failed with an internal model context-window overflow on 10 October (run `38064854986`, job
+`114250324847`). No successful security analysis is implied. The actual failing model/request size
+is not exposed by that log, so smaller whole-file batches remain an unverified option, not a promised
+fix. Preserve every original artifact byte and disclose the actual scanner coverage limits below.
+Use independent source-backed critique to distinguish a viable subdivision from an external provider
+constraint. Keep staging delivery pending; do not weaken scanner policy or silently retry unchanged.
+
+### Versioned scanner coverage limits
+
+The failing job installed Promptfoo `0.124.1`. Its built-in filters omit blob content above 500 KiB
+and patches above 200 KiB before submitting scan patches. This is existing provider behavior, not a
+new repository exclusion. The source-backed gaps for this selected delivery are:
+
+- `docs/reviews/evidence/artifact-import-coordinator/role-tools-final.json`: 1,516,989-byte blob exceeds
+  the built-in blob maximum; no scan patch is submitted.
+- `docs/reviews/role-enforcement-evidence/final-client-controls.json`: 226,852-byte generated patch
+  exceeds the built-in patch maximum; no scan patch is submitted.
+- `docs/reviews/role-enforcement-evidence/prior-client-controls.json`: 208,712-byte generated patch
+  exceeds the built-in patch maximum; no scan patch is submitted.
+
+See the [versioned filter constants](https://raw.githubusercontent.com/promptfoo/promptfoo/0.124.1/src/codeScan/constants/filtering.ts),
+[diff processor](https://raw.githubusercontent.com/promptfoo/promptfoo/0.124.1/src/codeScan/git/diffProcessor.ts) and
+[scan request builder](https://raw.githubusercontent.com/promptfoo/promptfoo/0.124.1/src/codeScan/scanner/request.ts).
+Default filesystem exploration can still access repository files, but the failure exposes no completed
+analysis or per-file coverage. Do not infer those skipped patches were analyzed through exploration,
+or attribute the context error to a particular file. Smaller complete-file batches may reduce patch
+payload; they cannot prove analysis of skipped artifacts or guarantee provider compatibility.
+
+A supported provider/context remedy or an explicit owner policy disposition of these coverage limits
+is required before claiming this delivery's security qualification. No repository scan exclusion,
+limit increase, file truncation, silent pass or automatic merge is authorized by this diagnosis.
+
 ## Requirements and source selection
 
 - Copy the 220 non-Markdown evidence artifacts changed from staging to the reviewed feature under
@@ -36,7 +70,7 @@ This is a routine integration repair under the recorded owner authorization, not
   only JSON in the three evidence directories. Explicitly format-check the newly authored selection
   manifest with an empty ignore file and validate every original JSON/source hash after normal hooks.
 - The selected source is about 3.96 MB; remaining changed source is about 4.28 MB. Byte counts are
-  feasibility estimates, not proof of token counts. Both actual service scans must pass. If either
+  feasibility estimates, not proof of token counts. Both actual service scans must pass; disclose and resolve coverage limitations before qualification. If either
   remains too large, subdivide the same source-preserving scope with reviewed provenance.
 
 ## Dependency order and integration plan
@@ -44,14 +78,17 @@ This is a routine integration repair under the recorded owner authorization, not
 The handoff delivery `agent-platform-native-development-handoff` is closed. The parent staging
 integration depends on this evidence delivery; no deferred prototype readiness task is reopened.
 
-1. Review this split plan independently against actual source and scanner failure evidence.
-2. Start the feature at current staging `a5a1641c` and its task branch from that feature. Copy only the
-   selected artifacts, add manifest/spec/current handoff, verify blobs and inert path scope.
-3. Validate documentation, full Notion mirrors/readbacks and independent final source review. Push
-   the task and open its PR into `feature/staging-evidence-primer`; merge after exact-head gates pass.
-4. Open that feature's protected staging PR. All protection checks, full security scan and actual
-   packaged macOS VM check must pass. The currently offline `dev` runner must come online; do not
-   relabel queued/cancelled/skipped VM checks as success. Merge with exact head guard and no bypass.
+1. Complete: independent split-plan and source reviews approved the bounded artifact selection.
+2. Complete: the evidence feature started at staging `a5a1641c`; its task copied the selected source
+   bytes, manifest/spec/handoff and verified all blobs and inert paths. Do not recreate these branches.
+3. Complete: PR287 merged the reviewed task into `feature/staging-evidence-primer` at `d46668e7`
+   after all ten executed checks and review clearance. Documentation mirrors/readbacks are retained.
+   Subsequent handoff repairs require their own exact-head feature checks and source review.
+4. Current: PR288 is already open against staging. Fetch and verify its exact current feature head,
+   reconcile scanner/provider limitations above, then qualify all protected checks and the actual
+   packaged macOS VM. Do not repeat the completed PR287 integration or merge while blocked.
+   The offline `dev` runner must come online; queued/cancelled/skipped VM checks are not success.
+   Any eventual staging merge requires an exact head guard and no bypass.
 5. Verify intermediate staging artifact bytes, merge SHA and preserved dirty worktrees. Close this
    scoped task after delivery and sync Beads. This intermediate tree is not development-ready yet.
 6. Refresh/rehearse PR286. Bring the new staging ancestry into its feature through a guarded base
