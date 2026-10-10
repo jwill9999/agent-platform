@@ -106,5 +106,16 @@ Normal circular-dependency/build/typecheck/test hooks and push passed at `72411e
 The test source is unchanged in subsequent documentation-only updates. IDE Problems/SonarQube MCP
 unavailable as disclosed above. Hosted SonarCloud/CodeQL results remain separate delivery gates.
 
-**Hosted delivery / PR286 thread / mirrors / Beads closure:** pending; task remains in progress.  
+**Hosted delivery / PR286 thread / mirrors / Beads closure:** completed for this bounded scope.
+[PR290](https://github.com/jwill9999/agent-platform/pull/290) merged on 10 October at
+`732806dc28754bc9176d507516d85e612eaaef5f`, after all ten executed exact-head checks passed
+on independently reviewed `7c28c838a8f81bad78b76592dd6403977462a2f3`; review approved, no unresolved
+threads. Merge tree `03dd9594fb22a929fb4f03968c8629b74a7f9a14` equals reviewed source.
+The feature-targeted VM skip does not qualify staging. Both full task/session mirrors at `7c28c838`
+were read back with revision/body/hash, preserving earlier snapshots. Fresh actual PR286 source
+contains the static fixture; its new CodeQL analysis reports alert 10 fixed on `refs/pull/286/head`,
+and the original thread is resolved. Beads task closed/read back; latest closeout synchronization is
+recorded separately from earlier successful sync. Existing high-severity BashGuard alert 5 predates
+PR290 and is tracked by `agent-platform-native-staging-redos`; this closure does not resolve that
+alert, the scanner size/context failures, or staging's actual VM gate.  
 **Owner authority:** existing end-to-end consolidation and conditional merge grant; no new pilot grant.

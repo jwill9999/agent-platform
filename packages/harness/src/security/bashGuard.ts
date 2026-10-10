@@ -224,7 +224,9 @@ const BLOCKED_PATTERNS: readonly BlockedPattern[] = [
 // Shell splitting — tokenise command on shell separators
 // ---------------------------------------------------------------------------
 
-const SHELL_SEPARATORS = /\s*(?:\|\||\|&|\||&&|;)\s*/;
+// Segments are trimmed before tokenization; matching only operators avoids
+// quadratic backtracking on whitespace that is not followed by a separator.
+const SHELL_SEPARATORS = /\|\||\|&|\||&&|;/;
 
 /**
  * Split a command string on shell separators (|, &&, ||, ;, |&) and return
