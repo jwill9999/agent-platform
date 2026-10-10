@@ -1,0 +1,115 @@
+{
+  "date": "2026-10-09",
+  "branch": "task/codex-autonomy-plan",
+  "source": "5ef5f6e271391afda8ce58428a4281be8c5ed781",
+  "fullReadbacks": [
+    {
+      "path": "docs/planning/codex-developer-autonomy/plan.md",
+      "id": "3f4c07cd-cbcf-8178-a440-fde527b48b50",
+      "match": true,
+      "truncated": null,
+      "unknown": null,
+      "parentVerified": true,
+      "diff": null,
+      "sourceRevision": "5ef5f6e271391afda8ce58428a4281be8c5ed781",
+      "sourceDigest": "6f809bc46c85be7c974519edcf6f57f07762d04388d9dbad47bb954c199cba67",
+      "expectedLinksRetained": true
+    },
+    {
+      "path": "docs/planning/codex-developer-autonomy/inventory.md",
+      "id": "3f4c07cd-cbcf-81cb-aa83-c887e1ef46c7",
+      "match": true,
+      "truncated": null,
+      "unknown": null,
+      "parentVerified": true,
+      "diff": null,
+      "sourceRevision": "5ef5f6e271391afda8ce58428a4281be8c5ed781",
+      "sourceDigest": "64b35de2ad796846720dfaf43535a398d3df493262790960c013722d56532863",
+      "expectedLinksRetained": true
+    },
+    {
+      "path": "docs/planning/codex-developer-autonomy/global-follow-ups.md",
+      "id": "3f4c07cd-cbcf-811a-a3fa-ceda74855e07",
+      "match": true,
+      "truncated": null,
+      "unknown": null,
+      "parentVerified": true,
+      "diff": null,
+      "sourceRevision": "5ef5f6e271391afda8ce58428a4281be8c5ed781",
+      "sourceDigest": "8ec70af8d0a6e71836621e3fc5777c36252b8422cf536136680d8d79b2f79d2f",
+      "expectedLinksRetained": true
+    },
+    {
+      "path": "docs/tasks/agent-platform-codex-autonomy-plan.md",
+      "id": "3f4c07cd-cbcf-81f1-8e46-f5d1bd9a97e9",
+      "match": true,
+      "truncated": null,
+      "unknown": null,
+      "parentVerified": true,
+      "diff": null,
+      "sourceRevision": "5ef5f6e271391afda8ce58428a4281be8c5ed781",
+      "sourceDigest": "3d2e89ff977f99ef7667baad91b28a60d1a964cf417393f961ffa93c9458ecaa",
+      "expectedLinksRetained": true
+    },
+    {
+      "path": "docs/tasks/agent-platform-codex-autonomy-policy.md",
+      "id": "3f4c07cd-cbcf-8168-9122-e1c880afa5f0",
+      "match": true,
+      "truncated": null,
+      "unknown": null,
+      "parentVerified": true,
+      "diff": null,
+      "sourceRevision": "5ef5f6e271391afda8ce58428a4281be8c5ed781",
+      "sourceDigest": "90be74d781fbc13b2cc61e0149ead306830b4be2d8b9676c7a8b316a671439c3",
+      "expectedLinksRetained": true
+    },
+    {
+      "path": "docs/tasks/agent-platform-codex-autonomy-guidance.md",
+      "id": "3f4c07cd-cbcf-813a-91ab-f452077bcb4f",
+      "match": true,
+      "truncated": null,
+      "unknown": null,
+      "parentVerified": true,
+      "diff": null,
+      "sourceRevision": "5ef5f6e271391afda8ce58428a4281be8c5ed781",
+      "sourceDigest": "df2e0116b480e7cdacc3673d725a3b507de98979c642682b180dc7d959673d52",
+      "expectedLinksRetained": true
+    },
+    {
+      "path": "docs/tasks/agent-platform-codex-autonomy-acceptance.md",
+      "id": "3f4c07cd-cbcf-81f2-8ed7-fa6e28bce844",
+      "match": true,
+      "truncated": null,
+      "unknown": null,
+      "parentVerified": true,
+      "diff": null,
+      "sourceRevision": "5ef5f6e271391afda8ce58428a4281be8c5ed781",
+      "sourceDigest": "b45b0782a227cdff155f8a49c9f190f200a0c0068ab0e44db29242b1ff2b8e11",
+      "expectedLinksRetained": true
+    },
+    {
+      "path": "docs/testing/codex-developer-autonomy.md",
+      "id": "3f4c07cd-cbcf-81ad-9e06-c9f9b48a6c25",
+      "match": true,
+      "truncated": null,
+      "unknown": null,
+      "parentVerified": true,
+      "diff": null,
+      "sourceRevision": "5ef5f6e271391afda8ce58428a4281be8c5ed781",
+      "sourceDigest": "f0cb02832a58ae4ef51274bc77a59ffbf44f641b8e5cd52a0a90a6d3234574c0",
+      "expectedLinksRetained": true
+    },
+    {
+      "path": "docs/reviews/codex-developer-autonomy.md",
+      "id": "3f4c07cd-cbcf-8132-8749-e0f1fe69e4b7",
+      "match": true,
+      "truncated": null,
+      "unknown": null,
+      "parentVerified": true,
+      "diff": null,
+      "sourceRevision": "5ef5f6e271391afda8ce58428a4281be8c5ed781",
+      "sourceDigest": "a30a072bd13dd4114a220cb9df082956d24e83341facd56a1ea140655e74b0e2",
+      "expectedLinksRetained": true
+    }
+  ]
+}

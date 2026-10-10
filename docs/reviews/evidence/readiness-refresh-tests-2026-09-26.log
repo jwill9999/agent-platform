@@ -1,0 +1,84 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/continuationNotifications.test.ts (6 tests) 1881ms
+   ✓ durable human visibility outbox > never sends from a late observation after timeout or overwrites the successor receipt 396ms
+   ✓ durable human visibility outbox > never sends from a late observation after takeover or overwrites the successor receipt 309ms
+   ✓ durable human visibility outbox > records one handoff and one next action despite duplicate callbacks and acknowledgements 340ms
+ ✓ test/continuationWorker.test.ts (15 tests) 4110ms
+   ✓ durable continuation watchdog > does not report a blocker when the parent consumes before an unavailable observe response 373ms
+   ✓ durable continuation watchdog > does not report a blocker when the parent consumes before an unavailable start response 308ms
+   ✓ durable continuation watchdog > accepts an eventual immutable callback after watchdog acceptance and consumes the next action once 448ms
+   ✓ durable continuation watchdog > attaches a callback when completion is retried after the result transaction survived a restart 322ms
+   ✓ durable continuation watchdog > recovers a missed completion intent, defers missing callback, then consumes eventual callback once 352ms
+ ✓ test/phaseJobs.test.ts (44 tests) 18366ms
+   ✓ standalone durable phase jobs > maps implementing/continue to task_verification without inventing a transition 486ms
+   ✓ standalone durable phase jobs > maps implementing/repair to task_verification without inventing a transition 394ms
+   ✓ standalone durable phase jobs > maps task_verification/continue to task_review without inventing a transition 359ms
+   ✓ standalone durable phase jobs > maps task_verification/repair to repair without inventing a transition 363ms
+   ✓ standalone durable phase jobs > maps task_review/continue to task_accepted without inventing a transition 360ms
+   ✓ standalone durable phase jobs > maps task_review/repair to repair without inventing a transition 334ms
+   ✓ standalone durable phase jobs > maps feature_evaluation/repair to repair_planning without inventing a transition 341ms
+   ✓ standalone durable phase jobs > maps repair_planning/continue to implementing without inventing a transition 342ms
+   ✓ standalone durable phase jobs > maps pipeline/continue to delivery without inventing a transition 330ms
+   ✓ standalone durable phase jobs > maps delivery/continue to finalizing without inventing a transition 329ms
+   ✓ standalone durable phase jobs > maps finalizing/complete to finalizing without inventing a transition 334ms
+   ✓ standalone durable phase jobs > atomically consumes a callback into exactly one job across duplicate consumption and restart 345ms
+   ✓ standalone durable phase jobs > rejects stale run at enqueue and leaves no partial action 328ms
+   ✓ standalone durable phase jobs > rejects stale head at enqueue and leaves no partial action 329ms
+   ✓ standalone durable phase jobs > rejects substituted callback identity and phase 387ms
+   ✓ standalone durable phase jobs > allows only one claimer and fences stale workers after a pre-start crash 597ms
+   ✓ standalone durable phase jobs > revalidates authority at claim and start with a visible blocker for stale queued work 449ms
+   ✓ standalone durable phase jobs > rejects a head change between claim and start without a false phase-start event 448ms
+   ✓ standalone durable phase jobs > does not infer a head ledger or active callback authority when either is absent 578ms
+   ✓ standalone durable phase jobs > keeps started work beyond five seconds and requires recovery instead of duplicate launch 520ms
+   ✓ standalone durable phase jobs > requires execution-bound durable completion and fences late completion 524ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted head_sha without completing 535ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted producer without completing 550ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted producer_role without completing 510ms
+   ✓ standalone durable phase jobs > rejects a previous implementation result even when it has valid generic evidence scope 516ms
+   ✓ standalone durable phase jobs > does not invent coordinator completion authority from a generic transition receipt 458ms
+   ✓ standalone durable phase jobs > production continuation queues runnable work and reports missing authority visibly 582ms
+   ✓ standalone durable phase jobs > preserves approval and blocked outcomes without enqueueing specialist work 604ms
+   ✓ cancellation queue fencing > keeps phase launch fenced after an incomplete cancellation deadline while allowing observation recovery 636ms
+   ✓ cancellation queue fencing > atomically fences pending phase work and rejects cancellation-time enqueues/claims 428ms
+   ✓ cancellation queue fencing > atomically fences claimed phase work and rejects cancellation-time enqueues/claims 418ms
+   ✓ cancellation queue fencing > does not declare started phase execution stopped from a cleanup boolean alone 443ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'enqueue' without starting work 310ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'enqueue' without starting work 309ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'enqueue' without starting work 318ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'claim' without starting work 372ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'claim' without starting work 379ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'claim' without starting work 381ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'start' without starting work 480ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'start' without starting work 447ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'start' without starting work 448ms
+ ✓ test/phaseRuntime.test.ts (23 tests) 40443ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with failed criterion 1830ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with omitted criterion 1588ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with unapproved criterion 1564ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with unresolved finding 1524ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with remaining risk 1586ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with repair status with integrate intent 1541ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with blocked status with integrate intent 1547ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with continue review intent 1582ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with repair intent 1657ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with escalation intent 1488ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head without reusing evidence 2895ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to replacement owner without reusing evidence 2722ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head and replacement owner without reusing evidence 2849ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > executes verification then independent review through durable callbacks and exact evidence 2764ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > renews phase and resource leases across a specialist exceeding the initial TTL 8101ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > fails missing role or source authority before launch: {"roles":false} 399ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > fails missing role or source authority before launch: {"sourceFailure":true} 446ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > persists repair callback and queues no fake passing result 1495ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rejects invalid structured output and settles/revokes before marking blocked 1457ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never dispatches started work again after a restart without an execution record 452ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > recovers an interrupted scheduler by removing, observing, and revoking before terminal bookkeeping 516ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > cannot add phase role authority through an automatic contract revision 321ms
+
+ Test Files  4 passed (4)
+      Tests  88 passed (88)
+   Start at  01:15:28
+   Duration  41.03s (transform 427ms, setup 0ms, collect 1.12s, tests 64.80s, environment 0ms, prepare 227ms)
+

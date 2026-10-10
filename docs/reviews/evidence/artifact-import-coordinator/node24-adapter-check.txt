@@ -1,0 +1,43 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/bootstrapAdapters.test.ts (31 tests) 16890ms
+   ✓ pinned production bootstrap subprocess adapters > rejects a writable pinned dependency (mode=509) 1294ms
+   ✓ pinned production bootstrap subprocess adapters > rejects a writable pinned dependency (mode=455) 517ms
+   ✓ pinned production bootstrap subprocess adapters > reads one complete official snapshot using only readonly sandbox CLI commands and allowlisted environment 621ms
+   ✓ pinned production bootstrap subprocess adapters > observes and CAS-pushes the exact task ref through a real bare remote (existing=false) 930ms
+   ✓ pinned production bootstrap subprocess adapters > observes and CAS-pushes the exact task ref through a real bare remote (existing=true) 971ms
+   ✓ pinned production bootstrap subprocess adapters > ignores hostile repository config, URL rewrites and local pre-push hooks 593ms
+   ✓ pinned production bootstrap subprocess adapters > rejects a valid but unapproved local commit and a provider-side CAS race 895ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: kind 408ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: workspaceRoot 422ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: repository 411ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: remoteName 442ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: remoteUrl 470ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: ref 426ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: expectedOldSha 422ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: newSha 419ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: extra 421ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: kind 441ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: workspaceRoot 426ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: taskId 424ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: extra 423ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a redirect Beads subprocess response 581ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a wrong-task Beads subprocess response 635ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a wrong-project Beads subprocess response 582ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a failure Beads subprocess response 574ms
+   ✓ pinned production bootstrap subprocess adapters > rejects modified dependencies, oversized input, malformed JSON and CLI arguments 705ms
+   ✓ pinned production bootstrap subprocess adapters > rejects traversal and symlinked deployment parents before creating a bundle 511ms
+   ✓ pinned production bootstrap subprocess adapters > uses canonical nested destinations and never follows an existing destination symlink 331ms
+   ✓ pinned production bootstrap subprocess adapters > confines deployment to the default or explicitly trusted root 581ms
+   ✓ pinned production bootstrap subprocess adapters > validates CLI config files and rejects symlinks and relative escapes 481ms
+ ✓ test/sourceGit.test.ts (9 tests) 4335ms
+   ✓ publishes an exact-head transaction only after preparing its ref locks 465ms
+   ✓ does not send commit when a started transaction cannot prepare before the deadline 1517ms
+   ✓ reports uncertain publication when the commit acknowledgement is lost 1510ms
+
+ Test Files  2 passed (2)
+      Tests  40 passed (40)
+   Start at  22:25:25
+   Duration  21.52s (transform 41ms, setup 0ms, collect 64ms, tests 21.22s, environment 0ms, prepare 67ms)
+

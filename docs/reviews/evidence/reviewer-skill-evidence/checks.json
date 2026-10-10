@@ -1,0 +1,30 @@
+{
+  "capturedAt": "2026-09-29T16:14:28.976085+00:00",
+  "node": "24.14.0",
+  "sourceDigests": {
+    "packages/workflow-control/src/supervisedReview.ts": "788c995f6edf14c793953a91f709a6be82d789f2039e8d6d01d367451bee204d",
+    "packages/workflow-control/src/reviewSkillEvidence.ts": "57dd726f49c5a9cadba9da8e0259ed5976b3653530cc4c416551949aa38c1203",
+    "packages/workflow-control/test/reviewSkillEvidence.test.ts": "56fe589fcb00c76a273e86e22dadcde5dae8a0a2f1d38cd5d636bfd359fb7fa5",
+    "packages/workflow-control/dist/supervisedReview.js": "a5ded683e36735213e4beabcda1e352e59fea6c100acc3336d67cf966ef3df8f",
+    "packages/workflow-control/dist/reviewSkillEvidence.js": "522b9a8491eadb7b63dbfc2c6a88cba36078b03a193717a9613507f61e39c7d3"
+  },
+  "fullSuite": {
+    "command": "pnpm --filter @agent-platform/workflow-control exec vitest run --maxWorkers=1 --minWorkers=1",
+    "passed": 1140,
+    "skipped": 77,
+    "failed": 0
+  },
+  "containerSuite": {
+    "command": "WORKFLOW_REVIEW_IMAGE=<pinned image> pnpm --filter @agent-platform/workflow-control exec vitest run test/reviewSkillEvidence.test.ts test/supervisedReview.integration.test.ts test/supervisedReviewCapabilities.integration.test.ts --maxWorkers=1 --minWorkers=1",
+    "passed": 20,
+    "failed": 0
+  },
+  "diagnostics": {
+    "build": "pass",
+    "typecheck": "pass",
+    "lint": "pass",
+    "sonarMcp": "unavailable",
+    "ideProblems": "no callable diagnostics tool"
+  },
+  "scope": "Local qualification only; hosted gates and pilot remain separate."
+}

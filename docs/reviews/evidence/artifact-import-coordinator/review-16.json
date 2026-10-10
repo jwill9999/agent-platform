@@ -1,0 +1,73 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "97a5b9de-0d01-4037-8f58-4986687d640a",
+  "materialDigest": "50ee5116be897899672448eaf78d08f61cff800b8b87025436833d5204597ecb",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "bc57a4bfb7c4ac39d507d1168a770f69cd84fd863308026ae26bffdbba0b5de7"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "digest": "23e53b93abf0bf0103ee9464860a92418970f779d3831d5e2c55872cfbbd4caa"
+    },
+    {
+      "path": "packages/workflow-control/src/effectiveTaskAuthority.ts",
+      "digest": "7de59262f8824dab46eb382f09c1a2430eb091e7b49f5ae7284c1338d8fcae6a"
+    },
+    {
+      "path": "packages/workflow-control/src/featureEvaluation.ts",
+      "digest": "cb00f075c9024577c7982c86136d777d6fd8abdeed66f5ca0416b862470fb7be"
+    },
+    {
+      "path": "packages/workflow-control/src/integrationGate.ts",
+      "digest": "9e45c3d12452be2cb9aaec9eba377aacfdb3ac8ba11aa0b54d7f3cf3cb1475bd"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "9bd879917385737ff63dda5b758ec60f8681d0674ece60f296575f441131e576"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "0c02ddb69879812572df5b8a6f73d460c3f57397376bb45833d1dc76ddecb5f0"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanning.ts",
+      "digest": "53f75b26f4b0e6e1686d4d7c6143c1d27fe42dd5989fa7778014a6982cd8e9c7"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanningJournal.ts",
+      "digest": "27dbddf1355f38e9e13c6cbe4c6dda4dd869ab8335dea9aea0eb3a22fbaa8ab1"
+    },
+    {
+      "path": "packages/workflow-control/src/sourceGit.ts",
+      "digest": "d5e4fc571788fec8a6d4f34dae85fb8e1eceb344f0bdc06d04900290545f6533"
+    },
+    {
+      "path": "packages/workflow-control/src/standaloneCoordinators.ts",
+      "digest": "6fba3b198c41b4b24bdebda7b6cc5134152d12f9bf56bfc2d49874434ab4585f"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "95a4d031ed651fa263635c2ff4836370fb7e9ff3697ad2f34352b43b8a06ad7d"
+    },
+    {
+      "path": "packages/workflow-control/test/effectiveTaskAuthority.test.ts",
+      "digest": "6a0b5a2ff2307f4fc75e8978344438c0179e1746259b6db41fc3846953fd54d7"
+    },
+    {
+      "path": "packages/workflow-control/test/repairPlanning.test.ts",
+      "digest": "21bb7945672a9dfeb7e96c088eb3d8433fdff8b26c943166b2ffcf381a9e94e2"
+    }
+  ],
+  "formalApproval": false,
+  "review": 16,
+  "messages": [
+    "The supplied code addresses the prior Promise-return, child-context, lease-renewal, and private-clone document-check concerns. I\u2019m checking the remaining failure paths, especially whether exhausted planner recovery settles the scheduler execution as well as the phase job.",
+    "- **Medium \u2014 Exhausted planner recovery leaves the scheduler execution active.**  \n  **Locations:** `phaseRuntime.ts`: `#recoverRepairPlanning`, `#recover`; `phaseJobs.ts`: `deferCoordinator`, `block`; `storage.ts`: `assertRepairPlanningExecution`.  \n  **Reason:** After a planner handoff is persisted, a restart past the original execution deadline makes adoption fail. Recovery repeatedly calls `deferCoordinator`; exhaustion blocks only the phase job. The scheduler execution remains `active`, and the blocked job is no longer eligible for `claimRecovery`. It continues consuming specialist capacity and blocks cancellation completion. `cleanupStatus()` can nevertheless report `settled`, since it checks interruptions and started jobs rather than this stranded execution.  \n  **Correction:** On terminal handoff-recovery failure, durably settle or escalate the scheduler execution through a fenced cleanup/reconciliation path. Preserve the handoff and any committed child effects. Add a restart-after-deadline test asserting terminal scheduler status, retained child evidence, and accurate cleanup status.\n\nThe supplied code resolves the prior concerns: asynchronous dispatch results are wrapped before leaving the SQLite transaction; generated packets include committed child context and finding evidence; planner recovery renews resource leases without extending the execution deadline; document verification retains canonical-source checks and checks private-clone bytes. Approved repair-role changes are not treated as privilege escalation here.\n\n**Missing evidence:** The supplied tests do not exercise planner recovery exhaustion or combined child-reservation/verifier-retry budget exhaustion. Connected qualification results and several supporting implementations\u2014including the importer, transport, and coordinator receipt verifier\u2014were not supplied, so their behavior remains unverified in this review. No pilot execution or human approval is established."
+  ]
+}

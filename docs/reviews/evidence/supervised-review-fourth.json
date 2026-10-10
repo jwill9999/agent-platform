@@ -1,0 +1,150 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "6e45ac5f-b001-4813-95c4-006212666047",
+  "materialDigest": "399be334bc1346f01cd7d52042e238d767e389db8671cfb9c28e2b5f96876aee",
+  "manifest": [
+    {
+      "path": ".agents/skills/documentation/SKILL.md",
+      "digest": "a3e7410e3cd3a8e9fc4bf6066a0c5fd7990f4c60246c4c017be0ada03f0075fd"
+    },
+    {
+      "path": ".agents/skills/feature-implementation/SKILL.md",
+      "digest": "1565a4919c819e5697385ac280f54aad6b78d994730f27320ad589163668bb37"
+    },
+    {
+      "path": ".agents/skills/feature-planning/SKILL.md",
+      "digest": "2cd309b63c9a086fcf2d7ab574288efecad89d115f994efb24e3762779edff52"
+    },
+    {
+      "path": ".agents/skills/orchestration/SKILL.md",
+      "digest": "7e97190e112784b1fba509335edc9066daf0bf55a550d04e758acf392fca771d"
+    },
+    {
+      "path": ".agents/skills/plan-critique/SKILL.md",
+      "digest": "17d3a1de5e7e6f3d07fdb2c21ae6f1bb05d5e41eca44dfe7520a79e93bcddbd9"
+    },
+    {
+      "path": ".agents/skills/playwright-quality-gate/SKILL.md",
+      "digest": "debe3f3b983283cf65cb09f05d4cabc55b6a64299a5c093fc36d7c034108839f"
+    },
+    {
+      "path": "docs/README.md",
+      "digest": "57c70201a7835497c0cb1fcc0b1fae33aa8d74cf520bfff76b566489096603ec"
+    },
+    {
+      "path": "docs/adr/0004-codex-development-orchestration-control-plane.md",
+      "digest": "1c90f6d5ff79f5d27f5bb3d3376df012914901e2bb9737252ad9512a9cc9582c"
+    },
+    {
+      "path": "docs/agent-instructions-shared.md",
+      "digest": "211947ac88b85c9ac46a62ccd913ea2211ea64736d34837916cbc79ed0feb3f1"
+    },
+    {
+      "path": "docs/reviews/evidence/supervised-review-capabilities.json",
+      "digest": "b0990ad0b5f257c217ddbc902d28318416f51db04ef0a584d6d4738bb47a9d4c"
+    },
+    {
+      "path": "docs/tasks/README.md",
+      "digest": "c013a084ff06ad5f00f7c84b2d0d357f3f7446399f3a439f17052fa3f379d002"
+    },
+    {
+      "path": "docs/tasks/_template.md",
+      "digest": "b981346a0ad0922edf9d0be3901a2ecc5acd76b8ec30a13917fa76763169a5f3"
+    },
+    {
+      "path": "docs/tasks/agent-platform-pilot-zero.16.md",
+      "digest": "d0fa63e9ee059fbe5608583521c6c86735a643f5f8df9f0d6c9afe4f3736d985"
+    },
+    {
+      "path": "docs/workflow-control-planning.md",
+      "digest": "610c5b3b7bed72230c6c06aecb40a945f6ec0786abec7e1258037278cc6bda48"
+    },
+    {
+      "path": "docs/workflow-control-security.md",
+      "digest": "72393fb277b52a1f49e947a0924075922c3c3f03f6455018fd021d3d4dd3aa3e"
+    },
+    {
+      "path": "docs/workflow-control-supervised-review.md",
+      "digest": "beb7a7601f54d1dcfc0c6ff4e25e62938c4f24c30bf8eb9aa4a5c801aa1d2d2d"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "4352f833a4fd57cccc4d8f583b3e3e914418455c30507c8549591bbb74615834"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/reviewProxy.ts",
+      "digest": "ac53a7b70634f566520fd25355527dbb372b2b38c4d88d6c2e78972db7394c30"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "a26a4043857448cc758bf7301dbcd2891e362f1633ae42aaf9e45b650a2e30fa"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReview.ts",
+      "digest": "a1b954c01fb3ab6fdeb210c5a39f4018635feced5506562a3fd30cce8b3fd051"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReviewCli.ts",
+      "digest": "c83d1276a9120d7ad9f2abd990181330215b0abc4d22f6a64ddba8877473e584"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/reviewerCapabilityProbe.mjs",
+      "digest": "5f349804c888a10e25950bad05e2b30ef5b46781ef10518d036224f3aae7393c"
+    },
+    {
+      "path": "packages/workflow-control/test/reviewProxy.test.ts",
+      "digest": "d03e1fe628a1458a938da692f0622cb583cda651348d10edda560d3487b7565a"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.integration.test.ts",
+      "digest": "da254056e690919e7a56b36957566719c8d96d07c718ebc5cf3de78291725d31"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.test.ts",
+      "digest": "2af618618c2159a192fb95e5f1596f2044127c1311d87aaab1c76fda51c6913e"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReviewCapabilities.integration.test.ts",
+      "digest": "e4729bd3219b22b29cc3933d3de149637c52893d1f030a94d8bc621bff4267e0"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReviewLifecycle.test.ts",
+      "digest": "3d6af70f8541c0acf707effff2de12b520c0f353b415fe898969846337bbf904"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0d0d5-e1bd-7511-99e5-d2a34107a624"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "- **High \u2014 CONNECT allowlisting does not enforce model-only destinations inside tunnels.**  \n  **Evidence:** `packages/workflow-control/src/reviewProxy.ts`, `packages/workflow-control/test/supervisedReviewCapabilities.integration.test.ts`.  \n  The proxy checks the CONNECT authority, then forwards arbitrary bytes. A client can specify an allowed authority while using a different TLS SNI/HTTP hostname inside the tunnel. Shared hosting/CDN routing can consequently reach other services. The retained probe tests rejection of `CONNECT github.com:443`, but does not test this bypass.  \n  **Proposed correction:** Enforce the actual upstream service boundary through a constrained application gateway or equivalent verified control, and add a mismatched CONNECT/SNI negative test. Until then, describe the guarantee as CONNECT-authority filtering rather than model-only egress.\n\n- **Medium \u2014 Retained source hashes do not fully identify the implementation exercised by the probes.**  \n  **Evidence:** `docs/reviews/evidence/supervised-review-capabilities.json`, `packages/workflow-control/test/supervisedReviewCapabilities.integration.test.ts`.  \n  The network probe executes `../dist/reviewProxy.js` but records the hash of `../src/reviewProxy.ts`; no supplied evidence establishes their build correspondence. The report also omits `specialistLauncher.ts`, which constructs the tested mounts, environment and Docker restrictions. Thus matching recorded hashes cannot establish that the current launcher and proxy implementation received the reported qualification.  \n  **Proposed correction:** Record the executed proxy artifact digest, launcher source digest, and reproducible build/revision provenance; regenerate the report after verifying the build. These bindings are missing from the supplied evidence."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 59631,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 861,
+          "reasoning_output_tokens": 516
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

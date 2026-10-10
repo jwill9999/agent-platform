@@ -1,0 +1,62 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/bootstrap.test.ts (37 tests) 125869ms
+   ✓ approved bootstrap task artifact production composition > checks pinned adapter dependencies before constructing a production coordinator or preflight 1025ms
+   ✓ approved bootstrap task artifact production composition > reconciles a real commit effect with a lost acknowledgement under a new owner 9078ms
+   ✓ approved bootstrap task artifact production composition > reconciles a real push effect with a lost acknowledgement under a new owner 8264ms
+   ✓ approved bootstrap task artifact production composition > rejects lease expiry during the final adoption observation before dispatch 942ms
+   ✓ approved bootstrap task artifact production composition > rejects lease expiry during the final commit observation before dispatch 2807ms
+   ✓ approved bootstrap task artifact production composition > rejects lease expiry during the final push observation before dispatch 5542ms
+   ✓ approved bootstrap task artifact production composition > rejects a successor takeover during push observation before any remote dispatch 4136ms
+   ✓ approved bootstrap task artifact production composition > reopens cancellation after approval invalidation without allowing execution 7709ms
+   ✓ approved bootstrap task artifact production composition > crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases 8310ms
+   ✓ approved bootstrap task artifact production composition > rejects changed producer identifiers before bootstrap evidence persistence 1670ms
+   ✓ approved bootstrap task artifact production composition > rejects additional producer identifiers before bootstrap evidence persistence 1617ms
+   ✓ approved bootstrap task artifact production composition > still rejects direct github secret patterns inside an approved bootstrap producer 7750ms
+   ✓ approved bootstrap task artifact production composition > still rejects direct openai secret patterns inside an approved bootstrap producer 8234ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_task_observation without duplicate transitions or push 6685ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_candidate_adoption without duplicate transitions or push 6346ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_commit without duplicate transitions or push 5950ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_push without duplicate transitions or push 6092ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_attestation without duplicate transitions or push 6792ms
+   ✓ approved bootstrap task artifact production composition > rejects changed observations between the two real lifecycle transitions 1204ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: author 505ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: source 490ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: tree 484ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: manifest 501ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: remote 530ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: beads 544ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: binary 508ms
+   ✓ approved bootstrap task artifact production composition > rejects policy substitution: evidence 485ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: beads 1568ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: source 2009ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: ref 1638ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: adapter 1515ms
+   ✓ approved bootstrap task artifact production composition > rejects stale owners and missing approval/evidence without preparing anything 1481ms
+   ✓ approved bootstrap task artifact production composition > retains the full hash-bound policy and rejects database payload substitution 1524ms
+   ✓ approved bootstrap task artifact production composition > preflight remains read-only, including an old journal without bootstrap schema 634ms
+   ✓ approved bootstrap task artifact production composition > does not fabricate an artifact receipt when owned work remains 7315ms
+   ✓ approved bootstrap task artifact production composition > rolls back the adoption receipt, head ledger and second transition together on storage failure 2450ms
+   ✓ approved bootstrap task artifact production composition > rejects a substituted commit before preparing even with internal delivery capability 1533ms
+ ✓ test/storage.test.ts (28 tests) 14575ms
+   ✓ WorkflowStore > uses CAS versions, idempotency keys, and fenced commits 601ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_claim after suspended observations in execution and recovery 2397ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_close after suspended observations in execution and recovery 2373ms
+   ✓ JournaledMutationBroker recovery > guards beads.dolt_push after suspended observations in execution and recovery 2450ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_prepare without duplicate mutation 364ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_prepare without duplicate mutation 393ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_external_mutation without duplicate mutation 373ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_external_mutation without duplicate mutation 386ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_local_commit without duplicate mutation 390ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_local_commit without duplicate mutation 424ms
+   ✓ JournaledMutationBroker recovery > commits an externally applied close without repeating it and escalates contradictions 590ms
+   ✓ JournaledMutationBroker recovery > brokers beads.task_claim through the pinned official adapter 378ms
+   ✓ JournaledMutationBroker recovery > brokers beads.task_close through the pinned official adapter 371ms
+   ✓ JournaledMutationBroker recovery > brokers beads.dolt_push through the pinned official adapter 381ms
+
+ Test Files  2 passed (2)
+      Tests  65 passed (65)
+   Start at  20:01:52
+   Duration  141.25s (transform 360ms, setup 0ms, collect 548ms, tests 140.44s, environment 0ms, prepare 67ms)
+

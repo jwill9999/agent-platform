@@ -1,0 +1,40 @@
+{
+  "brokerImage": "sha256:7f8671d5961c4f9957057fa4f2d1d537266de30102f1234f6ec9771f7c265ea2",
+  "expectedCompiledSha256": [
+    {
+      "path": "localCredentialBrokerCli.js",
+      "sha256": "a8d12d7dbef72f0c9d39f90cd40710f474163310b0f6ef210bb9eddc628dc907"
+    },
+    {
+      "path": "localCredentialGateway.js",
+      "sha256": "dcc13f194f2ab9ff110089dd6eac5376370d6f1cebff85c2a0ec81eb2f65ed73"
+    },
+    {
+      "path": "reviewProxy.js",
+      "sha256": "cd8f7b04ed3743c3d08538a1364459c1ee5f98d92e6c163c75eab401bd12068f"
+    },
+    {
+      "path": "localCredentialLeases.js",
+      "sha256": "d1820d03d1d8ca8c901982f80d55d4614eb49db98e57383f5f49423294d2d0b9"
+    }
+  ],
+  "observedCompiledSha256": [
+    {
+      "path": "localCredentialBrokerCli.js",
+      "sha256": "a8d12d7dbef72f0c9d39f90cd40710f474163310b0f6ef210bb9eddc628dc907"
+    },
+    {
+      "path": "localCredentialGateway.js",
+      "sha256": "dcc13f194f2ab9ff110089dd6eac5376370d6f1cebff85c2a0ec81eb2f65ed73"
+    },
+    {
+      "path": "reviewProxy.js",
+      "sha256": "cd8f7b04ed3743c3d08538a1364459c1ee5f98d92e6c163c75eab401bd12068f"
+    },
+    {
+      "path": "localCredentialLeases.js",
+      "sha256": "d1820d03d1d8ca8c901982f80d55d4614eb49db98e57383f5f49423294d2d0b9"
+    }
+  ],
+  "matches": true
+}

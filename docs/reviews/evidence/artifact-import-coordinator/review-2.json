@@ -1,0 +1,55 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "933d2ce2-e99d-4220-aa44-b025125c1a81",
+  "materialDigest": "57030069ae7c0c877c1d4c3df5e4b2af1c34a6cfec5cfe514dbb2b8d8182654d",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "packages/workflow-control/src/featureDeliveryBroker.ts",
+      "digest": "4e17157badcf541ba6f989be529891acd2f03dc7b4a56bb8443318c2d49e5a24"
+    },
+    {
+      "path": "packages/workflow-control/src/featureEvaluation.ts",
+      "digest": "de38328c817380c36372a310a584bff0076a8c805d458e72f34c0f6aee973d63"
+    },
+    {
+      "path": "packages/workflow-control/src/finalization.ts",
+      "digest": "75801c38df7392bd841de3ca9025d89a425aa4cb7c2c2d83a67393a6bdf7e647"
+    },
+    {
+      "path": "packages/workflow-control/src/governedOperations.ts",
+      "digest": "754650b394e7b64a70c37a50dc53aaa5456948043a16e73de97b3ae56240beff"
+    },
+    {
+      "path": "packages/workflow-control/src/orchestrator.ts",
+      "digest": "9941c960a629546c61a4d985bb73d193ebdfc1fc70dc3c3afa06cfe8dd9af336"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "d5c11cb500b574fdaa6033844498aa40a03553487d5d8833f0635685919aefee"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "5d39c51dfd43df5a98b4812c2553dd89f0ed339d6507cf14ca0b8c2e5c04f6db"
+    },
+    {
+      "path": "packages/workflow-control/src/reconciliation.ts",
+      "digest": "4d84a51e476e1b53247daf608072bea92b078de4b7ebafbbc49ce53be6354f96"
+    },
+    {
+      "path": "packages/workflow-control/src/repairLoops.ts",
+      "digest": "90cfdf6a6da4d0281f2c4079be96e9fe8ffa6595cbfa5158189588dbe0843462"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "c51046085c2622939b9780ed0a9be7d2dc17c7cafab4ae383a9d1152c0b6db10"
+    }
+  ],
+  "formalApproval": false,
+  "findings": [
+    "R3 needs explicit decisions about transition ownership, continuation provenance and delivery scope before it can be wired safely. These are contract gaps beyond the acknowledged absence of dispatch implementation.\n\n1. **High \u2014 Coordinator successors cannot use the existing callback-only job identity.**  \n   **Evidence:** `phaseJobs.ts`: `initializePhaseJobSchema`, `phaseActionForCallback`, `assertPhaseJobAuthority`; `storage.ts`: `commitTransition`.  \n   Phase jobs require unique continuation and callback references. Their authority derives from a specialist callback and assumes `parentRunVersion + 1`. Brokered transitions produce no callback and advance the version twice\u2014at prepare and commit. A fabricated callback would misrepresent both execution provenance and versioning.  \n   **Correction:** Support an explicit origin union: specialist callback or committed typed coordinator receipt. Preserve foreign keys and enforce exactly one origin. Atomically enqueue the successor continuation with the coordinator\u2019s authoritative commit, using the resulting persisted state/version. Reconciliation must recover this enqueue idempotently.\n\n2. **High \u2014 Task acceptance reaches integration, but the next authoritative edge is unspecified.**  \n   **Evidence:** `orchestrator.ts`: `acceptAndCloseTask`; `reconciliation.ts`: `JournaledBeadsTaskCloser.closeTask`; `storage.ts`: `commitTransition`, `#commitVerifiedMerge`.  \n   The concrete path is exact-head verification \u2192 journaled Beads closure \u2192 `integration` for the last task, or `scheduling` otherwise. No supplied implementation establishes `integration \u2192 feature_evaluation`. The supplied GitHub merge commit instead requires `delivery` and enters `finalizing`; it cannot serve as that integration edge.  \n   **Correction:** Specify what integration actually does, which existing production component owns it, and which head evaluation consumes. Bind an integration receipt to the committed task-close operation, trusted gate evidence and resulting head. Verify the normative transition before selecting an existing transition API.\n\n3. **High \u2014 Existing repair bookkeeping does not define the proposed repair handoff.**  \n   **Evidence:** `repairLoops.ts`: `DurableRepairCoordinator.dispatch`, `accept`; `storage.ts`: `planRepairDispatch`, `acceptRepairDispatch`; `governedOperations.ts`: `DELEGATE_CALLBACK_TARGETS`.  \n   Dispatch reserves durable task/finding attempts but leaves the run in repair. Acceptance requires an already repaired descendant head while the run remains `repair` or `repair_planning`. Moving immediately to `implementing` makes that acceptance API unusable afterward. Separately, the `repair_planning \u2192 implementing` callback has no visible requirement tying it to a committed repair dispatch or budget reservation.  \n   **Correction:** Define the handoff around a durable, budgeted repair dispatch\u2014not an \u201caccepted repair\u201d receipt before implementation. Require its ID and attempt numbers when entering implementing and reserving the worker. Explicitly define how subsequent verification/review resolves the finding. If repair children are used, extend task authority deliberately: current packet/callback checks use static `contract.tasks`, although `getAuthorizedRunTask` supports committed children.\n\n4. **High \u2014 Delivery and finalization already own transitions that generic callbacks would duplicate.**  \n   **Evidence:** `storage.ts`: `#commitVerifiedMerge`, `closeFeatureFinalization`; `finalization.ts`: `finalize`; `phaseJobs.ts`: `claimRecovery`.  \n   A committed `github.merge` atomically enters `finalizing` and sets `mergeVerified`. Finalization closes the run after its report and Beads/Dolt effects are verified. A delivery callback would attempt a second transition; a finalizing \u201ccomplete\u201d callback only self-transitions and cannot attest closure. Also, recovery excludes closed runs without an interruption record, so a crash after closure but before job completion would strand the started coordinator job.  \n   **Correction:** Complete coordinator jobs from their actual durable outcomes. Use distinct receipt types for acceptance, integration, repair dispatch, pipeline, delivery and finalization, validating each against its owning journal. Permit bookkeeping recovery after run closure without authorizing further effects. The production pipeline owner still needs identification.\n\n5. **High \u2014 Feature-delivery intent creates an evaluation-authority ordering conflict.**  \n   **Evidence:** `storage.ts`: `getApprovedFeatureDeliveryContract`, `assertApprovedEvaluationHead`, `recordFeatureDeliveryContract`; `featureEvaluation.ts`: `ContractEvaluator.evaluate`.  \n   Recording required feature-delivery intent makes `getApprovedFeatureDeliveryContract` throw until an exact approved contract is recorded. That contract can only be recorded during `finalizing`. Consequently, an early intent can block feature evaluation before pipeline; omitting intent instead makes evaluation use the approved task head. Finalization with feature delivery requires evaluation at the integrated feature head.  \n   **Correction:** Define separate authority for pre-delivery task evaluation and post-merge integrated-head evaluation. Keep required delivery intent mandatory for closeout, but do not use its unresolved contract as the sole authority source for earlier evaluation. Specify the additional evaluation step if staging delivery remains required.\n\n6. **High \u2014 Delivery scope requires an explicit qualification decision.**  \n   **Evidence:** `plan.md`: boundaries and integrated qualification; `featureDeliveryBroker.ts`: staging-only request schemas; `storage.ts`: feature-delivery approval and intent checks.  \n   The repair deliverable is a reviewable PR, with no merge/staging authority. Existing finalization requires a verified merge, and feature delivery introduces separately approved staging authority. Those semantics cannot describe successful completion of this repair\u2019s own PR-only delivery.  \n   **Correction:** Explicitly select a disposable fixture scenario that exercises the production merge/closeout path under separately scoped fixture authority. Keep that qualification outcome distinct from the repair PR and later live pilot. Real staging delivery requires a new scope/approval decision; implementation alone cannot supply it.\n\n**Missing evidence:** `stateMachine.ts`, contract/role-policy schemas, continuation consumption code, production integration/pipeline/delivery composition, integration-gate implementation, and the referenced scenario matrix and proposed contract. Without these, the normative integration/repair targets and complete production dispatch path cannot be confirmed. This review provides no human approval."
+  ]
+}

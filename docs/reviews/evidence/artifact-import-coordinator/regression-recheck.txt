@@ -1,0 +1,105 @@
+
+ RUN  v2.1.9 <checkout>/packages/workflow-control
+
+ ✓ test/phaseRuntime.test.ts (60 tests) 144799ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > reconciles a verified import under a new owner without relaunching the worker 4863ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: admission 3665ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: sync-admission 3429ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: cleanup-only 3261ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > renews live import fences across synchronous work longer than the initial lease without extending execution deadline 3312ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rechecks production import authority at mutation boundaries: before-files 3005ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rechecks production import authority at mutation boundaries: before-ref 3012ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > retains ordinary long code identifiers and string literals without entropy false positives 3577ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rejects source containing a secret assignment before importing 1814ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > imports actual worker bytes and commits a changed-head callback before verification 3828ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > publishes private-only objects with remote CAS and reconciles a lost acknowledgement 4152ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with failed criterion 1795ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with omitted criterion 1819ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with unapproved criterion 1759ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with unresolved finding 1756ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with remaining risk 1780ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with repair status with integrate intent 1827ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with blocked status with integrate intent 1737ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with continue review intent 1940ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with repair intent 1744ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with escalation intent 1716ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head without reusing evidence 3318ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to replacement owner without reusing evidence 3509ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head and replacement owner without reusing evidence 3277ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > executes verification then independent review through durable callbacks and exact evidence 3406ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > renews phase and resource leases across a specialist exceeding the initial TTL 8308ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > fails missing role or source authority before launch: {"roles":false} 393ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > fails missing role or source authority before launch: {"sourceFailure":true} 449ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > persists repair callback and queues no fake passing result 1852ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > blocks a non-actionable repair result before queuing an infrastructure retry 1723ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > persists broker interruption even while credential revocation is unavailable 5842ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rejects invalid structured output and settles/revokes before marking blocked 1840ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never dispatches started work again after a restart without an execution record 463ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > recovers an interrupted scheduler by removing, observing, and revoking before terminal bookkeeping 559ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > cannot add phase role authority through an automatic contract revision 357ms
+   ✓ rechecks admission after source preparation before credential issuance and dispatch 850ms
+   ✓ reconciles a crash before atomic interrupted finalization without acquiring execution leases 1669ms
+   ✓ contains the worker and latches admission when interruption persistence fails 4180ms
+   ✓ bounds shutdown when container removal fails while attach remains outstanding 1650ms
+   ✓ records ambiguous issuance before compensating revocation within the cleanup budget 1163ms
+   ✓ seals the credential pathname before a delayed issuance reply can recreate token bytes 3680ms
+   ✓ rejects a late credential acknowledgement after cleanup ownership changes 3146ms
+   ✓ finishes pending cleanup after the run becomes terminal without advancing it 1957ms
+   ✓ preserves committed success when interruption loses the completion race 2490ms
+   ✓ reports pending recovery for an orphan whose phase lease has not expired 482ms
+   ✓ rejects late success and callback commitment when interruption wins the transaction race 1718ms
+   ✓ recovers a crash after the cancel effect before its durable acknowledgement 1685ms
+   ✓ recovers a crash after the revoke effect before its durable acknowledgement 2349ms
+   ✓ recovers a crash after the settle effect before its durable acknowledgement 1781ms
+   ✓ recovers a persisted pre-reservation interruption without stranding cleanup 495ms
+   ✓ keeps a delayed create isolated until acknowledgement, then attaches before start 2429ms
+   ✓ redacts source verification exceptions before persisting a blocked phase 579ms
+   ✓ bounds credential filesystem settlement and rejects a late completion 7790ms
+   ✓ bounds waiting for a held container lock and prevents a late start 6595ms
+   ✓ redacts sensitive exceptions from both background runtime rejection paths 1482ms
+   ✓ rechecks service admission after synchronous document verification: topology_stale 1605ms
+   ✓ rechecks service admission after synchronous document verification: control_unavailable 1646ms
+   ✓ settles a create rejected at admission before Docker was invoked 1137ms
+   ✓ settles a create rejected at preflight before Docker was invoked 969ms
+ ✓ test/orchestrator.test.ts (23 tests) 13592ms
+   ✓ Beads-authoritative scheduling > closes only accepted exact-head results through the injected broker 672ms
+   ✓ Beads-authoritative scheduling > rejects substituted scheduler input before credentials or container dispatch 605ms
+   ✓ Beads-authoritative scheduling > launches bounded packets through the isolated launcher and releases capacity 1426ms
+   ✓ Beads-authoritative scheduling > revokes the single-run credential before releasing a retained workspace 1491ms
+   ✓ Beads-authoritative scheduling > compensates when a delayed issue response arrives after restart revocation 366ms
+   ✓ Beads-authoritative scheduling > validates the production command-backed credential protocol 1598ms
+   ✓ Beads-authoritative scheduling > 'interrupts timed-out specialists and …' 1104ms
+   ✓ Beads-authoritative scheduling > 'retains timed-out specialist work whe…' 1093ms
+   ✓ Beads-authoritative scheduling > rejects completion when leases expire while the specialist runs 1475ms
+   ✓ Beads-authoritative scheduling > rejects a blocked task using the official Beads snapshot 350ms
+   ✓ Beads-authoritative scheduling > reserves durable scheduler capacity before committing the Beads claim 453ms
+   ✓ Beads-authoritative scheduling > removes the owned persisted container and escalates the run exactly once after restart 549ms
+   ✓ Beads-authoritative scheduling > finishes a scheduler intent when a conflicting prepared Beads claim escalates recovery 415ms
+   ✓ Beads-authoritative scheduling > quarantines an active pre-credential scheduler row until the legacy credential is rotated 354ms
+   ✓ recovers revocation after a crash between never-issued credential transitions 309ms
+ ✓ test/storage.test.ts (29 tests) 14988ms
+   ✓ WorkflowStore > uses CAS versions, idempotency keys, and fenced commits 486ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_claim after suspended observations in execution and recovery 2415ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_close after suspended observations in execution and recovery 2382ms
+   ✓ JournaledMutationBroker recovery > guards beads.dolt_push after suspended observations in execution and recovery 2526ms
+   ✓ JournaledMutationBroker recovery > reconciles a lost acknowledgement under the same live owner without duplicating the effect 397ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_prepare without duplicate mutation 413ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_prepare without duplicate mutation 423ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_external_mutation without duplicate mutation 411ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_external_mutation without duplicate mutation 379ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_local_commit without duplicate mutation 373ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_local_commit without duplicate mutation 408ms
+   ✓ JournaledMutationBroker recovery > commits an externally applied close without repeating it and escalates contradictions 586ms
+   ✓ JournaledMutationBroker recovery > brokers beads.task_claim through the pinned official adapter 372ms
+   ✓ JournaledMutationBroker recovery > brokers beads.task_close through the pinned official adapter 355ms
+   ✓ JournaledMutationBroker recovery > brokers beads.dolt_push through the pinned official adapter 373ms
+ ✓ test/waitRecovery.test.ts (1 test) 890ms
+   ✓ PipelineWaitRecoveryDriver > restarts a committed repair-child wait and completes it at the exact head 890ms
+ ✓ test/standaloneCoordinators.test.ts (1 test) 643ms
+   ✓ renews cancelled coordinator transport only after admission and never after permanent stop 642ms
+
+ Test Files  5 passed (5)
+      Tests  114 passed (114)
+   Start at  21:37:21
+   Duration  176.37s (transform 438ms, setup 0ms, collect 879ms, tests 174.91s, environment 0ms, prepare 150ms)
+

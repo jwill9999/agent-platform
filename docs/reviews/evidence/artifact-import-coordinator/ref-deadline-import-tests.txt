@@ -1,0 +1,24 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/implementationImport.test.ts (27 tests) 15242ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects a concurrent destination symlink replacement without modifying its outside target 653ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects a concurrent ancestor symlink replacement without modifying its outside target 621ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > imports verified bytes, advances the exact base and replays without another commit 1246ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_prepare without duplicate effects 1029ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_head_apply without duplicate effects 1146ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_apply without duplicate effects 1118ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_prepare 1098ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_head_apply 1203ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_apply 1131ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > retains prepared evidence and refuses uncertain partial application 797ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects concurrent source drift and revoked authority before any writes 435ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rechecks authority when reconciling an already verified import 1020ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > imports a new regular file under newly created parent directories 1223ms
+ ✓ test/sourceGit.test.ts (5 tests) 1256ms
+   ✓ publishes an exact-head transaction only after preparing its ref locks 428ms
+
+ Test Files  2 passed (2)
+      Tests  32 passed (32)
+   Start at  18:38:10
+   Duration  16.85s (transform 66ms, setup 0ms, collect 95ms, tests 16.50s, environment 0ms, prepare 74ms)

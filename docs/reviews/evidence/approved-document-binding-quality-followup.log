@@ -1,0 +1,38 @@
+
+ RUN  v2.1.9 /tmp/review/packages/workflow-control
+
+Preparing worktree (new branch 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+ ✓ test/gitDeliveryPort.test.ts (8 tests) 317ms
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+ ✓ test/deliveryBrokers.test.ts (35 tests) 4586ms
+   ✓ DurableDeliveryBroker > rejects unresolved threads and resolved threads without matching durable dispositions 307ms
+   ✓ DurableDeliveryBroker > requires durable broker-approved head lineage for every commit and push 365ms
+   ✓ DurableDeliveryBroker > persists pipeline backoff, completes on success, and escalates an expired wait once 528ms
+ ✓ test/bootstrap.test.ts (37 tests) 18553ms
+   ✓ approved bootstrap task artifact production composition > reconciles a real commit effect with a lost acknowledgement under a new owner 1506ms
+   ✓ approved bootstrap task artifact production composition > reconciles a real push effect with a lost acknowledgement under a new owner 1556ms
+   ✓ approved bootstrap task artifact production composition > rejects lease expiry during the final push observation before dispatch 586ms
+   ✓ approved bootstrap task artifact production composition > rejects a successor takeover during push observation before any remote dispatch 460ms
+   ✓ approved bootstrap task artifact production composition > reopens cancellation after approval invalidation without allowing execution 1297ms
+   ✓ approved bootstrap task artifact production composition > crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases 1379ms
+   ✓ approved bootstrap task artifact production composition > still rejects direct github secret patterns inside an approved bootstrap producer 1282ms
+   ✓ approved bootstrap task artifact production composition > still rejects direct openai secret patterns inside an approved bootstrap producer 1284ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_task_observation without duplicate transitions or push 733ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_candidate_adoption without duplicate transitions or push 671ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_commit without duplicate transitions or push 681ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_push without duplicate transitions or push 665ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_attestation without duplicate transitions or push 766ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: source 337ms
+   ✓ approved bootstrap task artifact production composition > does not fabricate an artifact receipt when owned work remains 1541ms
+   ✓ approved bootstrap task artifact production composition > rolls back the adoption receipt, head ledger and second transition together on storage failure 514ms
+
+ Test Files  3 passed (3)
+      Tests  80 passed (80)
+   Start at  02:03:44
+   Duration  18.99s (transform 475ms, setup 0ms, collect 1.08s, tests 23.46s, environment 0ms, prepare 102ms)
+

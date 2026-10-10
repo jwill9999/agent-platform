@@ -1,0 +1,72 @@
+diff --git a/packages/workflow-control/src/bootstrap.ts b/packages/workflow-control/src/bootstrap.ts
+index f64562a..751129f 100644
+--- a/packages/workflow-control/src/bootstrap.ts
++++ b/packages/workflow-control/src/bootstrap.ts
+@@ -1,4 +1,3 @@
+-import { workflowDeliveryMutationCapability } from './storage.js';
+ import { execFileSync } from 'node:child_process';
+ import { createHash, randomUUID } from 'node:crypto';
+ import { readFileSync, realpathSync, statSync } from 'node:fs';
+@@ -12,7 +11,7 @@ import {
+   type BootstrapPolicy,
+ } from './bootstrapPolicy.js';
+ import { BootstrapJournal } from './bootstrapJournal.js';
+-import { WorkflowStore } from './storage.js';
++import { WorkflowStore, workflowDeliveryMutationCapability } from './storage.js';
+ import { DurableDeliveryBroker, type DeliveryFence } from './deliveryBrokers.js';
+ import { createProductionBootstrapGitPort } from './gitDeliveryPort.js';
+ import { ProcessCapabilityBroker } from './authorization.js';
+diff --git a/packages/workflow-control/src/gitDeliveryPort.ts b/packages/workflow-control/src/gitDeliveryPort.ts
+index 0f81bb1..3ebeaf5 100644
+--- a/packages/workflow-control/src/gitDeliveryPort.ts
++++ b/packages/workflow-control/src/gitDeliveryPort.ts
+@@ -248,22 +248,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
+       this.#assertDocumentTree(
+         gitRequest.kind === 'git.push' ? gitRequest.newSha : gitRequest.parentSha,
+       );
+-    if (gitRequest.kind === 'git.push') {
+-      this.#assertSafeLocalConfig();
+-      const remoteSha = await this.#observeRemoteRef({
+-        workspaceRoot: this.#workspaceRoot,
+-        repository: gitRequest.repository,
+-        remoteName: this.#remoteName,
+-        ref: gitRequest.ref,
+-      });
+-      if (remoteSha === gitRequest.newSha) {
+-        return { kind: 'expected', result: { ref: gitRequest.ref, sha: remoteSha } };
+-      }
+-      if (remoteSha === gitRequest.expectedRemoteSha) {
+-        return { kind: 'unchanged', result: { ref: gitRequest.ref, sha: remoteSha } };
+-      }
+-      return { kind: 'conflict', result: { ref: gitRequest.ref, sha: remoteSha } };
+-    }
++    if (gitRequest.kind === 'git.push') return this.#observePush(gitRequest);
+     const refSha = this.#readRef(gitRequest.ref);
+     if (gitRequest.kind === 'git.create_ref') {
+       if (refSha === gitRequest.parentSha) {
+@@ -290,6 +275,25 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
+     }
+   }
+ 
++  async #observePush(
++    request: Extract<GitDeliveryRequest, { kind: 'git.push' }>,
++  ): Promise<ExternalObservation> {
++    this.#assertSafeLocalConfig();
++    const remoteSha = await this.#observeRemoteRef({
++      workspaceRoot: this.#workspaceRoot,
++      repository: request.repository,
++      remoteName: this.#remoteName,
++      ref: request.ref,
++    });
++    if (remoteSha === request.newSha) {
++      return { kind: 'expected', result: { ref: request.ref, sha: remoteSha } };
++    }
++    if (remoteSha === request.expectedRemoteSha) {
++      return { kind: 'unchanged', result: { ref: request.ref, sha: remoteSha } };
++    }
++    return { kind: 'conflict', result: { ref: request.ref, sha: remoteSha } };
++  }
++
+   async mutate(
+     request: DeliveryRequest,
+     _merge?: Parameters<DeliveryMutationPort['mutate']>[1],

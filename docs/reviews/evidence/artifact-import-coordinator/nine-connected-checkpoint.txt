@@ -1,0 +1,19 @@
+
+ RUN  v2.1.9 <checkout>/packages/workflow-control
+
+ ✓ test/implementationImport.integration.test.ts (9 tests) 497097ms
+   ✓ qualifies import through production runtime, Docker, credential broker and retained evidence 11376ms
+   ✓ qualifies verify-review through production runtime, Docker, credential broker and retained evidence 28709ms
+   ✓ qualifies coordinators through production runtime, Docker, credential broker and retained evidence 46192ms
+   ✓ qualifies repair-verifier through production runtime, Docker, credential broker and retained evidence 68162ms
+   ✓ qualifies repair-reviewer through production runtime, Docker, credential broker and retained evidence 80458ms
+   ✓ qualifies repair-feature through production runtime, Docker, credential broker and retained evidence 96648ms
+   ✓ qualifies lost-close-ack through production runtime, Docker, credential broker and retained evidence 48405ms
+   ✓ qualifies no-hosted-checks through production runtime, Docker, credential broker and retained evidence 48310ms
+   ✓ qualifies late-first-checks through production runtime, Docker, credential broker and retained evidence 68837ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  21:36:13
+   Duration  497.77s (transform 277ms, setup 0ms, collect 369ms, tests 497.10s, environment 0ms, prepare 61ms)
+

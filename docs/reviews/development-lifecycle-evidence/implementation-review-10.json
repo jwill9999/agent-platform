@@ -1,0 +1,150 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "5bca4db6-6ae1-48e0-b2eb-8d8a3a3a1220",
+  "materialDigest": "7aa53b823faf36e3c399ee4ea9ee752a2213d55fe03127073b6d0faf94d1b724",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-addendum.md",
+      "digest": "83c1d0676c880f7b5ef4d1ba1f4f4c1fd56f7e4e8c72d8e9fc091f6b2d1d61f7"
+    },
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-design.md",
+      "digest": "7bf3e3b24ab06b1aa183bc1d1fbc24ad0ec601f23fbb590c5354c62598467556"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/local-verification.json",
+      "digest": "4bf0071bf061a34c2407a6d65dfd0cbd156e2c35e21c99029be533f341d14328"
+    },
+    {
+      "path": "docs/testing/development-lifecycle.md",
+      "digest": "1f0a4a3eeaccc96acf0ed4c249a95e9c31f422a02dddcf94a374bf4475e098f3"
+    },
+    {
+      "path": "docs/workflow-control-development.md",
+      "digest": "5e9d965832bd3a8915002a07d9097182dbb5192ea5673979a70d13d36361d83f"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "digest": "f1f12cea5ce61bae083acfa18f1b5778f55c39b2cf9d3a786873b943cb37631a"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationWorker.ts",
+      "digest": "922b5059994abaa1b694f356b4442ed6f7c92987daf0c2fffa829db6f855231d"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHost.ts",
+      "digest": "c1149defb436476a8c7b7ccea60c228a9fc57a50a71d50cbbbc6e08dd6dbc2a4"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHostJournal.ts",
+      "digest": "26579b414622e1209831e944da03264e1153f7665fcacfe1343306f0a96b5600"
+    },
+    {
+      "path": "packages/workflow-control/src/documentSources.ts",
+      "digest": "f52531076e4b28dd163634aa2516586829c0a128e474d537e55e1a1de98f087e"
+    },
+    {
+      "path": "packages/workflow-control/src/executionInterruptions.ts",
+      "digest": "d220df4a2023cee181b4ee1da8037091b4db93cf1a3e869ec9cb2562c7da0ac7"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialBrokerCli.ts",
+      "digest": "44e78eacad363fa3857528ccaf75b76db67c4c0789b4a0647f0b99c8a8e9cf96"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialGateway.ts",
+      "digest": "0a7fe2bfab80cd94af9d71b3735ee24a31da4bf3b42af71ff32e6b573b2430f3"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialLeases.ts",
+      "digest": "06cdda9ea4cc0bfedf0a385d32a8efd6c1e506b48cc4db7292b7c2e79ba826c4"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "5f81b14c8205a59292fcab8885ebfc82c5084ef6c7881df7ff609b45182a3530"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "b392a696a43cc3fc97ce7c43325bf32c67fe86c2b5642bff8213d2dadda918a9"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "4fdb2647494631e8cde1573ec3d1798d41bcf3b408c49217b5b740ba4e250dd7"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "0ef9db07ff6ff8947e90f314c4292fd5dd805709593a5c44c17ca29ee88ba606"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHost.integration.test.ts",
+      "digest": "8e6f99b687280febc864d0c7e05c1036d199d44680581180f1c0f8b10fa05649"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostFailures.test.ts",
+      "digest": "613dfb2e1a8885edb0fe677353039ccddab9d10f84bd8d181e1ae2a8200fa8bb"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostJournal.test.ts",
+      "digest": "f9577eb50bfa909a00dd78409d56cac635f858ac91a3e116bed7133847ad004c"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentWorkflowFixture.ts",
+      "digest": "49316e8bc66ad313503b534e2c10a2d0c0bbd18204942bf5dae6ab79486a767e"
+    },
+    {
+      "path": "packages/workflow-control/test/executionInterruptions.test.ts",
+      "digest": "3e33085d67b5bf78df539d49a0f32d6392dbc775d844b38218d17180fe4d8ba5"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "9c6a09b8f5db7cceeef48b6fb83aaf77880d431df89b160f417b149d39106d9c"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0e072-ac75-7722-b28a-6e794dd4d9b4"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "I\u2019m checking the supplied code for remaining lifecycle and cleanup defects, and separating those findings from qualification evidence that is still missing."
+        }
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_2",
+          "type": "agent_message",
+          "text": "Review of supplied material `7aa53b823faf36e3c399ee4ea9ee752a2213d55fe03127073b6d0faf94d1b724` found three actionable defects:\n\n1. **High \u2014 Changing the runtime file can bypass recovery of existing workers.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts` \u2014 `create`, `#attachRuntime`, `#validateMember`; `phaseRuntime.ts` \u2014 `cleanupStatus`, `#runOnce`.  \n   The service fingerprint includes the runtime configuration\u2019s pathname, but not its contents or bound run ID. After a supervisor crash, changing that file from run A to run B permits adoption under the same fingerprint. Recovery examines only B, while topology validation accepts an active, journal-bound worker from A without checking its run. The host can therefore report readiness while A\u2019s orphaned execution remains unreconciled.  \n   **Correction:** Persist and validate the runtime\u2019s semantic identity, including run ID, before adoption. Reject changes while prior obligations remain, or reconcile all executions durably bound to the service before admission.\n\n2. **Medium \u2014 Broker adoption accepts additional, unapproved privilege settings.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts` \u2014 `DockerInspection`, `#definition`.  \n   Validation checks that `CapDrop` contains `ALL` and `SecurityOpt` contains `no-new-privileges`, but never checks `CapAdd` or rejects additional security options. An otherwise matching container with added capabilities or `seccomp=unconfined` passes this check. Thus the command-only mismatch repair does not establish the required configuration identity.  \n   **Correction:** Validate the complete permitted capability and security configuration, including absence of added capabilities and unapproved namespace/device settings. Add adoption rejection cases that change only these fields.\n\n3. **Medium \u2014 PID reuse can permanently misidentify an unrelated process as the supervisor.**  \n   **Evidence:** `packages/workflow-control/src/developmentHostJournal.ts` \u2014 `claim`; `developmentHost.ts` \u2014 `processAlive`, `runDevelopmentCommand`.  \n   Ownership records contain only a PID. After a crash or reboot, PID reuse makes `claim` reject recovery even after lease expiry. `development-recover` likewise records a request for that apparently live owner, although no supervisor is present to consume it.  \n   **Correction:** Persist a process start identity and boot identity alongside the PID; verify that identity in both adoption and recovery routing. Test a live PID belonging to a different process incarnation.\n\n**Missing evidence:** `docs/reviews/development-lifecycle-evidence/local-verification.json` records source hashes differing from the supplied manifest for `developmentHost.ts`, `executionInterruptions.ts`, `phaseRuntime.ts`, and `specialistLauncher.ts`. Its passing logs therefore do not establish verification of this exact revision. Exact-revision regression results, results for the newly added fault tests, and the required typecheck/lint/build/hosted gates remain unestablished by this packet. The connected worker fixture explicitly makes no model-generation call; deployed-image generation qualification also needs separate evidence.\n\nThese evidence gaps are qualification limitations, not additional code defects. No commands were executed or state changed. This review is not human approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 187372,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 3173,
+          "reasoning_output_tokens": 2464
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

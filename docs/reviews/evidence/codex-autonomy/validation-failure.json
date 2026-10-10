@@ -1,0 +1,7 @@
+{
+  "stage": "initial_validation",
+  "passed": false,
+  "actual": "native-route=pending\n",
+  "expected": "native-route=ready\n",
+  "exit_code": 1
+}

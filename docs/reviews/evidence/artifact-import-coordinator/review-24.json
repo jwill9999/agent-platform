@@ -1,0 +1,76 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "e62ddc8a-9d6d-4deb-9805-7f9611dad393",
+  "materialDigest": "a9a9c9853e90412b2eb292b6def040a40c3f7c11d087a9754730c0d033e24114",
+  "manifest": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "digest": "7a281b86c0c19451c466b851124d9e970dacf320b3112d313740e873c63189a6"
+    },
+    {
+      "path": "docs/reviews/artifact-import-coordinator-qualification.md",
+      "digest": "b123310e1052b28db8fd18d119393943c51aa2741c1bc5c52072dcb3c54e9fd5"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/final-regression.txt",
+      "digest": "d86880fb5907c397973a421c3cf10a4f3264975c7ee4a72d88c52171f8f0da61"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/import-cleanup-completion-fences.txt",
+      "digest": "154d964fa6b4e8b4b6ccdc0b32b38c3c73f38fc56580208d151b92471c8d9605"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/qualification-manifest.json",
+      "digest": "3d4553b6d8c5b4c89baade19310ef031a3e836097192ba30ae59a4b5159a9a51"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-23.json",
+      "digest": "2c7dc623b0e553dbadaef9be22733f0850e40ec72137e012ff8a32bc077192ae"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/role-final.txt",
+      "digest": "55ef71d9a819f854e9fdd1845cfb9e7e2c62e83fc7de0ebeb2d1b5276d230834"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/thirteen-connected.txt",
+      "digest": "ff04bf286ec71ec1eb1ff73ef7ab4c8664336fa1dad16648a442c4d0b8813548"
+    },
+    {
+      "path": "docs/reviews/run-discovery-qualification.md",
+      "digest": "3fd4ba1617a33ff8e6becd80ef69923dfb83a34b4c0f9c8615ec815bce188607"
+    },
+    {
+      "path": "docs/testing/standalone-pilot-prerequisites.md",
+      "digest": "1e8994a0e0b73d3845218804e5deb388388bf1b900a19c71d0b5c34747dcaa18"
+    },
+    {
+      "path": "packages/workflow-control/src/sourceGit.ts",
+      "digest": "d5e4fc571788fec8a6d4f34dae85fb8e1eceb344f0bdc06d04900290545f6533"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/coordinatorServices.mjs",
+      "digest": "b400f81b211598d48f5f58c76c8a16b9836ac1f032666290079d839b85e2a158"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.integration.test.ts",
+      "digest": "7e0f275c2126353ace25bf633cad404fefab7deb3914c379888adb9db529030a"
+    },
+    {
+      "path": "session.md",
+      "digest": "febeaf59d287b0c55468a057ed208d3cc207f684ffefc57fa416859b43cc1b56"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "- **Medium \u2014 Required configuration provenance is incomplete.**  \n  **Evidence:** `qualification-manifest.json`; `implementationImport.integration.test.ts`; `docs/testing/standalone-pilot-prerequisites.md`.  \n  **Reason:** The matrix requires retained configuration hashes and startup observations. The manifest binds source, build, image and logs, but omits the generated runtime, broker and coordinator configurations. The test deletes those configurations during cleanup. Source hashes alone do not record their actual runtime values.  \n  **Correction:** Retain sanitized per-scenario configurations or canonical configuration digests with startup observations, bound to the execution results.\n\n- **Medium \u2014 Hosted-gate claims lack supplied verification evidence.**  \n  **Evidence:** `artifact-import-coordinator-qualification.md`; `session.md`; `qualification-manifest.json`.  \n  **Reason:** Both reports state that nine hosted checks passed on `e7cab36`, but the supplied bundle contains no check-result snapshot identifying those checks, their conclusions and checked revision. CI configuration establishes what should run, not what passed.  \n  **Correction:** Supply the retained hosted check results with exact SHA and run URLs; retain publication-head results separately when available.\n\nNo additional concrete production defect is established by the supplied evidence. The signal-aware shutdown correction addresses review23\u2019s reported double wait, and retained logs support the stated 1,123 regression, 13 connected and 25 role/tool passes. The private CI interpreter copy preserves the stated executable-permission restriction.\n\nLive pilot, staging, real external delivery and terminal cancellation remain explicitly unqualified; they are not additional findings against this bounded scope. This review is not human approval."
+        }
+      }
+    ]
+  },
+  "formalApproval": false
+}

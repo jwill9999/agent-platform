@@ -1,0 +1,6 @@
+{
+  "stage": "single_repair",
+  "path": "/Users/letuscode/.codex/autonomy-cleanup-20261009/native-adoption-smoke/fixture.txt",
+  "contents": "native-route=ready\n",
+  "sha256": "59017caf67c74ad171dc25091c045eea061914d4908ca05a57e116285c252b1d"
+}

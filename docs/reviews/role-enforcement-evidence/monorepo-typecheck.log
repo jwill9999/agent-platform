@@ -1,0 +1,79 @@
+
+> agent-platform@ typecheck <workspace>
+> pnpm --filter @agent-platform/contracts build && pnpm --filter @agent-platform/agent-validation build && pnpm --filter @agent-platform/logger build && pnpm --filter @agent-platform/db build && pnpm --filter @agent-platform/mcp-adapter build && pnpm --filter @agent-platform/model-router build && pnpm --filter @agent-platform/plugin-sdk build && pnpm --filter @agent-platform/plugin-session build && pnpm --filter @agent-platform/plugin-observability build && pnpm --filter @agent-platform/planner build && pnpm --filter @agent-platform/harness build && pnpm -r run typecheck
+
+
+> @agent-platform/contracts@0.0.0 build <workspace>/packages/contracts
+> tsc -p tsconfig.json
+
+
+> @agent-platform/agent-validation@0.0.0 build <workspace>/packages/agent-validation
+> tsc -p tsconfig.json
+
+
+> @agent-platform/logger@0.0.0 build <workspace>/packages/logger
+> tsc -p tsconfig.json
+
+
+> @agent-platform/db@0.0.0 build <workspace>/packages/db
+> tsc -p tsconfig.json
+
+
+> @agent-platform/mcp-adapter@0.0.0 build <workspace>/packages/mcp-adapter
+> tsc -p tsconfig.json
+
+
+> @agent-platform/model-router@0.0.0 build <workspace>/packages/model-router
+> tsc -p tsconfig.json
+
+
+> @agent-platform/plugin-sdk@0.0.0 build <workspace>/packages/plugin-sdk
+> tsc -p tsconfig.json
+
+
+> @agent-platform/plugin-session@0.0.0 build <workspace>/packages/plugin-session
+> tsc -p tsconfig.json
+
+
+> @agent-platform/plugin-observability@0.0.0 build <workspace>/packages/plugin-observability
+> tsc -p tsconfig.json
+
+
+> @agent-platform/planner@0.0.0 build <workspace>/packages/planner
+> tsc -p tsconfig.json
+
+
+> @agent-platform/harness@0.0.0 build <workspace>/packages/harness
+> tsc -p tsconfig.json
+
+Scope: 15 of 16 workspace projects
+packages/contracts typecheck$ tsc --noEmit -p tsconfig.json
+packages/logger typecheck$ tsc --noEmit -p tsconfig.json
+packages/workflow-control typecheck$ tsc --noEmit -p tsconfig.json
+packages/model-router typecheck$ tsc --noEmit -p tsconfig.json
+packages/logger typecheck: Done
+packages/model-router typecheck: Done
+packages/contracts typecheck: Done
+packages/workflow-control typecheck: Done
+apps/desktop typecheck$ tsc --noEmit -p tsconfig.json
+apps/web typecheck$ tsc --noEmit -p tsconfig.json
+packages/agent-validation typecheck$ tsc --noEmit -p tsconfig.json
+packages/db typecheck$ tsc --noEmit -p tsconfig.json
+packages/agent-validation typecheck: Done
+packages/mcp-adapter typecheck$ tsc --noEmit -p tsconfig.json
+apps/desktop typecheck: Done
+packages/plugin-sdk typecheck$ tsc --noEmit -p tsconfig.json
+packages/db typecheck: Done
+packages/plugin-sdk typecheck: Done
+packages/mcp-adapter typecheck: Done
+apps/web typecheck: Done
+packages/planner typecheck$ tsc --noEmit -p tsconfig.json
+packages/plugin-session typecheck$ tsc --noEmit -p tsconfig.json
+packages/plugin-observability typecheck$ tsc --noEmit -p tsconfig.json
+packages/plugin-observability typecheck: Done
+packages/plugin-session typecheck: Done
+packages/planner typecheck: Done
+packages/harness typecheck$ tsc --noEmit -p tsconfig.json
+packages/harness typecheck: Done
+apps/api typecheck$ tsc --noEmit -p tsconfig.json
+apps/api typecheck: Done
