@@ -41,6 +41,10 @@ No successful scan or analysis of those artifacts is claimed. A supported provid
 owner policy disposition is needed; the macOS VM remains separately queued on the offline runner.
 After the handoff repair passes feature checks and is delivered, pause the integration monitor at this
 external blocker rather than keep rerunning unchanged scans or polling the same runner state.
+Diagnostic handoff repair PR289 targets the evidence feature. Its current spec marks PR287 steps
+complete and uses version-pinned official raw source links after the hosted GitHub URL returned HTTP503.
+Next useful delivery is PR289 after exact-head feature gates and review clearance; then verify the
+repair in PR288, resolve its handoff finding and pause at the documented scanner blocker.
 
 Preserve PR283, `task/pilot-active-budget` at `ee3a160f` and `task/test-runner-offline-adapter` at
 `e1222b19`, and all dirty primary/paused/unrelated worktrees. The paused checkout retains thirteen
