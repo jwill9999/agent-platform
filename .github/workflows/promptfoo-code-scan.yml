@@ -3,28 +3,285 @@ name: Promptfoo Code Scan
 on:
   pull_request:
     branches: [main, staging]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'PR number to scan'
+        description: 'Exact archive-only staging PR to qualify from protected staging'
         required: true
+
+permissions:
+  contents: read
 
 jobs:
   security-scan:
+    name: security-scan
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: write
       id-token: write
-
     steps:
-      - name: Checkout code
+      - name: Checkout protected base control only
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .trusted
+          persist-credentials: false
           fetch-depth: 0
 
-      - name: Run Promptfoo Code Scan
-        uses: promptfoo/code-scan-action@148e01f35bc65bd992b9f44679577aa9123be6ab # v0.1.8
+      - name: Setup trusted Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          min-severity: medium
+          node-version: '24'
+
+      - name: Classify from protected base or require bootstrap full scan
+        id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE_RECEIPT_PATH: ${{ runner.temp }}/archive-qualification.json
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          TARGET_BRANCH: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$TARGET_BRANCH" = staging ] && { [ -f .trusted/scripts/classify-historical-evidence.mjs ] || [ -f .trusted/.github/security/historical-evidence-allowlist.v1.json ]; }; then
+            ARCHIVE_DATA_DIR=$(mktemp -d "$RUNNER_TEMP/archive-data.XXXXXX")
+            export ARCHIVE_DATA_DIR
+            node .trusted/scripts/qualify-historical-evidence.mjs
+          else
+            echo 'route=full' >> "$GITHUB_OUTPUT"
+            echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
+            echo "head=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+            echo 'No adopted protected archive policy or target main: actual full analysis required.'
+          fi
+
+      - name: Checkout exact full-scan head as data only
+        if: steps.route.outputs.route == 'full'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: .scan
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Bind actual scan to current PR and remove candidate report
+        if: steps.route.outputs.route == 'full'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_BASE: ${{ github.event.pull_request.base.sha }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_PR: ${{ github.event.pull_request.number }}
+          SCAN_ROOT: ${{ github.workspace }}/.scan
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { rmSync } from 'node:fs';
+          if (process.env.GITHUB_REPOSITORY !== 'jwill9999/agent-platform') throw new Error('Wrong repository');
+          const response = await fetch(`https://api.github.com/repos/jwill9999/agent-platform/pulls/${process.env.EXPECTED_PR}`, { headers: { Authorization: `Bearer ${process.env.GH_TOKEN}` }, redirect: 'error', signal: AbortSignal.timeout(30000) });
+          if (!response.ok) throw new Error('PR lookup failed');
+          const pr = await response.json();
+          if (pr.state !== 'open' || pr.head.repo.full_name !== 'jwill9999/agent-platform' || pr.head.sha !== process.env.EXPECTED_HEAD || pr.base.sha !== process.env.EXPECTED_BASE) throw new Error('Fork or stale PR input');
+          const head = execFileSync('git', ['-C', process.env.SCAN_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (head !== pr.head.sha || !['main', 'staging'].includes(pr.base.ref)) throw new Error('Wrong local scan HEAD/target');
+          // The vendor fetch runs in RUNNER_TEMP. Prepare its data-only local
+          // base explicitly so detached checkout can resolve staging...HEAD.
+          execFileSync('git', ['-C', process.env.SCAN_ROOT, '-c', 'core.hooksPath=/dev/null', 'update-ref', `refs/heads/${pr.base.ref}`, pr.base.sha]);
+          const base = execFileSync('git', ['-C', process.env.SCAN_ROOT, 'rev-parse', pr.base.ref], { encoding: 'utf8' }).trim();
+          if (base !== pr.base.sha) throw new Error('Wrong prepared local base');
+          rmSync(`${process.env.SCAN_ROOT}/promptfoo-scan.sarif.json`, { force: true });
+          NODE
+
+      - name: Checkout immutable Promptfoo action bundle
+        if: steps.route.outputs.route == 'full'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: promptfoo/code-scan-action
+          ref: 148e01f35bc65bd992b9f44679577aa9123be6ab # v0.1.8
+          path: .promptfoo-action
+          persist-credentials: false
+
+      - name: Run full Promptfoo with audited pinned vendor base and response guard
+        if: steps.route.outputs.route == 'full'
+        id: promptfoo
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCAN_ROOT: ${{ github.workspace }}/.scan
+          ACTION_ROOT: ${{ github.workspace }}/.promptfoo-action
+          GUARD_PROOF_PATH: ${{ runner.temp }}/promptfoo-vendor-guard.json
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const PROMPTFOO_BUNDLE_SHA256 = 'dfaa683013d457419f4246a9a17892fab6da368072fc2bd6e90857af7c67ac03';
+          const PROMPTFOO_GUARD_VERSION = 'raw-response-v1';
+          const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+          function validatePromptfooResponse(response) {
+            if (
+              response?.success !== true ||
+              !Array.isArray(response.comments) ||
+              response.skipReason !== undefined
+            )
+              throw new Error('Promptfoo analysis failed or skipped');
+            if (response.review !== undefined && typeof response.review !== 'string')
+              throw new Error('Malformed Promptfoo review');
+            const review = (response.review || '').trim();
+            if (
+              /^no files to scan[.!]?$/i.test(review) ||
+              /^(?:scan (?:was )?skipped|mock scan|running in act mode|fork pr scanning not authorized|authentication failed|authorization failed|setup failed)/i.test(
+                review,
+              )
+            )
+              throw new Error('Promptfoo did not perform genuine analysis');
+          }
+          function insertPromptfooResponseGuard(bundle) {
+            const responseAnchor = 'async function handleScanResponse(scanResponse, inputs, context3) {';
+            const mockAnchor = 'function createMockScanResponse() {';
+            for (const anchor of [responseAnchor, mockAnchor])
+              if (bundle.split(anchor).length !== 2)
+                throw new Error('Unknown or ambiguous pinned vendor guard anchor');
+            const predicate = validatePromptfooResponse.toString();
+            const guarded = bundle
+              .replace(responseAnchor, `${responseAnchor}\n  (${predicate})(scanResponse);`)
+              .replace(
+                mockAnchor,
+                `${mockAnchor}\n  throw new Error('Mock Promptfoo execution cannot qualify');`,
+              );
+            return {
+              bundle: guarded,
+              originalSha256: sha256(bundle),
+              guardedSha256: sha256(guarded),
+              guardVersion: PROMPTFOO_GUARD_VERSION,
+              guardSha256: sha256(predicate),
+              limits: [
+                'Guard validates raw response completion; ordinary built-in file omissions remain disclosed',
+              ],
+            };
+          }
+          function guardPromptfooAction(bundle) {
+            if (sha256(bundle) !== PROMPTFOO_BUNDLE_SHA256)
+              throw new Error('Pinned vendor bundle digest mismatch');
+            return insertPromptfooResponseGuard(bundle);
+          }
+          const action = execFileSync('git', ['-C', process.env.ACTION_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (action !== '148e01f35bc65bd992b9f44679577aa9123be6ab') throw new Error('Wrong action bundle');
+          const originalPath = `${process.env.ACTION_ROOT}/dist/index.js`;
+          const original = readFileSync(originalPath);
+          const committed = execFileSync('git', ['-C', process.env.ACTION_ROOT, 'show', 'HEAD:dist/index.js'], { maxBuffer: 4 * 1024 * 1024 });
+          if (!original.equals(committed)) throw new Error('Vendor checkout differs from pinned Git blob');
+          const guarded = guardPromptfooAction(original.toString('utf8'));
+          const guardedPath = `${process.env.ACTION_ROOT}/dist/guarded-index.js`;
+          writeFileSync(guardedPath, guarded.bundle, { flag: 'wx' });
+          const { bundle, ...guardProof } = guarded;
+          writeFileSync(process.env.GUARD_PROOF_PATH, JSON.stringify(guardProof) + '\n');
+          // GitHub workflow defaults are not overwritten. Only this child process
+          // receives the exact data repository path expected by the pinned bundle.
+          const env = { ...process.env, GITHUB_WORKSPACE: process.env.SCAN_ROOT, ACT: 'false', NODE_OPTIONS: '', 'INPUT_API-HOST': 'https://api.promptfoo.app', 'INPUT_MIN-SEVERITY': 'medium', 'INPUT_GITHUB-TOKEN': process.env.GH_TOKEN, 'INPUT_ENABLE-FORK-PRS': 'false', 'INPUT_SARIF-OUTPUT-PATH': 'promptfoo-scan.sarif.json', 'INPUT_CONFIG-PATH': '', 'INPUT_GUIDANCE': '', 'INPUT_GUIDANCE-FILE': '' };
+          execFileSync(process.execPath, [guardedPath], { cwd: process.env.RUNNER_TEMP, env, stdio: 'inherit' });
+          NODE
+
+      - name: Require completed non-skipped analysis and record actual CLI
+        if: steps.route.outputs.route == 'full'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_BASE: ${{ github.event.pull_request.base.sha }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_PR: ${{ github.event.pull_request.number }}
+          SCAN_ROOT: ${{ github.workspace }}/.scan
+          PROOF_PATH: ${{ runner.temp }}/full-scan-proof.json
+          SARIF_PATH: ${{ steps.promptfoo.outputs.sarif-path }}
+          ACTION_ROOT: ${{ github.workspace }}/.promptfoo-action
+          GUARD_PROOF_PATH: ${{ runner.temp }}/promptfoo-vendor-guard.json
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
+          const expected = `${process.env.SCAN_ROOT}/promptfoo-scan.sarif.json`;
+          if (process.env.SARIF_PATH !== expected || !lstatSync(expected).isFile()) throw new Error('Missing completed analysis report; skips do not qualify');
+          const bytes = readFileSync(expected); const sarif = JSON.parse(bytes);
+          if (sarif.version !== '2.1.0' || !Array.isArray(sarif.runs) || sarif.runs.length !== 1) throw new Error('Malformed completed analysis report');
+          const rawReview = sarif.runs[0]?.properties?.promptfoo?.review;
+          if (sarif.runs[0]?.tool?.driver?.name !== 'Promptfoo Code Scan' || (rawReview && /^no files to scan[.!]?$/i.test(rawReview.trim()))) throw new Error('SARIF does not demonstrate completed analysis');
+          const guard = JSON.parse(readFileSync(process.env.GUARD_PROOF_PATH, 'utf8'));
+          const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
+          if (guard.guardVersion !== 'raw-response-v1' || guard.originalSha256 !== 'dfaa683013d457419f4246a9a17892fab6da368072fc2bd6e90857af7c67ac03' || guard.guardedSha256 !== hash(readFileSync(`${process.env.ACTION_ROOT}/dist/guarded-index.js`)) || guard.originalSha256 !== hash(readFileSync(`${process.env.ACTION_ROOT}/dist/index.js`))) throw new Error('Vendor response guard proof mismatch');
+          const response = await fetch(`https://api.github.com/repos/jwill9999/agent-platform/pulls/${process.env.EXPECTED_PR}`, { headers: { Authorization: `Bearer ${process.env.GH_TOKEN}` }, redirect: 'error', signal: AbortSignal.timeout(30000) });
+          if (!response.ok) throw new Error('Final PR lookup failed');
+          const pr = await response.json();
+          if (pr.state !== 'open' || pr.head.sha !== process.env.EXPECTED_HEAD || pr.base.sha !== process.env.EXPECTED_BASE) throw new Error('PR changed during scan');
+          const localHead = execFileSync('git', ['-C', process.env.SCAN_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const localBase = execFileSync('git', ['-C', process.env.SCAN_ROOT, 'rev-parse', pr.base.ref], { encoding: 'utf8' }).trim();
+          if (localHead !== pr.head.sha || localBase !== pr.base.sha) throw new Error('Scan refs mismatch');
+          const cliVersion = execFileSync('promptfoo', ['--version'], { encoding: 'utf8' }).trim();
+          writeFileSync(process.env.PROOF_PATH, JSON.stringify({ qualification: 'actual-full-promptfoo-analysis', repository: process.env.GITHUB_REPOSITORY, pr: pr.number, head: pr.head.sha, base: pr.base.sha, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT, vendorBaseActionSha: '148e01f35bc65bd992b9f44679577aa9123be6ab', vendorResponseGuard: guard, cliVersion, diffsOnly: false, sarifSha256: createHash('sha256').update(bytes).digest('hex'), limits: ['Built-in blob/patch omissions remain; filesystem access is not analysis coverage', 'Action installs current CLI; actual installed version recorded'] }, null, 2) + '\n');
+          NODE
+
+      - name: Upload actual full-analysis receipt
+        if: steps.route.outputs.route == 'full' && success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: full-promptfoo-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/full-scan-proof.json
+            .scan/promptfoo-scan.sarif.json
+
+      - name: Upload explicit automatic archive qualification
+        if: steps.route.outputs.route == 'archive' && success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: automatic-archive-${{ github.event.pull_request.number }}-${{ steps.route.outputs.head }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/archive-qualification.json
+
+  archive-provenance:
+    name: archive-provenance
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Reject dispatch outside protected staging
+        env:
+          EVENT_REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          test "$EVENT_REF" = refs/heads/staging
+          test "$REPOSITORY" = jwill9999/agent-platform
+
+      - name: Checkout exact protected workflow source only
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          path: .trusted
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Setup trusted Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Independently qualify complete archive from protected source
+        id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE_RECEIPT_PATH: ${{ runner.temp }}/archive-qualification.json
+        run: |
+          set -euo pipefail
+          ARCHIVE_DATA_DIR=$(mktemp -d "$RUNNER_TEMP/archive-provenance.XXXXXX")
+          export ARCHIVE_DATA_DIR
+          node .trusted/scripts/qualify-historical-evidence.mjs
+
+      - name: Upload protected provenance receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: archive-provenance-${{ inputs.pr_number }}-${{ steps.route.outputs.head }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          path: ${{ runner.temp }}/archive-qualification.json
