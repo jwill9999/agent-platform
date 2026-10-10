@@ -119,6 +119,14 @@ pattern, while retaining its explicit `node --test` invocation in CI. No asserti
 hooks or timeouts are disabled. Fresh affected Vitest passes 113 assertions in 17 files; the explicit Node invocation passes all
 12 resolver tests. Both test runners now select their intended suites.
 
+## Initial hosted feature findings
+
+At exact `2dd99c6f`, lychee failed only the old Agent Zero GitHub usage-document URL with HTTP503
+in the retained historical gap analysis. Carry the identical official raw Markdown URL repair
+already reviewed on the full consolidation/primer branches; preserve the rest of that document.
+Fresh head link checks are required. Sourcery skipped because its weekly review budget is exhausted;
+its generated summary is not a code review. The distinct independent source reviews remain recorded.
+
 ## Pending delivery gates
 
 Actual policy-adoption full scan and VM, protected archive

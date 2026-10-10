@@ -20,12 +20,19 @@ Work is now on `task/native-staging-archive-policy` from staging-derived
 Beads runner/archive-policy issues and dependencies are read back; parent/primer remain in progress.
 Beads synced after this initial resumed checkpoint. Subsequent changes need their own readback/sync.
 
+[PR292](https://github.com/jwill9999/agent-platform/pull/292) delivers this segment to the dedicated
+feature. At `2dd99c6f`, both critics approve the source; normal hooks pass and all six substantive
+initial mirrors are fully read-back verified. Initial lychee failed only the retained Agent Zero
+GitHub usage URL with HTTP503; carry its already-reviewed official raw-source URL repair, then
+refresh checks and all seven document mirrors at the new tip. Sourcery skipped due to exhausted
+weekly budget; no Sourcery code-review pass is claimed. No staging qualification or merge yet.
+
 Fresh official runner 2.337.0 on native APFS is online as dev 23 with the four required labels;
 old ExFAT installation is preserved, old idle Listener stopped gracefully, fresh credentials used
 without copying/publishing tokens, and no service installed. PR286 CI 38081623129 attempt 2,
 job 114337873032, completed preparation4 seconds, checkout3 seconds, install/preflight/assets/Swift
 build. Signing failed because hardcoded build output differed from actual Swift output. A reviewed
-shared `--show-bin-path` signing/packaging resolver is being implemented; actual VM remains required.
+shared `--show-bin-path` signing/packaging resolver is implemented and source-reviewed; hosted actual VM remains required.
 Both old attempts stalled approximately 60 minutes before cancellation. Exact cancellation origin is
 unconfirmed; cancellation does not explain the preceding filesystem stall. The owner-raised CI
 concurrency refinement preserves active staging/feature validations using `github.base_ref == main`
