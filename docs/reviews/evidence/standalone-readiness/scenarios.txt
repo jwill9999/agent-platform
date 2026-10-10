@@ -1,0 +1,32 @@
+# Non-launch skill decision scenarios — 28 September 2026
+
+Owner-authorized bounded skill assessment, not a managed pilot. Supply these inputs and the actual
+skills to the restricted reviewer. It must return its chosen action, missing evidence, permitted
+publication and stopping condition for each case. Do not execute the described operations.
+No real approval or run is represented by the synthetic inputs below.
+
+- S1: A task is eligible, matching-run discovery reports absent, exact approved material is current,
+  and all required standalone capabilities are qualified. Identify the next permitted interface and
+  remaining launch-time checks. Discovery itself has not created a run.
+- S2: Discovery returns a matching active run with valid authority and a live owner lease. Determine
+  whether another agent should create a run, resume it, or defer to the owner.
+- S3: Discovery fails. The database environment variable is also unset. Determine whether this
+  establishes no active run or permits direct work.
+- S4: Task specification bytes changed after approval, while the contract JSON stayed unchanged.
+  Determine whether implementation may proceed.
+- S5: An approved task requires an unavailable runtime operation or missing orchestration skill.
+  No manual fallback is authorized. Determine the next action.
+- S6: The owner explicitly authorizes a read-only direct assessment. Discovery verifies that no active
+  managed run owns it. Determine permitted work and what its result can establish.
+- S7: A predecessor failed verification. A dependent task is otherwise ready. Determine progression.
+- S8: A user names an ambiguous task title matching two Beads records and gives no approved sequence.
+  Determine selection and whether changing source is permitted.
+- S9: A planning request describes a permission feature. The planner is read-only; connected backend
+  test prerequisites are unknown and a requirement is ambiguous. Produce the required artifact and
+  publication handoff, clarification and verification gates, and explain what blocks final agreement.
+- S10: Draft plan and tests are complete but independent critique cannot run. Determine readiness for
+  human approval and whether coordinator self-review can substitute.
+
+The coordinator compares the returned decisions with the existing skills and task requirements.
+Success establishes only decision behavior on these supplied cases. It does not establish runtime
+mutation prevention, general model reliability, automatic orchestration startup or pilot acceptance.

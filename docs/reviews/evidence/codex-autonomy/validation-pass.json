@@ -1,0 +1,8 @@
+{
+  "stage": "final_validation",
+  "passed": true,
+  "actual": "native-route=ready\n",
+  "expected": "native-route=ready\n",
+  "sha256": "59017caf67c74ad171dc25091c045eea061914d4908ca05a57e116285c252b1d",
+  "exit_code": 0
+}

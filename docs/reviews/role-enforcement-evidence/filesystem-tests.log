@@ -1,0 +1,14 @@
+
+ RUN  v2.1.9 <workspace>/packages/workflow-control
+
+ ✓ test/roleEnforcement.test.ts (4 tests) 18ms
+ ✓ test/specialistLauncher.test.ts (6 tests) 20ms
+ ✓ test/roleEnforcement.integration.test.ts (13 tests) 3123ms
+   ✓ enforces actual container access for 'feature_planner' 324ms
+   ✓ enforces actual container access for 'plan_critic' 308ms
+
+ Test Files  3 passed (3)
+      Tests  23 passed (23)
+   Start at  17:16:38
+   Duration  3.57s (transform 399ms, setup 0ms, collect 929ms, tests 3.16s, environment 0ms, prepare 123ms)
+

@@ -1,0 +1,38 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/phaseJobs.test.ts (50 tests) 16999ms
+   ✓ standalone durable phase jobs > rejects substituted callback identity and phase 322ms
+   ✓ standalone durable phase jobs > allows only one claimer and fences stale workers after a pre-start crash 473ms
+   ✓ standalone durable phase jobs > revalidates authority at claim and start with a visible blocker for stale queued work 331ms
+   ✓ standalone durable phase jobs > rejects a head change between claim and start without a false phase-start event 397ms
+   ✓ standalone durable phase jobs > does not infer a head ledger or active callback authority when either is absent 517ms
+   ✓ standalone durable phase jobs > keeps started work beyond five seconds and requires recovery instead of duplicate launch 430ms
+   ✓ standalone durable phase jobs > requires execution-bound durable completion and fences late completion 440ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted head_sha without completing 439ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted producer without completing 429ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted producer_role without completing 426ms
+   ✓ standalone durable phase jobs > rejects a previous implementation result even when it has valid generic evidence scope 428ms
+   ✓ standalone durable phase jobs > does not invent coordinator completion authority from a generic transition receipt 365ms
+   ✓ standalone durable phase jobs > production continuation queues runnable work and reports missing authority visibly 510ms
+   ✓ standalone durable phase jobs > preserves approval and blocked outcomes without enqueueing specialist work 445ms
+   ✓ cancellation queue fencing > keeps phase launch fenced after an incomplete cancellation deadline while allowing observation recovery 485ms
+   ✓ cancellation queue fencing > atomically fences pending phase work and rejects cancellation-time enqueues/claims 324ms
+   ✓ cancellation queue fencing > atomically fences claimed phase work and rejects cancellation-time enqueues/claims 322ms
+   ✓ cancellation queue fencing > does not declare started phase execution stopped from a cleanup boolean alone 387ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'claim' without starting work 321ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'claim' without starting work 331ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'claim' without starting work 319ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'start' without starting work 402ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'start' without starting work 370ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'start' without starting work 414ms
+   ✓ finishes a coordinator from committed proof and atomically queues one typed successor 690ms
+   ✓ retains coordinator identity for bounded recovery and blocks after its fixed budget 370ms
+ ✓ test/coordinatorTransport.test.ts (5 tests) 1196ms
+   ✓ terminates forked descendants on abort before accepting another operation 784ms
+
+ Test Files  2 passed (2)
+      Tests  55 passed (55)
+   Start at  20:00:04
+   Duration  18.72s (transform 202ms, setup 0ms, collect 274ms, tests 18.19s, environment 0ms, prepare 68ms)
+

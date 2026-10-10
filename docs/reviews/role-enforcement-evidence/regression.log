@@ -1,0 +1,150 @@
+
+ RUN  v2.1.9 /build/packages/workflow-control
+
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+ ✓ test/governedPersistence.test.ts (20 tests) 1679ms
+ ✓ test/orchestrator.test.ts (22 tests) 2770ms
+   ✓ Beads-authoritative scheduling > validates the production command-backed credential protocol 405ms
+ ✓ test/repairLoops.test.ts (28 tests) 2122ms
+ ✓ test/featureDeliveryBroker.test.ts (25 tests) 2446ms
+ ✓ test/deliveryBrokers.test.ts (35 tests) 7841ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with none changed 387ms
+   ✓ DurableDeliveryBroker > persists an attested zero-thread snapshot before the immediate merge re-observation 304ms
+   ✓ DurableDeliveryBroker > rejects unresolved threads and resolved threads without matching durable dispositions 504ms
+   ✓ DurableDeliveryBroker > recovers response loss only after a durable verified merge precondition 409ms
+   ✓ DurableDeliveryBroker > migrates a legacy prepared merge and completes verified recovery 349ms
+   ✓ DurableDeliveryBroker > requires durable broker-approved head lineage for every commit and push 590ms
+   ✓ DurableDeliveryBroker > escalates corrupt journal rows without suppressing later recovery 584ms
+   ✓ DurableDeliveryBroker > persists pipeline backoff, completes on success, and escalates an expired wait once 894ms
+ ✓ test/documentApproval.test.ts (106 tests | 2 skipped) 8295ms
+ ✓ test/featureEvaluation.test.ts (25 tests) 2975ms
+ ✓ test/finalization.test.ts (11 tests) 2688ms
+   ✓ FeatureFinalizationCoordinator > derives durable feature authority and blocks omission of the staging attestation 385ms
+   ✓ FeatureFinalizationCoordinator > recovers beads.task_close after its external effect without duplication 306ms
+ ✓ test/storage.test.ts (28 tests) 3156ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_claim after suspended observations in execution and recovery 504ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_close after suspended observations in execution and recovery 478ms
+   ✓ JournaledMutationBroker recovery > guards beads.dolt_push after suspended observations in execution and recovery 533ms
+ ✓ test/activeSpecialistSettlement.test.ts (35 tests) 4687ms
+ ✓ test/featureDeliveryApproval.test.ts (7 tests) 534ms
+ ✓ test/governedOperations.test.ts (11 tests) 10ms
+ ✓ test/phaseJobs.test.ts (44 tests) 3881ms
+ ✓ test/recoveryCancellation.test.ts (8 tests) 788ms
+ ↓ test/activeSpecialistSettlement.integration.test.ts (4 tests | 4 skipped)
+ ✓ test/specialistContainerLifecycle.test.ts (52 tests) 23ms
+ ✓ test/continuationWorker.test.ts (15 tests) 1016ms
+ ✓ test/secureEvidence.test.ts (26 tests) 351ms
+ ✓ test/specialistOutputManifest.test.ts (59 tests) 109ms
+Preparing worktree (new branch 'task/delivery-feature.7')
+ ✓ test/gitDeliveryPort.test.ts (8 tests) 362ms
+ ✓ test/githubDeliveryPort.test.ts (11 tests) 11ms
+ ✓ test/authorization.test.ts (19 tests) 18ms
+ ↓ test/specialistContainerLifecycle.integration.test.ts (3 tests | 3 skipped)
+ ↓ test/supervisedReviewCapabilities.integration.test.ts (3 tests | 3 skipped)
+ ✓ test/localCredentialBroker.test.ts (9 tests) 593ms
+   ✓ satisfies CLI protocol without returning a worker token on stdout 414ms
+ ✓ test/preapprovalMaterial.test.ts (49 tests) 69ms
+ ✓ test/planning.test.ts (8 tests) 428ms
+ ✓ test/cancellationWork.test.ts (4 tests) 283ms
+ ✓ test/continuationNotifications.test.ts (6 tests) 350ms
+ ✓ test/specialistLauncher.test.ts (6 tests) 23ms
+ ✓ test/continuationProcess.test.ts (12 tests) 2755ms
+   ✓ production process continuation release gate > consumes feature_planner completion exactly once in a real parent process with no user turn 317ms
+   ✓ production process continuation release gate > watchdog bounds acceptance from a real host process that never starts the parent 554ms
+ ✓ test/phaseRuntime.test.ts (23 tests) 13402ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with failed criterion 347ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head without reusing evidence 647ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to replacement owner without reusing evidence 718ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head and replacement owner without reusing evidence 601ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > executes verification then independent review through durable callbacks and exact evidence 554ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > renews phase and resource leases across a specialist exceeding the initial TTL 6837ms
+ ✓ test/localCredentialGateway.test.ts (7 tests) 276ms
+ ↓ test/roleTools.integration.test.ts (12 tests | 12 skipped)
+ ✓ test/waitRecovery.test.ts (1 test) 214ms
+ ✓ test/lifecycle.test.ts (8 tests) 9ms
+ ✓ test/featureDeliveryContracts.test.ts (12 tests) 8ms
+ ↓ test/roleEnforcement.integration.test.ts (13 tests | 13 skipped)
+ ↓ test/isolation.integration.test.ts (4 tests | 4 skipped)
+ ✓ test/schedulerCompletionContention.test.ts (3 tests) 288ms
+ ✓ test/stateMachine.test.ts (17 tests) 16ms
+ ✓ test/planningDocuments.test.ts (12 tests) 57ms
+ ✓ test/integrationGate.test.ts (4 tests) 83ms
+ ✓ test/supervisedReviewLifecycle.test.ts (6 tests) 41ms
+ ✓ test/bootstrapPolicy.test.ts (3 tests) 131ms
+ ✓ test/prePushIsolation.test.ts (4 tests) 642ms
+ ✓ test/roleEnforcement.test.ts (4 tests) 43ms
+ ✓ test/contracts.test.ts (7 tests) 9ms
+ ✓ test/supervisedReview.test.ts (7 tests) 42ms
+ ✓ test/reviewProxyStreams.test.ts (3 tests) 40ms
+ ✓ test/reviewProxy.test.ts (19 tests) 23ms
+ ✓ test/artifacts.test.ts (5 tests) 92ms
+ ↓ test/supervisedReview.integration.test.ts (1 test | 1 skipped)
+ ✓ test/mcpServer.test.ts (1 test) 54ms
+ ✓ test/bootstrapAdapters.test.ts (31 tests) 13898ms
+   ✓ pinned production bootstrap subprocess adapters > rejects a writable pinned dependency (mode=509) 589ms
+   ✓ pinned production bootstrap subprocess adapters > rejects a writable pinned dependency (mode=455) 455ms
+   ✓ pinned production bootstrap subprocess adapters > reads one complete official snapshot using only readonly sandbox CLI commands and allowlisted environment 419ms
+   ✓ pinned production bootstrap subprocess adapters > observes and CAS-pushes the exact task ref through a real bare remote (existing=false) 913ms
+   ✓ pinned production bootstrap subprocess adapters > observes and CAS-pushes the exact task ref through a real bare remote (existing=true) 846ms
+   ✓ pinned production bootstrap subprocess adapters > ignores hostile repository config, URL rewrites and local pre-push hooks 478ms
+   ✓ pinned production bootstrap subprocess adapters > rejects a valid but unapproved local commit and a provider-side CAS race 582ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: kind 336ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: workspaceRoot 335ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: repository 355ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: remoteName 339ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: remoteUrl 358ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: ref 408ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: expectedOldSha 337ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: newSha 363ms
+   ✓ pinned production bootstrap subprocess adapters > rejects remote request substitution: extra 434ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: kind 338ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: workspaceRoot 324ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: taskId 322ms
+   ✓ pinned production bootstrap subprocess adapters > rejects Beads request substitution before launching CLI: extra 338ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a redirect Beads subprocess response 360ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a wrong-task Beads subprocess response 371ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a wrong-project Beads subprocess response 353ms
+   ✓ pinned production bootstrap subprocess adapters > fails closed and redacts a failure Beads subprocess response 362ms
+   ✓ pinned production bootstrap subprocess adapters > rejects modified dependencies, oversized input, malformed JSON and CLI arguments 532ms
+   ✓ pinned production bootstrap subprocess adapters > binds deployment dependency pins and never overwrites an existing reviewed directory 310ms
+   ✓ pinned production bootstrap subprocess adapters > rejects traversal and symlinked deployment parents before creating a bundle 679ms
+   ✓ pinned production bootstrap subprocess adapters > uses canonical nested destinations and never follows an existing destination symlink 424ms
+   ✓ pinned production bootstrap subprocess adapters > confines deployment to the default or explicitly trusted root 813ms
+   ✓ pinned production bootstrap subprocess adapters > validates CLI config files and rejects symlinks and relative escapes 515ms
+ ✓ test/bootstrap.test.ts (37 tests) 34916ms
+   ✓ approved bootstrap task artifact production composition > reconciles a real commit effect with a lost acknowledgement under a new owner 2133ms
+   ✓ approved bootstrap task artifact production composition > reconciles a real push effect with a lost acknowledgement under a new owner 2660ms
+   ✓ approved bootstrap task artifact production composition > rejects lease expiry during the final commit observation before dispatch 734ms
+   ✓ approved bootstrap task artifact production composition > rejects lease expiry during the final push observation before dispatch 1517ms
+   ✓ approved bootstrap task artifact production composition > rejects a successor takeover during push observation before any remote dispatch 1219ms
+   ✓ approved bootstrap task artifact production composition > reopens cancellation after approval invalidation without allowing execution 1841ms
+   ✓ approved bootstrap task artifact production composition > crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases 3040ms
+   ✓ approved bootstrap task artifact production composition > rejects changed producer identifiers before bootstrap evidence persistence 490ms
+   ✓ approved bootstrap task artifact production composition > rejects additional producer identifiers before bootstrap evidence persistence 500ms
+   ✓ approved bootstrap task artifact production composition > still rejects direct github secret patterns inside an approved bootstrap producer 2503ms
+   ✓ approved bootstrap task artifact production composition > still rejects direct openai secret patterns inside an approved bootstrap producer 2951ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_task_observation without duplicate transitions or push 1730ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_candidate_adoption without duplicate transitions or push 2368ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_commit without duplicate transitions or push 1455ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_push without duplicate transitions or push 917ms
+   ✓ approved bootstrap task artifact production composition > recovers response loss at after_attestation without duplicate transitions or push 1629ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: beads 398ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: source 478ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: ref 384ms
+   ✓ approved bootstrap task artifact production composition > fails fresh authority observation before mutation: adapter 358ms
+   ✓ approved bootstrap task artifact production composition > rejects stale owners and missing approval/evidence without preparing anything 367ms
+   ✓ approved bootstrap task artifact production composition > retains the full hash-bound policy and rejects database payload substitution 540ms
+   ✓ approved bootstrap task artifact production composition > does not fabricate an artifact receipt when owned work remains 2032ms
+   ✓ approved bootstrap task artifact production composition > rolls back the adoption receipt, head ledger and second transition together on storage failure 559ms
+   ✓ approved bootstrap task artifact production composition > rejects a substituted commit before preparing even with internal delivery capability 312ms
+
+ Test Files  49 passed | 7 skipped (56)
+      Tests  901 passed | 42 skipped (943)
+   Start at  16:17:32
+   Duration  40.23s (transform 2.07s, setup 0ms, collect 7.68s, tests 114.54s, environment 6ms, prepare 2.11s)
+

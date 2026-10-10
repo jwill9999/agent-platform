@@ -1,0 +1,140 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ❯ test/phaseRuntime.test.ts (59 tests | 1 failed) 133611ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > reconciles a verified import under a new owner without relaunching the worker 4439ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: admission 3383ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: sync-admission 3283ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > does not resume import or commit callbacks when recovery is denied: cleanup-only 3293ms
+   × standalone phase runtime production orchestration with fixture launcher transport > renews live import fences across synchronous work longer than the initial lease without extending execution deadline 2133ms
+     → expected false to be true // Object.is equality
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rechecks production import authority at mutation boundaries: before-files 2805ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rechecks production import authority at mutation boundaries: before-ref 2910ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > retains ordinary long code identifiers and string literals without entropy false positives 3273ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rejects source containing a secret assignment before importing 1677ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > imports actual worker bytes and commits a changed-head callback before verification 3507ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > publishes private-only objects with remote CAS and reconciles a lost acknowledgement 3900ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with failed criterion 1711ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with omitted criterion 1689ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with unapproved criterion 1678ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with unresolved finding 1685ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with remaining risk 1823ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with repair status with integrate intent 2012ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with blocked status with integrate intent 2170ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with continue review intent 1736ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with repair intent 1729ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never accepts review with passed status with escalation intent 1691ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head without reusing evidence 3231ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to replacement owner without reusing evidence 3274ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > binds repeated verification input to changed head and replacement owner without reusing evidence 3305ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > executes verification then independent review through durable callbacks and exact evidence 3172ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > renews phase and resource leases across a specialist exceeding the initial TTL 8260ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > fails missing role or source authority before launch: {"roles":false} 483ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > fails missing role or source authority before launch: {"sourceFailure":true} 511ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > persists repair callback and queues no fake passing result 1820ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > persists broker interruption even while credential revocation is unavailable 5860ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > rejects invalid structured output and settles/revokes before marking blocked 1639ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > never dispatches started work again after a restart without an execution record 463ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > recovers an interrupted scheduler by removing, observing, and revoking before terminal bookkeeping 516ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > cannot add phase role authority through an automatic contract revision 321ms
+   ✓ rechecks admission after source preparation before credential issuance and dispatch 843ms
+   ✓ reconciles a crash before atomic interrupted finalization without acquiring execution leases 1650ms
+   ✓ contains the worker and latches admission when interruption persistence fails 4034ms
+   ✓ bounds shutdown when container removal fails while attach remains outstanding 1629ms
+   ✓ records ambiguous issuance before compensating revocation within the cleanup budget 974ms
+   ✓ seals the credential pathname before a delayed issuance reply can recreate token bytes 3414ms
+   ✓ rejects a late credential acknowledgement after cleanup ownership changes 3060ms
+   ✓ finishes pending cleanup after the run becomes terminal without advancing it 1562ms
+   ✓ preserves committed success when interruption loses the completion race 1765ms
+   ✓ reports pending recovery for an orphan whose phase lease has not expired 460ms
+   ✓ rejects late success and callback commitment when interruption wins the transaction race 1638ms
+   ✓ recovers a crash after the cancel effect before its durable acknowledgement 1551ms
+   ✓ recovers a crash after the revoke effect before its durable acknowledgement 1528ms
+   ✓ recovers a crash after the settle effect before its durable acknowledgement 1519ms
+   ✓ recovers a persisted pre-reservation interruption without stranding cleanup 462ms
+   ✓ keeps a delayed create isolated until acknowledgement, then attaches before start 2040ms
+   ✓ redacts source verification exceptions before persisting a blocked phase 448ms
+   ✓ bounds credential filesystem settlement and rejects a late completion 6610ms
+   ✓ bounds waiting for a held container lock and prevents a late start 6413ms
+   ✓ redacts sensitive exceptions from both background runtime rejection paths 1382ms
+   ✓ rechecks service admission after synchronous document verification: topology_stale 1519ms
+   ✓ rechecks service admission after synchronous document verification: control_unavailable 1469ms
+   ✓ settles a create rejected at admission before Docker was invoked 1137ms
+   ✓ settles a create rejected at preflight before Docker was invoked 958ms
+ ✓ test/featureEvaluation.test.ts (26 tests) 13756ms
+   ✓ ContractEvaluator > separates initial task-head evaluation from unapproved integrated-head delivery 328ms
+   ✓ ContractEvaluator > maps every criterion to secure exact-head evidence and freezes accepted evidence 446ms
+   ✓ DurableRepairChildBroker > creates an in-envelope append-only repair child idempotently 765ms
+   ✓ DurableRepairChildBroker > carries approved-head lineage and decremented retry authority into a second repair 1206ms
+   ✓ DurableRepairChildBroker > rejects a second child until its predecessor advances and is accepted and closed 773ms
+   ✓ DurableRepairChildBroker > derives child authority from durable attempts and rejects an exhausted aggregate budget 771ms
+   ✓ DurableRepairChildBroker > rejects repair count expansion before mutation 457ms
+   ✓ DurableRepairChildBroker > rejects repair path expansion before mutation 430ms
+   ✓ DurableRepairChildBroker > rejects repair role expansion before mutation 465ms
+   ✓ DurableRepairChildBroker > rejects repair authority expansion before mutation 464ms
+   ✓ DurableRepairChildBroker > rejects repair dependency expansion before mutation 459ms
+   ✓ DurableRepairChildBroker > rejects repair retry budget expansion before mutation 444ms
+   ✓ DurableRepairChildBroker > durably escalates conflicting external state without mutation 580ms
+   ✓ DurableRepairChildBroker > rechecks changed planning documents immediately before repair child mutation 700ms
+   ✓ DurableRepairChildBroker > rechecks 'invalidate' authority after suspended 'child' observation in the official repair port 681ms
+   ✓ DurableRepairChildBroker > rechecks 'takeover' authority after suspended 'child' observation in the official repair port 686ms
+   ✓ DurableRepairChildBroker > rechecks 'invalidate' authority after suspended 'ref' observation in the official repair port 789ms
+   ✓ DurableRepairChildBroker > rechecks 'takeover' authority after suspended 'ref' observation in the official repair port 765ms
+   ✓ DurableRepairChildBroker > reconciles a crash after external mutation without duplicating the effect 825ms
+   ✓ DurableRepairChildBroker > adopts a prepared intent after lease-owner rollover without duplicating the effect 840ms
+   ✓ DurableRepairChildBroker > rejects a fabricated evaluation and a run outside repair_planning 639ms
+ ✓ test/implementationImport.test.ts (33 tests) 32626ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > preserves concurrent destination symlink replacement in the original checkout 1518ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > preserves concurrent ancestor symlink replacement in the original checkout 1467ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > preserves a same-inode editor write during modify import 1462ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > preserves a same-inode editor write during delete import 1459ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > fails closed after restart with a missing registered workspace 1427ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > fails closed after restart with a replaced registered workspace 1195ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > fails closed after restart with a symlinked registered workspace 962ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > does not inherit host hooks, credentials, ignored files or hardlinked source 1426ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > imports verified bytes, advances the exact base and replays without another commit 2022ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_prepare without duplicate effects 1802ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_head_apply without duplicate effects 1860ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > reconciles crash at after_apply without duplicate effects 1980ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_prepare 1919ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_head_apply 1944ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > recovers retained intent after process termination at after_apply 1992ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > retains prepared evidence and refuses uncertain partial application 1573ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects concurrent source drift and revoked authority before any writes 302ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > refuses deletion of ignored host files absent from the approved base 328ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects another checked-out branch even at the approved commit 352ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects a symlink source without importing 313ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects a hardlink source without importing 366ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rechecks authority when reconciling an already verified import 1461ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > imports a new regular file under newly created parent directories 1895ms
+   ✓ journaled implementation import repository adapter (unit authority fixture) > rejects forged content, missing prior digest, and unsupported file types 350ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/phaseRuntime.test.ts > standalone phase runtime production orchestration with fixture launcher transport > renews live import fences across synchronous work longer than the initial lease without extending execution deadline
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/phaseRuntime.test.ts:491:41
+    489|       });
+    490|     try {
+    491|       expect(await f.runtime.runOnce()).toBe(true);
+       |                                         ^
+    492|     } finally {
+    493|       spy.mockRestore();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 117 passed (118)
+   Start at  19:48:50
+   Duration  180.93s (transform 338ms, setup 0ms, collect 560ms, tests 179.99s, environment 0ms, prepare 99ms)
+
+undefined
+/Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/implementationImport.test.ts test/phaseRuntime.test.ts test/featureEvaluation.test.ts --no-file-parallelism

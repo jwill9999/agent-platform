@@ -1,0 +1,146 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "03343aed-bccc-469c-8455-9058438e9874",
+  "materialDigest": "6bbb6ce666b654e959c3eba953dd36aac4e344b973ab13d4cafe13747886d339",
+  "manifest": [
+    {
+      "path": ".agents/skills/documentation/SKILL.md",
+      "digest": "a3e7410e3cd3a8e9fc4bf6066a0c5fd7990f4c60246c4c017be0ada03f0075fd"
+    },
+    {
+      "path": ".agents/skills/feature-implementation/SKILL.md",
+      "digest": "1565a4919c819e5697385ac280f54aad6b78d994730f27320ad589163668bb37"
+    },
+    {
+      "path": ".agents/skills/feature-planning/SKILL.md",
+      "digest": "2cd309b63c9a086fcf2d7ab574288efecad89d115f994efb24e3762779edff52"
+    },
+    {
+      "path": ".agents/skills/orchestration/SKILL.md",
+      "digest": "7e97190e112784b1fba509335edc9066daf0bf55a550d04e758acf392fca771d"
+    },
+    {
+      "path": ".agents/skills/plan-critique/SKILL.md",
+      "digest": "17d3a1de5e7e6f3d07fdb2c21ae6f1bb05d5e41eca44dfe7520a79e93bcddbd9"
+    },
+    {
+      "path": ".agents/skills/playwright-quality-gate/SKILL.md",
+      "digest": "debe3f3b983283cf65cb09f05d4cabc55b6a64299a5c093fc36d7c034108839f"
+    },
+    {
+      "path": "docs/README.md",
+      "digest": "57c70201a7835497c0cb1fcc0b1fae33aa8d74cf520bfff76b566489096603ec"
+    },
+    {
+      "path": "docs/adr/0004-codex-development-orchestration-control-plane.md",
+      "digest": "1c90f6d5ff79f5d27f5bb3d3376df012914901e2bb9737252ad9512a9cc9582c"
+    },
+    {
+      "path": "docs/agent-instructions-shared.md",
+      "digest": "211947ac88b85c9ac46a62ccd913ea2211ea64736d34837916cbc79ed0feb3f1"
+    },
+    {
+      "path": "docs/tasks/README.md",
+      "digest": "c013a084ff06ad5f00f7c84b2d0d357f3f7446399f3a439f17052fa3f379d002"
+    },
+    {
+      "path": "docs/tasks/_template.md",
+      "digest": "b981346a0ad0922edf9d0be3901a2ecc5acd76b8ec30a13917fa76763169a5f3"
+    },
+    {
+      "path": "docs/tasks/agent-platform-pilot-zero.16.md",
+      "digest": "d0fa63e9ee059fbe5608583521c6c86735a643f5f8df9f0d6c9afe4f3736d985"
+    },
+    {
+      "path": "docs/workflow-control-planning.md",
+      "digest": "610c5b3b7bed72230c6c06aecb40a945f6ec0786abec7e1258037278cc6bda48"
+    },
+    {
+      "path": "docs/workflow-control-security.md",
+      "digest": "72393fb277b52a1f49e947a0924075922c3c3f03f6455018fd021d3d4dd3aa3e"
+    },
+    {
+      "path": "docs/workflow-control-supervised-review.md",
+      "digest": "ee81cfdda82721f33850bbb82978b6f9799b9c78644101f13ccfceb08ebd8031"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "4352f833a4fd57cccc4d8f583b3e3e914418455c30507c8549591bbb74615834"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/reviewProxy.ts",
+      "digest": "ac53a7b70634f566520fd25355527dbb372b2b38c4d88d6c2e78972db7394c30"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "a26a4043857448cc758bf7301dbcd2891e362f1633ae42aaf9e45b650a2e30fa"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReview.ts",
+      "digest": "7b108086c26b1aed3ee5585983fd58679df265ed3470ecf6428a92a13abda27d"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReviewCli.ts",
+      "digest": "c83d1276a9120d7ad9f2abd990181330215b0abc4d22f6a64ddba8877473e584"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/reviewerCapabilityProbe.mjs",
+      "digest": "1c6ec5c2a7949476e8affa12aac0fd8dd2d11bbccb1b351a72412578d41b5d2d"
+    },
+    {
+      "path": "packages/workflow-control/test/reviewProxy.test.ts",
+      "digest": "d03e1fe628a1458a938da692f0622cb583cda651348d10edda560d3487b7565a"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.integration.test.ts",
+      "digest": "da254056e690919e7a56b36957566719c8d96d07c718ebc5cf3de78291725d31"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.test.ts",
+      "digest": "2af618618c2159a192fb95e5f1596f2044127c1311d87aaab1c76fda51c6913e"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReviewCapabilities.integration.test.ts",
+      "digest": "d3cdbde93807f47696cad25b98c47522966cde2cf80943c008073c9841231fe4"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReviewLifecycle.test.ts",
+      "digest": "d6727da7408cf624d7c181d4d622569bb733de0e8a9449726c1cdfe862b08a80"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0d0d3-4554-75b1-9227-690d961db106"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "- **Medium \u2014 Capability probe does not capture the complete tool inventory.**  \n  **Evidence:** `packages/workflow-control/test/fixtures/reviewerCapabilityProbe.mjs`; `supervisedReviewCapabilities.integration.test.ts`.  \n  The fixture retains only the first `additional_tools` inventory, ignores top-level request tool definitions, and checks inventory absence only for `collaboration.*`. Three injected-call rejections prove those particular calls fail; they do not establish that all prohibited tools or alternate delegation paths are unavailable.  \n  **Correction:** Capture tool definitions across all requests and assert an explicit permitted inventory. Preserve the inventory and rejection results as qualification artifacts.\n\n- **Low \u2014 Removal-failure test never reaches a successful review result.**  \n  **Evidence:** `packages/workflow-control/test/supervisedReviewLifecycle.test.ts`, test \u201cretains staging and rejects success when removal is not confirmed.\u201d  \n  Its output contains only `turn.completed`, which the revised executor already rejects for missing review text. Consequently, this test does not demonstrate that cleanup failure overrides an otherwise successful review.  \n  **Correction:** Supply both a completed agent message and `turn.completed`, then assert removal failure rejects and retains staging. Add the corresponding successful-cleanup case.\n\n- **Medium \u2014 Runtime qualification evidence is absent from the supplied snapshot.**  \n  **Evidence:** `docs/workflow-control-supervised-review.md`; `supervisedReviewCapabilities.integration.test.ts`.  \n  The new probes exercise real Docker/client boundaries when enabled, unlike model self-reports. However, they are optional, and the supplied material contains no execution artifacts establishing their results against the revised configuration and pinned image. The documentation still explicitly marks qualification blocked.  \n  **Correction:** Supply revision/image-bound results, captured inventories, rejection outputs and boundary-probe observations before changing that qualification status. External-document approval binding remains the separately acknowledged, unimplemented task `agent-platform-pilot-zero.16`."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 54994,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1315,
+          "reasoning_output_tokens": 921
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

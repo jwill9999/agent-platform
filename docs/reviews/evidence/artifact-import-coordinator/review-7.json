@@ -1,0 +1,79 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "f989f30e-22d1-4445-a2de-5d39023865d8",
+  "materialDigest": "a0d1b3c045d6b53e329dd3747ecc3bbbb2d04f2c462ee7d4b23261e6731c7878",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "packages/workflow-control/src/anchoredFileMutation.ts",
+      "digest": "8736a42bc008e0b0ba951b0fce83fd834432c2b50ecacfc495596d6f9164125f"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationImport.ts",
+      "digest": "41dd46339c35d43b0620d9be3736d9e53add7c0cc3eec0138081a0661f60d865"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationOutput.ts",
+      "digest": "6ea5b7667f31db3607924d0f6aa81814eed9aa2853c835f6b8f90439fa3d29c0"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "c610626b50bcbb2e7752259d5dbf5ab88743d17bd31c5c86c768098d9eec3716"
+    },
+    {
+      "path": "packages/workflow-control/src/secureEvidence.ts",
+      "digest": "3b0b0be3b09931f1de2b90c85a60ec8612cbd84c4a6e45ab741312dd6076212e"
+    },
+    {
+      "path": "packages/workflow-control/src/sourceGit.ts",
+      "digest": "1306d1e0a6d7fc628164d4eea231ccf923a136f2342ea446d2b60ec69faa9db4"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "c636134945b197507d89dd596afd1786fab53db47546b055d720f60f4c2d9806"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistOutputManifest.ts",
+      "digest": "64c9dd79ff56ef6215ac1dfa0fd9826d959b7596eda189cf9f8248ff158dc204"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistTerminalResult.ts",
+      "digest": "14b1ce372f1e1223935ddb8455c7f7a8a25c89c80e8bc06d72c547d27384553f"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "ed31c3adaf8e00f247fccf1ac0c929b28a11cdff835eb6b1e1e2108c5ec03623"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/implementationResponses.mjs",
+      "digest": "fd1aad01402a91994bc19bb8a472cb5b89fcac619b36b3457836c8881b4d1c4b"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.integration.test.ts",
+      "digest": "31f50083db1826d13bab312f4a45c7338a7fbbb0f04e0075d4b9f13da20dafed"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.test.ts",
+      "digest": "909281754cdc5a026f6ae9854b1fc24a32c52960c84f0797dfe4c196fb2b123e"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "a5c323de920266628198d5fd519170ca95a84e3e061108eafa4672d83693e6e9"
+    },
+    {
+      "path": "packages/workflow-control/test/sourceGit.test.ts",
+      "digest": "d33e9b9e5f4ed91d99a2c5a2247931da02f5ca7c463f6dd49d1d0c8c59ca8cbb"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistLauncher.test.ts",
+      "digest": "333a0e8a83fd7b9df05e0bcf613f9103330b6ab4613a773f6c6ba1769908e003"
+    }
+  ],
+  "formalApproval": false,
+  "findings": [
+    "No concrete correctness defect found in the narrow fix, treating the deadline as the **latest permitted commit-dispatch time**.\n\n- **Evidence:** `sourceGit.ts`, `TrustedSourceGit.updateRef` and `refTransactionProgram`. Git prepares the exact-old-head transaction before the child checks the deadline. Expired preparation sends `abort`; success requires both `commit: ok` and exit code zero. Lock contention fails immediately.\n- **Evidence:** `implementationImport.ts`, `ImportWorkspace.apply`. Authority is rechecked after deadline-bounded `read-tree` and before `updateRef`. A rejected or uncertain ref transaction cannot produce a verified receipt.\n\n**Missing evidence:**\n\n1. **Medium \u2014 deadline semantics.** `refTransactionProgram` checks time before sending `commit`; this does not guarantee that Git publishes the ref before the deadline. Scheduling or filesystem delays can cross it afterward, and killing Git cannot undo publication. Clarify that the guarantee concerns dispatch. If publication-before-expiry is required, this fix does not establish it.\n\n2. **Low \u2014 boundary coverage.** `sourceGit.test.ts` covers expiry before invocation and immediate lock rejection, but neither exercises expiration after transaction startup or around `prepare: ok`. Add deterministic coverage proving that late preparation never receives `commit`, and that timeout/lost acknowledgement after commit dispatch remains uncertain. Verify importer replay observes the resulting head without creating another commit.\n\nAssessment is limited to supplied evidence; no tests executed or state changed. This is not human approval."
+  ]
+}

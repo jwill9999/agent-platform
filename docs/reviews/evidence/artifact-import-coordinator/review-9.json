@@ -1,0 +1,99 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "4ae6e843-1347-4596-9467-ec8ad0af8b09",
+  "materialDigest": "f6b6fcb3bef95972f6391bdc449efa0111ef82c7c967d69fd90b86947d179f68",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "docs/reviews/artifact-import-coordinator-qualification.md",
+      "digest": "57d6f385fcd6f6842ae3f1b2db07008d001114854b16b7f4e08b83c9a580f000"
+    },
+    {
+      "path": "packages/workflow-control/src/anchoredFileMutation.ts",
+      "digest": "8736a42bc008e0b0ba951b0fce83fd834432c2b50ecacfc495596d6f9164125f"
+    },
+    {
+      "path": "packages/workflow-control/src/gitDeliveryPort.ts",
+      "digest": "123f1536dd305eb501eb632fb36424df8a53fc50cd364adcb95a3e55744f47b0"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationImport.ts",
+      "digest": "b00c41bb0179c01ffcb9d3f83e158801c6868a0f62a8e38ef333860166e6df40"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationOutput.ts",
+      "digest": "a216e04ab4246beeb6b774254388113fd527622c3fcfdd9c689113f9d0d4ba51"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "753b2afc3ffa6057cd7fc41c7a0d3dccfa69a96af4ad9c6eb6cf76556c857767"
+    },
+    {
+      "path": "packages/workflow-control/src/secureEvidence.ts",
+      "digest": "3b0b0be3b09931f1de2b90c85a60ec8612cbd84c4a6e45ab741312dd6076212e"
+    },
+    {
+      "path": "packages/workflow-control/src/sourceGit.ts",
+      "digest": "4d29fa97763147d61257ec4264b140e3b815dd1a9d67ca4a3462fb627bd606c4"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "c09892fb4a58968da3c6e0b01f68ba21df4197980d26ae00d1c91d984f02abd1"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistOutputManifest.ts",
+      "digest": "64c9dd79ff56ef6215ac1dfa0fd9826d959b7596eda189cf9f8248ff158dc204"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistTerminalResult.ts",
+      "digest": "14b1ce372f1e1223935ddb8455c7f7a8a25c89c80e8bc06d72c547d27384553f"
+    },
+    {
+      "path": "packages/workflow-control/src/standaloneCoordinators.ts",
+      "digest": "306c0834d7338b4c786e5e6720e15d8f6911f3ed7a9f3d8ad4104e653b841543"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "acd4695a0cabbfb0350dec03b820851a71f18e7a5807dc60bcb6498c9bc8c327"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentWorkflowFixture.ts",
+      "digest": "155364b8a625b470dfe8de4c651ddb0392023e0e92bf9dd632319e4a2f24eff8"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/implementationResponses.mjs",
+      "digest": "8bf8352ef5e9eefd807c5b4ed41421c0633059504b3095920b3960014f4ba58f"
+    },
+    {
+      "path": "packages/workflow-control/test/gitDeliveryPort.test.ts",
+      "digest": "bad398d1b71be7d2d9bb3a1ec66e204bbdf8a6ac0648b0274e325fde641a4285"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.integration.test.ts",
+      "digest": "b4271171f67a0ccd50d4b9a7c76a99963b3b38e8170d5e481a9bec1d4384d33e"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.test.ts",
+      "digest": "2eaee93c1fdae2c8600b222bf6bd3ef12055348b41cf65ffbebfaabb2ccae75a"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "fa628064eb89d85b2a0f462001670f50a416a4b624f84f765d0f6b51ab91cb1c"
+    },
+    {
+      "path": "packages/workflow-control/test/sourceGit.test.ts",
+      "digest": "c7f523e402c24d46255f6829216bff0cc0efebd70c4f39bc1e9473e34cc10b30"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistLauncher.test.ts",
+      "digest": "333a0e8a83fd7b9df05e0bcf613f9103330b6ab4613a773f6c6ba1769908e003"
+    }
+  ],
+  "formalApproval": false,
+  "messages": [
+    "No confirmed actionable R2 defects found in the supplied evidence under the stated private-workspace threat model.\n\nThe import preserves the original checkout, validates the registered directory identity, reconciles retained intents against the private checkout, and retains the published SHA. Delivery passes the private object source to `pushCas` and reuses the prior push precondition.\n\nMissing evidence:\n\n- **Delivery handoff qualification** \u2014 `gitDeliveryPort.ts`, `gitDeliveryPort.test.ts`: supplied tests do not demonstrate `createForWorkflow` pushing a commit available only in the private clone to a disposable Git remote. Add coverage verifying object transfer, original-checkout preservation, stale remote CAS rejection, and lost-acknowledgement replay.\n- **Registry recovery qualification** \u2014 `implementationImport.ts`, `implementationImport.test.ts`: directory identity checks exist, but supplied tests do not exercise missing, replaced, or symlinked registered workspaces. Add restart tests proving rejection without recreating the workspace, mutating the original checkout, or committing a callback.\n\nThese are qualification gaps, not demonstrated implementation bugs. Review was static and limited to supplied evidence; reported test results were not independently executed. R3 completion remains outside this conclusion. This is not human approval."
+  ]
+}

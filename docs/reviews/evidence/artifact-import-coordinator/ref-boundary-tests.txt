@@ -1,0 +1,13 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/sourceGit.test.ts (7 tests) 4271ms
+   ✓ publishes an exact-head transaction only after preparing its ref locks 479ms
+   ✓ does not wait past authority expiry for a real contested ref lock 317ms
+   ✓ does not send commit when a started transaction cannot prepare before the deadline 1506ms
+   ✓ reports uncertain publication when the commit acknowledgement is lost 1508ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  18:43:51
+   Duration  4.61s (transform 31ms, setup 0ms, collect 31ms, tests 4.27s, environment 0ms, prepare 42ms)

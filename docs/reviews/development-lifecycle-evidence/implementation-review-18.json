@@ -1,0 +1,201 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "b4fc23e8-4eb9-4a31-97ab-bab41bc33c32",
+  "materialDigest": "63da24a1b84977bcae31297fafbdcb9372c3fd3032c87558fd3ffeb951b5106b",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-addendum.md",
+      "digest": "83c1d0676c880f7b5ef4d1ba1f4f4c1fd56f7e4e8c72d8e9fc091f6b2d1d61f7"
+    },
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-design.md",
+      "digest": "7bf3e3b24ab06b1aa183bc1d1fbc24ad0ec601f23fbb590c5354c62598467556"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/broker-image-binding.json",
+      "digest": "693c224d665803066223bffaeab2aa6d3e977e39dae38ccd1801f4d05f001647"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/current-image-generation-driver.txt",
+      "digest": "8e9651a1a3be11e9c89feada5b2fc08e3036428dc2d6c9942aeab33caaf38a90"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/current-image-generation.json",
+      "digest": "1d474cbbd5d14811735efffff089319c8cbc384cb4a48e28cc43d5fd32e8e17c"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-13.json",
+      "digest": "e1b3a1534f4a426b0227ad5e5c25d8c47ceac4c8c5bf691a41e94f4d6be583bb"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-14.json",
+      "digest": "57bd8a03c2e022555d2e55298f1274f6c6f9a1c4fc7ce2097b5803105b7b1341"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-15.json",
+      "digest": "a449864c9cf24a2f1e27e34f8f116339ced71cea41da96d383e825e3ab045c9e"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-16.json",
+      "digest": "af134ed93264139476396c52380e5e79b8e8a82be834aea832c16f1119c82d7b"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-17.json",
+      "digest": "92dac0b388c6493f63b4b9f46f9fa8768952477c9181d50d55b7b5ebb8c5a99b"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/local-verification.json",
+      "digest": "8772cf54fe4ef1312391d072fc199527c04eb093257b01235247862058c8f78d"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-qualification.md",
+      "digest": "1beb73d87797a24702db1dcd9863e868f5243d557557bf86dd297055ccc50e53"
+    },
+    {
+      "path": "docs/reviews/local-credential-broker-qualification.md",
+      "digest": "6ab4e48e37d29bdc7e487b8286fe31a976d0c5683df016b02a6cbeb0f4958960"
+    },
+    {
+      "path": "docs/testing/development-lifecycle.md",
+      "digest": "1f0a4a3eeaccc96acf0ed4c249a95e9c31f422a02dddcf94a374bf4475e098f3"
+    },
+    {
+      "path": "docs/workflow-control-development.md",
+      "digest": "41f926857dc74314404ebb050d7a658b38d10b54f0ad68adc99adbc3239bf210"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "digest": "f1f12cea5ce61bae083acfa18f1b5778f55c39b2cf9d3a786873b943cb37631a"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationWorker.ts",
+      "digest": "922b5059994abaa1b694f356b4442ed6f7c92987daf0c2fffa829db6f855231d"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "061911165daf440a30851a87ebd5744a28c311f6d84584b740d8411cd9a095cf"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHost.ts",
+      "digest": "f89585a0d8b899fc05d8683a905f439139b3341c08b4d42419c4de0649362612"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHostJournal.ts",
+      "digest": "9f1a475bc8942ee297a715ca8ab3930e233f2ffd4ac810c1263dd1aff6e42328"
+    },
+    {
+      "path": "packages/workflow-control/src/dockerDefaultSeccomp.json",
+      "digest": "77454d35f44551da514cb0aebd36212fb40c0a61528526736d856cbb34c80e1f"
+    },
+    {
+      "path": "packages/workflow-control/src/documentSources.ts",
+      "digest": "f52531076e4b28dd163634aa2516586829c0a128e474d537e55e1a1de98f087e"
+    },
+    {
+      "path": "packages/workflow-control/src/executionInterruptions.ts",
+      "digest": "d220df4a2023cee181b4ee1da8037091b4db93cf1a3e869ec9cb2562c7da0ac7"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialBrokerCli.ts",
+      "digest": "44e78eacad363fa3857528ccaf75b76db67c4c0789b4a0647f0b99c8a8e9cf96"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialGateway.ts",
+      "digest": "0a7fe2bfab80cd94af9d71b3735ee24a31da4bf3b42af71ff32e6b573b2430f3"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialLeases.ts",
+      "digest": "06cdda9ea4cc0bfedf0a385d32a8efd6c1e506b48cc4db7292b7c2e79ba826c4"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "5f81b14c8205a59292fcab8885ebfc82c5084ef6c7881df7ff609b45182a3530"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "b3266f3b475e5ccd40912d91c756bc03ee60a76d819f725c3f33a6b86ac73cb7"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistInput.ts",
+      "digest": "d5d556caa9f4cdaab5500f7d101b96c61bd50b288ffa38442c1a64a45cc8a889"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "9de2c3eeac24a2fe416ec26d8bd6cccc23588df3b2a4b00ff8dae9d37845f9a0"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistRoleProfile.ts",
+      "digest": "be0b0ea604e50971b0fa3473c7bd76c0abb964a8e4f7343fc632aec24976c35b"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistSeccomp.ts",
+      "digest": "785b8120e6902387edf1ce2d575dd8fcd18ebc9086fc24c780f0d0d57cae5de5"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "0e51d50b9c8655417a1ee039dcb1107b515f0f8a31c3aac898e5692c6120b01d"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHost.integration.test.ts",
+      "digest": "10cbe4fc4842d3df0b11de2a429eb16d98d5f905766f23bec2ddcd0d13b6bcc2"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostFailures.test.ts",
+      "digest": "2a13b5ebe7c0c08eaf3b33046f5185de415f37f5f2ee3343b7febcc89637315d"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostJournal.test.ts",
+      "digest": "8c9a629f6bf69131afd7e84c869ef8c78dc08cbf9382b08166b37aa37d7cd525"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentWorkflowFixture.ts",
+      "digest": "49316e8bc66ad313503b534e2c10a2d0c0bbd18204942bf5dae6ab79486a767e"
+    },
+    {
+      "path": "packages/workflow-control/test/executionInterruptions.test.ts",
+      "digest": "3e33085d67b5bf78df539d49a0f32d6392dbc775d844b38218d17180fe4d8ba5"
+    },
+    {
+      "path": "packages/workflow-control/test/orchestrator.test.ts",
+      "digest": "6d8edb3952bdfd9f5aa47c5be2a55099b8d056ce4a652dcf9766f8ea33d6ff49"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "870d02897fef7d13a3a69c23e06abdc2721cab4e5d700e53f7628601b3b5c708"
+    }
+  ],
+  "result": {
+    "events": [
+      { "type": "thread.started", "thread_id": "01a0e0ad-4df2-7033-9432-e2a1786dd6fd" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      { "type": "turn.started" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "- **Medium — Valid JSON with invalid runtime configuration still receives cleanup diagnostics.**  \n  **Evidence:** `packages/workflow-control/src/developmentHost.ts`, `#attachRuntime` and `classifyDevelopmentError`; `packages/workflow-control/src/phaseRuntime.ts`, `readPhaseRuntimeConfig`.  \n  **Reason:** A runtime file containing `null` passes JSON parsing but throws at `key in supplied`. A runtime object missing `image` throws `standalone_specialist_image_missing`. Both become `cleanup_pending`, yielding exit code 4 and recovery guidance instead of invalid-configuration exit code 2. The runtime-JSON regression covers syntax errors only.  \n  **Correction:** Validate the runtime value’s object shape and required configuration before generating adapter files; explicitly classify configuration failures as `invalid_configuration`. Add CLI regressions for `null` and a missing required image.\n\nReview17’s correction is supported: column additions and backfill share an immediate transaction, migration failure closes the connection, and the regression verifies rollback and conservative cleanup after reopening.\n\nRetained evidence reports 33 focused checks passing after that correction. The earlier 967-pass Linux regression predates it; the final full rerun and final-head hosted gates remain unproven here. The delayed-probe test combines controlled timing, journal reopening and real container removal; it does not exercise that fault through a production supervisor restart.\n\nThe finding above prevents a “no remaining actionable blockers” conclusion. Broader R1–R3 and pilot qualification remain separate. No execution or state changes performed; this is not human or merge approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 264203,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 842,
+          "reasoning_output_tokens": 516
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

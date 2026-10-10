@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-09",
+  "branch": "task/codex-autonomy-policy",
+  "source": "f08cd6250250c87f8ef93e7c9fa0cb9f46bd6b86",
+  "fullReadbacks": [
+    {
+      "path": "docs/agent-instructions-shared.md",
+      "id": "3f4c07cd-cbcf-81f4-b0eb-d719009252ed",
+      "sourceRevision": "f08cd6250250c87f8ef93e7c9fa0cb9f46bd6b86",
+      "sourceDigest": "ac39863a4b3f05993a51678775f43f82669ec39ad8f33ccc99bb22a17e674079",
+      "match": true,
+      "parentVerified": true,
+      "expectedLinksRetained": true,
+      "diff": null
+    },
+    {
+      "path": "docs/development/codex-development.md",
+      "id": "3f4c07cd-cbcf-8130-98e6-e5708776763d",
+      "sourceRevision": "f08cd6250250c87f8ef93e7c9fa0cb9f46bd6b86",
+      "sourceDigest": "5f3b3835fe39fe46c725847c89b9080d6573577cc7ee4265d124c32baa4f850a",
+      "match": true,
+      "parentVerified": true,
+      "expectedLinksRetained": true,
+      "diff": null
+    },
+    {
+      "path": "docs/adr/0005-native-codex-development.md",
+      "id": "3f4c07cd-cbcf-81a8-aa75-ff6edcf44a74",
+      "sourceRevision": "f08cd6250250c87f8ef93e7c9fa0cb9f46bd6b86",
+      "sourceDigest": "df687789b187345b14ff879a820f934c2268b59c9b05a82ba89dca5ae9b02b0e",
+      "match": true,
+      "parentVerified": true,
+      "expectedLinksRetained": true,
+      "diff": null
+    },
+    {
+      "path": "docs/tasks/agent-platform-codex-autonomy-policy.md",
+      "id": "3f4c07cd-cbcf-8168-8d84-c1b8e3a4ee97",
+      "sourceRevision": "f08cd6250250c87f8ef93e7c9fa0cb9f46bd6b86",
+      "sourceDigest": "703d8c1f9a5573821687fd6d9fe4c57e4e71de0390d854c8f3070ef4019403fc",
+      "match": true,
+      "parentVerified": true,
+      "expectedLinksRetained": true,
+      "diff": null
+    },
+    {
+      "path": "docs/reviews/codex-developer-autonomy.md",
+      "id": "3f4c07cd-cbcf-81eb-a2dd-d82c80d340b9",
+      "sourceRevision": "f08cd6250250c87f8ef93e7c9fa0cb9f46bd6b86",
+      "sourceDigest": "1686d70547b80d4b05c2fcea24a701ad204dc414122c14fab95b4bdc0dccb9ab",
+      "match": true,
+      "parentVerified": true,
+      "expectedLinksRetained": true,
+      "diff": null
+    }
+  ]
+}

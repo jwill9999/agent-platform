@@ -1,0 +1,26 @@
+[
+  {
+    "source": "/Users/letuscode/.codex/worktrees/harness-readiness/agent-platform/docs/tasks/agent-platform-codex-autonomy-plan.md",
+    "revision": "e1222b1958b87ddc2cf371983fe5e56536fb5fe3",
+    "sha256": "1b6526b67c3cf25a698d1b4415f2c2e74b575785d7edebc7726e4d7ddd813525",
+    "copiedPath": "docs/reviews/evidence/codex-autonomy/initial-spec.md"
+  },
+  {
+    "source": "/Users/letuscode/.codex/worktrees/harness-readiness/agent-platform/docs/reviews/codex-autonomy-removal-review-2026-10-09.md",
+    "revision": "e1222b1958b87ddc2cf371983fe5e56536fb5fe3",
+    "sha256": "38b40b7d2d3e7f93ac4ca21731836de4e0aec72987cf50a9411cd59a3397bba7",
+    "copiedPath": "docs/reviews/codex-autonomy-removal-review-2026-10-09.md"
+  },
+  {
+    "source": "/Users/letuscode/.codex/worktrees/harness-readiness/agent-platform/session.md",
+    "revision": "local uncommitted snapshot; absent from remote e1222b19",
+    "sha256": "d5f67422e75225594d6dc0f93a9808c17e22ac9b6990566070fec4b2d05a6ef1",
+    "copiedPath": "docs/reviews/evidence/codex-autonomy/supporting-audit.md"
+  },
+  {
+    "source": "/Users/letuscode/.codex/worktrees/harness-readiness/agent-platform/session.md",
+    "revision": "local uncommitted snapshot; absent from remote e1222b19",
+    "sha256": "1d18146415edb5d92fd93e38c346560d81816c7a789b380d2aa3614fb7d97917",
+    "copiedPath": "docs/reviews/evidence/codex-autonomy/paused-checkpoint.md"
+  }
+]

@@ -1,0 +1,130 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "2636d81b-7ba3-4ff2-8d68-a6db00098541",
+  "materialDigest": "57458460cfed0445a95a343d5e2ae1e41c4e0bed55f532a0c93d674e3ef8bd51",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-addendum.md",
+      "digest": "83c1d0676c880f7b5ef4d1ba1f4f4c1fd56f7e4e8c72d8e9fc091f6b2d1d61f7"
+    },
+    {
+      "path": "docs/planning/standalone-pilot/development-lifecycle-design.md",
+      "digest": "7bf3e3b24ab06b1aa183bc1d1fbc24ad0ec601f23fbb590c5354c62598467556"
+    },
+    {
+      "path": "docs/testing/development-lifecycle.md",
+      "digest": "1f0a4a3eeaccc96acf0ed4c249a95e9c31f422a02dddcf94a374bf4475e098f3"
+    },
+    {
+      "path": "docs/workflow-control-development.md",
+      "digest": "dd41c9c31c448435b30d67caa1e464575352869017afa66d45261af7029b9029"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "digest": "f1f12cea5ce61bae083acfa18f1b5778f55c39b2cf9d3a786873b943cb37631a"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationWorker.ts",
+      "digest": "922b5059994abaa1b694f356b4442ed6f7c92987daf0c2fffa829db6f855231d"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHost.ts",
+      "digest": "16b2e954eda4e76872e782d315bf404c950a4728d433c292cf5d32d6e87b2678"
+    },
+    {
+      "path": "packages/workflow-control/src/developmentHostJournal.ts",
+      "digest": "37611bbdba189e3aa78ec2cf77fac91d6c74748dc7590ae0e7a33e0c5bb95a32"
+    },
+    {
+      "path": "packages/workflow-control/src/documentSources.ts",
+      "digest": "f52531076e4b28dd163634aa2516586829c0a128e474d537e55e1a1de98f087e"
+    },
+    {
+      "path": "packages/workflow-control/src/executionInterruptions.ts",
+      "digest": "1bd01dea30cbb301ffb3fee4675322e6b45aa702e8ac761fdefaaf81756cfb32"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialBrokerCli.ts",
+      "digest": "44e78eacad363fa3857528ccaf75b76db67c4c0789b4a0647f0b99c8a8e9cf96"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialGateway.ts",
+      "digest": "0a7fe2bfab80cd94af9d71b3735ee24a31da4bf3b42af71ff32e6b573b2430f3"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialLeases.ts",
+      "digest": "06cdda9ea4cc0bfedf0a385d32a8efd6c1e506b48cc4db7292b7c2e79ba826c4"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "5f81b14c8205a59292fcab8885ebfc82c5084ef6c7881df7ff609b45182a3530"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "d0863590c0cce6e3df0b6879497743dfaa88635ef97d4a9e2eeb1b71c9c5293b"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "24d8e9a4cd8dbdf3f280bff594f5563be881b5378a5ff43ad69064e8f9b0f925"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "58ecc932bcdb4e5265f11f579378875cb440f1ab9d48a2f0166ca5c9d230c573"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHost.integration.test.ts",
+      "digest": "639451f3c187355857f8b4f6c6de02460d84158bbd6644992b5d75decbf8e9cb"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentHostJournal.test.ts",
+      "digest": "4ec5103132004ae3f156e2f78ea0b0cef0484a72f63885dcf1282a2e69acaf5b"
+    },
+    {
+      "path": "packages/workflow-control/test/executionInterruptions.test.ts",
+      "digest": "3e33085d67b5bf78df539d49a0f32d6392dbc775d844b38218d17180fe4d8ba5"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "33dfaf64a0e70f0109306079bf13042eb7daa942f2cbae640ed9adcc26025778"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0e05a-068d-7a81-8090-bf896fe8c4b1"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "Found four actionable defects in the supplied source.\n\n1. **High \u2014 Shutdown does not immediately fence admission.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts`, `run()` signal handler, `#monitor()`, and the admission callback in `#attachRuntime()`.  \n   Signals only set `#stopping`; `development-stop` sets `stop_requested`. Admission checks neither flag. The runtime remains running while the monitor sleeps and while `topology.stop()` awaits an outstanding check, so credential issuance or worker dispatch can still pass admission after shutdown is requested.  \n   **Correction:** Invalidate readiness immediately on shutdown and reject admission whenever either shutdown flag is set, including at the final dispatch boundary.\n\n2. **High \u2014 Restart can publish readiness before recovering existing executions.**  \n   **Evidence:** `packages/workflow-control/src/phaseRuntime.ts`, `cleanupStatus()` and `#runOnce()`; `packages/workflow-control/src/phaseJobs.ts`, `claimRecovery()`; `developmentHost.ts`, `#publishReadiness()`.  \n   `cleanupStatus()` considers only existing interruption records. After a coordinator crash before interruption persistence, a started execution with an unexpired phase lease is ineligible for recovery, yet cleanup reports `settled`. Successful service qualification can therefore publish `ready` while the previous worker and its effects remain unreconciled.  \n   **Correction:** Include unreconciled started executions in the admission/readiness barrier. Preserve ownership fencing while reporting cleanup pending until recovery can safely claim and reconcile them.\n\n3. **Medium \u2014 Probe removal failure suppresses credential revocation.**  \n   **Evidence:** `packages/workflow-control/src/developmentHost.ts`, `#reconcileProbes()`:\n   ```ts\n   await this.#removeProbe(probe.id);\n   await this.#control({ operation: 'revoke', ... });\n   ```\n   A Docker inspection/removal failure skips revocation even when authenticated broker control remains available. The short TTL limits exposure but does not satisfy the independent cleanup obligations. The same exception also prevents `#shutdown()` from reaching its broker-stop operation.  \n   **Correction:** Attempt probe containment and generation-bound revocation independently, persist unresolved obligations separately, and allow other safe shutdown operations to proceed.\n\n4. **Medium \u2014 The added delayed-revocation test fails TypeScript checking.**  \n   **Evidence:** `packages/workflow-control/test/phaseRuntime.test.ts`, `setup()` options declaration, the revoke fixture\u2019s `options.revokeDelayMs` access, and the final test\u2019s `setup({ delayMs: 10000, revokeDelayMs: 500 })`.  \n   `revokeDelayMs` is absent from the declared options type. Both property access and the object-literal argument produce type errors; passing transpiled Vitest tests does not establish typecheck success.  \n   **Correction:** Add `revokeDelayMs?: number` to the fixture options and run the required typecheck.\n\n**Missing evidence:** The supplied material contains test definitions and a reported 31-test pass, but no execution results for the connected scenarios, required regression gates, typecheck, or deployed-image generation qualification. It also lacks tests covering shutdown admission fencing, restart readiness before interruption persistence, and independent probe cleanup failure.\n\nFindings are based solely on supplied content; method names and quoted statements identify locations without inventing line numbers. No execution or state changes performed. This is not human approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 170273,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1740,
+          "reasoning_output_tokens": 1034
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

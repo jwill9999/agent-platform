@@ -1,0 +1,12 @@
+
+ RUN  v2.1.9 <checkout>/packages/workflow-control
+
+ ✓ test/documentApproval.test.ts (108 tests | 106 skipped) 678ms
+   ✓ checks approved document bytes in the source workspace after private import 366ms
+   ✓ checks approved document bytes in the private workspace after private import 312ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 106 skipped (108)
+   Start at  21:35:37
+   Duration  1.38s (transform 355ms, setup 0ms, collect 482ms, tests 678ms, environment 0ms, prepare 49ms)
+

@@ -1,4 +1,46 @@
-# Session handoff
+# Current handoff — bounded staging integration — 10 October 2026
+
+PR285 merged into `feature/harness-backlog-review` at
+`6ca3cd1baf7ff13add1da57dc0ecc330d2ab2cec` after all ten executed final-head checks passed,
+review approval and resolved threads. The owner authorized promotion to staging once checks pass;
+no main promotion or prototype resumption is authorized. The next product priority is still undecided.
+
+PR286 is open, but its full security scan stopped before analysis because 1,400,512 tokens exceeds
+Promptfoo's 1,000,000-token maximum. Split the same delivery without excluding files or weakening
+checks. This first segment copies only reviewed inert evidence; application/package runtime and
+security workflows remain unchanged. The final full feature promotion stays pending afterward.
+Scoped archived-JSON Prettier ignores preserve original evidence bytes; security scanning is unchanged.
+New manifest/documentation formatting and all original artifact hashes are explicitly verified.
+Primer PR287 caught the same historical Agent Zero HTTP503 already repaired in PR285; carry that
+one-line official raw-source URL correction so the older staging baseline passes link checking.
+
+Current task: `agent-platform-native-staging-evidence`, a prerequisite of
+`agent-platform-native-staging-integration`. See
+[the evidence delivery specification](docs/tasks/agent-platform-native-staging-evidence.md).
+Task branch `task/staging-evidence-primer` starts from `feature/staging-evidence-primer` at current
+staging `a5a1641c`. Selected evidence source is the reviewed feature at `6ca3cd1b`; exact path/blob/hash
+provenance is recorded in `docs/reviews/evidence/native-staging-evidence-selection.json`.
+
+Next: independent review, task-to-feature CI/integration, then protected evidence-feature-to-staging
+qualification. Every required/executed gate, including the actual packaged macOS VM journey, must
+pass before staging merge. The `dev` self-hosted runner is offline and its job is queued; the owner
+has been asked to bring it online. Do not treat cancellation or a skipped VM test as success.
+
+Preserve PR283, `task/pilot-active-budget` at `ee3a160f` and `task/test-runner-offline-adapter` at
+`e1222b19`, and all dirty primary/paused/unrelated worktrees. The paused checkout retains thirteen
+changed paths; primary retains three. Before/after snapshots and scanner evidence are in
+`/Users/letuscode/.codex/staging-integration-20261010`. No pilot, paid model call, deletion or old
+orchestration automation resumption. The integration-only monitor follows this authorized delivery.
+
+After the primer merges, refresh the full feature promotion against staging, preserve the entire
+reviewed source plus integration bookkeeping, and rerun the smaller remaining diff through all gates.
+Do not declare staging development-ready at the intermediate evidence checkpoint. After full delivery,
+review the live product backlog with the owner to choose the next priority. Beads/remote refs remain
+current authority; the older handoffs below are historical snapshots.
+
+---
+
+## Historical staging handoff
 
 ## Verified snapshot — 2026-09-13
 

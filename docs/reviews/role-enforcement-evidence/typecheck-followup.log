@@ -1,0 +1,4 @@
+
+> @agent-platform/workflow-control@0.0.0 typecheck <workspace>/packages/workflow-control
+> tsc --noEmit -p tsconfig.json
+

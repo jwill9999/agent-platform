@@ -1,0 +1,14 @@
+
+ RUN  v2.1.9 <worktree>/packages/workflow-control
+
+ ✓ test/activeSpecialistSettlement.integration.test.ts (4 tests) 6922ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > runs public publication/approval/coordinator/launcher/result/restart and rejects changed fixture-spec.md 1885ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > runs public publication/approval/coordinator/launcher/result/restart and rejects changed fixture-tests.md 1832ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > confirms durable success settlement and independent daemon absence 1441ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > confirms durable cancel settlement and independent daemon absence 1271ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  02:38:42
+   Duration  7.38s (transform 193ms, setup 0ms, collect 252ms, tests 6.92s, environment 0ms, prepare 56ms)
+

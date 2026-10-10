@@ -1,0 +1,14 @@
+{
+  "verdict": "correction_required",
+  "reviewer": "/root/runner_plan_critic",
+  "resolved": ["C01", "C02", "C03"],
+  "findings": [
+    {
+      "id": "C04",
+      "severity": "medium",
+      "requirement": "AUT-08/V-02",
+      "finding": "Three untracked directories represented only as absent-or-directory, so contents not protected.",
+      "disposition": "Recursive lstat entry-type/file SHA256/symlink-target manifest; genuine absence distinguished; dirty status entries separated from file counts."
+    }
+  ]
+}
