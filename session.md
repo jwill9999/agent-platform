@@ -1,9 +1,13 @@
 # Current handoff — native development and retained orchestration — 10 October 2026
 
 **Current position:** cleanup is complete; the next product-development priority is **undecided**.
-The owner requested a pause after saving this handoff. Their return on 10 October is a position review,
-not an instruction to restart the paused prototype or begin a new implementation task.
-Next session: review the live Beads backlog with the owner and decide which work to take forward.
+The owner initially requested a pause after saving this handoff. On 10 October they authorized finishing
+PR285 and promoting `feature/harness-backlog-review` into protected `staging` once checks pass.
+That integration is tracked by `agent-platform-native-staging-integration` and
+[its specification](docs/tasks/agent-platform-native-staging-integration.md); consult Beads and exact
+remote refs for the live result. At this snapshot PR285 and staging promotion are not yet merged.
+This does not restart the paused prototype or select a new product implementation task.
+After integration: review the live Beads backlog with the owner and decide which work to take forward.
 Agree that task's objective, requirements, definition of done and meaningful tests before execution.
 
 This section supersedes the older execution/approval/status instructions below. Historical entries
@@ -120,8 +124,9 @@ code; verify before allocating or changing task status. Do not invent a preferre
 Documentation worktree: `/Users/letuscode/.codex/worktrees/codex-developer-autonomy/agent-platform`.
 This handoff is on `task/native-development-handoff`, based on the merged feature; source publication
 is separate from feature/staging integration. Preserve the dirty primary and other unrelated worktrees.
-Old orchestration automations remain paused; no new background continuation or pilot is requested.
-After this handoff is committed, pushed and mirrored/read back, stop until the owner selects further work.
+Old orchestration automations remain paused; no prototype continuation or pilot is requested.
+Complete the newly authorized handoff/staging integration after checks pass, then stop until the
+owner selects the next product priority. Any integration-only monitor must not revive old pilot work.
 No product implementation or new tests were performed for this status-only documentation update.
 
 ---
