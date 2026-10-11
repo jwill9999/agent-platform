@@ -186,6 +186,28 @@ passes 28 tests, zero failures/cancellations/skips, in 92.435 seconds. After the
 scalar-input amendment, two relevant API/fetch controls pass. Fresh actual hosted Sonar remains
 required; source approval and local tests do not clear the failed hosted gate.
 
+## Third hosted Sonar result
+
+Actual `a86f4d72` analysis reduces open issues to two. New reliability rating is 1, maintainability
+rating is 1 and duplicated new lines are 0.0%; those conditions now pass. Security remains 3
+against required 1, so the gate still fails. Remaining S6350 traces remote PR data through the
+strictly SHA-validated ancestry check to the generic Git invocation; a minor Set-membership
+finding remains in the bootstrap. Evidence: `pr292-sonar-a86-issues.json`.
+
+The failed result remains authoritative. Both plan critics approve a dedicated ancestry operation
+with literal Git arguments, an explicit `--` operand boundary and unchanged strict SHA/repository
+guards. It is implemented for both archive classification and adoption ancestry; the generic
+dispatcher no longer accepts ancestry operations. Only status 1 returns non-ancestor; missing
+objects and process failures propagate. Bootstrap control membership uses a Set with unchanged
+six-control iteration. Both distinct independent critics approve final frozen source with no
+findings; they independently pass two and one focused controls. Complete affected suite: 29
+passed, zero failed/cancelled/skipped, 94.365 seconds. Six scripts pass lint, nine owned files
+formatting, six modules and three workflow blocks syntax, and diff validation. Captured actual
+output: `pr292-ancestry-suite-20261011.log`, SHA256
+`21cab092181c01c12e6a24c3a62fc16fd527a66401304402330fdc013d480097`, in the external evidence root.
+No issue suppression or false-positive disposition is manufactured. Fresh actual hosted
+analysis remains required; the previous failed gate is not relabeled.
+
 ## Pending delivery gates
 
 Actual policy-adoption full scan and VM, protected archive

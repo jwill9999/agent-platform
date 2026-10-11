@@ -17,14 +17,14 @@ import { createHash } from 'node:crypto';
 // the entire local control bundle has been compared with protected Git objects.
 const REPOSITORY = 'jwill9999/agent-platform';
 const WORKFLOW_PATH = '.github/workflows/promptfoo-code-scan.yml';
-const CONTROL_PATHS = [
+const CONTROL_PATHS = new Set([
   '.github/security/historical-evidence-allowlist.v1.json',
   '.github/security/historical-evidence-review.v1.json',
   WORKFLOW_PATH,
   'scripts/classify-historical-evidence.mjs',
   'scripts/qualify-historical-evidence.mjs',
   'scripts/verify-historical-evidence-provenance.mjs',
-];
+]);
 const sha = (value) => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const GIT_EXECUTABLE = '/usr/bin/git';
@@ -41,7 +41,7 @@ export function validateDataRepoPath(repo) {
   return repo;
 }
 export function validateBootstrapControlRequest(commit, path) {
-  if (!sha(commit) || !CONTROL_PATHS.includes(path))
+  if (!sha(commit) || !CONTROL_PATHS.has(path))
     throw new Error('Invalid protected bootstrap object request');
 }
 function readProtectedControl(repo, commit, path) {
@@ -289,10 +289,11 @@ export async function verifyHistoricalEvidenceProvenance({
   const helpers = await loadProtectedHelpers({ repo, protectedTip, localRoot });
   try {
     const { qualifyHistoricalEvidence } = helpers.qualifier;
-    const { assertCommit, git } = helpers.classifier;
+    const { assertCommit, git, isAncestor } = helpers.classifier;
     validateTarget(pr, pr.head?.sha, protectedTip);
     assertCommit(repo, adoptionCommit);
-    git(repo, 'merge-base', '--is-ancestor', adoptionCommit, protectedTip);
+    if (!isAncestor(repo, adoptionCommit, protectedTip))
+      throw new Error('Adopted policy is not a protected-base ancestor');
     // All trust-boundary code must still be the independently adopted policy,
     // not merely reside somewhere below its ancestry after a policy rewrite.
     for (const path of CONTROL_PATHS) {

@@ -44,8 +44,6 @@ export function validateGitArguments(args) {
       sha(values[1]) &&
       values[2] === '--' &&
       safeTreePath(values[3]),
-    'merge-base': () =>
-      values.length === 3 && values[0] === '--is-ancestor' && sha(values[1]) && sha(values[2]),
     'rev-parse': () => values.length === 1 && ['HEAD', 'staging'].includes(values[0]),
     'update-ref': () => values.length === 2 && values[0] === 'refs/heads/staging' && sha(values[1]),
     show: () =>
@@ -99,6 +97,43 @@ export function git(repo, ...args) {
       },
     },
   );
+}
+
+export function isAncestor(repo, base, head) {
+  if (!sha(base) || !sha(head)) throw new Error('Invalid ancestry commit identities');
+  validateDataRepoPath(repo);
+  try {
+    execFileSync(
+      GIT_EXECUTABLE,
+      [
+        '-c',
+        'core.hooksPath=/dev/null',
+        '-c',
+        'core.attributesFile=/dev/null',
+        '-C',
+        repo,
+        'merge-base',
+        '--is-ancestor',
+        '--',
+        base,
+        head,
+      ],
+      {
+        timeout: 30_000,
+        maxBuffer: 1024,
+        env: {
+          PATH: SYSTEM_PATH,
+          GIT_CONFIG_NOSYSTEM: '1',
+          GIT_CONFIG_GLOBAL: '/dev/null',
+          GIT_TERMINAL_PROMPT: '0',
+        },
+      },
+    );
+    return true;
+  } catch (error) {
+    if (error.status === 1) return false;
+    throw error;
+  }
 }
 
 export function readObjectBatch(repo, value, expectedType = null) {
@@ -217,12 +252,8 @@ export function classifyHistoricalEvidence({ repo, base, head }) {
   assertCommit(repo, base);
   assertCommit(repo, head);
   const { policy, policySha256 } = readPolicy(repo, base);
-  try {
-    git(repo, 'merge-base', '--is-ancestor', base, head);
-  } catch (error) {
-    if (error.status !== 1) throw error;
+  if (!isAncestor(repo, base, head))
     return { route: 'full', reason: 'base-is-not-head-ancestor', base, head, policySha256 };
-  }
   const raw = git(
     repo,
     'diff',

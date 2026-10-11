@@ -37,7 +37,10 @@ duplication. A further independently critiqued bounded refactor uses fixed Git a
 SHA stdin and narrows builtin-only bootstrap before reusing protected helpers. Both distinct critics approve the implemented second pass with no remaining findings, including
 the added scalar bootstrap denial controls. All 28 affected tests pass, followed by two controls
 for the final test-only amendment. New hosted qualification remains required; no stage merge.
-See current review results.
+Actual `a86f4d72` analysis now has only two issues: reliability and 0.0% duplication pass, but
+security still fails on the ancestry Git invocation. The dedicated fixed-argument `--` boundary
+repair is now independently approved by both critics; all 29 affected tests and scoped quality
+checks pass. Fresh hosted analysis remains mandatory; staging is unchanged. See current review results.
 
 Fresh official runner 2.337.0 on native APFS is online as dev 23 with the four required labels;
 old ExFAT installation is preserved, old idle Listener stopped gracefully, fresh credentials used

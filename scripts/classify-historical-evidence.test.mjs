@@ -17,6 +17,7 @@ import test from 'node:test';
 import {
   classifyHistoricalEvidence,
   assertCommit,
+  isAncestor,
   readObjectBatch,
   decodeObjectBatch,
   git,
@@ -151,6 +152,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       assert.equal(result.route, 'archive');
       assert.equal(result.files, 220);
       assert.equal(result.bytes, 3_958_506);
+      const reverse = classifyHistoricalEvidence({ repo: f.root, base: f.head, head: f.base });
+      assert.equal(reverse.route, 'full');
+      assert.equal(reverse.reason, 'base-is-not-head-ancestor');
     } finally {
       f.cleanup();
     }
@@ -405,6 +409,58 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         { env, input: hash + '\n', stdio: ['pipe', 'pipe', 'pipe'] },
       );
       assert.equal(readObjectBatch(target, hash, 'commit').type, 'commit');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  test('dedicated ancestry argv terminates options and only status one is a negative ancestry result', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ancestry-command-contract-'));
+    const env = {
+      PATH: '/usr/bin:/bin',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_AUTHOR_NAME: 'ancestry-fixture',
+      GIT_AUTHOR_EMAIL: 'ancestry@example.invalid',
+      GIT_COMMITTER_NAME: 'ancestry-fixture',
+      GIT_COMMITTER_EMAIL: 'ancestry@example.invalid',
+    };
+    const run = (...args) =>
+      execFileSync('/usr/bin/git', ['-c', 'core.hooksPath=/dev/null', '-C', root, ...args], {
+        env,
+        encoding: 'utf8',
+      }).trim();
+    try {
+      run('init', '-q');
+      writeFileSync(join(root, 'data.txt'), 'base\n');
+      run('add', '.');
+      run('commit', '-qm', 'base');
+      const base = run('rev-parse', 'HEAD');
+      writeFileSync(join(root, 'data.txt'), 'head\n');
+      run('add', '.');
+      run('commit', '-qm', 'head');
+      const head = run('rev-parse', 'HEAD');
+      assert.equal(isAncestor(root, base, head), true);
+      assert.equal(isAncestor(root, head, base), false);
+      assert.throws(
+        () => isAncestor(root, 'a'.repeat(40), head),
+        (error) => error.status === 128,
+      );
+      for (const value of [
+        '--help',
+        '--is-ancestor',
+        'refs/heads/staging',
+        base + '\n',
+        '../outside',
+        'A'.repeat(40),
+      ]) {
+        assert.throws(() => isAncestor(root, value, head), /Invalid ancestry/);
+        assert.throws(() => isAncestor(root, base, value), /Invalid ancestry/);
+      }
+      assert.throws(() => isAncestor('relative.git', base, head), /absolute/);
+      assert.throws(
+        () => validateGitArguments(['merge-base', '--is-ancestor', base, head]),
+        /Unsupported/,
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
