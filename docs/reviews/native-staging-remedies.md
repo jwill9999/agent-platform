@@ -208,6 +208,36 @@ output: `pr292-ancestry-suite-20261011.log`, SHA256
 No issue suppression or false-positive disposition is manufactured. Fresh actual hosted
 analysis remains required; the previous failed gate is not relabeled.
 
+## Fourth hosted Sonar result and commit-identity boundary
+
+Actual `2d10d8b2` remains failed with two S6350 reports: the dedicated ancestry invocation and a
+Git tree read in automatic-workflow provenance. Reliability, maintainability and duplication
+conditions pass. Explicit operand boundaries and strict SHA guards remain defense in depth;
+the analyzer still reports the remote-response flow. Evidence: `pr292-sonar-2d-issues.json`.
+No accepted argument-injection path is established by the independent reviews, and no issue is
+suppressed or falsely declared resolved.
+
+Both independent plan critics approve a bounded content-integrity refinement: after exact batch
+framing/type checks, recompute the object identity from untouched raw payload via canonical Git
+`hash-object --stdin -t TYPE --no-filters`, with fixed type enum and no `-w`. Require computed ID,
+parsed header ID and original requested strict SHA to match exactly; then use that verified ID
+for subsequent object operations. This adds payload verification rather than echoing a header.
+Original API/receipt IDs and approval bindings remain equal; mismatch fails, never normalizes
+into another revision. The [Git object format](https://git-scm.com/book/en/v2/Git-Internals-Git-Objects),
+[batch framing](https://git-scm.com/docs/git-cat-file) and
+[raw read-only object hashing](https://git-scm.com/docs/git-hash-object) are the source contracts.
+The implementation is frozen and both distinct critics approve all affected source with no
+findings. Independent focused controls pass three and two tests, covering unchanged binary bytes,
+forged headers, same-length body tampering, malformed computed output and ancestry denials.
+The complete affected suite passes 30 tests, zero failures/cancellations/skips, in 172.225 seconds.
+Revalidating raw commit content at every exported tree lookup increases fixture runtime; no
+unreviewed cache or bypass flag is introduced. Six scripts pass lint, nine owned files formatting,
+six modules and three workflow blocks syntax, and diff checks. Actual output is retained in
+`pr292-content-identity-suite-20261011.log`, SHA256
+`a25b9db974c6684ff17f484a491531609451cbb30f43d385c56a837192609636`, in the external evidence root.
+Fresh actual hosted analysis remains required; this does not establish a prior accepted
+injection exploit or relabel the previous failed gate.
+
 ## Pending delivery gates
 
 Actual policy-adoption full scan and VM, protected archive

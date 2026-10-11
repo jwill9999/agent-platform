@@ -102,6 +102,8 @@ export function git(repo, ...args) {
 export function isAncestor(repo, base, head) {
   if (!sha(base) || !sha(head)) throw new Error('Invalid ancestry commit identities');
   validateDataRepoPath(repo);
+  const verifiedBase = assertCommit(repo, base);
+  const verifiedHead = assertCommit(repo, head);
   try {
     execFileSync(
       GIT_EXECUTABLE,
@@ -115,8 +117,8 @@ export function isAncestor(repo, base, head) {
         'merge-base',
         '--is-ancestor',
         '--',
-        base,
-        head,
+        verifiedBase,
+        verifiedHead,
       ],
       {
         timeout: 30_000,
@@ -182,14 +184,46 @@ export function decodeObjectBatch(output, value, expectedType = null) {
     output.at(-1) !== 10
   )
     throw new Error('Malformed Git object size/framing');
-  return { type: header[2], content: output.subarray(headerEnd + 1, headerEnd + 1 + bytes) };
+  const content = output.subarray(headerEnd + 1, headerEnd + 1 + bytes);
+  const objectId = hashObjectIdentity(header[2], content);
+  if (objectId !== header[1] || objectId !== value)
+    throw new Error('Git object content identity mismatch');
+  return { objectId, type: header[2], content };
+}
+export function decodeHashObjectIdentity(output) {
+  if (!Buffer.isBuffer(output)) throw new Error('Malformed computed Git object identity');
+  const match = /^([a-f0-9]{40})\n$/.exec(output.toString('utf8'));
+  if (output.length !== 41 || !match) throw new Error('Malformed computed Git object identity');
+  return match[1];
+}
+export function hashObjectIdentity(type, content) {
+  if (!['blob', 'tree', 'commit', 'tag'].includes(type) || !Buffer.isBuffer(content))
+    throw new Error('Invalid Git object type/payload');
+  const output = execFileSync(
+    GIT_EXECUTABLE,
+    ['hash-object', '--stdin', '-t', type, '--no-filters'],
+    {
+      cwd: '/',
+      input: content,
+      maxBuffer: 1024,
+      timeout: 30_000,
+      env: {
+        PATH: SYSTEM_PATH,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_TERMINAL_PROMPT: '0',
+      },
+    },
+  );
+  return decodeHashObjectIdentity(output);
 }
 export function assertCommit(repo, value) {
-  readObjectBatch(repo, value, 'commit');
+  return readObjectBatch(repo, value, 'commit').objectId;
 }
 
 export function treeEntry(repo, commit, path) {
-  const bytes = git(repo, 'ls-tree', '-z', commit, '--', path);
+  const verifiedCommit = assertCommit(repo, commit);
+  const bytes = git(repo, 'ls-tree', '-z', verifiedCommit, '--', path);
   if (!bytes.length) return null;
   const records = bytes.toString('utf8').split('\0').filter(Boolean);
   if (records.length !== 1) throw new Error('Ambiguous tree entry');
@@ -249,10 +283,10 @@ export function readPolicy(repo, base) {
 }
 
 export function classifyHistoricalEvidence({ repo, base, head }) {
-  assertCommit(repo, base);
-  assertCommit(repo, head);
-  const { policy, policySha256 } = readPolicy(repo, base);
-  if (!isAncestor(repo, base, head))
+  const verifiedBase = assertCommit(repo, base);
+  const verifiedHead = assertCommit(repo, head);
+  const { policy, policySha256 } = readPolicy(repo, verifiedBase);
+  if (!isAncestor(repo, verifiedBase, verifiedHead))
     return { route: 'full', reason: 'base-is-not-head-ancestor', base, head, policySha256 };
   const raw = git(
     repo,
@@ -263,8 +297,8 @@ export function classifyHistoricalEvidence({ repo, base, head }) {
     '--no-ext-diff',
     '--no-textconv',
     '--no-abbrev',
-    base,
-    head,
+    verifiedBase,
+    verifiedHead,
     '--',
   );
   const parts = raw.toString('utf8').split('\0');
@@ -304,7 +338,7 @@ export function classifyHistoricalEvidence({ repo, base, head }) {
       change.oldBlob !== '0'.repeat(40) ||
       change.mode !== '100644' ||
       change.blob !== approved.blob ||
-      treeEntry(repo, base, change.path)
+      treeEntry(repo, verifiedBase, change.path)
     )
       return { route: 'full', reason: 'unapproved-change', base, head, policySha256 };
     const content = git(repo, 'cat-file', 'blob', change.blob);

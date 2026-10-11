@@ -86,11 +86,11 @@ export function guardPromptfooAction(bundle) {
   return insertPromptfooResponseGuard(bundle);
 }
 export function prepareFullScanRefs(repo, base, head) {
-  assertCommit(repo, base);
+  const verifiedBase = assertCommit(repo, base);
   assertCommit(repo, head);
   if (git(repo, 'rev-parse', 'HEAD').toString().trim() !== head)
     throw new Error('Wrong detached scan head');
-  git(repo, 'update-ref', 'refs/heads/staging', base);
+  git(repo, 'update-ref', 'refs/heads/staging', verifiedBase);
   if (git(repo, 'rev-parse', 'staging').toString().trim() !== base)
     throw new Error('Wrong prepared local scan base');
   return { base, head };
@@ -169,12 +169,15 @@ export function controlIdentity(repo, commit) {
 }
 
 export function validateAutomaticSource(repo, base, head, merge) {
-  assertCommit(repo, merge);
-  const parents = git(repo, 'show', '-s', '--format=%P', merge).toString().trim().split(' ');
+  const verifiedMerge = assertCommit(repo, merge);
+  const parents = git(repo, 'show', '-s', '--format=%P', verifiedMerge)
+    .toString()
+    .trim()
+    .split(' ');
   if (parents.length !== 2 || parents[0] !== base || parents[1] !== head)
     throw new Error('Automatic merge source is not the qualified base/head');
   const baseWorkflow = treeEntry(repo, base, WORKFLOW_PATH);
-  const mergeWorkflow = treeEntry(repo, merge, WORKFLOW_PATH);
+  const mergeWorkflow = treeEntry(repo, verifiedMerge, WORKFLOW_PATH);
   if (
     !baseWorkflow ||
     !mergeWorkflow ||

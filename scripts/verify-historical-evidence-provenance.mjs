@@ -291,14 +291,15 @@ export async function verifyHistoricalEvidenceProvenance({
     const { qualifyHistoricalEvidence } = helpers.qualifier;
     const { assertCommit, git, isAncestor } = helpers.classifier;
     validateTarget(pr, pr.head?.sha, protectedTip);
-    assertCommit(repo, adoptionCommit);
-    if (!isAncestor(repo, adoptionCommit, protectedTip))
+    const verifiedAdoption = assertCommit(repo, adoptionCommit);
+    const verifiedProtected = assertCommit(repo, protectedTip);
+    if (!isAncestor(repo, verifiedAdoption, verifiedProtected))
       throw new Error('Adopted policy is not a protected-base ancestor');
     // All trust-boundary code must still be the independently adopted policy,
     // not merely reside somewhere below its ancestry after a policy rewrite.
     for (const path of CONTROL_PATHS) {
-      const adopted = git(repo, 'ls-tree', '-z', adoptionCommit, '--', path);
-      const current = git(repo, 'ls-tree', '-z', protectedTip, '--', path);
+      const adopted = git(repo, 'ls-tree', '-z', verifiedAdoption, '--', path);
+      const current = git(repo, 'ls-tree', '-z', verifiedProtected, '--', path);
       if (!adopted.length || !adopted.equals(current))
         throw new Error('Protected policy changed since independently qualified adoption');
     }

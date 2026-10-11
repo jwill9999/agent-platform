@@ -20,6 +20,8 @@ import {
   isAncestor,
   readObjectBatch,
   decodeObjectBatch,
+  decodeHashObjectIdentity,
+  hashObjectIdentity,
   git,
   validateDataRepoPath,
   validateGitArguments,
@@ -339,7 +341,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         input: payload,
         encoding: 'utf8',
       }).trim();
-      assert.ok(readObjectBatch(root, hash, 'blob').content.equals(payload));
+      const actual = readObjectBatch(root, hash, 'blob');
+      assert.ok(actual.content.equals(payload));
+      assert.equal(actual.objectId, hash);
       assert.throws(() => assertCommit(root, hash), /type/);
       // cat-file --batch exits zero for a missing object; parse its response,
       // never treat the subprocess exit code as existence/type evidence.
@@ -350,7 +354,21 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         payload,
         Buffer.from('\n'),
       ]);
-      assert.ok(decodeObjectBatch(response, hash, 'blob').content.equals(payload));
+      const decoded = decodeObjectBatch(response, hash, 'blob');
+      assert.ok(decoded.content.equals(payload));
+      assert.equal(decoded.objectId, hash);
+      const tampered = Buffer.from(response);
+      tampered[response.indexOf(10) + 1] ^= 1;
+      assert.throws(() => decodeObjectBatch(tampered, hash, 'blob'), /content identity/);
+      const forgedHeader = Buffer.concat([
+        Buffer.from(`${'b'.repeat(40)} blob ${payload.length}\n`),
+        payload,
+        Buffer.from('\n'),
+      ]);
+      assert.throws(
+        () => decodeObjectBatch(forgedHeader, 'b'.repeat(40), 'blob'),
+        /content identity/,
+      );
       for (const invalid of [
         response.subarray(0, -1),
         Buffer.concat([response, Buffer.from('extra')]),
@@ -367,6 +385,36 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+  test('native Git content hashing uses exact binary bytes and rejects malformed computed identities', () => {
+    const payload = Buffer.from([0, 10, 255, 67, 0, 10]);
+    const expected = execFileSync(
+      '/usr/bin/git',
+      ['hash-object', '--stdin', '-t', 'blob', '--no-filters'],
+      {
+        cwd: '/',
+        input: payload,
+        env: { PATH: '/usr/bin:/bin', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
+      },
+    );
+    assert.equal(hashObjectIdentity('blob', payload), decodeHashObjectIdentity(expected));
+    const changed = Buffer.from(payload);
+    changed[0] ^= 1;
+    assert.notEqual(hashObjectIdentity('blob', changed), decodeHashObjectIdentity(expected));
+    for (const invalid of [
+      Buffer.alloc(0),
+      expected.subarray(0, -1),
+      Buffer.concat([expected, Buffer.from('\n')]),
+      Buffer.from('A'.repeat(40) + '\n'),
+      Buffer.from('a'.repeat(40) + '\r\n'),
+      Buffer.from('a'.repeat(39) + '\0\n'),
+      Buffer.from('missing\n'),
+      expected.toString(),
+    ])
+      assert.throws(() => decodeHashObjectIdentity(invalid), /Malformed computed/);
+    for (const type of ['--help', 'blob\n', 'commit --literally', null])
+      assert.throws(() => hashObjectIdentity(type, payload), /type\/payload/);
+    assert.throws(() => hashObjectIdentity('blob', payload.toString()), /type\/payload/);
   });
   test('Git fetch stdin accepts exact immutable refspec data without argument interpretation', () => {
     const root = mkdtempSync(join(tmpdir(), 'git-fetch-stdin-'));
@@ -439,12 +487,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       run('add', '.');
       run('commit', '-qm', 'head');
       const head = run('rev-parse', 'HEAD');
+      assert.equal(assertCommit(root, base), base);
+      assert.equal(assertCommit(root, head), head);
       assert.equal(isAncestor(root, base, head), true);
       assert.equal(isAncestor(root, head, base), false);
-      assert.throws(
-        () => isAncestor(root, 'a'.repeat(40), head),
-        (error) => error.status === 128,
-      );
+      assert.throws(() => isAncestor(root, 'a'.repeat(40), head), /Missing or wrong Git object/);
       for (const value of [
         '--help',
         '--is-ancestor',

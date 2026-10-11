@@ -40,7 +40,11 @@ for the final test-only amendment. New hosted qualification remains required; no
 Actual `a86f4d72` analysis now has only two issues: reliability and 0.0% duplication pass, but
 security still fails on the ancestry Git invocation. The dedicated fixed-argument `--` boundary
 repair is now independently approved by both critics; all 29 affected tests and scoped quality
-checks pass. Fresh hosted analysis remains mandatory; staging is unchanged. See current review results.
+checks pass. Actual `2d10d8b2` hosted Sonar still fails two S6350 traces despite those defenses.
+The verified raw Git-object identity boundary is implemented and independently approved by
+both critics. All 30 affected tests pass, along with scoped lint/format/syntax checks. The new
+identity must equal the original request; no normalization, cache or waiver. Fresh actual hosted
+Sonar remains required. Staging is unchanged. See current review results.
 
 Fresh official runner 2.337.0 on native APFS is online as dev 23 with the four required labels;
 old ExFAT installation is preserved, old idle Listener stopped gracefully, fresh credentials used
