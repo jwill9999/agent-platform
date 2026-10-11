@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Preserve long staging VM validations; this workflow runs only on PR events.
+  cancel-in-progress: ${{ github.base_ref == 'main' }}
 
 jobs:
   verify:
@@ -30,6 +31,15 @@ jobs:
         with:
           node-version: '24'
           cache: pnpm
+
+      - name: Test macOS VM build-output discovery
+        run: node --test apps/desktop/scripts/resolve-macos-vm-helper.node-test.mjs
+
+      - name: Test historical archive trust boundaries
+        run: >-
+          node --test scripts/classify-historical-evidence.test.mjs
+          scripts/qualify-historical-evidence.test.mjs
+          scripts/verify-historical-evidence-provenance.test.mjs
 
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -349,14 +359,16 @@ jobs:
       - name: Build and sign macOS VM helper
         run: |
           pnpm --filter @agent-platform/desktop native:vm:build
-          pnpm --filter @agent-platform/desktop native:vm:sign-dev
+          HELPER_PATH="$(node apps/desktop/scripts/resolve-macos-vm-helper.mjs)"
+          pnpm --filter @agent-platform/desktop native:vm:sign-dev -- --helper "$HELPER_PATH"
+          printf 'AGENT_PLATFORM_MACOS_VM_SIGNED_HELPER=%s\n' "$HELPER_PATH" >> "$GITHUB_ENV"
 
       - name: Package macOS VM runtime resources
         run: |
           pnpm --filter @agent-platform/desktop native:vm:package -- \
             --assets-dir "$AGENT_PLATFORM_MACOS_VM_ASSETS_DIR" \
             --out-dir "$RUNNER_TEMP/agent-platform-resources/macos-vm" \
-            --helper "$GITHUB_WORKSPACE/apps/desktop/native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner" \
+            --helper "$AGENT_PLATFORM_MACOS_VM_SIGNED_HELPER" \
             --skip-build
           mkdir -p "$RUNNER_TEMP/agent-platform-vm-evidence"
           cp -f "$RUNNER_TEMP/agent-platform-resources/macos-vm/package-manifest.json" \

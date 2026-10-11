@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "verdict": "approved-inert-retention-with-limits",
+  "reviewer": "/root/runner_plan_critic",
+  "sourceRevision": "6ca3cd1baf7ff13add1da57dc0ecc330d2ab2cec",
+  "selectionManifestSha256": "30788264b062ce9dec1060237b6b41fb78a6b8734a6fecc46861a375a9b49b11",
+  "allowlistSha256": "5057f25d29d0da48228781258f44a360bf03207e4592f9d2c56fd8a1a055ca84",
+  "files": 220,
+  "bytes": 3958506,
+  "jsonFiles": 139,
+  "evidenceSha256": "599524f8120be052d77a46299ed8cc0daa0fa88adaa4b077b6567134eec1575e",
+  "evidenceBytes": 89530,
+  "evidenceReference": "archive-data-independent-review.json retained by coordinator; exact SHA-256 above",
+  "coverage": [
+    "All 220 mode100644 Git blobs rehashed against original source and PR288",
+    "All 139 JSON files syntactically validated",
+    "Known credential-pattern and metadata checks across archive bytes; no confirmed credential exposure",
+    "Literal exact-path and directory consumer-reference inspection; no executable consumer identified"
+  ],
+  "findings": [
+    "58 files contain local absolute-path metadata",
+    "Two dependency reports and two scanner-app descriptions contain owner email metadata",
+    "Ten files contain historical instruction candidates retained only as inert data"
+  ],
+  "limits": [
+    "Pattern checks do not prove absence of every secret type",
+    "Literal consumer inspection does not exclude dynamic discovery",
+    "Not Promptfoo or adversarial-model coverage",
+    "GitGuardian success does not disclose its internal rules or archive byte coverage",
+    "No archive execution, import or patch application is authorized"
+  ]
+}
