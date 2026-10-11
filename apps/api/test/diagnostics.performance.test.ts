@@ -25,16 +25,29 @@ const percentile95 = (values: number[]) =>
 
 it('measures 100 real requests per mode and preserves outcomes while the diagnostic writer is locked', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'diagnostic-performance-'));
-  const logs = vi.spyOn(console, 'log').mockImplementation(() => {});
+  const originalLog = console.log;
+  let logCalls = 0;
+  // Keep production serialization, without retaining every log argument in a mock.
+  console.log = () => {
+    logCalls++;
+  };
   vi.stubEnv('AGENT_OPENAI_API_KEY', 'local-benchmark-double');
   vi.stubEnv('LANGCHAIN_TRACING_V2', 'false');
   vi.stubEnv('LANGSMITH_TRACING', 'false');
   vi.stubEnv('LANGSMITH_TRACING_V2', 'false');
-  const modes = ['disabled', 'healthy', 'locked'] as const;
+  const modeOrders = [
+    ['disabled', 'healthy', 'locked'],
+    ['healthy', 'locked', 'disabled'],
+    ['locked', 'disabled', 'healthy'],
+  ] as const;
   const cleanups: Array<() => Promise<void>> = [];
   const samples: Record<
     string,
     {
+      status: 'measuring' | 'verifying' | 'passed';
+      requestDurationsMs: number[];
+      enqueueDurationsMs: number[];
+      logCalls: number;
       requestP95Ms: number;
       enqueueP95Ms: number;
       providerCalls: number;
@@ -46,10 +59,69 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
       eventLoopSamples: number;
     }
   > = {};
+  let captureActiveSample: (() => void) | undefined;
+  let completed = false;
+  const publishMeasurements = () => {
+    captureActiveSample?.();
+    const evidence = {
+      completed,
+      samples,
+      repetitions: 3,
+      modeOrders,
+      requestsPerMode: 100,
+      warmupPerMode: 10,
+      requestOverheadLimitMs: 20,
+      enqueueLimitMs: 2,
+      provider: 'deterministic fixture',
+      logSink: 'non-retaining no-op; production serialization still runs',
+    };
+    const json = JSON.stringify(evidence, null, 2);
+    // Always retain numerical evidence, including partial measurements on assertion failure.
+    originalLog(
+      '[diagnostics performance measurements]',
+      JSON.stringify({
+        ...evidence,
+        samples: Object.fromEntries(
+          Object.entries(samples).map(([key, sample]) => {
+            const { requestDurationsMs, enqueueDurationsMs, ...summary } = sample;
+            return [
+              key,
+              {
+                ...summary,
+                measuredRequests: requestDurationsMs.length,
+                recordedEnqueues: enqueueDurationsMs.length,
+              },
+            ];
+          }),
+        ),
+      }),
+    );
+    if (process.env.DIAGNOSTICS_BENCHMARK_RESULT)
+      writeFileSync(process.env.DIAGNOSTICS_BENCHMARK_RESULT, json);
+  };
   try {
     for (let repetition = 1; repetition <= 3; repetition++) {
-      for (const mode of modes) {
+      for (const mode of modeOrders[repetition - 1]!) {
         const key = `${repetition}-${mode}`;
+        const sample = (samples[key] = {
+          status: 'measuring' as 'measuring' | 'verifying' | 'passed',
+          requestDurationsMs: [] as number[],
+          enqueueDurationsMs: [] as number[],
+          logCalls: 0,
+          requestP95Ms: 0,
+          enqueueP95Ms: 0,
+          providerCalls: 0,
+          maxPending: 0,
+          dropped: 0,
+          retainedEvents: 0,
+          enqueueSamples: 0,
+          eventLoopP95Ms: 0,
+          eventLoopSamples: 0,
+        });
+        const initialLogCalls = logCalls;
+        captureActiveSample = () => {
+          sample.logCalls = logCalls - initialLogCalls;
+        };
         const { db, sqlite } = openDatabase(join(directory, `${key}-app.sqlite`));
         runSeed(db);
         // Fixture-only setting: same existing limiter in all modes, enough for warm-up +100 requests.
@@ -73,7 +145,7 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
           lock = new Database(join(directory, `${key}-diagnostics.sqlite`));
           lock.exec('BEGIN IMMEDIATE');
         }
-        const enqueue: number[] = [];
+        const enqueue = sample.enqueueDurationsMs;
         let maxPending = 0;
         if (store) {
           const record = store.record.bind(store);
@@ -102,6 +174,7 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
               disableEvaluatorNodes: true,
               llmReasonNode: async () => {
                 providerCalls++;
+                sample.providerCalls = providerCalls;
                 return {
                   llmOutput: { kind: 'text' as const, content: 'benchmark result' },
                   messages: [{ role: 'assistant' as const, content: 'benchmark result' }],
@@ -120,9 +193,19 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
           );
         });
         const client = request(server);
-        const durations: number[] = [];
+        const durations = sample.requestDurationsMs;
         const eventLoop = monitorEventLoopDelay({ resolution: 10 });
         eventLoop.enable();
+        captureActiveSample = () => {
+          sample.requestP95Ms = percentile95(durations);
+          sample.enqueueP95Ms = percentile95(enqueue);
+          sample.enqueueSamples = enqueue.length;
+          sample.maxPending = maxPending;
+          sample.dropped = store?.health().dropped ?? 0;
+          sample.eventLoopP95Ms = eventLoop.percentile(95) / 1e6;
+          sample.eventLoopSamples = Number(eventLoop.count);
+          sample.logCalls = logCalls - initialLogCalls;
+        };
         cleanups.push(async () => {
           eventLoop.disable();
         });
@@ -144,6 +227,8 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
           if (index >= 10) durations.push(elapsed);
         }
         eventLoop.disable();
+        sample.status = 'verifying';
+        publishMeasurements();
         expect(Number(eventLoop.count)).toBeGreaterThan(0);
         expect(providerCalls).toBe(110);
         let retainedEvents = 0;
@@ -162,6 +247,7 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
             } finally {
               inspect.close();
             }
+            sample.retainedEvents = retainedEvents;
             expect(retainedEvents).toBe(enqueue.length);
             expect(store.health().acknowledgedSequence).toBeGreaterThanOrEqual(retainedEvents);
           } else {
@@ -171,51 +257,34 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
         }
         expect(maxPending).toBeLessThanOrEqual(256);
         const enqueueP95Ms = percentile95(enqueue);
-        expect(enqueueP95Ms).toBeLessThan(2);
-        samples[key] = {
-          retainedEvents,
-          enqueueSamples: enqueue.length,
-          eventLoopP95Ms: eventLoop.percentile(95) / 1e6,
-          eventLoopSamples: Number(eventLoop.count),
-          requestP95Ms: percentile95(durations),
-          enqueueP95Ms,
-          providerCalls,
-          maxPending,
-          dropped: store?.health().dropped ?? 0,
-        };
-        if (process.env.DIAGNOSTICS_BENCHMARK_RESULT)
-          writeFileSync(
-            process.env.DIAGNOSTICS_BENCHMARK_RESULT + '.progress',
-            JSON.stringify(samples, null, 2),
-          );
+        expect(enqueueP95Ms, `${key}: enqueue p95 ${enqueueP95Ms} ms`).toBeLessThan(2);
+        sample.status = 'passed';
+        publishMeasurements();
+        captureActiveSample = undefined;
         // Release each mode's actual DB/worker before the next measurement.
         for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
       }
       const baseline = samples[`${repetition}-disabled`]!.requestP95Ms;
-      for (const mode of ['healthy', 'locked'])
-        expect(samples[`${repetition}-${mode}`]!.requestP95Ms - baseline).toBeLessThanOrEqual(20);
+      for (const mode of ['healthy', 'locked']) {
+        const actual = samples[`${repetition}-${mode}`]!.requestP95Ms;
+        expect(
+          actual - baseline,
+          `repetition ${repetition} ${mode}: p95 ${actual} ms - disabled ${baseline} ms`,
+        ).toBeLessThanOrEqual(20);
+      }
     }
-    // Optional local evidence path is test-only; report contains numerical measurements, no request data.
-    if (process.env.DIAGNOSTICS_BENCHMARK_RESULT)
-      writeFileSync(
-        process.env.DIAGNOSTICS_BENCHMARK_RESULT,
-        JSON.stringify(
-          {
-            samples,
-            repetitions: 3,
-            requestsPerMode: 100,
-            warmupPerMode: 10,
-            provider: 'deterministic fixture',
-            logSink: 'captured console',
-          },
-          null,
-          2,
-        ),
-      );
+    completed = true;
   } finally {
-    for (const cleanup of cleanups.reverse()) await cleanup();
-    logs.mockRestore();
-    vi.unstubAllEnvs();
-    rmSync(directory, { recursive: true, force: true });
+    try {
+      publishMeasurements();
+    } finally {
+      console.log = originalLog;
+      try {
+        for (const cleanup of cleanups.reverse()) await cleanup();
+      } finally {
+        vi.unstubAllEnvs();
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
   }
 }, 90000);

@@ -25,11 +25,16 @@ timeout is retained alongside the unchanged focused and full rerun passes. Fresh
 passed again on final code revision `7e5ba9d6`, with no Blocker/Critical/Major findings and only
 two independently reviewed Minor dispositions. Normal push hooks passed all 222 API and 133
 desktop tests. Final documentation clarification aligns the V1 dependency section with accepted
-P1 and live Beads; its current-head CI remains required. No bypass, merge or closure. See results
+P1 and live Beads. That handoff revision passed hosted browser/Electron but failed one latency
+comparison (25.464694 ms versus the unchanged 20 ms bound). A bounded measurement-fixture repair
+removes retained spy-call overhead and preserves numeric failure evidence; no cause is inferred
+from one sample and no limit is raised. New current-head qualification remains required. No
+bypass, merge or closure. See results
 for the retained first failure and source-backed minor-warning dispositions.
 See [results](docs/reviews/agent-observability-mvp-results.md) and
-[usage](docs/development/diagnostics.md) for evidence and limits. Next: publish this documentation clarification to PR302, refresh its changed full mirrors, and
-qualify the current-head CI/security/comments.
+[usage](docs/development/diagnostics.md) for evidence and limits. Next: publish the independently reviewed measurement repair to PR302, refresh its changed full
+mirrors, and qualify current-head CI/security/comments with the retained numerical benchmark
+artifact. The focused repaired benchmark and two explicit failure/cleanup controls passed locally.
 V1 stays in progress through actual authorized feature delivery; no merge is authorized by this step.
 
 <!-- markdownlint-disable MD025 -->

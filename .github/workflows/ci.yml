@@ -72,7 +72,17 @@ jobs:
           echo "$workflow_test_bin" >> "$GITHUB_PATH"
 
       - name: Test
+        env:
+          DIAGNOSTICS_BENCHMARK_RESULT: ${{ runner.temp }}/diagnostics-benchmark.json
         run: pnpm run test
+
+      - name: Upload diagnostic benchmark measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: diagnostics-benchmark
+          path: ${{ runner.temp }}/diagnostics-benchmark.json*
+          retention-days: 7
 
       - name: Seed (idempotent)
         run: |

@@ -194,11 +194,37 @@ compiled-module startup scenarios and two actual API restart tests passed; the e
 change passed eight focused tests. Normal push hooks passed all 222 API and 133 desktop tests.
 Later documentation clarification changes no executable source; its own hosted checks still apply.
 
+## Hosted performance measurement follow-up
+
+Final handoff revision `1e10a2d0fef657dfd256134ee96d350f2efdb403` passed hosted browser and
+Electron journeys, but CI run `38183711144` failed the API benchmark: one request p95 difference
+was 25.464694 ms against the unchanged 20 ms limit. The other 221 API tests passed. The initial
+benchmark did not retain mode/repetition measurements in hosted CI, so this is a real failed
+acceptance observation with insufficient evidence to attribute its cause. Earlier successful
+runs do not erase it.
+
+Source review identified the console spy's retained call history as an unnecessary measurement
+confounder, not proof of the failure's cause. The bounded fixture repair keeps real production
+logger execution while replacing its test output sink with a restoring no-op, and records numeric
+measurements before assertions and on failure. A predetermined balanced mode order reduces fixed
+order bias across the three repetitions; every comparison is still enforced, without discarding
+samples or selecting a best run. CI retains the numeric artifact even when the
+job fails. Workloads, healthy persistence/locked writer checks, three repetitions, 100 measured
+requests per mode, the 2 ms enqueue bound and 20 ms request-overhead bound remain unchanged.
+No runtime behavior, timeout, threshold, retry allowance or test selection is relaxed.
+
+The one planned focused invocation passed all 990 real requests: the largest healthy/locked
+request p95 overhead was 0.449458 ms, and the largest enqueue p95 was 0.008459 ms. API lint,
+typecheck and formatting passed. Two separate intentional failure controls confirmed that a
+mid-request assertion preserves partial numeric evidence and that an artifact-write failure still
+restores console/environment state and removes the temporary database. These local results do not
+qualify the new hosted revision or establish the earlier failure's cause.
+
 ## Remaining qualification
 
 Connected T06/T07/T12 and local quality/regression checks passed. The implementation and quality
 repairs were committed and pushed with normal hooks, and all eight substantive document mirrors
-were read back in full at their recorded source revisions. Qualify the latest documentation
-clarification with its current-head feature CI/reviews and refreshed changed mirrors, then record
+were read back in full at their recorded source revisions. Qualify the measurement repair
+with its current-head feature CI/reviews, retained numeric benchmark artifact and refreshed changed mirrors, then record
 actual completion evidence in Beads. Merge and final owner acceptance retain their actual
 authorization boundaries.
