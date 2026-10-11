@@ -6,6 +6,9 @@ import {
   assertCommit,
   classifyHistoricalEvidence,
   git,
+  GIT_EXECUTABLE,
+  SYSTEM_PATH,
+  validateDataRepoPath,
   POLICY_PATH,
   readPolicy,
   REVIEW_PATH,
@@ -135,8 +138,8 @@ export function validateContext(context, base, head) {
     context?.repository !== REPOSITORY ||
     !Number.isSafeInteger(context.pr) ||
     context.pr < 1 ||
-    !/^[1-9][0-9]*$/.test(String(context.runId)) ||
-    !/^[1-9][0-9]*$/.test(String(context.runAttempt)) ||
+    !/^[1-9]\d*$/.test(String(context.runId)) ||
+    !/^[1-9]\d*$/.test(String(context.runAttempt)) ||
     context.controlSource !== base ||
     context.base !== base ||
     context.head !== head
@@ -155,7 +158,7 @@ export function controlIdentity(repo, commit) {
   return Object.fromEntries(
     CONTROL_PATHS.map((path) => {
       const entry = treeEntry(repo, commit, path);
-      if (!entry || entry.mode !== '100644' || entry.type !== 'blob')
+      if (entry?.mode !== '100644' || entry.type !== 'blob')
         throw new Error(`Missing regular protected control: ${path}`);
       return [
         path,
@@ -186,10 +189,10 @@ export function validateArchiveData(repo, head, policy) {
   let jsonFiles = 0;
   const secretCandidates = [];
   const patterns = [
-    ['private-key', /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g],
-    ['github-token', /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{70,})\b/g],
-    ['aws-access-key', /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g],
-    ['provider-token', /\bsk-(?:proj-|ant-api\d+-)?[A-Za-z0-9_-]{32,}\b/g],
+    { category: 'private-key', pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g },
+    { category: 'github-token', pattern: /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_\w{70,})\b/g },
+    { category: 'aws-access-key', pattern: /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g },
+    { category: 'provider-token', pattern: /\bsk-(?:proj-|ant-api\d+-)?[A-Za-z0-9_-]{32,}\b/g },
   ];
   for (const file of policy.files) {
     const bytes = git(repo, 'cat-file', 'blob', file.blob);
@@ -205,7 +208,7 @@ export function validateArchiveData(repo, head, policy) {
       JSON.parse(text);
       jsonFiles++;
     }
-    for (const [category, pattern] of patterns) {
+    for (const { category, pattern } of patterns) {
       pattern.lastIndex = 0;
       for (const match of text.matchAll(pattern))
         secretCandidates.push({
@@ -244,7 +247,7 @@ export function qualifyHistoricalEvidence({ repo, base, head, context }) {
     validateAutomaticSource(repo, base, head, context.workflowSource);
   const { policy } = readPolicy(repo, base);
   const reviewEntry = treeEntry(repo, base, REVIEW_PATH);
-  if (!reviewEntry || reviewEntry.mode !== '100644' || reviewEntry.type !== 'blob')
+  if (reviewEntry?.mode !== '100644' || reviewEntry.type !== 'blob')
     throw new Error('Protected independent review receipt missing');
   const reviewBytes = git(repo, 'cat-file', 'blob', reviewEntry.blob);
   const review = JSON.parse(reviewBytes.toString('utf8'));
@@ -261,8 +264,37 @@ export function qualifyHistoricalEvidence({ repo, base, head, context }) {
   };
 }
 
+export function githubApiUrl(path) {
+  if (typeof path !== 'string' || path.length > 256 || /[^\x20-\x7e]/.test(path))
+    throw new Error('Invalid GitHub API route');
+  const id = '[1-9]\\d*';
+  const page = '(?:\\?per_page=100&page=([1-9]\\d*))?';
+  const routes = [
+    new RegExp(`^pulls/(${id})$`),
+    /^git\/ref\/heads\/staging$/,
+    new RegExp(`^actions/runs/(${id})$`),
+    new RegExp(`^actions/runs/(${id})/attempts/(${id})/jobs${page}$`),
+    new RegExp(`^actions/runs/(${id})/artifacts${page}$`),
+    new RegExp(`^actions/artifacts/(${id})/zip$`),
+  ];
+  const match = routes.map((route) => route.exec(path)).find(Boolean);
+  const workflow =
+    /^actions\/workflows\/promptfoo-code-scan\.yml\/runs\?event=pull_request&head_sha=([a-f0-9]{40})(?:&per_page=100&page=([1-9]\d*))?$/.exec(
+      path,
+    );
+  if (!match && !workflow) throw new Error('Unsupported GitHub API route/query');
+  const numeric = match
+    ? match.slice(1).filter((value) => value !== undefined)
+    : [workflow[2]].filter((value) => value !== undefined);
+  if (numeric.some((value) => !Number.isSafeInteger(Number(value)) || Number(value) < 1))
+    throw new Error('Invalid numeric GitHub API identity');
+  const pagination = /(?:[?&])per_page=100&page=([1-9]\d*)$/.exec(path);
+  if (pagination && Number(pagination[1]) > 20) throw new Error('Invalid bounded API page');
+  return new URL(path, 'https://api.github.com/repos/jwill9999/agent-platform/').href;
+}
+
 export async function githubJson(path, token) {
-  const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/${path}`, {
+  const response = await fetch(githubApiUrl(path), {
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
@@ -276,20 +308,28 @@ export async function githubJson(path, token) {
 }
 
 export function fetchObjects(repo, refs, token) {
+  validateDataRepoPath(repo);
+  if (!Array.isArray(refs) || refs.length < 1 || refs.length > 4 || !refs.every(sha))
+    throw new Error('Invalid requested object identities');
   mkdirSync(repo, { recursive: false });
   const env = {
-    PATH: process.env.PATH,
+    PATH: SYSTEM_PATH,
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_TERMINAL_PROMPT: '0',
     GIT_CONFIG_COUNT: '1',
     GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
-    GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
+    GIT_CONFIG_VALUE_0:
+      'AUTHORIZATION: basic ' + Buffer.from('x-access-token:' + token).toString('base64'),
   };
   const args = ['-c', 'core.hooksPath=/dev/null'];
-  execFileSync('git', [...args, 'init', '--bare', repo], { env, stdio: 'pipe', timeout: 30_000 });
+  execFileSync(GIT_EXECUTABLE, [...args, 'init', '--bare', repo], {
+    env,
+    stdio: 'pipe',
+    timeout: 30_000,
+  });
   execFileSync(
-    'git',
+    GIT_EXECUTABLE,
     [
       ...args,
       '-C',
@@ -302,6 +342,25 @@ export function fetchObjects(repo, refs, token) {
     ],
     { env, stdio: 'pipe', timeout: 120_000, maxBuffer: 16 * 1024 * 1024 },
   );
+}
+
+function validateWorkflowTarget(event, eventName, ref, workflowSource, base, head) {
+  if (
+    eventName === 'pull_request' &&
+    (event.pull_request.head.sha !== head || event.pull_request.base.sha !== base)
+  )
+    throw new Error('Stale automatic event');
+  if (
+    eventName === 'workflow_dispatch' &&
+    (ref !== 'refs/heads/staging' || workflowSource !== base)
+  )
+    throw new Error('Dispatch source is not current protected staging');
+}
+function writeFullRoute(outputPath, githubOutput, context, record) {
+  const { base, head } = context;
+  if (githubOutput) appendFileSync(githubOutput, `route=full\nbase=${base}\nhead=${head}\n`);
+  writeFileSync(outputPath, JSON.stringify({ version: 1, ...context, ...record }, null, 2) + '\n');
+  return { route: 'full', base, head };
 }
 
 export async function runQualification({
@@ -321,22 +380,13 @@ export async function runQualification({
     throw new Error('Missing trusted workflow inputs');
   const value =
     eventName === 'workflow_dispatch' ? event.inputs?.pr_number : event.pull_request?.number;
-  if (!/^[1-9][0-9]*$/.test(String(value)) || !Number.isSafeInteger(Number(value)))
+  if (!/^[1-9]\d*$/.test(String(value)) || !Number.isSafeInteger(Number(value)))
     throw new Error('Invalid PR number');
   const pr = await githubJson(`pulls/${value}`, token);
   const base = pr.base?.sha;
   const head = pr.head?.sha;
   validateTarget(pr, head, base);
-  if (
-    eventName === 'pull_request' &&
-    (event.pull_request.head.sha !== head || event.pull_request.base.sha !== base)
-  )
-    throw new Error('Stale automatic event');
-  if (
-    eventName === 'workflow_dispatch' &&
-    (ref !== 'refs/heads/staging' || workflowSource !== base)
-  )
-    throw new Error('Dispatch source is not current protected staging');
+  validateWorkflowTarget(event, eventName, ref, workflowSource, base, head);
   const protectedTip = await githubJson('git/ref/heads/staging', token);
   if (protectedTip.object?.sha !== base) throw new Error('Protected base changed');
   const repo = join(directory, 'objects.git');
@@ -358,28 +408,17 @@ export async function runQualification({
   const protectedPolicy = treeEntry(repo, base, POLICY_PATH);
   // Bootstrap is full-scan only. A partially installed policy is an error, not fallback.
   if (!protectedClassifier && !protectedPolicy && eventName === 'pull_request') {
-    if (githubOutput) appendFileSync(githubOutput, `route=full\nbase=${base}\nhead=${head}\n`);
-    writeFileSync(
-      outputPath,
-      JSON.stringify(
-        { version: 1, route: 'full', reason: 'protected-policy-not-adopted', ...context },
-        null,
-        2,
-      ) + '\n',
-    );
-    return { route: 'full', base, head };
+    return writeFullRoute(outputPath, githubOutput, context, {
+      route: 'full',
+      reason: 'protected-policy-not-adopted',
+    });
   }
   if (!protectedClassifier || !protectedPolicy) throw new Error('Protected policy is incomplete');
   const classification = classifyHistoricalEvidence({ repo, base, head });
   if (classification.route !== 'archive') {
     if (eventName === 'workflow_dispatch')
       throw new Error(`Archive provenance denied: ${classification.reason}`);
-    if (githubOutput) appendFileSync(githubOutput, `route=full\nbase=${base}\nhead=${head}\n`);
-    writeFileSync(
-      outputPath,
-      JSON.stringify({ version: 1, ...context, classification }, null, 2) + '\n',
-    );
-    return { route: 'full', base, head };
+    return writeFullRoute(outputPath, githubOutput, context, { classification });
   }
   const receipt = qualifyHistoricalEvidence({ repo, base, head, context });
   const after = await githubJson(`pulls/${pr.number}`, token);

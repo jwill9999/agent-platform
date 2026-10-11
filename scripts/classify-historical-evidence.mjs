@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { isAbsolute, normalize } from 'node:path';
 
 export const POLICY_PATH = '.github/security/historical-evidence-allowlist.v1.json';
 export const REVIEW_PATH = '.github/security/historical-evidence-review.v1.json';
@@ -10,16 +11,88 @@ export const SELECTION = '30788264b062ce9dec1060237b6b41fb78a6b8734a6fecc46861a3
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 export const sha = (value) => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 
+export const GIT_EXECUTABLE = '/usr/bin/git';
+export const SYSTEM_PATH = '/usr/bin:/bin';
+export function validateDataRepoPath(repo) {
+  if (
+    typeof repo !== 'string' ||
+    !isAbsolute(repo) ||
+    normalize(repo) !== repo ||
+    repo === '/' ||
+    /[\0-\x1f\x7f]/.test(repo)
+  )
+    throw new Error('Invalid absolute data repository path');
+  return repo;
+}
+function safeTreePath(path) {
+  return (
+    typeof path === 'string' &&
+    /^[\w.\/-]+$/.test(path) &&
+    path.split('/').every((part) => part && part !== '.' && part !== '..') &&
+    !path.startsWith('-')
+  );
+}
+export function validateGitArguments(args) {
+  if (!Array.isArray(args) || !args.every((arg) => typeof arg === 'string'))
+    throw new Error('Invalid Git argument types');
+  const [command, ...values] = args;
+  const shape = {
+    'cat-file': () => values.length === 2 && ['-t', 'blob'].includes(values[0]) && sha(values[1]),
+    'ls-tree': () =>
+      values.length === 4 &&
+      values[0] === '-z' &&
+      sha(values[1]) &&
+      values[2] === '--' &&
+      safeTreePath(values[3]),
+    'merge-base': () =>
+      values.length === 3 && values[0] === '--is-ancestor' && sha(values[1]) && sha(values[2]),
+    'rev-parse': () => values.length === 1 && ['HEAD', 'staging'].includes(values[0]),
+    'update-ref': () => values.length === 2 && values[0] === 'refs/heads/staging' && sha(values[1]),
+    show: () =>
+      (values.length === 3 &&
+        values[0] === '-s' &&
+        values[1] === '--format=%P' &&
+        sha(values[2])) ||
+      (values.length === 1 &&
+        /^[a-f0-9]{40}:[\w.\/-]+$/.test(values[0]) &&
+        safeTreePath(values[0].slice(41))),
+  };
+  // The raw diff has six fixed flags followed by two immutable identities and --.
+  if (command === 'diff') {
+    if (
+      values.length !== 9 ||
+      values.slice(0, 6).join(' ') !==
+        '--raw -z --no-renames --no-ext-diff --no-textconv --no-abbrev' ||
+      !sha(values[6]) ||
+      !sha(values[7]) ||
+      values[8] !== '--'
+    )
+      throw new Error('Unsupported Git argument shape');
+    return args;
+  }
+  if (!Object.hasOwn(shape, command) || !shape[command]())
+    throw new Error('Unsupported Git argument shape');
+  return args;
+}
+
 export function git(repo, ...args) {
   return execFileSync(
-    'git',
-    ['-c', 'core.hooksPath=/dev/null', '-c', 'core.attributesFile=/dev/null', '-C', repo, ...args],
+    GIT_EXECUTABLE,
+    [
+      '-c',
+      'core.hooksPath=/dev/null',
+      '-c',
+      'core.attributesFile=/dev/null',
+      '-C',
+      validateDataRepoPath(repo),
+      ...validateGitArguments(args),
+    ],
     {
       encoding: null,
       maxBuffer: 16 * 1024 * 1024,
       timeout: 30_000,
       env: {
-        PATH: process.env.PATH,
+        PATH: SYSTEM_PATH,
         GIT_CONFIG_NOSYSTEM: '1',
         GIT_CONFIG_GLOBAL: '/dev/null',
         GIT_TERMINAL_PROMPT: '0',
@@ -84,7 +157,7 @@ export function validatePolicy(policy) {
 
 export function readPolicy(repo, base) {
   const entry = treeEntry(repo, base, POLICY_PATH);
-  if (!entry || entry.mode !== '100644' || entry.type !== 'blob')
+  if (entry?.mode !== '100644' || entry.type !== 'blob')
     throw new Error('Protected policy missing or not regular data');
   const bytes = git(repo, 'cat-file', 'blob', entry.blob);
   return {

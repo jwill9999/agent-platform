@@ -127,6 +127,38 @@ already reviewed on the full consolidation/primer branches; preserve the rest of
 Fresh head link checks are required. Sourcery skipped because its weekly review budget is exhausted;
 its generated summary is not a code review. The distinct independent source reviews remain recorded.
 
+## Hosted Sonar findings at the reviewed delivery tip
+
+At exact `e3c8523f`, hosted SonarCloud returned 41 open issues and failed new reliability/security
+ratings (both 4; required 1). Direct public API readback is retained as `pr292-sonar-issues.json`.
+Prior source-review approval does not clear this actual hosted gate. No issue is suppressed or
+silently accepted, and staging remains unchanged.
+
+Four resolver-test warnings concern literal public temporary paths. Replace these with unique
+`mkdtemp` fixtures while retaining malformed multiline/NUL output, environment injection,
+quote/space and cleanup assertions. All 12 Node tests pass; independent focused critic approves
+that exact test change, with the production helper unchanged.
+
+Independent archive security triage requires three bounded corrections: fixed trusted Git/Python
+executables and child environments (S01); explicit Git helper command/arity/options/SHA/path
+contracts, including fetch-ref validation (S02); exact repository API route/query contracts,
+rejecting traversal/encoded separators/backslashes/unknown queries (S03). Existing callers already
+validate IDs and revisions and no shell injection or off-host credential forwarding was shown;
+helper-level contracts still need strengthening. Remaining reported sorting/type/complexity/style
+issues must be addressed without changing trust boundaries. The bounded implementation is complete and both critics approve source delivery. Git/Python use
+fixed `/usr/bin` paths with minimal child PATH. Supported Git commands/arguments/revisions/tree
+paths and normalized absolute repository roots are validated; fetch refs reject before side
+effects. Exact GitHub endpoint/query contracts retain fixed origin and redirect denial. Reported
+sorting, typing, complexity and independent-read awaits are corrected without suppressions.
+
+The frozen affected suite passes 26 tests, zero failures/cancellations/skips, in 97.544 seconds.
+After fixture-only temporary-path changes, three malicious boundary controls pass; five connected
+pinned-bundle/API/fetch controls pass. Critics independently ran six and three focused controls
+and approved final source/test hashes. Six scripts pass focused lint, nine owned files formatting,
+three workflow blocks syntax and diff checks. The parent resolver test still passes all 12 cases.
+No VM/model call is repeated for these script/test changes. Fresh actual hosted Sonar and all
+current-head pipelines remain required; no closure of the e3 hosted result is manufactured.
+
 ## Pending delivery gates
 
 Actual policy-adoption full scan and VM, protected archive

@@ -1,12 +1,17 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, isAbsolute, join, normalize } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
-import { lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
-import { dirname } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 // Bootstrap imports are builtins only. No adjacent project code executes before
 // the entire local control bundle has been compared with protected Git objects.
@@ -22,15 +27,87 @@ const CONTROL_PATHS = [
 ];
 const sha = (value) => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const GIT_EXECUTABLE = '/usr/bin/git';
+const SYSTEM_PATH = '/usr/bin:/bin';
+export function validateDataRepoPath(repo) {
+  if (
+    typeof repo !== 'string' ||
+    !isAbsolute(repo) ||
+    normalize(repo) !== repo ||
+    repo === '/' ||
+    /[\0-\x1f\x7f]/.test(repo)
+  )
+    throw new Error('Invalid absolute data repository path');
+  return repo;
+}
+function safeTreePath(path) {
+  return (
+    typeof path === 'string' &&
+    /^[\w.\/-]+$/.test(path) &&
+    path.split('/').every((part) => part && part !== '.' && part !== '..') &&
+    !path.startsWith('-')
+  );
+}
+export function validateGitArguments(args) {
+  if (!Array.isArray(args) || !args.every((arg) => typeof arg === 'string'))
+    throw new Error('Invalid Git argument types');
+  const [command, ...values] = args;
+  const shape = {
+    'cat-file': () => values.length === 2 && ['-t', 'blob'].includes(values[0]) && sha(values[1]),
+    'ls-tree': () =>
+      values.length === 4 &&
+      values[0] === '-z' &&
+      sha(values[1]) &&
+      values[2] === '--' &&
+      safeTreePath(values[3]),
+    'merge-base': () =>
+      values.length === 3 && values[0] === '--is-ancestor' && sha(values[1]) && sha(values[2]),
+    'rev-parse': () => values.length === 1 && ['HEAD', 'staging'].includes(values[0]),
+    'update-ref': () => values.length === 2 && values[0] === 'refs/heads/staging' && sha(values[1]),
+    show: () =>
+      (values.length === 3 &&
+        values[0] === '-s' &&
+        values[1] === '--format=%P' &&
+        sha(values[2])) ||
+      (values.length === 1 &&
+        /^[a-f0-9]{40}:[\w.\/-]+$/.test(values[0]) &&
+        safeTreePath(values[0].slice(41))),
+  };
+  // The raw diff has six fixed flags followed by two immutable identities and --.
+  if (command === 'diff') {
+    if (
+      values.length !== 9 ||
+      values.slice(0, 6).join(' ') !==
+        '--raw -z --no-renames --no-ext-diff --no-textconv --no-abbrev' ||
+      !sha(values[6]) ||
+      !sha(values[7]) ||
+      values[8] !== '--'
+    )
+      throw new Error('Unsupported Git argument shape');
+    return args;
+  }
+  if (!Object.hasOwn(shape, command) || !shape[command]())
+    throw new Error('Unsupported Git argument shape');
+  return args;
+}
+
 function git(repo, ...args) {
   return execFileSync(
-    'git',
-    ['-c', 'core.hooksPath=/dev/null', '-c', 'core.attributesFile=/dev/null', '-C', repo, ...args],
+    GIT_EXECUTABLE,
+    [
+      '-c',
+      'core.hooksPath=/dev/null',
+      '-c',
+      'core.attributesFile=/dev/null',
+      '-C',
+      validateDataRepoPath(repo),
+      ...validateGitArguments(args),
+    ],
     {
       maxBuffer: 16 * 1024 * 1024,
       timeout: 30_000,
       env: {
-        PATH: process.env.PATH,
+        PATH: SYSTEM_PATH,
         GIT_CONFIG_NOSYSTEM: '1',
         GIT_CONFIG_GLOBAL: '/dev/null',
         GIT_TERMINAL_PROMPT: '0',
@@ -57,8 +134,37 @@ function validateTarget(pr, head, base) {
   )
     throw new Error('Wrong repository, target or stale PR head/base');
 }
+export function githubApiUrl(path) {
+  if (typeof path !== 'string' || path.length > 256 || /[^\x20-\x7e]/.test(path))
+    throw new Error('Invalid GitHub API route');
+  const id = '[1-9]\\d*';
+  const page = '(?:\\?per_page=100&page=([1-9]\\d*))?';
+  const routes = [
+    new RegExp(`^pulls/(${id})$`),
+    /^git\/ref\/heads\/staging$/,
+    new RegExp(`^actions/runs/(${id})$`),
+    new RegExp(`^actions/runs/(${id})/attempts/(${id})/jobs${page}$`),
+    new RegExp(`^actions/runs/(${id})/artifacts${page}$`),
+    new RegExp(`^actions/artifacts/(${id})/zip$`),
+  ];
+  const match = routes.map((route) => route.exec(path)).find(Boolean);
+  const workflow =
+    /^actions\/workflows\/promptfoo-code-scan\.yml\/runs\?event=pull_request&head_sha=([a-f0-9]{40})(?:&per_page=100&page=([1-9]\d*))?$/.exec(
+      path,
+    );
+  if (!match && !workflow) throw new Error('Unsupported GitHub API route/query');
+  const numeric = match
+    ? match.slice(1).filter((value) => value !== undefined)
+    : [workflow[2]].filter((value) => value !== undefined);
+  if (numeric.some((value) => !Number.isSafeInteger(Number(value)) || Number(value) < 1))
+    throw new Error('Invalid numeric GitHub API identity');
+  const pagination = /(?:[?&])per_page=100&page=([1-9]\d*)$/.exec(path);
+  if (pagination && Number(pagination[1]) > 20) throw new Error('Invalid bounded API page');
+  return new URL(path, 'https://api.github.com/repos/jwill9999/agent-platform/').href;
+}
+
 async function githubJson(path, token) {
-  const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/${path}`, {
+  const response = await fetch(githubApiUrl(path), {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github+json',
@@ -70,22 +176,29 @@ async function githubJson(path, token) {
   if (!response.ok) throw new Error(`GitHub read failed: ${response.status}`);
   return response.json();
 }
-function fetchObjects(repo, refs, token) {
-  if (!refs.every(sha)) throw new Error('Invalid requested object identity');
+export function fetchObjects(repo, refs, token) {
+  validateDataRepoPath(repo);
+  if (!Array.isArray(refs) || refs.length < 1 || refs.length > 4 || !refs.every(sha))
+    throw new Error('Invalid requested object identity');
   mkdirSync(repo);
   const env = {
-    PATH: process.env.PATH,
+    PATH: SYSTEM_PATH,
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_TERMINAL_PROMPT: '0',
     GIT_CONFIG_COUNT: '1',
     GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
-    GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
+    GIT_CONFIG_VALUE_0:
+      'AUTHORIZATION: basic ' + Buffer.from('x-access-token:' + token).toString('base64'),
   };
   const args = ['-c', 'core.hooksPath=/dev/null'];
-  execFileSync('git', [...args, 'init', '--bare', repo], { env, stdio: 'pipe', timeout: 30_000 });
+  execFileSync(GIT_EXECUTABLE, [...args, 'init', '--bare', repo], {
+    env,
+    stdio: 'pipe',
+    timeout: 30_000,
+  });
   execFileSync(
-    'git',
+    GIT_EXECUTABLE,
     [
       ...args,
       '-C',
@@ -100,6 +213,18 @@ function fetchObjects(repo, refs, token) {
   );
 }
 
+function validateLocalControl(localRoot, path, bytes) {
+  const parts = path.split('/');
+  for (let i = 0; i < parts.length; i++) {
+    const stat = lstatSync(join(localRoot, ...parts.slice(0, i + 1)));
+    const correctType = i < parts.length - 1 ? stat.isDirectory() : stat.isFile();
+    if (stat.isSymbolicLink() || !correctType)
+      throw new Error(`Unsafe local protected control: ${path}`);
+  }
+  if (!bytes.equals(readFileSync(join(localRoot, path))))
+    throw new Error(`Local control differs from protected source: ${path}`);
+}
+
 export async function loadProtectedHelpers({
   repo,
   protectedTip,
@@ -112,16 +237,9 @@ export async function loadProtectedHelpers({
   for (const path of CONTROL_PATHS) {
     const entry = git(repo, 'ls-tree', '-z', protectedTip, '--', path).toString();
     const match = /^100644 blob [a-f0-9]{40}\t([^\0]+)\0$/.exec(entry);
-    if (!match || match[1] !== path) throw new Error(`Missing regular protected control: ${path}`);
+    if (match?.[1] !== path) throw new Error(`Missing regular protected control: ${path}`);
     const bytes = git(repo, 'show', `${protectedTip}:${path}`);
-    const parts = path.split('/');
-    for (let i = 0; i < parts.length; i++) {
-      const stat = lstatSync(join(localRoot, ...parts.slice(0, i + 1)));
-      if (stat.isSymbolicLink() || (i < parts.length - 1 ? !stat.isDirectory() : !stat.isFile()))
-        throw new Error(`Unsafe local protected control: ${path}`);
-    }
-    if (!bytes.equals(readFileSync(join(localRoot, path))))
-      throw new Error(`Local control differs from protected source: ${path}`);
+    validateLocalControl(localRoot, path, bytes);
     protectedBytes.set(path, bytes);
   }
   // Execute object-derived private copies, so changing adjacent local files after
@@ -163,8 +281,8 @@ function equivalent(left, right) {
       left.every((value, i) => equivalent(value, right[i]))
     );
   if (typeof left === 'object') {
-    const a = Object.keys(left).sort();
-    const b = Object.keys(right).sort();
+    const a = Object.keys(left).sort((a, b) => a.localeCompare(b, 'en'));
+    const b = Object.keys(right).sort((a, b) => a.localeCompare(b, 'en'));
     return equivalent(a, b) && a.every((key) => equivalent(left[key], right[key]));
   }
   return left === right;
@@ -308,11 +426,11 @@ export function decodeReceiptZip(zip) {
     throw new Error('Invalid receipt artifact bytes');
   const extract =
     "import io,json,stat,sys,zipfile\nz=zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read()))\nentries=z.infolist()\nassert len(entries)==1\ne=entries[0]\nassert e.filename=='archive-qualification.json' and not e.is_dir() and e.file_size<=65536\nmode=e.external_attr>>16\nassert not stat.S_ISLNK(mode) and (stat.S_IFMT(mode) in (0,stat.S_IFREG))\nsys.stdout.buffer.write(z.read(e))";
-  const bytes = execFileSync('python3', ['-I', '-c', extract], {
+  const bytes = execFileSync('/usr/bin/python3', ['-I', '-c', extract], {
     input: zip,
     maxBuffer: 64 * 1024,
     timeout: 10_000,
-    env: { PATH: process.env.PATH },
+    env: { PATH: SYSTEM_PATH },
   });
   return JSON.parse(bytes.toString('utf8'));
 }
@@ -329,14 +447,11 @@ async function downloadReceipt(run, name, token) {
   )
     throw new Error('Missing or ambiguous run-bound receipt artifact');
   const artifact = matches[0];
-  const response = await fetch(
-    `https://api.github.com/repos/${REPOSITORY}/actions/artifacts/${artifact.id}/zip`,
-    {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
-      redirect: 'manual',
-      signal: AbortSignal.timeout(30_000),
-    },
-  );
+  const response = await fetch(githubApiUrl(`actions/artifacts/${artifact.id}/zip`), {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+    redirect: 'manual',
+    signal: AbortSignal.timeout(30_000),
+  });
   if (response.status !== 302)
     throw new Error('Artifact download did not return a signed data URL');
   const location = new URL(response.headers.get('location'));
@@ -380,18 +495,20 @@ export async function revalidateFinalProof({
     throw new Error('Protected base changed during verification');
   const automatic = await read(`actions/runs/${automaticRun.id}`);
   const dispatch = await read(`actions/runs/${dispatchRun.id}`);
-  for (const [fresh, prior, event, source, name] of [
-    [automatic, automaticRun, 'pull_request', pr.head.sha, 'security-scan'],
-    [dispatch, dispatchRun, 'workflow_dispatch', protectedTip, 'archive-provenance'],
-  ]) {
-    if (fresh.id !== prior.id || fresh.run_attempt !== prior.run_attempt)
-      throw new Error('Workflow attempt changed during verification');
-    const jobs = await enumerate(
-      `actions/runs/${fresh.id}/attempts/${fresh.run_attempt}/jobs`,
-      'jobs',
-    );
-    validateRun(fresh, event, source, pr, name, jobs);
-  }
+  await Promise.all(
+    [
+      [automatic, automaticRun, 'pull_request', pr.head.sha, 'security-scan'],
+      [dispatch, dispatchRun, 'workflow_dispatch', protectedTip, 'archive-provenance'],
+    ].map(async ([fresh, prior, event, source, name]) => {
+      if (fresh.id !== prior.id || fresh.run_attempt !== prior.run_attempt)
+        throw new Error('Workflow attempt changed during verification');
+      const jobs = await enumerate(
+        `actions/runs/${fresh.id}/attempts/${fresh.run_attempt}/jobs`,
+        'jobs',
+      );
+      validateRun(fresh, event, source, pr, name, jobs);
+    }),
+  );
   const candidates = await enumerate(
     `actions/workflows/promptfoo-code-scan.yml/runs?event=pull_request&head_sha=${pr.head.sha}`,
     'workflow_runs',
@@ -415,8 +532,10 @@ export async function revalidateFinalProof({
   // Refresh both identities once more after enumeration: a same-head rerun may
   // begin while the latest-run or job pages are being fetched. A merge caller
   // must still repeat the gate immediately before its exact-head merge request.
-  for (const prior of [automaticRun, dispatchRun]) {
-    const fresh = await read(`actions/runs/${prior.id}`);
+  const priorRuns = [automaticRun, dispatchRun];
+  const freshRuns = await Promise.all(priorRuns.map((prior) => read(`actions/runs/${prior.id}`)));
+  freshRuns.forEach((fresh, index) => {
+    const prior = priorRuns[index];
     if (
       fresh.id !== prior.id ||
       fresh.run_attempt !== prior.run_attempt ||
@@ -425,7 +544,7 @@ export async function revalidateFinalProof({
       fresh.conclusion !== 'success'
     )
       throw new Error('Workflow changed at final verification fence');
-  }
+  });
 }
 
 async function main() {
@@ -433,7 +552,7 @@ async function main() {
   if (
     process.argv.length !== 6 ||
     ![prText, automaticText, dispatchText].every(
-      (value) => /^[1-9][0-9]*$/.test(value) && Number.isSafeInteger(Number(value)),
+      (value) => /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)),
     ) ||
     !sha(adoptionCommit)
   )

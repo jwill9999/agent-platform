@@ -1,15 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { sha256 } from './classify-historical-evidence.mjs';
+import {
+  fetchObjects as bootstrapFetchObjects,
+  githubApiUrl as bootstrapApiUrl,
+  validateGitArguments as bootstrapGitArguments,
+  validateDataRepoPath as bootstrapRepoPath,
+} from './verify-historical-evidence-provenance.mjs';
 import { fixture } from './classify-historical-evidence.test.mjs';
 import {
   qualifyHistoricalEvidence,
+  fetchObjects,
+  githubApiUrl,
+  githubJson,
   guardPromptfooAction,
   PROMPTFOO_BUNDLE_SHA256,
   insertPromptfooResponseGuard,
@@ -325,6 +334,84 @@ test('workflow reads pinned-size vendor Git blob above default buffer without tr
         guardPromptfooAction(committed.toString('utf8')).originalSha256,
         PROMPTFOO_BUNDLE_SHA256,
       );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('GitHub endpoint contract rejects traversal, forged routes and unsafe identities without requests', async () => {
+  const sha = 'a'.repeat(40);
+  const supported = [
+    'pulls/288',
+    'git/ref/heads/staging',
+    'actions/runs/200',
+    'actions/runs/200/attempts/1/jobs?per_page=100&page=20',
+    'actions/runs/200/artifacts?per_page=100&page=1',
+    'actions/artifacts/42/zip',
+    `actions/workflows/promptfoo-code-scan.yml/runs?event=pull_request&head_sha=${sha}&per_page=100&page=1`,
+  ];
+  const unsafe = [
+    '../other/repo',
+    'https://evil.test/path',
+    '//evil.test/path',
+    'pulls/1/../../issues',
+    'pulls/%31',
+    'pulls/1%2f..',
+    'pulls/1\\../../issues',
+    'pulls/1?url=https://evil.test',
+    'pulls/1#ignored',
+    'pulls/0',
+    'pulls/01',
+    'pulls/9007199254740992',
+    'pulls/1\n',
+    'git/ref/heads/main',
+    'actions/runs/1/jobs',
+    'actions/runs/1/attempts/1/jobs?per_page=100&page=21',
+    'actions/runs/1/artifacts?per_page=100&page=1&extra=1',
+    `actions/workflows/promptfoo-code-scan.yml/runs?event=workflow_dispatch&head_sha=${sha}`,
+    `actions/workflows/promptfoo-code-scan.yml/runs?event=pull_request&head_sha=${sha}&per_page=100&page=1&extra=1`,
+  ];
+  for (const validate of [githubApiUrl, bootstrapApiUrl]) {
+    for (const path of supported)
+      assert.equal(validate(path), `https://api.github.com/repos/jwill9999/agent-platform/${path}`);
+    for (const path of unsafe) assert.throws(() => validate(path), /route|query|identity|page/);
+  }
+  let calls = 0;
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => {
+      calls++;
+      throw new Error('unexpected network request');
+    };
+    for (const path of unsafe)
+      await assert.rejects(() => githubJson(path, 'unit-token-never-sent'));
+    assert.equal(calls, 0);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('both fetch bootstraps reject malicious refs and repository paths before creation or networking', () => {
+  const root = mkdtempSync(join(tmpdir(), 'fetch-contract-negative-'));
+  const output = join(root, 'must-not-exist.git');
+  try {
+    for (const fetch of [fetchObjects, bootstrapFetchObjects]) {
+      for (const refs of [
+        ['--upload-pack=' + join(root, 'evil')],
+        ['a'.repeat(40), '--config=evil'],
+        [],
+        ['refs/heads/staging'],
+        ['a'.repeat(40) + '\n'],
+      ])
+        assert.throws(() => fetch(output, refs, 'unit-token-never-sent'), /identit/);
+      assert.throws(() => fetch('--directory', ['a'.repeat(40)], 'unit-token'), /absolute/);
+    }
+    assert.equal(existsSync(output), false);
+    assert.throws(() => bootstrapRepoPath(root + '/../outside'), /absolute/);
+    assert.throws(
+      () => bootstrapGitArguments(['show', '--ext-diff', 'a'.repeat(40)]),
+      /Unsupported/,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

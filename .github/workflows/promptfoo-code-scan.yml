@@ -84,12 +84,12 @@ jobs:
           if (!response.ok) throw new Error('PR lookup failed');
           const pr = await response.json();
           if (pr.state !== 'open' || pr.head.repo.full_name !== 'jwill9999/agent-platform' || pr.head.sha !== process.env.EXPECTED_HEAD || pr.base.sha !== process.env.EXPECTED_BASE) throw new Error('Fork or stale PR input');
-          const head = execFileSync('git', ['-C', process.env.SCAN_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const head = execFileSync('/usr/bin/git', ['-C', process.env.SCAN_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
           if (head !== pr.head.sha || !['main', 'staging'].includes(pr.base.ref)) throw new Error('Wrong local scan HEAD/target');
           // The vendor fetch runs in RUNNER_TEMP. Prepare its data-only local
           // base explicitly so detached checkout can resolve staging...HEAD.
-          execFileSync('git', ['-C', process.env.SCAN_ROOT, '-c', 'core.hooksPath=/dev/null', 'update-ref', `refs/heads/${pr.base.ref}`, pr.base.sha]);
-          const base = execFileSync('git', ['-C', process.env.SCAN_ROOT, 'rev-parse', pr.base.ref], { encoding: 'utf8' }).trim();
+          execFileSync('/usr/bin/git', ['-C', process.env.SCAN_ROOT, '-c', 'core.hooksPath=/dev/null', 'update-ref', `refs/heads/${pr.base.ref}`, pr.base.sha]);
+          const base = execFileSync('/usr/bin/git', ['-C', process.env.SCAN_ROOT, 'rev-parse', pr.base.ref], { encoding: 'utf8' }).trim();
           if (base !== pr.base.sha) throw new Error('Wrong prepared local base');
           rmSync(`${process.env.SCAN_ROOT}/promptfoo-scan.sarif.json`, { force: true });
           NODE
@@ -166,11 +166,11 @@ jobs:
               throw new Error('Pinned vendor bundle digest mismatch');
             return insertPromptfooResponseGuard(bundle);
           }
-          const action = execFileSync('git', ['-C', process.env.ACTION_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const action = execFileSync('/usr/bin/git', ['-C', process.env.ACTION_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
           if (action !== '148e01f35bc65bd992b9f44679577aa9123be6ab') throw new Error('Wrong action bundle');
           const originalPath = `${process.env.ACTION_ROOT}/dist/index.js`;
           const original = readFileSync(originalPath);
-          const committed = execFileSync('git', ['-C', process.env.ACTION_ROOT, 'show', 'HEAD:dist/index.js'], { maxBuffer: 4 * 1024 * 1024 });
+          const committed = execFileSync('/usr/bin/git', ['-C', process.env.ACTION_ROOT, 'show', 'HEAD:dist/index.js'], { maxBuffer: 4 * 1024 * 1024 });
           if (!original.equals(committed)) throw new Error('Vendor checkout differs from pinned Git blob');
           const guarded = guardPromptfooAction(original.toString('utf8'));
           const guardedPath = `${process.env.ACTION_ROOT}/dist/guarded-index.js`;
@@ -213,8 +213,8 @@ jobs:
           if (!response.ok) throw new Error('Final PR lookup failed');
           const pr = await response.json();
           if (pr.state !== 'open' || pr.head.sha !== process.env.EXPECTED_HEAD || pr.base.sha !== process.env.EXPECTED_BASE) throw new Error('PR changed during scan');
-          const localHead = execFileSync('git', ['-C', process.env.SCAN_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-          const localBase = execFileSync('git', ['-C', process.env.SCAN_ROOT, 'rev-parse', pr.base.ref], { encoding: 'utf8' }).trim();
+          const localHead = execFileSync('/usr/bin/git', ['-C', process.env.SCAN_ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const localBase = execFileSync('/usr/bin/git', ['-C', process.env.SCAN_ROOT, 'rev-parse', pr.base.ref], { encoding: 'utf8' }).trim();
           if (localHead !== pr.head.sha || localBase !== pr.base.sha) throw new Error('Scan refs mismatch');
           const cliVersion = execFileSync('promptfoo', ['--version'], { encoding: 'utf8' }).trim();
           writeFileSync(process.env.PROOF_PATH, JSON.stringify({ qualification: 'actual-full-promptfoo-analysis', repository: process.env.GITHUB_REPOSITORY, pr: pr.number, head: pr.head.sha, base: pr.base.sha, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT, vendorBaseActionSha: '148e01f35bc65bd992b9f44679577aa9123be6ab', vendorResponseGuard: guard, cliVersion, diffsOnly: false, sarifSha256: createHash('sha256').update(bytes).digest('hex'), limits: ['Built-in blob/patch omissions remain; filesystem access is not analysis coverage', 'Action installs current CLI; actual installed version recorded'] }, null, 2) + '\n');

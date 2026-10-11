@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -15,6 +16,9 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import {
   classifyHistoricalEvidence,
+  git,
+  validateDataRepoPath,
+  validateGitArguments,
   POLICY_PATH,
   REVIEW_PATH,
   SELECTION,
@@ -255,6 +259,66 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       );
     } finally {
       f.cleanup();
+    }
+  });
+  test('Git argument contract rejects options, unsafe revisions and repository paths before execution', () => {
+    const root = mkdtempSync(join(tmpdir(), 'git-contract-negative-'));
+    const hash = 'a'.repeat(40);
+    try {
+      for (const repo of [
+        'relative.git',
+        '--upload-pack=evil',
+        root + '/../outside',
+        '/',
+        join(root, 'bad\npath'),
+        join(root, 'bad\0path'),
+      ])
+        assert.throws(() => validateDataRepoPath(repo));
+      for (const args of [
+        ['config', 'core.hooksPath', join(root, 'evil')],
+        ['cat-file', '-t', '--help'],
+        ['cat-file', 'blob', hash, '--batch'],
+        ['ls-tree', '-z', hash, '--', '../outside'],
+        ['ls-tree', '-z', hash, '--', '-command'],
+        ['show', `${hash}:../outside`],
+        ['show', '--ext-diff', hash],
+        ['merge-base', '--is-ancestor', hash, '--help'],
+        ['rev-parse', '--git-path', 'hooks'],
+        ['update-ref', 'refs/heads/main', hash],
+        [
+          'diff',
+          '--raw',
+          '-z',
+          '--no-renames',
+          '--ext-diff',
+          '--no-textconv',
+          '--no-abbrev',
+          hash,
+          hash,
+          '--',
+        ],
+        ['constructor'],
+      ]) {
+        assert.throws(() => validateGitArguments(args));
+        assert.throws(() => git(root, ...args), /Unsupported|Invalid/);
+      }
+      validateGitArguments(['cat-file', '-t', hash]);
+      validateGitArguments(['ls-tree', '-z', hash, '--', 'docs/reviews/evidence.json']);
+      const sentinel = join(root, 'untrusted-path-executed');
+      writeFileSync(join(root, 'git'), '#!/bin/sh\n/usr/bin/touch ' + sentinel + '\n');
+      chmodSync(join(root, 'git'), 0o755);
+      const before = process.env.PATH;
+      try {
+        process.env.PATH = root;
+        // The fixed executable runs, reports no repository, and never executes
+        // the candidate PATH binary or inherits its search directory.
+        assert.throws(() => git(root, 'rev-parse', 'HEAD'));
+        assert.equal(existsSync(sentinel), false);
+      } finally {
+        process.env.PATH = before;
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 }

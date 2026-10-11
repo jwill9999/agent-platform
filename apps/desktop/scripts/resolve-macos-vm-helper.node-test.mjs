@@ -54,9 +54,20 @@ test('Swift query failure propagates instead of guessing an output layout', () =
   );
 });
 
-for (const output of ['', '\n', 'relative/debug\n', '/tmp/one\n/tmp/two\n', '/tmp/one\0two']) {
-  test(`invalid Swift output ${JSON.stringify(output)} fails closed`, () => {
-    assert.throws(() => resolveMacosVmHelper({ run: () => output }), /one absolute directory/);
+for (const invalid of ['empty', 'newline', 'relative', 'multiline', 'nul']) {
+  test(`invalid Swift output ${invalid} fails closed`, (t) => {
+    const { binDir } = fixture(t, 'output');
+    const outputs = {
+      empty: '',
+      newline: '\n',
+      relative: 'relative/debug\n',
+      multiline: `${binDir}\n${join(binDir, 'second')}\n`,
+      nul: `${binDir}\0second`,
+    };
+    assert.throws(
+      () => resolveMacosVmHelper({ run: () => outputs[invalid] }),
+      /one absolute directory/,
+    );
   });
 }
 
@@ -69,15 +80,13 @@ test('missing helper, directory and non-executable file fail without discovery f
   assert.throws(() => resolveMacosVmHelper({ helper, run }), /executable file/);
 });
 
-test('newline helper path cannot inject a workflow environment variable', () => {
-  assert.throws(
-    () => resolveMacosVmHelper({ helper: '/tmp/binary\nINJECTED=value' }),
-    /single-line/,
-  );
+test('newline helper path cannot inject a workflow environment variable', (t) => {
+  const { helper } = fixture(t, 'output');
+  assert.throws(() => resolveMacosVmHelper({ helper: `${helper}\nINJECTED=value` }), /single-line/);
 });
 
-test('signing accepts only a complete structured helper override', () => {
-  const path = '/tmp/literal "quote" space/macos-vm-runner';
+test('signing accepts only a complete structured helper override', (t) => {
+  const { helper: path } = fixture(t, 'literal "quote" space');
   assert.equal(parseHelperArgument([]), undefined);
   assert.equal(parseHelperArgument(['--helper', path]), path);
   assert.equal(parseHelperArgument(['--', '--helper', path]), path);
