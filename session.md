@@ -1,5 +1,101 @@
 # Session handoff
 
+## Current native staging consolidation — 11 October 2026
+
+Current owner direction supersedes historical prototype handoffs below. The orchestration
+prototype remains paused/retained, with PR283 and budget/offline-adapter branches outside this
+integration. Native development does not require its pilot/discovery/broker approvals. The owner
+approved reviewed APFS runner setup and narrow archive scanner policy B, routine blocker repairs,
+and protected staging merges only after actual current-head checks and actionable reviews clear.
+No main promotion, paid model calls, pilot, decommissioning or next priority selection.
+
+Staging remains `a5a1641c3d2a5ef317c05fa45c6190e7189c1915`; full feature PR286 head is
+`542e082e3569934b4dcd86ab58b0ea3ce9edbbb3`. PR290 coordinator and PR291 BashGuard repairs are
+merged into the feature; current PR286 CodeQL analyses have zero results and their scoped findings
+are fixed on this PR ref. PR288 primer head `2ad1a88a7bcf3978e9c02884e36c0cfae8ab11d0` remains
+unmerged. Neither staging delivery nor complete native development readiness is claimed.
+
+Work is now on `task/native-staging-archive-policy` from staging-derived
+`feature/native-staging-security-policy` in the clean codex-developer-autonomy worktree. New child
+Beads runner/archive-policy issues and dependencies are read back; parent/primer remain in progress.
+Beads synced after this initial resumed checkpoint. Subsequent changes need their own readback/sync.
+
+[PR292](https://github.com/jwill9999/agent-platform/pull/292) delivers this segment to the dedicated
+feature. At `2dd99c6f`, both critics approve the source; normal hooks pass and all six substantive
+initial mirrors are fully read-back verified. Initial lychee failed only the retained Agent Zero
+GitHub usage URL with HTTP503; carry its already-reviewed official raw-source URL repair, then
+refresh checks and all seven document mirrors at the new tip. Sourcery skipped due to exhausted
+weekly budget; no Sourcery code-review pass is claimed. No staging qualification or merge yet.
+
+New hosted Sonar result at `e3c8523f` fails reliability/security ratings with 41 open issues.
+The bounded resolver-test temporary-path correction passes 12 tests and independent review.
+Archive executable/argument/API-route and reported quality repairs now pass 26 affected tests,
+plus final revised negative controls, and both independent critics approve source delivery. Fresh
+hosted Sonar and all exact-head CI remain required; previous source approval does not waive the failed hosted gate.
+Actual repaired `bdcb34b3` analysis reduces open issues to 12 but remains failed, including 5.5%
+duplication. A further independently critiqued bounded refactor uses fixed Git argv with validated
+SHA stdin and narrows builtin-only bootstrap before reusing protected helpers. Both distinct critics approve the implemented second pass with no remaining findings, including
+the added scalar bootstrap denial controls. All 28 affected tests pass, followed by two controls
+for the final test-only amendment. New hosted qualification remains required; no stage merge.
+Actual `a86f4d72` analysis now has only two issues: reliability and 0.0% duplication pass, but
+security still fails on the ancestry Git invocation. The dedicated fixed-argument `--` boundary
+repair is now independently approved by both critics; all 29 affected tests and scoped quality
+checks pass. Actual `2d10d8b2` hosted Sonar still fails two S6350 traces despite those defenses.
+The verified raw Git-object identity boundary is implemented and independently approved by
+both critics. All 30 affected tests pass, along with scoped lint/format/syntax checks. The new
+identity must equal the original request; no normalization, cache or waiver. Fresh actual hosted
+Sonar remains required. Staging is unchanged. See current review results.
+
+Fresh official runner 2.337.0 on native APFS is online as dev 23 with the four required labels;
+old ExFAT installation is preserved, old idle Listener stopped gracefully, fresh credentials used
+without copying/publishing tokens, and no service installed. PR286 CI 38081623129 attempt 2,
+job 114337873032, completed preparation4 seconds, checkout3 seconds, install/preflight/assets/Swift
+build. Signing failed because hardcoded build output differed from actual Swift output. A reviewed
+shared `--show-bin-path` signing/packaging resolver is implemented and source-reviewed; hosted actual VM remains required.
+Both old attempts stalled approximately 60 minutes before cancellation. Exact cancellation origin is
+unconfirmed; cancellation does not explain the preceding filesystem stall. The owner-raised CI
+concurrency refinement preserves active staging/feature validations using `github.base_ref == main`
+for cancellation on this PR-only workflow; stale-head success never qualifies a new head.
+
+Packaging fix local qualification: 12 resolver tests, 8 desktop fixture/script tests, actual
+Swift build/development signing/asset hashes/package/signature verification and 2 packaged
+Electron journeys pass. Healthy path uses real VM/assets/helper; provider output and unhealthy
+runtime are documented doubles. Full build/typecheck/format/final lint pass. Independent PACK-01
+toolchain selection finding is corrected with canonical `/usr/bin/swift` for build/discovery;
+CI resolves once, signs/packages exact helper. Packaging re-review approved the correction.
+Final frozen archive implementation passes 23 tests, with zero failures or skips. Independent re-review approved the
+verifier dependency/attempt guards and scanner response/base-ref fixes. The further vendor-bundle
+output-buffer correction passes the actual large-bundle regression and is independently approved. Hosted new-head full scan and VM remain
+required before policy adoption.
+Local success is not staging readiness.
+
+PR286 full Promptfoo scan failed before analysis at 1,409,530 tokens > 1,000,000. PR288 provider
+context overflow remains distinct. Owner approved narrow deterministic exact historical archive
+qualification, not a blanket authored-code skip. Small policy adoption must itself receive actual
+full scan and actual VM before protected trust. Existing PR288 includes authored bookkeeping, so
+that must be delivered through full scanning before archive-only qualification. Archive route
+requires exact 220 inert additions, protected-base immutable allowlist, independent data/security
+review, automatic check plus separate protected staging dispatch and trusted merge verification.
+Independent critiques approve implementation/source review; hosted adoption and connected qualification remain pending.
+
+All 220 artifact bytes remain retained:3,958,506 bytes from original6ca3cd1b; all 139 JSON parse.
+Independent data review found no confirmed credentials, disclosed local path/email metadata and
+historical instructions as inert data, and documented non-exhaustive secret/consumer coverage.
+Primary dirty3paths, paused dirty13paths and separate branch tips remain preserved.
+
+Read [execution manifest](docs/planning/native-staging-remedies.md),
+[policy spec](docs/tasks/agent-platform-native-staging-archive-policy.md),
+[runner spec](docs/tasks/agent-platform-native-staging-runner.md),
+[verification plan](docs/testing/native-staging-remedies.md) and
+[actual results](docs/reviews/native-staging-remedies.md).
+Next sequence: fully qualified small policy/runner segment to staging; fully scanned authored
+primer bookkeeping; exact archive-only PR288 qualification/promotion; refreshed/rehearsed PR286
+actual full scan/VM/protected promotion; verify complete source/preservation and clean only proven
+delivered temporary refs with recovery protection. Then owner reviews the live Beads backlog to
+choose next feature. Automation stays active within that authorization and quiet on unchanged jobs.
+
+---
+
 ## Verified snapshot — 2026-09-13
 
 Pilot-zero prerequisite, lifecycle, output-validation and active-settlement repairs are delivered to
