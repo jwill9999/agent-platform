@@ -1233,6 +1233,11 @@ describe('POST /v1/chat (session-aware)', () => {
 
   it('writes canonical /workspace files inside the bound Project root', async () => {
     await withMockChatApp(dirs, async ({ app, db }) => {
+      // These cases exercise path mapping/access, with writes explicitly permitted.
+      await request(app)
+        .put('/v1/settings')
+        .send({ executionPolicy: { workspaceWrite: 'auto' } })
+        .expect(200);
       const projectRoot = createProjectRoot(dirs);
       const sessionId = await createProjectSession(app, db, {
         name: 'Writable Project',
@@ -1474,6 +1479,11 @@ describe('POST /v1/chat (session-aware)', () => {
 
   it('rejects canonical /workspace writes when the bound Project is unavailable', async () => {
     await withMockChatApp(dirs, async ({ app, db }) => {
+      // These cases exercise path mapping/access, with writes explicitly permitted.
+      await request(app)
+        .put('/v1/settings')
+        .send({ executionPolicy: { workspaceWrite: 'auto' } })
+        .expect(200);
       const sessionId = await createProjectSession(app, db, {
         name: 'Unavailable Project',
         backendProjectRoot: '/missing/project',

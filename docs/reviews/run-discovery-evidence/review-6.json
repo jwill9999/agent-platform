@@ -1,0 +1,65 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "ce36d4de-5a8d-4505-8c65-4357b16b7d3f",
+  "materialDigest": "95af9aa19149b62536fc6acdd31d1d7a3866f151a8a28dabbfc3a488074115b2",
+  "manifest": [
+    {
+      "path": "docs/reviews/run-discovery-evidence/focused.txt",
+      "digest": "6d7bd35f2f4d89a8313278c4f1402bb9c8aacda493eaf7e49ea0dd35bd5b1bfb"
+    },
+    {
+      "path": "docs/reviews/run-discovery-evidence/quality-refactor.diff",
+      "digest": "c780e7f403b8240d04daeebec5b44ba3e8f56f498658c91b51545c22140dbb6a"
+    },
+    {
+      "path": "docs/reviews/run-discovery-evidence/review-4.json",
+      "digest": "514f657d61bc3ba77ec52ce385bebc6ca1e9f5e9dd9f2801fe8c3115433e2bf9"
+    },
+    {
+      "path": "packages/workflow-control/src/cli.ts",
+      "digest": "b483251c4e32de63be154d803c0713f2faa6321396740733938850dca2fad37c"
+    },
+    {
+      "path": "packages/workflow-control/src/runDiscovery.ts",
+      "digest": "830c3ee8f7b5d4c93e2d9a0b11c8e86de0b87046c34820196ee4fdab4ceff58a"
+    },
+    {
+      "path": "packages/workflow-control/test/runDiscovery.test.ts",
+      "digest": "059249b111a5882b017e50910c80a3ba1d7b228c08d453e6e97584cccae3cefd"
+    }
+  ],
+  "result": {
+    "events": [
+      { "type": "thread.started", "thread_id": "01a0e38a-ba6c-7d83-9125-82f937459cae" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      { "type": "turn.started" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "No actionable findings in the final quality refactor.\n\nThe supplied diff preserves validation order, status precedence, CLI argument handling, and discovery behavior. The helper extractions and consolidated filesystem import introduce no evident behavior regressions or security changes.\n\nSupplied post-refactor evidence reports 26 passing tests across three files. No missing evidence for this scoped refactor recheck.\n\nThis is not human approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 19651,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 112,
+          "reasoning_output_tokens": 28
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

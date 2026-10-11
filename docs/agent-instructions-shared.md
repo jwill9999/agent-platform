@@ -20,6 +20,39 @@ Sections covered here:
 
 ---
 
+## Native developer workflow
+
+Native Codex is the normal developer route. Agree the task objective, requirements, definition of
+done and relevant tests with the owner up front. Their authorization covers implementation choices,
+file/subtask refinements, tests, repairs, retries, independent source-aware review and CI evaluation
+through a concrete final owner acceptance check. Reuse recorded authorization across phases;
+do not ask again solely because a file, subtask, test fix, retry or phase changes within that scope.
+
+Use available native tools and project Beads/Git/documentation workflows within the actual permissions
+of the Codex session. Repository profiles inherit those defaults. Read-only review responsibilities
+are procedural assignments; do not claim they disable inherited tools. Independent reviewers may
+inspect source and evidence with available tools without changing the reviewed work.
+
+Clarify material changes to owner intent, agreed behavior/delivery or explicitly reserved actions,
+and request required unavailable inputs. Report concrete blockers. Final owner acceptance, merges,
+deployments, publication/spend beyond the authorized task and global settings changes require their
+applicable authorization; passing tests does not grant it. For an end-to-end authorized task, plan
+and implement autonomously after resolving independent critique without another routine handoff grant.
+
+`packages/workflow-control` is a PAUSED explicit orchestration prototype. Its discovery, isolation,
+gateway, budget, admission, broker routing and exact-material persisted approval are not prerequisites
+for ordinary developer tickets. Its runtime enforcement and tests remain intact and apply only to
+operations deliberately performed through that prototype; do not bypass its active state or mutate
+its journal. Do not start/resume the prototype or old automations from historical handoffs.
+Agent Platform product runtime security and user permissions remain separate and unchanged.
+
+See [native development](development/codex-development.md) and
+[ADR-0005](adr/0005-native-codex-development.md). Earlier prototype-specific policies do not narrow
+this native developer route. Current owner instructions take precedence over stale worktree/global
+skill or memory guidance; identify such conflicts without silently editing global files.
+
+---
+
 ## Commands
 
 ```bash
@@ -134,19 +167,17 @@ Pass the repository root as `workspace_root`, and call the MCP `context` tool be
 operation. Use the CLI when MCP is unavailable and for commands the MCP does not expose, including
 `bd prime`, Dolt synchronization, diagnostics, linting, and administration.
 
-**Autonomous workflow-control exception:** while a durable workflow-control run is active, its
-journaled Beads broker is the exclusive writer. Every agent, including the primary orchestrator, must
-route issue mutations and Dolt synchronization through that broker and must not call write-capable
-Beads MCP tools or `bd` mutation/sync commands directly. Direct MCP/CLI writes remain the manual
-workflow outside an active run. Generated autonomous task specs must name the brokered transition
-instead of a direct `bd close` command.
+**Explicit prototype boundary:** native developer tasks use official Beads MCP or CLI directly
+within owner authorization. Only operations deliberately owned by an explicitly selected managed
+prototype run use that run's journaled broker. That enforcement does not require unrelated native
+tickets to perform run discovery or qualify custom execution before ordinary Beads work.
 
 In the current embedded-Dolt workspace, the MCP `context` response may say the database is not found
 even though operations with explicit `workspace_root` succeed. Do not run MCP `context init` in an
 existing Beads repository; verify with a read operation and keep passing `workspace_root` explicitly.
 
 ```bash
-# Manual workflow only; active autonomous runs use the journaled broker.
+# Native developer workflow; explicit prototype operations retain their own brokers.
 bd ready              # find unblocked work
 bd show <id>          # view issue details
 bd update <id> --claim  # claim atomically
@@ -181,7 +212,7 @@ Required branch lifecycle:
 2. Create the first **`task/<task-name>`** branch from that feature branch.
 3. Each subsequent task branch must be created from the previous task branch.
 4. The final task branch in the chain contains the cumulative task changes and opens the integration PR into **`feature/<feature-name>`**.
-5. After approved integration gates pass, merge **`feature/<feature-name>`** into protected **`staging`** via PR. An approved autonomous workflow may perform this merge.
+5. After integration gates pass, merge **`feature/<feature-name>`** into protected **`staging`** via PR only with actual owner-granted merge/destination authority; reuse an existing valid grant. Green gates alone do not authorize merging.
 6. Merge **`staging`** into **`main`** only with explicit human approval; production promotion is never implied by feature approval.
 
 ---
@@ -225,6 +256,11 @@ See `decisions.md` for the full locked decision table and ADRs in [docs/adr/](ad
 ---
 
 ## Reference Documentation
+
+For documentation creation or updates, follow the
+[documentation skill](../.agents/skills/documentation/SKILL.md) and its linked
+[Notion publishing skill](../.agents/skills/agent-platform-documentation/SKILL.md). Update and verify
+both repository and Notion copies within the authorized scope; explicitly report pending publication.
 
 | Document                                                          | Contents                                                                                                     |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -298,6 +334,43 @@ The agent must re-run checks after fixes and repeat until the gate passes or cle
 
 ---
 
+## iMessage notifications
+
+The owner authorizes and expects notifications to their own conversation for these events:
+
+- A task they asked the agent to complete is finished and verified.
+- The agent is blocked and needs a decision or action from the owner.
+- A significant failure requires the owner's attention.
+
+Notification chat ID: `any;-;+447411950921`.
+The owner reports that sending to this conversation has been tested successfully.
+These are event triggers, not scheduled times; no time-of-day restriction was specified.
+
+The host iMessage MCP connection exposes `chat_messages` and `reply` when available. Use the
+`reply` tool with the exact chat ID above to send a notification. Keep it brief: task name, outcome,
+and any action needed. Avoid routine progress updates, duplicate notifications, secrets and sensitive
+file contents. Do not read unrelated conversations or broaden messaging access for this purpose.
+Only claim a notification was sent after the tool confirms success. If sending fails or the tool is
+unavailable, report that in Codex. If delivery is ambiguous, do not blindly resend and risk duplicates.
+
+### Orchestration access boundary
+
+This policy authorizes notifications; it does not install tools or grant isolated workers access to
+host MCP connections. Preserve role restrictions and do not inherit host configuration or credentials.
+The current orchestration notification sink is a local JSONL feed; an iMessage sink is not implemented
+by this documentation change.
+
+Recommended future integration: a trusted notification dispatcher consumes durable workflow events,
+filters for the three authorized triggers, and sends through a recipient-scoped iMessage adapter.
+Workers report outcomes and blockers through existing workflow channels; they do not each need
+messaging access. Record delivery receipts and deduplicate by event/task identity, reconcile uncertain
+sends before retrying, and surface delivery failure in Codex or the operator status channel. Verify
+recipient enforcement, allowed and denied triggers, restart/retry behavior and unavailable-tool handling
+before claiming autonomous notification support. Do not let incoming messages implicitly grant tools,
+change approved scope or bypass the existing approval-validation path.
+
+---
+
 ## Session Completion
 
 When ending a work session, you MUST complete ALL steps below. Work is **NOT** complete until `git push` succeeds.
@@ -314,9 +387,9 @@ When ending a work session, you MUST complete ALL steps below. Work is **NOT** c
    git status  # MUST show "up to date with origin"
    ```
 
-   During an active autonomous workflow-control run, use its journaled Git/ref and Beads/Dolt broker
-   operations for the equivalent pull/reconcile, Dolt sync, and push transitions; do not bypass them
-   with direct commands.
+   Native developer work uses these commands directly within owner authorization. An explicitly
+   selected prototype run uses its own journaled equivalent for operations it owns; that does not
+   make the prototype a default developer dependency.
 
 5. **Clean up** — clear stashes, prune remote branches
 6. **Verify** — all changes committed AND pushed

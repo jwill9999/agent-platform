@@ -62,7 +62,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-async function setup(executor: GateCommandExecutor) {
+async function setup(executor: GateCommandExecutor, approvedParentShas?: Record<string, string>) {
   const root = await mkdtemp(join(tmpdir(), 'workflow-integration-gate-'));
   roots.push(root);
   const workspaceRoot = join(root, 'workspace');
@@ -76,18 +76,35 @@ async function setup(executor: GateCommandExecutor) {
     artifacts: new JournaledArtifactRecorder(artifacts, store),
     checkCommands: { test: ['pnpm', 'test'] },
     executor,
+    approvedParentShas,
   });
   return { artifacts, gate, store };
 }
 
 describe('LocalExactHeadIntegrationGate', () => {
+  it('preserves Unicode and whitespace in NUL-delimited Git paths', async () => {
+    const paths = ['packages/workflow-control/café.ts', 'packages/workflow-control/ leading.ts'];
+    const executor: GateCommandExecutor = async (_executable, args) => {
+      if (args[0] === 'diff') {
+        expect(args).toContain('-z');
+        return { stdout: paths.join('\0') + '\0', stderr: '' };
+      }
+      return { stdout: args[0] === 'rev-parse' ? 'a'.repeat(40) : '', stderr: '' };
+    };
+    const { gate, store } = await setup(executor);
+    expect(
+      (await gate.verify({ contract, runId: 'gate-run', taskId: 'gate-feature.1' })).changedFiles,
+    ).toEqual(paths);
+    store.close();
+  });
+
   it('derives the real diff and stores retrievable check evidence at a stable head', async () => {
     const head = 'a'.repeat(40);
     const { artifacts, gate, store } = await setup(async (executable, args) => {
       if (executable === 'git' && args[0] === 'rev-parse')
         return { stdout: `${head}\n`, stderr: '' };
       if (executable === 'git' && args[0] === 'diff') {
-        return { stdout: 'packages/workflow-control/src/orchestrator.ts\n', stderr: '' };
+        return { stdout: 'packages/workflow-control/src/orchestrator.ts\0', stderr: '' };
       }
       if (executable === 'git' && args[0] === 'status') return { stdout: '', stderr: '' };
       return { stdout: 'passed\n', stderr: '' };
@@ -152,7 +169,7 @@ describe('LocalExactHeadIntegrationGate', () => {
         return { stdout: `${args[1] === 'HEAD' ? head : base}\n`, stderr: '' };
       }
       if (executable === 'git' && args[0] === 'diff') {
-        diffRange = args[2]!;
+        diffRange = args[3]!;
         return { stdout: '', stderr: '' };
       }
       return { stdout: 'passed\n', stderr: '' };
@@ -162,4 +179,19 @@ describe('LocalExactHeadIntegrationGate', () => {
     expect(diffRange).toBe(`${base}...${head}`);
     store.close();
   });
+});
+
+it('rejects a moved parent ref before running checks even with a valid head', async () => {
+  const f = await setup(
+    async (executable, args) => {
+      if (executable !== 'git') throw new Error('checks must not run');
+      if (args[0] === 'status') return { stdout: '', stderr: '' };
+      return { stdout: 'a'.repeat(40), stderr: '' };
+    },
+    { 'gate-feature.1': 'b'.repeat(40) },
+  );
+  await expect(
+    f.gate.verify({ contract, runId: 'gate-run', taskId: 'gate-feature.1' }),
+  ).rejects.toThrow('parent differs from approved SHA');
+  f.store.close();
 });

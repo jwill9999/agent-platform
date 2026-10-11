@@ -1,0 +1,203 @@
+{
+  "materialDigest": "sha256:ff4e32528590799682edd71aaf8c98a6a06f39e7a0f70b190ae5437ea1b9c291",
+  "policyDigest": "sha256:211947ac88b85c9ac46a62ccd913ea2211ea64736d34837916cbc79ed0feb3f1",
+  "sourceRevision": "cb373f348a9bdaadf5193ee6d9e641c84eed7116",
+  "entries": [
+    {
+      "path": "docs/planning/mvp-reliability/execution-contract.v1.json",
+      "digest": "sha256:d9306eab196b066053c92d0953746b5b35feed0f4ce5b6f995c1d027ba080e40",
+      "sizeBytes": 23272,
+      "mediaType": "application/json",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/planning/mvp-reliability/plan.md",
+      "digest": "sha256:1fa975c78bb02efdf3f2f19e7b9ab66d681c85809aee9c950d06231b88bf10fc",
+      "sizeBytes": 14770,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/agent-instructions-shared.md",
+      "digest": "sha256:211947ac88b85c9ac46a62ccd913ea2211ea64736d34837916cbc79ed0feb3f1",
+      "sizeBytes": 14540,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/reviews/current-runtime-recovery-baseline.md",
+      "digest": "sha256:c76850d815c5d7ccb1f9d8c1850cf8bb79f4101c14e8f909f7d5b3bb3dcbdefd",
+      "sizeBytes": 6355,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "apps/web/components/chat/chat-input.tsx",
+      "digest": "sha256:a5ce7312f89779aea6a44bbd66d3be2035f1e5a3ddff3df62612f3727e8f8509",
+      "sizeBytes": 11395,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "apps/web/hooks/use-harness-chat.ts",
+      "digest": "sha256:1a595c30300348acc00cbd46b4600d7e3e9caf0ce87383778c7ab55f08e639ce",
+      "sizeBytes": 28213,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "apps/api/src/infrastructure/http/v1/chatRouter.ts",
+      "digest": "sha256:e8197e0255989e1a892c9d7c88cdac57526b3f37ca117ebb2372eae08dd53dad",
+      "sizeBytes": 53097,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "packages/db/src/repositories/approvalRequests.ts",
+      "digest": "sha256:4b485b8568cdf8cd90a7ffb92388524d7e785b2ba38697e2598be4381c8bf600",
+      "sizeBytes": 6742,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "packages/plugin-observability/src/index.ts",
+      "digest": "sha256:ca88e70c691bc6fa09f7e973295baf0ae8eb5aa73de1014c42c4a095432e9b19",
+      "sizeBytes": 696,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-harness-baseline-p2.md",
+      "digest": "sha256:c63ecaec8b656c8fe08febaac1904b0919801533982cf65e5d23600265c63a95",
+      "sizeBytes": 7759,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-harness-baseline-x2.md",
+      "digest": "sha256:d6ba34e7ed0f0fcec436c28a848578631937abe73cb3f2150049c4fab669efb8",
+      "sizeBytes": 4524,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-harness-baseline-x3.md",
+      "digest": "sha256:a5ccdac407780592f7a19446e04029e445ace05ce5c4293869873bd11091c60a",
+      "sizeBytes": 5864,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-harness-baseline-x5.md",
+      "digest": "sha256:7b7dd05ab2bcd786dc2a7373ec62287559105dd67a8ebe4982da8ceb41b9b746",
+      "sizeBytes": 6220,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-harness-v1.md",
+      "digest": "sha256:aacc9354492e5fe0f188dcfa3a3d7127fec565a0b588b81c6a8b5474c68a816e",
+      "sizeBytes": 4433,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-harness-r3.cancel.md",
+      "digest": "sha256:7fe514873fa2eb0e7d7273199c75ce3ecb7f7cd8a6b190933b8a614885ea09f3",
+      "sizeBytes": 5058,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-harness-r3.reconcile.md",
+      "digest": "sha256:27ecd447e78d0b96cb3cd063c8e22fafe6578e57c15dedc432a9235e67633a69",
+      "sizeBytes": 5410,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-harness-v4.local.md",
+      "digest": "sha256:298c7511706d3e4e79768173b0a8be126e68b4adbb284b01fa76c204702d4e53",
+      "sizeBytes": 5297,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-harness-v5.mvp.md",
+      "digest": "sha256:5a74dd4dd595b04f50097e11bf92a60c27d9734f9b9fc20e3f2234dba148eb28",
+      "sizeBytes": 5090,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-harness-review-gate.md",
+      "digest": "sha256:dae972488602949531ad34e3d372ecfbe1543b2829156193a482d7a4ef65eed0",
+      "sizeBytes": 3997,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "apps/web/app/page.tsx",
+      "digest": "sha256:31d6c63bbdac6fc2df3de87e1b91d619b45d1b2182c9eca65ff007fea737fcf1",
+      "sizeBytes": 62643,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "apps/web/components/chat/chat.tsx",
+      "digest": "sha256:73038ca29c621aea8ba08645a22abe3d43801b6313fe807dc225a20ce36d1304",
+      "sizeBytes": 9713,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "sha256:2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da",
+      "sizeBytes": 5891,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "digest": "sha256:838747d11ae81ecba6fc558b8b2b6a4dd2e4ca3df2e0844c9d8d7d08256394c5",
+      "sizeBytes": 313942,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/reviews/current-runtime-permission-baseline.md",
+      "digest": "sha256:a611c0b3854cb6998b091857c09abc590a22825e0734d5ceb0564e45b9b6292b",
+      "sizeBytes": 10371,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "docs/tasks/agent-platform-permission-ui-consistency.md",
+      "digest": "sha256:ab4d22b7f25b02e36a2861943e93d9aa61c90e1c11283df9e1a24086162ac812",
+      "sizeBytes": 3220,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "apps/desktop/e2e/packaged-vm-command.e2e.ts",
+      "digest": "sha256:8461bb9ad4333108c2bd72b1b940aa2a7bc67969b3edd24ada4a493482afd969",
+      "sizeBytes": 42692,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "apps/web/components/config/workspace-dashboard.tsx",
+      "digest": "sha256:e69a4002fb10e712245789f3f996349779c84194e3dc6f3fda4978604aa79f44",
+      "sizeBytes": 13549,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    },
+    {
+      "path": "packages/harness/src/nodes/toolDispatch.ts",
+      "digest": "sha256:80ff8797dc80d7c7b7d02e82e67bb21cdc5ec645a9b18cc70117e655aa1be3f0",
+      "sizeBytes": 47316,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+[
+  {
+    "source_filename": "framework-reuse-analysis.md",
+    "source_sha256": "4a71172b8d24767ffdb0428e1b5a93e40c6faea6d04bf517b63009a50542926a",
+    "repository_path": "docs/planning/harness-modernization/framework-reuse-analysis.md"
+  },
+  {
+    "source_filename": "implementation-proposal.md",
+    "source_sha256": "395af7801d480c94b8f2e1dfff6e5a9cb352478bf222a9c7409680e3adc925ec",
+    "repository_path": "docs/planning/harness-modernization/implementation-proposal.md"
+  },
+  {
+    "source_filename": "initial-resolution-plan.md",
+    "source_sha256": "5aa0ac77876d80016b282aec4d899a6c09ee74b1d9358f53cebbac75300cd438",
+    "repository_path": "docs/planning/harness-modernization/archive/initial-resolution-plan.md"
+  },
+  {
+    "source_filename": "beads-backlog-review.md",
+    "source_sha256": "5a70aa53ad6994bbc19715b5f32358a8c428c0694e873ae655c134bde6c049ff",
+    "repository_path": "docs/planning/harness-modernization/beads-backlog-review.md"
+  },
+  {
+    "source_filename": "beads-outstanding-audit.md",
+    "source_sha256": "5657f1571e7807ae4f81e4024ffceabca7cdf6ef464ea5ac1826c72edf6b59a7",
+    "repository_path": "docs/planning/harness-modernization/archive/beads-outstanding-audit.md"
+  },
+  {
+    "source_filename": "initial-analysis-brief.md",
+    "source_sha256": "871a212444d47cfb3c9d05391982bc6a2e474f08b211a448d688a43129ab5a1d",
+    "repository_path": "docs/planning/harness-modernization/archive/initial-analysis-brief.md"
+  },
+  {
+    "source_filename": "review-outcome.md",
+    "source_sha256": "316822c170127230f0f6bbbf49c28bec4b5adb9f8a316aa2cd7be9f83b4634dc",
+    "repository_path": "docs/planning/harness-modernization/archive/review-outcome.md"
+  },
+  {
+    "source_filename": "review-scorecard.md",
+    "source_sha256": "092fb75905036ce57142d72ce9678ebe647f1a60ba06442ccd743395d46dcf78",
+    "repository_path": "docs/planning/harness-modernization/reviews/review-scorecard.md"
+  },
+  {
+    "source_filename": "critic-review.md",
+    "source_sha256": "f93c73c2235f4cf2f4fa591dbf8b3e9914f3318c5803abbc68a76d148b43a7f6",
+    "repository_path": "docs/planning/harness-modernization/reviews/critic-review.md"
+  },
+  {
+    "source_filename": "final-independent-critic-review.md",
+    "source_sha256": "29bb9284ba44c47d37ca60d05282bb6cf01342de9afc698050e4bfe5b1377538",
+    "repository_path": "docs/planning/harness-modernization/reviews/final-independent-critic-review.md"
+  }
+]

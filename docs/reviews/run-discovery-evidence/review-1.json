@@ -1,0 +1,85 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "13d099d2-9fec-4daf-b656-9e39e08b2b6c",
+  "materialDigest": "49afa97673bdff9b357c1ee4cfe61be8614ccba31929fe7d7b2c5c45ddd43ad8",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "docs/testing/standalone-pilot-prerequisites.md",
+      "digest": "1e8994a0e0b73d3845218804e5deb388388bf1b900a19c71d0b5c34747dcaa18"
+    },
+    {
+      "path": "packages/workflow-control/src/cli.ts",
+      "digest": "45de9a2c6b26c9207707159ca736f8bbba04ec0569ba04b474538f9ef4401757"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "061911165daf440a30851a87ebd5744a28c311f6d84584b740d8411cd9a095cf"
+    },
+    {
+      "path": "packages/workflow-control/src/mcpServer.ts",
+      "digest": "4bd4a9c4b83ac3c044459a3e1ea66169a8c5fc36494c5ff3ec403a0d68bd3488"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/runDiscovery.ts",
+      "digest": "2b62a420da6fe97f3a79b22bd393361396c8bcade9529d17f17a64cd8541cf76"
+    },
+    {
+      "path": "packages/workflow-control/src/stateMachine.ts",
+      "digest": "be4776b2a63906500927f7101e261da786cbb53b03e2d60b6c9f4ff77795fadc"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "35a19974f6001c94e5d1c3ce34d9663f49f112ec8020a8fb135c55a5d130e46d"
+    },
+    {
+      "path": "packages/workflow-control/test/mcpServer.test.ts",
+      "digest": "09ea121b0ba832531fc36cc74a95096c215cec16f8e910758e9aaaa52bdee0c9"
+    },
+    {
+      "path": "packages/workflow-control/test/runDiscovery.test.ts",
+      "digest": "f16308117abcce896730483e1d5f448efe38654b0317c71f695c5cc51b00b0c5"
+    }
+  ],
+  "result": {
+    "events": [
+      { "type": "thread.started", "thread_id": "01a0e378-b729-7bb1-ab9c-616ddef7aa28" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      { "type": "turn.started" },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "- **High — Workspace metadata mismatch can hide an active owner.**  \n  **Evidence:** `packages/workflow-control/src/runDiscovery.ts`, `queryRunInventory`: SQL filters on `c.workspace_id` before validating `contract.workspaceId`.  \n  **Reason:** If an active run’s contract JSON names the requested workspace but its indexed `workspace_id` differs, the run is excluded entirely. Discovery returns `absent`, and `WorkflowStore.createRun` uses the same query to admit another run. `foreign_key_check` does not detect this inconsistency.  \n  **Correction:** Validate workspace identity consistency before filtering, or enforce and verify that invariant independently. Add a test corrupting only `contracts.workspace_id`; discovery and admission must fail closed.\n\n- **Medium — Incomplete journals can produce false empty success.**  \n  **Evidence:** `packages/workflow-control/src/runDiscovery.ts`, `queryRunInventory`: `repair_child_intents` is queried only inside the run loop; no schema compatibility check precedes inventory.  \n  **Reason:** A partial journal containing empty `runs`, `contracts`, and `leases` tables can return `absent` even when `repair_child_intents` is missing. The supplied incomplete-journal test creates only `wrong`, which does not exercise this case.  \n  **Correction:** Validate the required schema independently of row presence. Test missing required tables/columns with both empty and populated journals.\n\n- **Medium — Canonical pathname checks do not establish journal identity.**  \n  **Evidence:** `packages/workflow-control/src/runDiscovery.ts`, `discoverCanonicalRuns`: identity checks establish a regular file at the expected real path.  \n  **Reason:** A valid journal from another workspace, copied into that location, passes these checks and can return `absent` because the workspace-filtered query finds nothing. The “substituted journals” test covers a symlink, not a substituted regular SQLite database.  \n  **Correction:** Bind discovery to a durable, independently expected journal/workspace identity and reject mismatches. Add a valid foreign-journal substitution test; explicitly define how legitimate empty journals establish identity.\n\n- **Medium — Required concurrency and binding evidence is incomplete.**  \n  **Evidence:** `packages/workflow-control/test/runDiscovery.test.ts`; `packages/workflow-control/test/mcpServer.test.ts`.  \n  **Reason:** Concurrent process launch does not guarantee both requests observe empty inventory before admission. Coverage also omits repair-child task discovery/admission, `recovering` and `cancelling` ownership, `closed` history, malformed contract/state rows, and actual MCP discovery calls. The MCP test only lists the tool.  \n  **Correction:** Add a process barrier after both inventory reads, then assert one admission and one conflict. Add the listed state/binding/error cases and MCP calls with configured and missing scope.\n\nReview limited to supplied evidence; no tools or tests executed. These findings do not constitute execution approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 113363,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 803,
+          "reasoning_output_tokens": 197
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

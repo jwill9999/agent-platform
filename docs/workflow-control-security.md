@@ -1,19 +1,31 @@
 # Workflow-control specialist security boundary
 
+> **Scope: PAUSED explicit workflow-control prototype.** This guide describes prototype enforcement,
+> APIs and historical qualification only. Ordinary Codex developer tasks use
+> [native development](development/codex-development.md); discovery, isolation, gateway, budgets,
+> admission, brokers and persisted exact-material approval are not their prerequisites.
+> Do not start/resume the prototype or pilot from this guide. Existing runtime controls remain intact.
+
 Active workflow-control runs launch every specialist as an external `codex exec` process in a
 dedicated container or VM. Built-in collaboration agents are permitted only while no privileged
-capability is active and the primary session exposes no mutation-capable tools.
+capability is active and the primary session exposes no mutation-capable tools, except for the
+owner-authorized supervised evidence-only review procedure in
+[ADR-0004](adr/0004-codex-development-orchestration-control-plane.md). That no-tool procedure is
+instruction-constrained and is not a substitute for enforced active-run isolation.
 
 ## Specialist workspace
 
 The launcher copies approved source into a private staging directory. It does not copy `.git`,
-`.beads`, `.ssh`, `.env`, `node_modules`, or symbolic links. The container receives only the staged
+`.beads`, `.ssh`, `.codex`, `.agents`, `.env` variants, `node_modules`, or symbolic links. The container receives only the staged
 workspace, generated Codex home, read-only minimal configuration, read-only model authentication,
 and task prompt. It does not receive the host repository, primary `CODEX_HOME`, Docker socket, broker
 socket, SSH agent, keychain, GitHub credentials, or host environment.
 
-The container is read-only except for the staged workspace, generated Codex runtime home, and bounded
-temporary filesystem. It runs non-root, drops all Linux capabilities, enables `no-new-privileges`,
+The container source is read-only except for an implementation worker explicitly granted workspace.patch.
+Authorized tests use /scratch and artifact output uses /evidence, separate from source. Generated Codex
+runtime home and bounded temporary storage are housekeeping locations. MCP is disabled rather than
+inherited; additional connections need explicit authorization. See the [role enforcement audit](reviews/role-enforcement-qualification.md)
+for declared policy, effective tools, measured containment and the pinned-client catalogue limitation. It runs non-root, drops all Linux capabilities, enables `no-new-privileges`,
 and enforces process, memory, CPU, and network bounds. An active model run requires a dedicated
 policy-controlled egress network; host, default, and bridge networking are rejected.
 

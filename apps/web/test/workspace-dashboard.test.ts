@@ -10,14 +10,13 @@ beforeAll(() => {
 });
 
 describe('WorkspaceDashboard', () => {
-  it('renders execution policy controls with conservative defaults', () => {
+  it('shows loading without inventing saved permission defaults', () => {
     const html = renderToStaticMarkup(createElement(WorkspaceDashboard));
 
     expect(html).toContain('Execution policy');
-    expect(html).toContain('Unknown commands');
-    expect(html).toContain('Ask approval');
-    expect(html).toContain('Package and script commands');
-    expect(html).toContain('Git mutations');
+    expect(html).toContain('Loading execution policy');
+    expect(html).not.toContain('<select');
+    expect(html).not.toContain('Ask approval');
     expect(html).toContain('Destructive host actions are always blocked');
   });
 });

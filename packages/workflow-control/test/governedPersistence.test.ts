@@ -1,8 +1,10 @@
+import { documentFixture } from './documentFixture.js';
+import { deriveContractMaterialDigest } from '../src/planning.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 
 import {
@@ -33,7 +35,7 @@ import {
 
 const roots: string[] = [];
 const hash = (character: string) => `sha256:${character.repeat(64)}`;
-const workspaceId = hash('a');
+let workspaceId = hash('a');
 const policyDigest = hash('b');
 const contract: ExecutionContract = {
   featureId: 'governed-persistence',
@@ -106,14 +108,17 @@ async function setup() {
   roots.push(root);
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
+  const publishDocuments = await documentFixture(contract, root);
+  workspaceId = contract.workspaceId;
   const contractId = store.createContract(contract, 1000);
-  return { store, database, contractId };
+  return { store, database, contractId, publishDocuments };
 }
 
 describe('governed SQLite persistence', () => {
   it('migrates legacy single approval contexts without treating delivery acceptance as parent progress', async () => {
-    const { store, contractId, database } = await setup();
+    const { store, contractId, database, publishDocuments } = await setup();
     store.createRun(contractId, 'approval_waiting', 'legacy');
+    publishDocuments(store, 'legacy', true);
     store.close();
     const db = new Database(database);
     db.exec(`DROP TABLE approval_wait_contexts;
@@ -139,8 +144,9 @@ describe('governed SQLite persistence', () => {
     reopened.close();
   });
   it('rejects forged approval booleans without persisted wait and notification records', async () => {
-    const { store, contractId } = await setup();
+    const { store, contractId, publishDocuments } = await setup();
     store.createRun(contractId, 'approval_waiting', 'forged');
+    publishDocuments(store, 'forged', true);
     const ownerId = 'owner';
     const workspaceLeaseEpoch = store.acquireLease(
       'workspace',
@@ -193,8 +199,9 @@ describe('governed SQLite persistence', () => {
   it.each([1, 2])(
     'fences takeover during notes read %s and lets the new owner adopt prepared work',
     async (takeoverRead) => {
-      const { store, contractId, database } = await setup();
+      const { store, contractId, database, publishDocuments } = await setup();
       store.createRunForTest(contractId, 'pipeline', 'race');
+      publishDocuments(store, 'race', true);
       let now = 1000;
       const fence = {
         ownerId: 'old',
@@ -252,7 +259,7 @@ describe('governed SQLite persistence', () => {
         actorRole: 'workflow_orchestrator' as const,
         contractVersion: 1 as const,
         policyDigest,
-        materialDigest: hash('c'),
+        materialDigest: deriveContractMaterialDigest(contract),
         ...fence,
         expectedPriorNotesDigest: digestGovernedValue('old'),
         expectedNonNotesDigest: digestGovernedValue(nonNotes),
@@ -263,7 +270,7 @@ describe('governed SQLite persistence', () => {
         createWorkflowStoreGovernedJournal(store, () => now),
         createProductionGovernedExternalPort(client),
       );
-      await expect(broker.execute(request)).rejects.toThrow('fencing');
+      await expect(broker.execute(request)).rejects.toThrow('document_lease_stale');
       expect(mutations).toBe(0);
       const id = digestGovernedValue([
         'governed-operation',
@@ -341,8 +348,9 @@ describe('governed SQLite persistence', () => {
   });
 
   it('persists approval CAS state across restart and rejects stale CAS', async () => {
-    const { store, database, contractId } = await setup();
+    const { store, database, contractId, publishDocuments } = await setup();
     store.createRun(contractId, 'approval_waiting', 'run-approval');
+    publishDocuments(store, 'run-approval', true);
     const ownerId = 'owner';
     const workspaceLeaseEpoch = store.acquireLease(
       'workspace',
@@ -363,7 +371,7 @@ describe('governed SQLite persistence', () => {
       resumeTarget: 'finalizing',
       contractVersion: 1,
       policyDigest,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       headSha: 'd'.repeat(40),
       actionScopeDigest: hash('e'),
       recipientIdentity: 'owner',
@@ -396,8 +404,9 @@ describe('governed SQLite persistence', () => {
   });
 
   it('requires separate authenticated approval and acknowledged resume transport', async () => {
-    const { store, contractId, database } = await setup();
+    const { store, contractId, database, publishDocuments } = await setup();
     store.createRun(contractId, 'approval_waiting', 'run-notification');
+    publishDocuments(store, 'run-notification', true);
     const ownerId = 'owner';
     const workspaceLeaseEpoch = store.acquireLease(
       'workspace',
@@ -418,7 +427,7 @@ describe('governed SQLite persistence', () => {
       resumeTarget: 'finalizing',
       contractVersion: 1,
       policyDigest,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       headSha: 'd'.repeat(40),
       actionScopeDigest: hash('e'),
       recipientIdentity: 'owner',
@@ -591,8 +600,9 @@ describe('governed SQLite persistence', () => {
   });
 
   it('reconciles resume provider acceptance after response loss and process restart', async () => {
-    const { store, database, contractId } = await setup();
+    const { store, database, contractId, publishDocuments } = await setup();
     store.createRun(contractId, 'approval_waiting', 'run-resume-loss');
+    publishDocuments(store, 'run-resume-loss', true);
     const ownerId = 'owner';
     const workspaceLeaseEpoch = store.acquireLease(
       'workspace',
@@ -613,7 +623,7 @@ describe('governed SQLite persistence', () => {
       resumeTarget: 'finalizing',
       contractVersion: 1,
       policyDigest,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       headSha: 'd'.repeat(40),
       actionScopeDigest: hash('e'),
       recipientIdentity: 'owner',
@@ -697,10 +707,11 @@ describe('governed SQLite persistence', () => {
   });
 
   it('never crosses approval and resume delivery-failure retry purposes', async () => {
-    const { store, contractId } = await setup();
+    const { store, contractId, publishDocuments } = await setup();
     const runId = 'run-cross-purpose';
     const ownerId = 'owner';
     store.createRun(contractId, 'approval_waiting', runId);
+    publishDocuments(store, runId, true);
     const identity = {
       kind: 'notification.approval',
       workspaceId,
@@ -711,7 +722,7 @@ describe('governed SQLite persistence', () => {
       resumeTarget: 'finalizing',
       contractVersion: 1,
       policyDigest,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       headSha: 'd'.repeat(40),
       actionScopeDigest: hash('e'),
       recipientIdentity: ownerId,
@@ -764,9 +775,10 @@ describe('governed SQLite persistence', () => {
   it.each(['workspace', 'run', 'task'] as const)(
     'rejects stale %s fences on every notification CAS',
     async (resource) => {
-      const { store, contractId } = await setup();
+      const { store, contractId, publishDocuments } = await setup();
       const runId = `run-stale-${resource}`;
       store.createRun(contractId, 'approval_waiting', runId);
+      publishDocuments(store, runId, true);
       const ownerId = 'owner';
       const workspaceLeaseEpoch = store.acquireLease(
         'workspace',
@@ -799,7 +811,7 @@ describe('governed SQLite persistence', () => {
         resumeTarget: 'finalizing',
         contractVersion: 1,
         policyDigest,
-        materialDigest: hash('c'),
+        materialDigest: deriveContractMaterialDigest(contract),
         headSha: 'd'.repeat(40),
         actionScopeDigest: hash('e'),
         recipientIdentity: 'owner',
@@ -833,8 +845,9 @@ describe('governed SQLite persistence', () => {
   );
 
   it('rejects notification preparation outside approval_waiting', async () => {
-    const { store, contractId } = await setup();
+    const { store, contractId, publishDocuments } = await setup();
     store.createRun(contractId, 'delivery', 'wrong-state');
+    publishDocuments(store, 'wrong-state', true);
     const ownerId = 'owner';
     const workspaceLeaseEpoch = store.acquireLease(
       'workspace',
@@ -855,7 +868,7 @@ describe('governed SQLite persistence', () => {
       resumeTarget: 'finalizing',
       contractVersion: 1,
       policyDigest,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       headSha: 'd'.repeat(40),
       actionScopeDigest: hash('e'),
       recipientIdentity: 'owner',
@@ -877,8 +890,9 @@ describe('governed SQLite persistence', () => {
   });
 
   it('reconciles a callback wakeup lost across restart and rejects stale fences', async () => {
-    const { store, database, contractId } = await setup();
+    const { store, database, contractId, publishDocuments } = await setup();
     store.createRun(contractId, 'task_review', 'run-callback');
+    publishDocuments(store, 'run-callback', true);
     const ownerId = 'owner';
     const workspaceLeaseEpoch = store.acquireLease(
       'workspace',
@@ -907,7 +921,7 @@ describe('governed SQLite persistence', () => {
       workspaceLeaseEpoch,
       runLeaseEpoch: parentRunLeaseEpoch,
       taskLeaseEpoch,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       headSha,
       inputProducerIdentity: 'orchestrator',
       input: { packet: 'review' },
@@ -961,7 +975,7 @@ describe('governed SQLite persistence', () => {
       attemptNumber: 1,
       contractVersion: 1,
       policyDigest,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       workspaceLeaseEpoch,
       parentRunLeaseEpoch,
       taskLeaseEpoch,
@@ -1037,7 +1051,7 @@ describe('governed SQLite persistence', () => {
         ...staleRunIdentity,
         callbackId: digestGovernedValue(staleRunIdentity),
       }),
-    ).toThrow('scheduler authorization');
+    ).toThrow('document_lease_stale');
     const staleTaskIdentity = {
       ...identity,
       taskLeaseEpoch: taskLeaseEpoch + 1,
@@ -1052,9 +1066,11 @@ describe('governed SQLite persistence', () => {
   });
 
   it('atomically imports exact lineage and idempotently survives restart', async () => {
-    const { store, database, contractId } = await setup();
+    const { store, database, contractId, publishDocuments } = await setup();
     store.createRun(contractId, 'cancelled', 'source-run');
+    publishDocuments(store, 'source-run', true);
     store.createRun(contractId, 'approved', 'target-run');
+    publishDocuments(store, 'target-run', false);
     const ownerId = 'owner';
     const workspaceLeaseEpoch = store.acquireLease(
       'workspace',
@@ -1082,7 +1098,7 @@ describe('governed SQLite persistence', () => {
       beadsSnapshotDigest: hash('d'),
       contractDigest: digestGovernedValue(contract),
       policyDigest,
-      materialDigest: hash('f'),
+      materialDigest: deriveContractMaterialDigest(contract),
       workspaceLeaseEpoch,
       runLeaseEpoch,
       taskLeaseEpoch,
@@ -1193,11 +1209,12 @@ describe('governed SQLite persistence', () => {
   });
 
   it('uses the existing SQLite delivery journal for exact Beads note CAS and restart replay', async () => {
-    const { store, database, contractId } = await setup();
+    const { store, database, contractId, publishDocuments } = await setup();
     expect(() => store.createRun(contractId, 'pipeline', 'forbidden-pipeline')).toThrow(
       'exact lineage import',
     );
     store.createRunForTest(contractId, 'pipeline', 'run-notes');
+    publishDocuments(store, 'run-notes', true);
     const ownerId = 'owner';
     const workspaceLeaseEpoch = store.acquireLease(
       'workspace',
@@ -1259,7 +1276,7 @@ describe('governed SQLite persistence', () => {
       actorRole: 'workflow_orchestrator',
       contractVersion: 1,
       policyDigest,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       ownerId,
       workspaceLeaseEpoch,
       runLeaseEpoch,
@@ -1293,8 +1310,9 @@ describe('governed SQLite persistence', () => {
   });
 
   it('persists independently evidenced review dispositions and binds resolution to their digest', async () => {
-    const { store, contractId } = await setup();
+    const { store, contractId, publishDocuments } = await setup();
     store.createRunForTest(contractId, 'pipeline', 'run-review');
+    publishDocuments(store, 'run-review', true);
     const ownerId = 'owner';
     const workspaceLeaseEpoch = store.acquireLease(
       'workspace',
@@ -1317,7 +1335,7 @@ describe('governed SQLite persistence', () => {
       workspaceLeaseEpoch,
       runLeaseEpoch,
       taskLeaseEpoch,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       headSha,
       inputProducerIdentity: 'orchestrator',
       input: { review: 'input' },
@@ -1333,7 +1351,7 @@ describe('governed SQLite persistence', () => {
       actorRole: 'workflow_orchestrator',
       contractVersion: 1,
       policyDigest,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       ownerId,
       workspaceLeaseEpoch,
       runLeaseEpoch,
@@ -1403,7 +1421,7 @@ describe('governed SQLite persistence', () => {
       actorRole: 'workflow_orchestrator',
       contractVersion: 1,
       policyDigest,
-      materialDigest: hash('c'),
+      materialDigest: deriveContractMaterialDigest(contract),
       ownerId,
       workspaceLeaseEpoch,
       runLeaseEpoch,
@@ -1423,3 +1441,88 @@ describe('governed SQLite persistence', () => {
     store.close();
   });
 });
+
+it.each(['invalidated', 'pending'] as const)(
+  'denies effect dispatch when a peer makes authority %s after byte verification',
+  async (mode) => {
+    const { store, contractId, database, publishDocuments } = await setup();
+    store.createRunForTest(contractId, 'pipeline', 'race');
+    publishDocuments(store, 'race', true);
+    const peer = new Database(database);
+    const fence = {
+      ownerId: 'owner',
+      workspaceLeaseEpoch: store.acquireLease('workspace', workspaceId, 'owner', 60000, 1000).epoch,
+      runLeaseEpoch: store.acquireLease('run', 'race', 'owner', 60000, 1000).epoch,
+      taskLeaseEpoch: store.acquireLease('task', 'task.1', 'owner', 60000, 1000).epoch,
+    };
+    const nonNotes = {
+      id: 'task.1',
+      status: 'in_progress',
+      description: 'same',
+      acceptanceCriteria: 'same',
+      owner: 'owner',
+      dependencies: [],
+    };
+    let mutations = 0;
+    const port = createProductionGovernedExternalPort({
+      readIssue: async () => ({ ...nonNotes, notes: 'old', revision: '1' }),
+      compareAndSwapNotes: async () => {
+        mutations++;
+        return { ...nonNotes, notes: 'new', revision: '2' };
+      },
+      observeThreads: async () => [],
+      replyToThread: async () => {
+        throw new Error('unused');
+      },
+      resolveThread: async () => {
+        throw new Error('unused');
+      },
+    });
+    const verify = store.verifyPlanningDocuments.bind(store);
+    const spy = vi.spyOn(store, 'verifyPlanningDocuments').mockImplementation((input) => {
+      const result = verify(input);
+      if (input.boundary === 'delivery.mutate') {
+        if (mode === 'invalidated')
+          peer.prepare("UPDATE plan_approvals SET status='invalidated' WHERE run_id='race'").run();
+        else
+          peer.exec(`INSERT INTO planning_document_attempts(id,run_id,task_id,approval_id,material_digest,manifest_digest,boundary,owner_id,run_lease_epoch,status,created_at_ms,deadline_ms)
+        SELECT 'peer-attempt',run_id,task_id,approval_id,material_digest,manifest_digest,'peer.verify','peer',run_lease_epoch,'pending',created_at_ms,deadline_ms
+        FROM planning_document_attempts WHERE run_id='race' ORDER BY rowid DESC LIMIT 1`);
+      }
+      return result;
+    });
+    try {
+      const broker = new GovernedOperationBroker(
+        createWorkflowStoreGovernedJournal(store, () => 1000),
+        port,
+      );
+      await expect(
+        broker.execute({
+          kind: 'beads.task_note_update',
+          workspaceId,
+          runId: 'race',
+          taskId: 'task.1',
+          actorRole: 'workflow_orchestrator',
+          contractVersion: 1,
+          policyDigest,
+          materialDigest: deriveContractMaterialDigest(contract),
+          ...fence,
+          expectedPriorNotesDigest: digestGovernedValue('old'),
+          expectedNonNotesDigest: digestGovernedValue(nonNotes),
+          replacementNotes: 'new',
+          replacementNotesDigest: digestGovernedValue('new'),
+        }),
+      ).rejects.toThrow(
+        mode === 'invalidated' ? 'document_approval_changed' : 'document_verification_unresolved',
+      );
+      expect(mutations).toBe(0);
+      expect(
+        peer.prepare("SELECT count(*) n FROM delivery_operations WHERE status='committed'").get(),
+      ).toEqual({ n: 0 });
+    } finally {
+      spy.mockRestore();
+      peer.close();
+      store.close();
+    }
+  },
+);

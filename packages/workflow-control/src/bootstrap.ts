@@ -11,7 +11,7 @@ import {
   type BootstrapPolicy,
 } from './bootstrapPolicy.js';
 import { BootstrapJournal } from './bootstrapJournal.js';
-import { WorkflowStore } from './storage.js';
+import { WorkflowStore, workflowDeliveryMutationCapability } from './storage.js';
 import { DurableDeliveryBroker, type DeliveryFence } from './deliveryBrokers.js';
 import { createProductionBootstrapGitPort } from './gitDeliveryPort.js';
 import { ProcessCapabilityBroker } from './authorization.js';
@@ -185,6 +185,7 @@ export class BootstrapCoordinator {
     policy: BootstrapPolicy,
     clients: BootstrapClients,
     fault: (boundary: BootstrapFault) => void,
+    private readonly cleanupOnly = false,
   ) {
     this.#policy = bootstrapPolicySchema.parse(JSON.parse(bootstrapJson(policy)));
     this.#clients = Object.freeze({
@@ -196,7 +197,8 @@ export class BootstrapCoordinator {
     this.#journal = new BootstrapJournal(database);
     this.#fault = fault;
     try {
-      this.#journal.assertApproved(runId, this.#policy);
+      if (cleanupOnly) this.#journal.assertStoredForCleanup(runId, this.#policy);
+      else this.#journal.assertApproved(runId, this.#policy);
     } catch (error) {
       this.close();
       throw error;
@@ -220,6 +222,35 @@ export class BootstrapCoordinator {
       policy,
       productionClients(policy),
       () => undefined,
+    );
+  }
+  /** Reopen only the cancellation path, even after execution approval is invalidated. */
+  static createForCleanup(
+    database: string,
+    runId: string,
+    policyInput: unknown,
+  ): BootstrapCoordinator {
+    const policy = bootstrapPolicySchema.parse(policyInput);
+    const check = new BootstrapJournal(database, true);
+    try {
+      check.assertStoredForCleanup(runId, policy);
+    } finally {
+      check.close();
+    }
+    const unavailable = (): never => {
+      throw new Error('bootstrap cleanup cannot execute adapters');
+    };
+    return new BootstrapCoordinator(
+      database,
+      runId,
+      policy,
+      {
+        readBeads: unavailable,
+        observeRemote: unavailable,
+        pushRemote: unavailable,
+      },
+      () => undefined,
+      true,
     );
   }
   static createForTest(
@@ -263,6 +294,7 @@ export class BootstrapCoordinator {
       throw new Error('bootstrap run is not implementing');
   }
   adopt(): void {
+    if (this.cleanupOnly) throw new Error('bootstrap cleanup cannot execute work');
     const policy = this.#policy;
     const fence = this.#fence();
     if (this.#store.getRun(this.runId)?.state === 'implementing') {
@@ -297,7 +329,15 @@ export class BootstrapCoordinator {
     const fence = this.#fence();
     const contract = this.#journal.contract(this.runId);
     const withMutation = <T>(operation: () => T) =>
-      this.#journal.withMutation(this.runId, policy, fence, operation);
+      this.#store.withinDeliveryMutation(
+        this.runId,
+        () => {
+          this.#journal.assertApproved(this.runId, policy);
+          this.#journal.assertFence(this.runId, policy, fence, Date.now());
+          return operation();
+        },
+        workflowDeliveryMutationCapability,
+      );
     const port = createProductionBootstrapGitPort({
       policy,
       assertAuthority: () => this.#authority(fence),
@@ -392,6 +432,13 @@ export class BootstrapCoordinator {
       startTimeMs: Math.floor(Date.now() - process.uptime() * 1000),
       executableDigest: `sha256:${createHash('sha256').update(readFileSync(process.execPath)).digest('hex')}`,
     };
+    this.#store.verifyPlanningDocuments({
+      runId: this.runId,
+      taskId: policy.taskId,
+      boundary: 'bootstrap.capability',
+      ownerId: fence.ownerId,
+      runLeaseEpoch: fence.runLeaseEpoch,
+    });
     const handle = capabilities.issue({
       workspaceId: contract.workspaceId,
       runId: this.runId,
@@ -427,7 +474,9 @@ export class BootstrapCoordinator {
   }
   async terminalize(requestedBy: string) {
     const policy = this.#policy;
-    const row = this.#journal.assertStored(this.runId, policy);
+    const row = this.cleanupOnly
+      ? this.#journal.assertStoredForCleanup(this.runId, policy)
+      : this.#journal.assertStored(this.runId, policy);
     if (row.status !== 'attested' || row.attestation_digest === null)
       throw new Error('bootstrap artifact attestation required');
     const evidence = this.#store.getSecureEvidence(
@@ -437,10 +486,12 @@ export class BootstrapCoordinator {
     );
     if (!evidence) throw new Error('bootstrap attestation evidence missing');
     const fence = this.#fence();
-    this.#beads();
-    assertBootstrapCandidate(policy, row.head_sha!);
-    if (this.#clients.observeRemote() !== row.head_sha)
-      throw new Error('bootstrap published ref changed');
+    if (!this.cleanupOnly) {
+      this.#beads();
+      assertBootstrapCandidate(policy, row.head_sha!);
+      if (this.#clients.observeRemote() !== row.head_sha)
+        throw new Error('bootstrap published ref changed');
+    }
     const coordinator = new WorkflowCancellationCoordinator({
       store: this.#store,
       contract: this.#journal.contract(this.runId),

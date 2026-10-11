@@ -1,4 +1,7 @@
-import { mkdtemp } from 'node:fs/promises';
+import { documentFixture } from './documentFixture.js';
+import { deriveContractMaterialDigest } from '../src/planning.js';
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -23,6 +26,7 @@ export async function continuationFixture(
   nowMs = Date.now(),
   role: WorkflowRole = 'code_reviewer',
   resultInput: unknown = terminalResult,
+  connectedSource = false,
 ) {
   const root = await mkdtemp(join(tmpdir(), 'continuation-'));
   const database = join(root, 'workflow.sqlite');
@@ -75,11 +79,34 @@ export async function continuationFixture(
     },
     escalationPolicy: [],
   };
+  const publishDocuments = await documentFixture(contract, root, join(root, 'source'));
+  let headSha = 'a'.repeat(40);
+  if (connectedSource) {
+    const source = join(root, 'source');
+    await mkdir(join(source, 'packages/workflow-control'), { recursive: true });
+    await writeFile(join(source, 'packages/workflow-control/example.txt'), 'fixture source');
+    const git = (args: string[]) =>
+      execFileSync(process.env.WORKFLOW_GIT_BINARY ?? '/usr/bin/git', ['-C', source, ...args], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Fixture',
+          GIT_AUTHOR_EMAIL: 'fixture@example.com',
+          GIT_COMMITTER_NAME: 'Fixture',
+          GIT_COMMITTER_EMAIL: 'fixture@example.com',
+        },
+      }).trim();
+    git(['add', 'packages']);
+    git(['commit', '-qm', 'disposable worker input']);
+    headSha = git(['rev-parse', 'HEAD']);
+  }
+  const materialDigest = deriveContractMaterialDigest(contract);
   const contractId = store.createContract(contract, nowMs);
   store.createRunForTest(contractId, 'task_review', 'run');
+  publishDocuments(store, 'run');
   const workspaceLeaseEpoch = store.acquireLease(
     'workspace',
-    digest,
+    contract.workspaceId,
     'owner',
     120_000,
     nowMs,
@@ -87,7 +114,7 @@ export async function continuationFixture(
   const runLeaseEpoch = store.acquireLease('run', 'run', 'owner', 120_000, nowMs).epoch;
   const taskLeaseEpoch = store.acquireLease('task', 'task', 'owner', 120_000, nowMs).epoch;
   const artifacts = store.seedDelegateCallbackAuthorizationForTest({
-    workspaceId: digest,
+    workspaceId: contract.workspaceId,
     runId: 'run',
     taskId: 'task',
     delegationId: 'child',
@@ -97,8 +124,8 @@ export async function continuationFixture(
     workspaceLeaseEpoch,
     runLeaseEpoch,
     taskLeaseEpoch,
-    materialDigest: digest,
-    headSha: 'a'.repeat(40),
+    materialDigest,
+    headSha,
     inputProducerIdentity: 'orchestrator',
     input: { task: 'fixture' },
     result: resultInput,
@@ -112,7 +139,7 @@ export async function continuationFixture(
   db.close();
   const identity = {
     kind: 'workflow.delegate_callback' as const,
-    workspaceId: digest,
+    workspaceId: contract.workspaceId,
     parentRunId: 'run',
     parentTaskId: 'task',
     parentState: 'task_review' as const,
@@ -123,11 +150,11 @@ export async function continuationFixture(
     attemptNumber: 1,
     contractVersion: 1 as const,
     policyDigest: digest,
-    materialDigest: digest,
+    materialDigest,
     workspaceLeaseEpoch,
     parentRunLeaseEpoch: runLeaseEpoch,
     taskLeaseEpoch,
-    headSha: 'a'.repeat(40),
+    headSha,
     inputProducerIdentity: 'orchestrator',
     resultProducerIdentity: 'child-process',
     inputArtifactDigest: artifacts.inputArtifactDigest,
@@ -154,5 +181,5 @@ export async function continuationFixture(
       nowMs,
       ...(withCallback ? { callback } : {}),
     });
-  return { root, database, store, callback, finish };
+  return { root, database, store, contract, callback, finish };
 }

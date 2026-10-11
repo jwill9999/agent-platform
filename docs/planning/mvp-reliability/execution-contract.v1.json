@@ -1,0 +1,517 @@
+{
+  "featureId": "agent-platform-mvp-reliability-plan",
+  "contractVersion": 1,
+  "policyDigest": "sha256:211947ac88b85c9ac46a62ccd913ea2211ea64736d34837916cbc79ed0feb3f1",
+  "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+  "objective": "Proposed current-stack connected-local MVP reliability and visibility tranche; execution requires scoped owner approval and Beads readiness reconciliation.",
+  "requirements": [
+    "Keep installed stack and permission semantics; no implementation authorized by this document.",
+    "Complete existing baseline assessments before implementation; missing capability is recorded rather than silently skipped.",
+    "Implement V1 minimal state and event foundation defined in plan.md, including durable run/operation control state, versioned read API, retention and redaction.",
+    "STOP-1: Show an accessible Stop button only for the selected active Project Chat run. Send a session-and-run-scoped idempotent cancellation request; never cancel a newly started run or a different session through a stale control.",
+    "STOP-2: Backend acknowledges the stop request within two seconds in controlled local tests, records stop_requested durably, and refuses any new dispatch for that run after acknowledgement. A successful request does not itself mean execution has stopped.",
+    "STOP-3: Forward cancellation through provider, harness and supported runner boundaries. Preserve completed effects. If a runner cannot acknowledge termination, retain stopping or outcome_unknown with an explanation; never claim rollback or successful cancellation.",
+    "STOP-4: Repeated Stop, Stop racing completion, Stop while waiting for approval and reconnect after Stop have deterministic terminal outcomes. Approval of a stopped run cannot dispatch its pending action; backend validates the run state at the effect boundary.",
+    "STOP-5: Existing tool risk, Ask/Automatic/Block precedence, approval and project/path restrictions are unchanged. A stop control is not a new permission to execute or resume.",
+    "REC-1: Persist operation identity, run/session linkage, effect classification, intent and dispatch/result state transactionally before side-effect dispatch. Claim/reconcile resumes atomically across concurrent requests; a reused approval cannot execute twice.",
+    "REC-2: Inject process death before dispatch, after effect but before result storage, and after result storage. On restart show respectively interrupted-before-dispatch, outcome-unknown, and the persisted completed result. Startup never blindly reruns work.",
+    "REC-3: A lost response after an effect is not a retryable transport failure by itself. No automatic retry of non-idempotent or uncertain operations. Permit automatic retry only for classified pre-dispatch failures/read-only actions or an explicitly supported stable idempotency key; unknown classification defaults to no replay.",
+    "REC-4: Explicit user continuation of provably undispatched work revalidates current project binding, permissions, approval and model/tool configuration. Revoked permission, changed arguments or incompatible schema/configuration refuses continuation and requires a new reviewed action.",
+    "REC-5: No unattended recovery while the app is closed, distributed worker guarantee, arbitrary shell exactly-once promise or framework persistence migration. Reconciliation UI offers inspect/acknowledge; acknowledging uncertainty never silently authorizes retry.",
+    "REC-6: Additive SQLite migration, backup/restore verification, bounded metadata and no raw prompts/credentials. Preserve unresolved intents and approvals; storage failure before intent commit fails closed before an effect.",
+    "UI-1: The selected Project conversation shows backend-authoritative running, waiting_for_approval, stop_requested, cancelled, completed, failed, interrupted and outcome_unknown states. Waiting is not running; silence is not success or failure.",
+    "UI-2: Display current action, elapsed time, last confirmed update and a concise next action. A lost connection is a separate freshness indicator, not a fabricated terminal run state. Proposed default: after 30 seconds without a heartbeat, show status unavailable; a 15-second backend heartbeat lets a long healthy tool remain running.",
+    "UI-3: Restore status and pending approvals after renderer reload from supported backend reads. Switching sessions cannot show or stop another session’s run. Terminal state persists; approval decisions stay in the existing authorized path.",
+    "UI-4: In controlled tests a backend state transition appears within two seconds after delivery. Use accessible labels and keyboard controls; display plain language in primary UI. Technical identifiers and sanitized event details live in expandable diagnostics and redacted export.",
+    "UI-5: Local diagnostics remain available without external collectors. Missing or stale evidence is explicitly identified; no spinning forever with invented progress percentages. Running-but-slow is distinguishable from disconnected, but there is no automatic stall verdict or kill solely from elapsed time.",
+    "UI-6: Owner explicitly accepted this smaller in-app panel as a planning requirement on September 23. It does not replace the broader activity panel or authorize implementation.",
+    "QA-1: Reuse the merged provider baseline and extend real Electron and browser/API journeys for policy precedence, Stop, duplicate first resume, renderer reconnect and backend process restart. Model/runner fixtures must be declared; do not mock UI, approval service or persistence under assessment.",
+    "QA-2: Each negative case waits for an observable acknowledgement/settled state, then verifies independent file/data effects, durable operation/approval records and provider/runner call counts. Lost-result tests assert no blind replay and truthful uncertainty.",
+    "QA-3: UI states, backend run/operation identities and sanitized timeline agree across resumed runs. Include pre-run failure, collector-off/outage and redaction tests using synthetic secret canaries. No live paid provider calls.",
+    "QA-4: Retain sanitized JSON evidence and Playwright traces for passing and failing CI journeys with bounded retention (proposed seven days). Fixtures contain no real user content or credentials. Upload failure makes evidence incomplete rather than a pass.",
+    "QA-5: All claimed MVP scenarios and required checks pass at the exact committed source. An unsupported runner cancellation or ambiguous outcome passes only by matching the specified honest pending/unknown behavior, not by silently skipping the case.",
+    "QA-6: Merge only the approved segment tip into feature/harness-backlog-review after human review. Staging promotion, real packaged macOS VM acceptance, live-provider behavior and broader backlog completion remain separate decisions.",
+    "Project Chat integration uses apps/web/app/page.tsx; separate IDE chat surface is out of scope.",
+    "Normative document: docs/planning/mvp-reliability/plan.md SHA256 sha256:1fa975c78bb02efdf3f2f19e7b9ab66d681c85809aee9c950d06231b88bf10fc",
+    "Normative document: docs/tasks/agent-platform-harness-review-gate.md SHA256 sha256:dae972488602949531ad34e3d372ecfbe1543b2829156193a482d7a4ef65eed0",
+    "Normative document: docs/tasks/agent-platform-harness-baseline-p2.md SHA256 sha256:c63ecaec8b656c8fe08febaac1904b0919801533982cf65e5d23600265c63a95",
+    "Normative document: docs/tasks/agent-platform-harness-baseline-x2.md SHA256 sha256:d6ba34e7ed0f0fcec436c28a848578631937abe73cb3f2150049c4fab669efb8",
+    "Normative document: docs/tasks/agent-platform-harness-baseline-x3.md SHA256 sha256:a5ccdac407780592f7a19446e04029e445ace05ce5c4293869873bd11091c60a",
+    "Normative document: docs/tasks/agent-platform-harness-baseline-x5.md SHA256 sha256:7b7dd05ab2bcd786dc2a7373ec62287559105dd67a8ebe4982da8ceb41b9b746",
+    "Normative document: docs/tasks/agent-platform-harness-v1.md SHA256 sha256:aacc9354492e5fe0f188dcfa3a3d7127fec565a0b588b81c6a8b5474c68a816e",
+    "Normative document: docs/tasks/agent-platform-harness-r3.cancel.md SHA256 sha256:7fe514873fa2eb0e7d7273199c75ce3ecb7f7cd8a6b190933b8a614885ea09f3",
+    "Normative document: docs/tasks/agent-platform-harness-r3.reconcile.md SHA256 sha256:27ecd447e78d0b96cb3cd063c8e22fafe6578e57c15dedc432a9235e67633a69",
+    "Normative document: docs/tasks/agent-platform-harness-v4.local.md SHA256 sha256:298c7511706d3e4e79768173b0a8be126e68b4adbb284b01fa76c204702d4e53",
+    "Normative document: docs/tasks/agent-platform-harness-v5.mvp.md SHA256 sha256:5a74dd4dd595b04f50097e11bf92a60c27d9734f9b9fc20e3f2234dba148eb28"
+  ],
+  "nonGoals": [
+    "Dependency upgrades or framework migration",
+    "Authentication or wider deployment access",
+    "Background autonomous execution while app is closed",
+    "Full collector/dashboard deployment or multi-agent oversight",
+    "Staging or production promotion",
+    "Blind replay of ambiguous side effects"
+  ],
+  "acceptanceCriteria": [
+    "Every numbered STOP/REC/UI/QA requirement passes its named test with independent backend/effect evidence.",
+    "V1 proposed refinement and original requirements have exact-source evidence.",
+    "A scoped owner approval and reconciled Beads blockers precede any runtime change; other broad tasks remain gated.",
+    "Required checks and evidence pass; only the segment tip integrates into the feature branch; parent tasks remain open for their wider scope."
+  ],
+  "constraints": {
+    "architecture": [
+      "TypeScript, existing LangGraph/AI SDK and SQLite; additive transactional migrations only.",
+      "Follow plan.md and linked task specs; no speculative runtime modernization.",
+      "Production runtime stays Docker-managed or the established isolated Electron test fixture."
+    ],
+    "security": [
+      "Preserve current project/permission/approval/path-jail rules.",
+      "Mandatory control persistence fails closed before effects; optional telemetry cannot drive execution.",
+      "No real credentials or prompt/tool payloads in retained diagnostics.",
+      "All provider/runner tests isolated; no billable calls."
+    ],
+    "allowedPaths": [
+      ".github/workflows/ci.yml",
+      "apps/api/src",
+      "apps/api/test",
+      "apps/desktop/e2e",
+      "apps/web/components/chat",
+      "apps/web/e2e",
+      "apps/web/hooks",
+      "apps/web/lib",
+      "apps/web/test",
+      "docs/planning/mvp-reliability",
+      "docs/reviews",
+      "docs/tasks",
+      "packages/contracts/src",
+      "packages/contracts/test",
+      "packages/db/drizzle",
+      "packages/db/src",
+      "packages/db/test",
+      "packages/harness/src",
+      "packages/harness/test",
+      "packages/plugin-observability/src",
+      "packages/plugin-observability/test",
+      "session.md",
+      "apps/web/app/page.tsx"
+    ]
+  },
+  "authority": {
+    "deliveryTarget": "feature/harness-backlog-review",
+    "allowedActions": [
+      "workspace.read",
+      "workspace.patch",
+      "process.test",
+      "artifact.write",
+      "beads.read",
+      "beads.mutate",
+      "git.read",
+      "git.commit",
+      "git.push",
+      "github.read",
+      "github.deliver"
+    ],
+    "github": {
+      "repository": "jwill9999/agent-platform",
+      "base": "feature/harness-backlog-review",
+      "mergeMethod": "squash",
+      "requiredChecks": [
+        "verify",
+        "deps:check-cycles",
+        "markdownlint",
+        "docker",
+        "lychee",
+        "desktop-e2e",
+        "e2e",
+        "GitGuardian Security Checks",
+        "SonarCloud Code Analysis"
+      ]
+    }
+  },
+  "tasks": [
+    {
+      "id": "agent-platform-harness-review-gate",
+      "dependsOn": [],
+      "risk": "high",
+      "assignedRole": "feature_planner",
+      "branchParent": "feature/harness-backlog-review",
+      "allowedPaths": ["docs/tasks", "docs/planning/mvp-reliability", "docs/reviews", "session.md"],
+      "allowedOperations": [
+        "workspace.read",
+        "artifact.write",
+        "beads.read",
+        "git.read",
+        "github.read"
+      ]
+    },
+    {
+      "id": "agent-platform-harness-baseline-p2",
+      "dependsOn": ["agent-platform-harness-review-gate"],
+      "risk": "standard",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "feature/harness-backlog-review",
+      "allowedPaths": [
+        "docs/tasks",
+        "docs/planning/mvp-reliability",
+        "docs/reviews",
+        "session.md",
+        "apps/desktop/e2e",
+        "apps/web/e2e",
+        "apps/api/test",
+        "packages/harness/test",
+        "packages/db/test"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "git.read",
+        "beads.read"
+      ]
+    },
+    {
+      "id": "agent-platform-harness-baseline-x2",
+      "dependsOn": ["agent-platform-harness-baseline-p2"],
+      "risk": "standard",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "task/mvp-baseline-p2",
+      "allowedPaths": [
+        "docs/tasks",
+        "docs/planning/mvp-reliability",
+        "docs/reviews",
+        "session.md",
+        "apps/desktop/e2e",
+        "apps/web/e2e",
+        "apps/api/test",
+        "packages/harness/test",
+        "packages/db/test"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "git.read",
+        "beads.read"
+      ]
+    },
+    {
+      "id": "agent-platform-harness-baseline-x3",
+      "dependsOn": ["agent-platform-harness-baseline-x2"],
+      "risk": "standard",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "task/mvp-baseline-x2",
+      "allowedPaths": [
+        "docs/tasks",
+        "docs/planning/mvp-reliability",
+        "docs/reviews",
+        "session.md",
+        "apps/desktop/e2e",
+        "apps/web/e2e",
+        "apps/api/test",
+        "packages/harness/test",
+        "packages/db/test"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "git.read",
+        "beads.read"
+      ]
+    },
+    {
+      "id": "agent-platform-harness-baseline-x5",
+      "dependsOn": ["agent-platform-harness-baseline-x3"],
+      "risk": "standard",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "task/mvp-baseline-x3",
+      "allowedPaths": [
+        "docs/tasks",
+        "docs/planning/mvp-reliability",
+        "docs/reviews",
+        "session.md",
+        "apps/desktop/e2e",
+        "apps/web/e2e",
+        "apps/api/test",
+        "packages/harness/test",
+        "packages/db/test"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "git.read",
+        "beads.read"
+      ]
+    },
+    {
+      "id": "agent-platform-harness-v1",
+      "dependsOn": ["agent-platform-harness-baseline-x5", "agent-platform-harness-review-gate"],
+      "risk": "high",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "task/mvp-baseline-x5",
+      "allowedPaths": [
+        "docs/tasks",
+        "docs/planning/mvp-reliability",
+        "docs/reviews",
+        "session.md",
+        "packages/contracts/src",
+        "packages/contracts/test",
+        "packages/db/src",
+        "packages/db/test",
+        "packages/db/drizzle",
+        "packages/plugin-observability/src",
+        "packages/plugin-observability/test",
+        "apps/api/src",
+        "apps/api/test",
+        "packages/harness/src",
+        "packages/harness/test",
+        "apps/desktop/e2e"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "git.read",
+        "beads.read"
+      ]
+    },
+    {
+      "id": "agent-platform-harness-r3.cancel",
+      "dependsOn": ["agent-platform-harness-v1", "agent-platform-harness-review-gate"],
+      "risk": "high",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "task/mvp-event-foundation",
+      "allowedPaths": [
+        "docs/tasks",
+        "docs/planning/mvp-reliability",
+        "docs/reviews",
+        "session.md",
+        "apps/web/components/chat",
+        "apps/web/hooks",
+        "apps/web/test",
+        "apps/api/src",
+        "apps/api/test",
+        "packages/harness/src",
+        "packages/harness/test",
+        "packages/contracts/src",
+        "packages/contracts/test",
+        "packages/db/src",
+        "packages/db/test",
+        "packages/db/drizzle",
+        "apps/desktop/e2e",
+        "apps/web/app/page.tsx"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "git.read",
+        "beads.read"
+      ]
+    },
+    {
+      "id": "agent-platform-harness-r3.reconcile",
+      "dependsOn": [
+        "agent-platform-harness-r3.cancel",
+        "agent-platform-harness-review-gate",
+        "agent-platform-harness-v1"
+      ],
+      "risk": "high",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "task/mvp-stop",
+      "allowedPaths": [
+        "docs/tasks",
+        "docs/planning/mvp-reliability",
+        "docs/reviews",
+        "session.md",
+        "apps/api/src",
+        "apps/api/test",
+        "packages/harness/src",
+        "packages/harness/test",
+        "packages/contracts/src",
+        "packages/contracts/test",
+        "packages/db/src",
+        "packages/db/test",
+        "packages/db/drizzle",
+        "apps/web/components/chat",
+        "apps/web/hooks",
+        "apps/web/test",
+        "apps/desktop/e2e",
+        "apps/web/app/page.tsx"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "git.read",
+        "beads.read"
+      ]
+    },
+    {
+      "id": "agent-platform-harness-v4.local",
+      "dependsOn": [
+        "agent-platform-harness-r3.reconcile",
+        "agent-platform-harness-review-gate",
+        "agent-platform-harness-v1",
+        "agent-platform-harness-r3.cancel"
+      ],
+      "risk": "standard",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "task/mvp-reconcile",
+      "allowedPaths": [
+        "docs/tasks",
+        "docs/planning/mvp-reliability",
+        "docs/reviews",
+        "session.md",
+        "apps/web/components/chat",
+        "apps/web/hooks",
+        "apps/web/lib",
+        "apps/web/test",
+        "apps/api/src",
+        "apps/api/test",
+        "packages/contracts/src",
+        "packages/contracts/test",
+        "apps/desktop/e2e",
+        "apps/web/app/page.tsx"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "git.read",
+        "beads.read"
+      ]
+    },
+    {
+      "id": "agent-platform-harness-v5.mvp",
+      "dependsOn": [
+        "agent-platform-harness-v4.local",
+        "agent-platform-harness-review-gate",
+        "agent-platform-harness-baseline-p2",
+        "agent-platform-harness-baseline-x2",
+        "agent-platform-harness-baseline-x3",
+        "agent-platform-harness-baseline-x5"
+      ],
+      "risk": "standard",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "task/mvp-local-status",
+      "allowedPaths": [
+        "docs/tasks",
+        "docs/planning/mvp-reliability",
+        "docs/reviews",
+        "session.md",
+        "apps/desktop/e2e",
+        "apps/web/e2e",
+        "apps/api/test",
+        "packages/harness/test",
+        "packages/db/test",
+        ".github/workflows/ci.yml"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "git.read",
+        "beads.read"
+      ]
+    }
+  ],
+  "qualityGates": [
+    "Schema validation and independent critique; owner scoped approval still required.",
+    "Build, format, lint, typecheck and focused unit/integration tests.",
+    "Real browser/Electron Gherkin journeys, evidence captured on success/failure.",
+    "SonarCloud or Problems fallback per shared instructions.",
+    "Hosted required checks at segment tip; human integration review."
+  ],
+  "retryPolicy": {
+    "implementationAttempts": 2,
+    "findingAttempts": 2,
+    "infrastructureAttempts": 2,
+    "waitDeadlineSeconds": 3600
+  },
+  "repairTaskPolicy": {
+    "idPattern": "agent-platform-mvp-reliability-repair.<n>",
+    "maxChildren": 2,
+    "allowedRoles": ["implementation_worker", "test_runner", "code_reviewer"],
+    "allowedPaths": [
+      ".github/workflows/ci.yml",
+      "apps/api/src",
+      "apps/api/test",
+      "apps/desktop/e2e",
+      "apps/web/components/chat",
+      "apps/web/e2e",
+      "apps/web/hooks",
+      "apps/web/lib",
+      "apps/web/test",
+      "docs/planning/mvp-reliability",
+      "docs/reviews",
+      "docs/tasks",
+      "packages/contracts/src",
+      "packages/contracts/test",
+      "packages/db/drizzle",
+      "packages/db/src",
+      "packages/db/test",
+      "packages/harness/src",
+      "packages/harness/test",
+      "packages/plugin-observability/src",
+      "packages/plugin-observability/test",
+      "session.md",
+      "apps/web/app/page.tsx"
+    ],
+    "authorityMayExpand": false
+  },
+  "escalationPolicy": [
+    "Owner approval is required before execution; schema or critic approval is not authorization.",
+    "At scoped approval reconcile only this tranche gate edges if global closure would release unrelated work; no other old blockers removed.",
+    "Stop for ambiguous intended behavior, security/architecture/dependency scope expansion, data-loss risk or inability to preserve current permissions.",
+    "After two failed repairs or infrastructure retries report blocker; never bypass a gate.",
+    "No push/merge to staging/main; operator decides later promotion separately.",
+    "Before execution recompute each Normative document SHA256 binding in requirements; mismatch blocks execution and requires a revised contract, critique and owner approval. No spec edits under an old approval."
+  ]
+}

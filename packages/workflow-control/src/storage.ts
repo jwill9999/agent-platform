@@ -1,8 +1,46 @@
+import {
+  initializeRepairPlanning,
+  readRepairPlanningHandoff,
+  prepareRepairPlanningHandoff,
+  activateRepairPlanningHandoff,
+  repairChildForCallback,
+  repairPlanningCapability,
+  type RepairPlanningHandoff,
+} from './repairPlanningJournal.js';
+import { assertRepairPlanningResult, repairChildContext } from './repairPlanning.js';
+import { queryRunInventory } from './runDiscovery.js';
+import {
+  initializeImplementationImports,
+  importImplementationOutput,
+  implementationWorkspace,
+} from './implementationImport.js';
+import { resolveEffectiveTask } from './effectiveTaskAuthority.js';
+import { specialistInputEnvelopeSchema } from './specialistInput.js';
+import { lstatSync } from 'node:fs';
+import {
+  InterruptionCleanupJournal,
+  type ExecutionInterruption,
+} from './executionInterruptions.js';
+import { assertExecutionNotInterrupted } from './executionInterruptions.js';
+import { isDeepStrictEqual } from 'node:util';
+import {
+  assertDocumentAuthority,
+  assertDocumentApprovalCandidate,
+  initializeDocumentApprovalSchema,
+  stageApprovedDocuments,
+  verifyApprovedDocumentSnapshot,
+  recordPlanningDocumentPublication,
+  verifyDocumentBoundary,
+  verifyDeliveryDocumentSource,
+  verifyDocumentsForApproval,
+  recoverDocumentVerification,
+  type DocumentBoundary,
+} from './documentApproval.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { fenceRunWork, runAcceptsWork } from './workCancellation.js';
 import { assertBootstrapDeliveryPolicy, initializeBootstrapSchema } from './bootstrapJournal.js';
 import { mkdir, realpath } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 
 import Database from 'better-sqlite3';
 import { enqueueContinuation, initializeContinuationSchema } from './continuationJournal.js';
@@ -10,6 +48,8 @@ import { specialistTerminalResult } from './specialistTerminalResult.js';
 
 import {
   executionContractSchema,
+  assertTaskPacketWithinTaskAuthority,
+  type TaskPacket,
   type EvidenceReference,
   type ExecutionContract,
 } from './contracts.js';
@@ -566,6 +606,16 @@ function transitionFromRow(row: TransitionRow): TransitionRecord {
   };
 }
 
+function assertSchedulerTerminalReplay(
+  execution: SchedulerExecutionRecord,
+  input: { status: SchedulerExecutionStatus; result: unknown },
+): void {
+  if (execution.status !== input.status)
+    throw new Error('scheduler terminal replay status changed');
+  if (!isDeepStrictEqual(execution.result, input.result))
+    throw new Error('scheduler terminal replay result changed');
+}
+
 function schedulerExecutionFromRow(row: SchedulerExecutionRow): SchedulerExecutionRecord {
   return {
     id: row.id,
@@ -703,20 +753,115 @@ function sameImmutableTransition(
 
 export class WorkflowStore {
   readonly #database: Database.Database;
+  // Only the synchronous, fenced dispatch transaction can cover its own inline commit.
+  #documentGuardedOperation: string | undefined;
+  #documentGuardedAuthority: (() => void) | undefined;
 
-  constructor(path: string) {
-    this.#database = new Database(path);
+  constructor(path: string, options: { readonly?: boolean } = {}) {
+    this.#database = new Database(path, {
+      readonly: options.readonly ?? false,
+      fileMustExist: options.readonly ?? false,
+    });
+    if (options.readonly) {
+      this.#database.pragma('query_only = ON');
+      return;
+    }
     this.#database.pragma('foreign_keys = ON');
     this.#database.pragma('journal_mode = WAL');
     this.#migrate();
+    this.#database.exec(
+      'CREATE TABLE IF NOT EXISTS workflow_journal_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), workspace_id TEXT NOT NULL)',
+    );
     initializeBootstrapSchema(this.#database);
+    initializeDocumentApprovalSchema(this.#database);
+    initializeImplementationImports(this.#database);
+    initializeRepairPlanning(this.#database);
+    for (const table of ['delivery_approved_heads', 'repair_approved_heads']) {
+      const columns = this.#database.prepare(`PRAGMA table_info(${table})`).all() as Array<{
+        name: string;
+      }>;
+      if (!columns.some((column) => column.name === 'import_execution_id'))
+        this.#database.exec(
+          `ALTER TABLE ${table} ADD COLUMN import_execution_id TEXT REFERENCES implementation_imports(execution_id)`,
+        );
+    }
   }
 
   close(): void {
     this.#database.close();
   }
 
+  recordPlanningDocumentPublication(input: {
+    runId: string;
+    sourceRoot: string;
+    sourcePolicy?: unknown;
+    nowMs?: number;
+  }): void {
+    recordPlanningDocumentPublication(this.#database, input);
+  }
+
+  verifyPlanningDocuments(input: DocumentBoundary) {
+    return verifyDocumentBoundary(this.#database, input);
+  }
+
+  verifyDeliveryDocumentSource(input: DocumentBoundary) {
+    return verifyDeliveryDocumentSource(this.#database, input);
+  }
+
+  #documentAuthority(input: DocumentBoundary): () => void {
+    const verified = this.verifyPlanningDocuments(input);
+    return () => assertDocumentAuthority(this.#database, input.runId, verified.approvalId);
+  }
+
+  stageApprovedDocuments(input: Parameters<typeof stageApprovedDocuments>[1]): void {
+    stageApprovedDocuments(this.#database, input);
+  }
+
+  verifyApprovedDocumentSnapshot(
+    input: Parameters<typeof verifyApprovedDocumentSnapshot>[1],
+  ): void {
+    verifyApprovedDocumentSnapshot(this.#database, input);
+  }
+
+  recoverPlanningDocumentVerification(input: DocumentBoundary): void {
+    recoverDocumentVerification(this.#database, input);
+  }
+
+  /** Explicit trusted provisioning, never called by discovery. Binding cannot be changed. */
+  bindWorkspaceIdentity(workspaceId: string): void {
+    if (!/^sha256:[a-f0-9]{64}$/u.test(workspaceId)) throw new Error('journal_workspace_invalid');
+    this.#database
+      .transaction(() => {
+        const rows = this.#database
+          .prepare('SELECT workspace_id, body_json FROM contracts')
+          .all() as Array<{ workspace_id: string; body_json: string }>;
+        if (
+          rows.some(
+            (row) =>
+              row.workspace_id !== workspaceId ||
+              executionContractSchema.parse(JSON.parse(row.body_json)).workspaceId !== workspaceId,
+          )
+        )
+          throw new Error('journal_workspace_conflict');
+        const bound = this.#database
+          .prepare('SELECT workspace_id FROM workflow_journal_identity WHERE singleton=1')
+          .get() as { workspace_id: string } | undefined;
+        if (bound && bound.workspace_id !== workspaceId)
+          throw new Error('journal_workspace_conflict');
+        this.#database
+          .prepare('INSERT OR IGNORE INTO workflow_journal_identity VALUES (1, ?)')
+          .run(workspaceId);
+      })
+      .immediate();
+  }
+
   createContract(contract: ExecutionContract, createdAtMs = Date.now()): string {
+    executionContractSchema.parse(contract);
+    const binding = this.#database
+      .prepare('SELECT workspace_id FROM workflow_journal_identity WHERE singleton=1')
+      .get() as { workspace_id: string } | undefined;
+    if (binding && binding.workspace_id !== contract.workspaceId)
+      throw new Error('journal_workspace_conflict');
     const id = `${contract.featureId}:v${contract.contractVersion}:${contract.policyDigest}`;
     const body = JSON.stringify(contract);
     this.#database
@@ -745,18 +890,44 @@ export class WorkflowStore {
     return id;
   }
 
-  createRun(contractId: string, state: WorkflowState = 'approved', id = randomUUID()): RunRecord {
+  createRun(
+    contractId: string,
+    state: WorkflowState = 'approved',
+    id: string = randomUUID(),
+  ): RunRecord {
     if (state === 'pipeline') {
       throw new Error('pipeline runs must be entered through exact lineage import');
     }
-    return this.#createRunFixture(contractId, state, id);
+    return this.#database
+      .transaction(() => {
+        const existing = this.getRun(id);
+        if (existing) {
+          if (existing.contractId !== contractId)
+            throw new Error('run_admission_identity_conflict');
+          return existing;
+        }
+        const row = this.#database
+          .prepare('SELECT body_json FROM contracts WHERE id = ?')
+          .get(contractId) as { body_json: string } | undefined;
+        if (!row) throw new Error('run_admission_contract_missing');
+        const contract = executionContractSchema.parse(JSON.parse(row.body_json));
+        for (const task of contract.tasks) {
+          const inventory = queryRunInventory(this.#database, {
+            workspaceId: contract.workspaceId,
+            taskId: task.id,
+          });
+          if (inventory.active.length) throw new Error('run_admission_conflict');
+        }
+        return this.#createRunFixture(contractId, state, id);
+      })
+      .immediate();
   }
 
   /** Explicit fixture seam; unavailable in production and never used by orchestration code. */
   createRunForTest(
     contractId: string,
     state: WorkflowState = 'approved',
-    id = randomUUID(),
+    id: string = randomUUID(),
   ): RunRecord {
     if (process.env.NODE_ENV !== 'test') throw new Error('test run fixture is unavailable');
     return this.#createRunFixture(contractId, state, id);
@@ -805,7 +976,22 @@ export class WorkflowStore {
     if (capability !== workflowGovernedPersistenceCapability)
       throw new Error('approval notification persistence requires coordinator capability');
     const event = approvalNotificationSchema.parse(eventInput);
+    const persisted = this.getApprovalNotification(event.eventId);
+    if (persisted) {
+      if (JSON.stringify(persisted.event) !== JSON.stringify(event))
+        throw new Error('approval notification identity collision');
+      return persisted;
+    }
+    const assertDocuments = this.#documentAuthority({
+      runId: event.runId,
+      taskId: event.taskId,
+      boundary: 'approval.notification',
+      ownerId: event.ownerId,
+      runLeaseEpoch: event.runLeaseEpoch,
+      nowMs,
+    });
     return this.#database.transaction(() => {
+      assertDocuments();
       const existing = this.getApprovalNotification(event.eventId);
       if (existing !== undefined) {
         if (JSON.stringify(existing.event) !== JSON.stringify(event))
@@ -1030,7 +1216,21 @@ export class WorkflowStore {
   ): ApprovalNotificationRecord {
     if (capability !== workflowGovernedPersistenceCapability)
       throw new Error('approval notification persistence requires coordinator capability');
+    let assertDocuments: (() => void) | undefined;
+    if (['accepted', 'resume_pending'].includes(input.to)) {
+      const pending = this.getApprovalNotification(input.eventId);
+      if (!pending) throw new Error('approval notification not found');
+      assertDocuments = this.#documentAuthority({
+        runId: pending.event.runId,
+        taskId: pending.event.taskId,
+        boundary: 'approval.resume',
+        ownerId: pending.event.ownerId,
+        runLeaseEpoch: pending.event.runLeaseEpoch,
+        nowMs: input.nowMs,
+      });
+    }
     return this.#database.transaction(() => {
+      assertDocuments?.();
       const record = this.getApprovalNotification(input.eventId);
       if (record === undefined) throw new Error('approval notification not found');
       const event = record.event;
@@ -1136,6 +1336,34 @@ export class WorkflowStore {
     if (capability !== workflowGovernedPersistenceCapability)
       throw new Error('delegate callback persistence requires coordinator capability');
     const callback = delegateCallbackSchema.parse(input.callback);
+    const assertDocuments = this.#documentAuthority({
+      runId: callback.parentRunId,
+      taskId: callback.parentTaskId,
+      boundary: 'callback.accept',
+      ownerId: input.ownerId,
+      runLeaseEpoch: callback.parentRunLeaseEpoch,
+      nowMs: input.nowMs,
+    });
+    return this.#database
+      .transaction(() => {
+        assertDocuments();
+        return this.#recordDelegateCallbackAndTransition(input, capability);
+      })
+      .immediate();
+  }
+
+  #recordDelegateCallbackAndTransition(
+    input: { callback: unknown; target: WorkflowState; ownerId: string; nowMs: number },
+    capability?: symbol,
+  ): {
+    disposition: 'committed' | 'duplicate';
+    state: WorkflowState;
+    version: number;
+    needsWake: boolean;
+  } {
+    if (capability !== workflowGovernedPersistenceCapability)
+      throw new Error('delegate callback persistence requires coordinator capability');
+    const callback = delegateCallbackSchema.parse(input.callback);
     if (delegateCallbackTarget(callback) !== input.target) {
       throw new Error('delegate callback target does not match validated transition');
     }
@@ -1146,6 +1374,7 @@ export class WorkflowStore {
         version: number;
         needsWake: boolean;
       } => {
+        assertExecutionNotInterrupted(this.#database, callback.delegationId);
         const prior = this.#database
           .prepare(
             'SELECT callback_json, target_state, parent_version, wake_status FROM delegate_callbacks WHERE callback_id = ?',
@@ -1179,7 +1408,7 @@ export class WorkflowStore {
           contract.policyDigest !== callback.policyDigest
         )
           throw new Error('delegate callback contract binding is stale');
-        const authorizedTask = contract.tasks.find((task) => task.id === callback.parentTaskId);
+        const authorizedTask = this.getEffectiveTask(callback.parentRunId, callback.parentTaskId);
         if (!authorizedTask?.allowedOperations.includes('workflow.delegate_callback')) {
           throw new Error('delegate callback is outside task authority');
         }
@@ -1205,6 +1434,9 @@ export class WorkflowStore {
           throw new Error('delegate callback lacks immutable scheduler authorization');
         }
         this.#assertDelegateTerminalResult(execution, callback);
+        if (callback.parentState === 'repair_planning' && callback.terminalStatus === 'continue')
+          repairChildForCallback(this.#database, callback);
+        const imported = this.#verifiedCallbackImport(callback, execution);
         const approval = this.#database
           .prepare(
             `SELECT 1 FROM plan_approvals WHERE run_id = ? AND status = 'active'
@@ -1223,11 +1455,13 @@ export class WorkflowStore {
             digest: callback.inputArtifactDigest,
             producer: callback.inputProducerIdentity,
             role: 'workflow_orchestrator',
+            headSha: imported?.base_head ?? callback.headSha,
           },
           {
             digest: callback.resultArtifactDigest,
             producer: callback.resultProducerIdentity,
             role: callback.delegateRole,
+            headSha: callback.headSha,
           },
         ];
         for (const evidence of evidenceBindings) {
@@ -1246,7 +1480,7 @@ export class WorkflowStore {
               evidence.role,
               callback.contractVersion,
               callback.policyDigest,
-              callback.headSha,
+              evidence.headSha,
             );
           if (found === undefined) throw new Error('delegate callback evidence binding is stale');
         }
@@ -1496,7 +1730,17 @@ export class WorkflowStore {
     if (capability !== workflowGovernedPersistenceCapability)
       throw new Error('lineage import requires coordinator capability');
     const request = lineageImportSchema.parse(input.request);
+    const assertDocuments = this.#documentAuthority({
+      runId: request.targetRunId,
+      taskId: request.targetTaskId,
+      boundary: 'lineage.import',
+      additionalSourceRef: request.ref,
+      ownerId: input.ownerId,
+      runLeaseEpoch: request.runLeaseEpoch,
+      nowMs: input.nowMs,
+    });
     return this.#database.transaction(() => {
+      assertDocuments();
       const existing = this.#database
         .prepare('SELECT request_json FROM workflow_lineage_imports WHERE target_run_id = ?')
         .get(request.targetRunId) as { request_json: string } | undefined;
@@ -1673,7 +1917,10 @@ export class WorkflowStore {
 
   assertRunUsesContract(runId: string, contract: ExecutionContract): void {
     const stored = this.#contractForRun(runId);
-    if (JSON.stringify(stored) !== JSON.stringify(contract)) {
+    if (
+      JSON.stringify(executionContractSchema.parse(stored)) !==
+      JSON.stringify(executionContractSchema.parse(contract))
+    ) {
       throw new Error('workflow run does not use the approved execution contract');
     }
   }
@@ -1950,6 +2197,13 @@ export class WorkflowStore {
       throw new Error('feature delivery approval requires the authenticated approval adapter');
     }
     const approval = featureDeliveryApprovalSchema.parse(approvalInput);
+    const assertDocuments = this.#documentAuthority({
+      runId: approval.runId,
+      taskId: approval.taskId,
+      boundary: 'feature.approval',
+      ownerId: approval.approverId,
+      nowMs: approval.approvedAtMs,
+    });
     const contract = featureDeliveryContractSchema.parse(contractInput);
     const executionContract = this.#contractForRun(approval.runId);
     const intent = this.getFeatureDeliveryRequiredIntent(approval.runId);
@@ -1978,6 +2232,7 @@ export class WorkflowStore {
       throw new Error('a new feature delivery approval must be active');
     }
     return this.#database.transaction(() => {
+      assertDocuments();
       const replay = this.getFeatureDeliveryApproval(approval.approvalId);
       if (replay !== undefined) {
         if (
@@ -2212,7 +2467,15 @@ export class WorkflowStore {
     if (capability !== workflowDeliveryMutationCapability) {
       throw new Error('feature delivery contracts require the internal delivery broker capability');
     }
+    const assertDocuments = this.#documentAuthority({
+      runId: input.runId,
+      boundary: 'delivery.contract',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: input.createdAtMs,
+    });
     this.#database.transaction(() => {
+      assertDocuments();
       const executionContract = this.#contractForRun(input.runId);
       if (
         executionContract.workspaceId !== input.workspaceId ||
@@ -2478,6 +2741,12 @@ export class WorkflowStore {
     ) {
       throw new Error('approved evaluation-head verification requires an internal capability');
     }
+    // Initial evaluation is of the approved task head. A required future feature-delivery
+    // intent is not yet authority for an integrated head; finalizing retains that stronger gate.
+    if (this.getRun(input.runId)?.state === 'feature_evaluation') {
+      this.assertApprovedTaskHead(input, capability);
+      return;
+    }
     const featureContract = this.getApprovedFeatureDeliveryContract(input.runId);
     if (featureContract !== undefined) {
       const parsed = featureDeliveryContractSchema.parse(featureContract);
@@ -2505,40 +2774,34 @@ export class WorkflowStore {
     ) {
       throw new Error('run-task authorization requires an internal capability');
     }
-    const contract = this.#contractForRun(runId);
-    const contractTask = contract.tasks.find((task) => task.id === taskId);
-    if (contractTask !== undefined) {
-      return {
-        id: contractTask.id,
-        assignedRole: contractTask.assignedRole,
-        allowedPaths: [...contractTask.allowedPaths],
-        allowedOperations: [...contractTask.allowedOperations],
-      };
-    }
-    const row = this.#database
-      .prepare(
-        `SELECT request_json FROM repair_child_intents
-         WHERE run_id = ? AND id = ? AND status = 'committed'`,
+    return this.getEffectiveTask(runId, taskId);
+  }
+
+  getEffectiveTask(runId: string, taskId: string): ExecutionContract['tasks'][number] | undefined {
+    return resolveEffectiveTask(this.#database, this.#contractForRun(runId), runId, taskId)?.task;
+  }
+
+  assertTaskPacketAuthority(
+    packet: TaskPacket,
+    phase?: 'task_verification' | 'task_review' | 'feature_evaluation' | 'repair_planning',
+  ): void {
+    const task = this.getEffectiveTask(packet.runId, packet.taskId);
+    if (!task) throw new Error('task packet references an unknown task');
+    assertTaskPacketWithinTaskAuthority(this.#contractForRun(packet.runId), packet, task, phase);
+    if (packet.repairChildContext) {
+      const child = this.getRepairChildIntent(packet.taskId);
+      if (
+        child?.status !== 'committed' ||
+        child.runId !== packet.runId ||
+        JSON.stringify(packet.repairChildContext) !==
+          JSON.stringify(
+            repairChildContext(
+              child.request as import('./repairChildContract.js').RepairChildRequest,
+            ),
+          )
       )
-      .get(runId, taskId) as { request_json: string } | undefined;
-    if (row === undefined) return undefined;
-    const request = JSON.parse(row.request_json) as Record<string, unknown>;
-    if (
-      request.id !== taskId ||
-      typeof request.assignedRole !== 'string' ||
-      !Array.isArray(request.allowedPaths) ||
-      !request.allowedPaths.every((path) => typeof path === 'string') ||
-      !Array.isArray(request.allowedOperations) ||
-      !request.allowedOperations.every((operation) => typeof operation === 'string')
-    ) {
-      throw new Error('committed repair-child authority is malformed');
+        throw new Error('repair child packet context differs from committed authority');
     }
-    return {
-      id: taskId,
-      assignedRole: request.assignedRole,
-      allowedPaths: request.allowedPaths as string[],
-      allowedOperations: request.allowedOperations as string[],
-    };
   }
 
   remainingRepairBudgetForChild(
@@ -2568,21 +2831,31 @@ export class WorkflowStore {
       scope_id: string;
       count: number;
     }>;
-    const findingIds = new Set([
-      ...reservations.map((reservation) => reservation.finding_id),
-      input.findingId,
-    ]);
+    const taskExtras = taskAttempts.reduce((total, row) => total + Math.max(0, row.count - 1), 0);
+    // Each child reservation funds its original finding. Subsequent child dispatches
+    // count even with a new finding ID; direct durable attempts remain accounted for too.
+    const findingIds = new Set([...reservations.map((row) => row.finding_id), input.findingId]);
     const findingAttempts = this.#database
       .prepare(
-        `SELECT scope_id, COUNT(*) AS count FROM attempts
-         WHERE run_id = ? AND scope = 'finding' GROUP BY scope_id`,
+        `SELECT scope_id,COUNT(*) AS n FROM attempts
+      WHERE run_id=? AND scope='finding' GROUP BY scope_id`,
       )
-      .all(input.runId) as Array<{ scope_id: string; count: number }>;
-    const taskExtras = taskAttempts.reduce((total, row) => total + Math.max(0, row.count - 1), 0);
-    const findingExtras = findingAttempts.reduce(
-      (total, row) => total + (findingIds.has(row.scope_id) ? Math.max(0, row.count - 1) : 0),
-      0,
+      .all(input.runId) as { scope_id: string; n: number }[];
+    const childDispatches = this.#database
+      .prepare(
+        `SELECT finding_id,COUNT(*) AS n FROM repair_dispatches
+      WHERE run_id=? AND task_id IN (SELECT child_id FROM repair_child_budget_reservations WHERE run_id=?) GROUP BY finding_id`,
+      )
+      .all(input.runId, input.runId) as { finding_id: string; n: number }[];
+    const extras = new Map(
+      findingAttempts.map((row) => [
+        row.scope_id,
+        findingIds.has(row.scope_id) ? Math.max(0, row.n - 1) : 0,
+      ]),
     );
+    for (const row of childDispatches)
+      extras.set(row.finding_id, Math.max(extras.get(row.finding_id) ?? 0, row.n));
+    const findingExtras = [...extras.values()].reduce((total, n) => total + n, 0);
     const infrastructure = this.#database
       .prepare(
         `SELECT COUNT(*) AS count FROM attempts WHERE run_id = ? AND scope = 'infrastructure'`,
@@ -2787,7 +3060,17 @@ export class WorkflowStore {
   }
 
   prepareTransition(input: PrepareTransitionInput): TransitionRecord {
+    let assertDocuments: (() => void) | undefined;
+    if (!['cancelling', 'cancelled', 'escalated', 'recovering'].includes(input.to))
+      assertDocuments = this.#documentAuthority({
+        runId: input.runId,
+        boundary: 'transition.prepare',
+        ownerId: input.leaseOwnerId,
+        runLeaseEpoch: input.leaseEpoch,
+        nowMs: input.nowMs,
+      });
     return this.#database.transaction(() => {
+      assertDocuments?.();
       const canonicalKey = deriveTransitionIdempotencyKey({
         runId: input.runId,
         transitionId: input.id,
@@ -2959,7 +3242,21 @@ export class WorkflowStore {
     result: unknown,
     nowMs = Date.now(),
   ): TransitionRecord {
+    const pending = this.getTransition(transitionId);
+    let assertDocuments: (() => void) | undefined;
+    if (
+      pending?.status === 'prepared' &&
+      !['cancelling', 'cancelled', 'escalated', 'recovering'].includes(pending.to)
+    )
+      assertDocuments = this.#documentAuthority({
+        runId: pending.runId,
+        boundary: 'transition.commit',
+        ownerId,
+        runLeaseEpoch: leaseEpoch,
+        nowMs,
+      });
     return this.#database.transaction(() => {
+      assertDocuments?.();
       const transition = this.getTransition(transitionId);
       if (transition === undefined) throw new Error('transition not found');
       if (transition.status === 'committed') return transition;
@@ -3267,7 +3564,16 @@ export class WorkflowStore {
   }): SchedulerExecutionRecord {
     const nowMs = input.nowMs ?? Date.now();
     if (input.deadlineMs <= nowMs) throw new Error('specialist deadline has elapsed');
+    const assertDocuments = this.#documentAuthority({
+      runId: input.runId,
+      taskId: input.taskId,
+      boundary: 'scheduler.reserve',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs,
+    });
     return this.#database.transaction(() => {
+      assertDocuments();
       if (!runAcceptsWork(this.#database, input.runId))
         throw new Error('scheduler run is cancelled');
       this.#assertResourceLease(
@@ -3350,6 +3656,37 @@ export class WorkflowStore {
       FROM scheduler_containers WHERE execution_id = ?`,
       )
       .get(id) as SchedulerContainerRecord | undefined;
+  }
+
+  /** Trusted launcher proof that its Docker create callback was never invoked. A crash before
+   * this acknowledgement deliberately leaves create_pending uncertain; never infer absence. */
+  recordRejectedSchedulerCreate(authority: SchedulerContainerAuthority, capability?: symbol): void {
+    if (capability !== workflowContainerJournalCapability)
+      throw new Error('container journal mutation requires launcher capability');
+    this.#database
+      .transaction(() => {
+        const execution = this.getSchedulerExecution(authority.id);
+        if (execution?.status !== 'active') throw new Error('active scheduler execution required');
+        for (const key of [
+          'ownerId',
+          'workspaceLeaseEpoch',
+          'runLeaseEpoch',
+          'taskLeaseEpoch',
+        ] as const)
+          if (execution[key] !== authority[key])
+            throw new Error('container execution fence changed');
+        const state = this.getSchedulerContainer(authority.id);
+        if (
+          state?.status !== 'create_pending' ||
+          state.containerId !== null ||
+          execution.processIdentity !== `docker:${state.name}`
+        )
+          throw new Error('container create rejection is stale');
+        this.#database
+          .prepare("UPDATE scheduler_containers SET status='not_dispatched' WHERE execution_id=?")
+          .run(authority.id);
+      })
+      .immediate();
   }
 
   advanceSchedulerContainer(
@@ -3466,54 +3803,67 @@ export class WorkflowStore {
       from: readonly SchedulerCredentialStatus[];
       to: SchedulerCredentialStatus;
       nowMs?: number;
+      cleanup?: ExecutionInterruption;
     },
     capability?: symbol,
   ): SchedulerExecutionRecord {
     if (capability !== workflowCredentialJournalCapability) {
       throw new Error('credential journal mutation requires broker capability');
     }
-    const execution = this.getSchedulerExecution(input.id);
-    if (execution === undefined || execution.status !== 'active') {
-      throw new Error('active scheduler execution not found for credential transition');
-    }
-    if (execution.credentialLeaseId !== input.leaseId) {
-      throw new Error('scheduler credential lease identity changed');
-    }
-    if (execution.credentialStatus === input.to) return execution;
-    const normativeTransitions: Readonly<
-      Record<SchedulerCredentialStatus, readonly SchedulerCredentialStatus[]>
-    > = {
-      pending: ['issuing', 'revoking'],
-      issuing: ['issued', 'revoking'],
-      issued: ['revoking'],
-      revoking: ['revoked'],
-      revoked: [],
-      legacy_quarantined: [],
-    };
-    if (!normativeTransitions[execution.credentialStatus].includes(input.to)) {
-      throw new Error(
-        `credential transition ${execution.credentialStatus} -> ${input.to} is forbidden`,
-      );
-    }
-    if (!input.from.includes(execution.credentialStatus)) {
-      throw new Error(
-        `credential transition ${execution.credentialStatus} -> ${input.to} is not allowed`,
-      );
-    }
-    if (
-      !this.#compareAndSwapSchedulerCredential({
-        id: input.id,
-        leaseId: input.leaseId,
-        expected: execution.credentialStatus,
-        to: input.to,
-        nowMs: input.nowMs,
+    return this.#database
+      .transaction(() => {
+        if (input.cleanup) {
+          if (
+            input.cleanup.execution_id !== input.id ||
+            !['revoking', 'revoked'].includes(input.to)
+          )
+            throw new Error('cleanup_transition_forbidden');
+          this.assertInterruptionCleanup(input.cleanup);
+        } else assertExecutionNotInterrupted(this.#database, input.id);
+        const execution = this.getSchedulerExecution(input.id);
+        if (execution === undefined || execution.status !== 'active') {
+          throw new Error('active scheduler execution not found for credential transition');
+        }
+        if (execution.credentialLeaseId !== input.leaseId) {
+          throw new Error('scheduler credential lease identity changed');
+        }
+        if (execution.credentialStatus === input.to) return execution;
+        const normativeTransitions: Readonly<
+          Record<SchedulerCredentialStatus, readonly SchedulerCredentialStatus[]>
+        > = {
+          pending: ['issuing', 'revoking'],
+          issuing: ['issued', 'revoking'],
+          issued: ['revoking'],
+          revoking: ['revoked'],
+          revoked: [],
+          legacy_quarantined: [],
+        };
+        if (!normativeTransitions[execution.credentialStatus].includes(input.to)) {
+          throw new Error(
+            `credential transition ${execution.credentialStatus} -> ${input.to} is forbidden`,
+          );
+        }
+        if (!input.from.includes(execution.credentialStatus)) {
+          throw new Error(
+            `credential transition ${execution.credentialStatus} -> ${input.to} is not allowed`,
+          );
+        }
+        if (
+          !this.#compareAndSwapSchedulerCredential({
+            id: input.id,
+            leaseId: input.leaseId,
+            expected: execution.credentialStatus,
+            to: input.to,
+            nowMs: input.nowMs,
+          })
+        ) {
+          const current = this.getSchedulerExecution(input.id);
+          if (current?.credentialStatus === input.to) return current;
+          throw new Error('credential transition lost compare-and-swap race');
+        }
+        return this.getSchedulerExecution(input.id)!;
       })
-    ) {
-      const current = this.getSchedulerExecution(input.id);
-      if (current?.credentialStatus === input.to) return current;
-      throw new Error('credential transition lost compare-and-swap race');
-    }
-    return this.getSchedulerExecution(input.id)!;
+      .immediate();
   }
 
   #compareAndSwapSchedulerCredential(input: {
@@ -3546,6 +3896,627 @@ export class WorkflowStore {
     return updated.changes === 1;
   }
 
+  assertSchedulerAcceptsWork(id: string): void {
+    assertExecutionNotInterrupted(this.#database, id);
+    const execution = this.getSchedulerExecution(id);
+    if (!execution || !runAcceptsWork(this.#database, execution.runId))
+      throw new Error('specialist run is cancelled or closed');
+  }
+
+  importImplementation(input: {
+    authority: SchedulerContainerAuthority;
+    sourceRoot: string;
+    gitBinary: string;
+    gitBinaryDigest?: string;
+    renewLeaseTtlMs?: number;
+    artifact: Uint8Array;
+    artifactDigest: string;
+  }) {
+    if (
+      input.renewLeaseTtlMs !== undefined &&
+      (!Number.isInteger(input.renewLeaseTtlMs) ||
+        input.renewLeaseTtlMs < 300 ||
+        input.renewLeaseTtlMs > 60000)
+    )
+      throw new Error('invalid import lease renewal bound');
+    let assertDocuments: () => void;
+    return importImplementationOutput({
+      database: this.#database,
+      sourceRoot: input.sourceRoot,
+      gitBinary: input.gitBinary,
+      gitBinaryDigest: input.gitBinaryDigest,
+      artifact: input.artifact,
+      artifactDigest: input.artifactDigest,
+      authority: input.authority,
+      mutationDeadline: () => {
+        const execution = this.getSchedulerExecution(input.authority.id)!;
+        const phase = this.#database
+          .prepare('SELECT lease_until_ms FROM phase_jobs WHERE execution_id=?')
+          .get(execution.id) as { lease_until_ms: number };
+        const deadlines = [
+          ['workspace', execution.workspaceId],
+          ['run', execution.runId],
+          ['task', execution.taskId],
+        ].map(
+          ([kind, id]) =>
+            (
+              this.#database
+                .prepare('SELECT expires_at_ms FROM leases WHERE resource_type=? AND resource_id=?')
+                .get(kind, id) as { expires_at_ms: number }
+            ).expires_at_ms,
+        );
+        return Math.min(execution.deadlineMs, phase.lease_until_ms, ...deadlines);
+      },
+      beforeTransaction: () => {
+        const execution = this.getSchedulerExecution(input.authority.id);
+        if (!execution) throw new Error('implementation execution missing');
+        assertDocuments = this.#documentAuthority({
+          runId: execution.runId,
+          taskId: execution.taskId,
+          ownerId: input.authority.ownerId,
+          runLeaseEpoch: input.authority.runLeaseEpoch,
+          expectedSourceRoot: input.sourceRoot,
+          boundary: 'implementation.import',
+        });
+      },
+      commitApprovedHead: (output, head) => {
+        const execution = this.getSchedulerExecution(output.executionId)!;
+        let changed = 0;
+        for (const table of ['delivery_approved_heads', 'repair_approved_heads']) {
+          changed += this.#database
+            .prepare(
+              `UPDATE ${table} SET current_sha=?,
+            import_execution_id=?,updated_at_ms=? WHERE workspace_id=? AND run_id=? AND task_id=?
+            AND ref=? AND (current_sha=? OR (current_sha=? AND import_execution_id=?))`,
+            )
+            .run(
+              head,
+              execution.id,
+              Date.now(),
+              execution.workspaceId,
+              execution.runId,
+              execution.taskId,
+              `refs/heads/task/${execution.taskId}`,
+              output.input.binding.headSha,
+              head,
+              execution.id,
+            ).changes;
+        }
+        if (changed !== 1) throw new Error('implementation import approved head CAS rejected');
+      },
+      assertAuthority: (output) => {
+        const now = Date.now();
+        const execution = this.getSchedulerExecution(input.authority.id);
+        if (
+          !execution ||
+          execution.id !== output.executionId ||
+          execution.status !== 'active' ||
+          execution.mode !== 'mutating' ||
+          execution.role !== 'implementation_worker' ||
+          execution.credentialStatus !== 'revoked' ||
+          execution.deadlineMs <= now ||
+          execution.attemptNumber !== output.attempt ||
+          !isDeepStrictEqual(execution.packet, output.input) ||
+          execution.ownerId !== input.authority.ownerId ||
+          execution.workspaceLeaseEpoch !== input.authority.workspaceLeaseEpoch ||
+          execution.runLeaseEpoch !== input.authority.runLeaseEpoch ||
+          execution.taskLeaseEpoch !== input.authority.taskLeaseEpoch ||
+          this.getSchedulerContainer(execution.id)?.status !== 'removal_confirmed'
+        )
+          throw new Error('implementation import execution authority rejected');
+        const evidence = this.#database
+          .prepare(
+            `SELECT b.content FROM secure_evidence e JOIN secure_evidence_blobs b ON b.digest=e.digest
+          WHERE e.digest=? AND e.workspace_id=? AND e.run_id=? AND e.task_id=?
+          AND e.contract_version=? AND e.policy_digest=? AND e.head_sha=?
+          AND e.producer=? AND e.producer_role='implementation_worker'
+          AND e.kind='artifact' AND e.deleted_at_ms IS NULL AND e.redaction_count=0`,
+          )
+          .get(
+            input.artifactDigest,
+            execution.workspaceId,
+            execution.runId,
+            execution.taskId,
+            output.input.task.contractVersion,
+            output.input.task.policyDigest,
+            output.input.binding.headSha,
+            execution.processIdentity,
+          ) as { content: Buffer } | undefined;
+        if (!evidence || !Buffer.from(evidence.content).equals(Buffer.from(input.artifact)))
+          throw new Error('implementation import lacks execution-bound retained evidence');
+        this.assertSchedulerAcceptsWork(execution.id);
+        for (const [kind, resourceId, epoch] of [
+          ['workspace', execution.workspaceId, execution.workspaceLeaseEpoch],
+          ['run', execution.runId, execution.runLeaseEpoch],
+          ['task', execution.taskId, execution.taskLeaseEpoch],
+        ] as const)
+          this.#assertResourceLease(kind, resourceId, execution.ownerId, epoch, now);
+        const run = this.getRun(execution.runId);
+        if (run?.state !== 'implementing' || run.version !== output.input.binding.runVersion)
+          throw new Error('implementation import phase changed');
+        const contract = this.getExecutionContract(execution.runId);
+        this.assertTaskPacketAuthority(output.input.task);
+        const task = this.getEffectiveTask(execution.runId, execution.taskId);
+        if (
+          !output.input.task.allowedOperations.includes('workspace.patch') ||
+          !contract.authority.allowedActions.includes('git.commit') ||
+          !task?.allowedOperations.includes('git.commit')
+        )
+          throw new Error('implementation import patch authority missing');
+        assertDocuments();
+        if (
+          output.files.some((file) =>
+            contract.planningDocuments!.files.some((document) => document.path === file.path),
+          )
+        )
+          throw new Error('implementation output alters approved planning material');
+        const approved = this.#database
+          .prepare(
+            `SELECT current_sha,import_execution_id FROM delivery_approved_heads
+          WHERE workspace_id=? AND run_id=? AND task_id=? AND ref=? UNION ALL
+          SELECT current_sha,import_execution_id FROM repair_approved_heads
+          WHERE workspace_id=? AND run_id=? AND task_id=? AND ref=?`,
+          )
+          .all(
+            execution.workspaceId,
+            execution.runId,
+            execution.taskId,
+            `refs/heads/task/${execution.taskId}`,
+            execution.workspaceId,
+            execution.runId,
+            execution.taskId,
+            `refs/heads/task/${execution.taskId}`,
+          ) as Array<{ current_sha: string; import_execution_id: string | null }>;
+        if (
+          approved.length !== 1 ||
+          (approved[0]!.current_sha !== output.input.binding.headSha &&
+            approved[0]!.import_execution_id !== execution.id)
+        )
+          throw new Error('implementation import base lacks broker authority');
+        const recovery = this.#database
+          .prepare(
+            `SELECT phase_lease_epoch FROM implementation_import_recoveries
+          WHERE execution_id=? AND owner_id=? AND workspace_lease_epoch=? AND run_lease_epoch=? AND task_lease_epoch=?`,
+          )
+          .get(
+            execution.id,
+            execution.ownerId,
+            execution.workspaceLeaseEpoch,
+            execution.runLeaseEpoch,
+            execution.taskLeaseEpoch,
+          ) as { phase_lease_epoch: number } | undefined;
+        const phase = this.#database
+          .prepare(
+            `SELECT 1 FROM phase_jobs WHERE execution_id=? AND
+          status='started' AND lease_owner=? AND lease_epoch=? AND lease_until_ms>?`,
+          )
+          .get(
+            execution.id,
+            execution.ownerId,
+            recovery?.phase_lease_epoch ?? output.input.binding.phaseLeaseEpoch,
+            now,
+          );
+        if (!phase) throw new Error('implementation import phase lease changed');
+        // Synchronous Git/file steps prevent the event-loop heartbeat from running. Renew only
+        // still-live, same-owner fences after full authority validation; never extend execution deadline.
+        this.#renewImportLeases(
+          execution,
+          input.renewLeaseTtlMs,
+          recovery?.phase_lease_epoch ?? output.input.binding.phaseLeaseEpoch,
+        );
+      },
+    });
+  }
+
+  #renewImportLeases(
+    execution: SchedulerExecutionRecord,
+    ttl: number | undefined,
+    phaseEpoch: number,
+  ): void {
+    if (ttl !== undefined) {
+      const renewalNow = Date.now();
+      const until = Math.min(execution.deadlineMs, renewalNow + ttl);
+      if (until <= renewalNow) throw new Error('implementation deadline elapsed');
+      for (const [kind, resourceId, epoch] of [
+        ['workspace', execution.workspaceId, execution.workspaceLeaseEpoch],
+        ['run', execution.runId, execution.runLeaseEpoch],
+        ['task', execution.taskId, execution.taskLeaseEpoch],
+      ] as const) {
+        const changed = this.#database
+          .prepare(
+            `UPDATE leases SET expires_at_ms=?
+              WHERE resource_type=? AND resource_id=? AND owner_id=? AND epoch=? AND expires_at_ms>?`,
+          )
+          .run(until, kind, resourceId, execution.ownerId, epoch, renewalNow).changes;
+        if (changed !== 1) throw new Error('implementation lease expired before renewal');
+      }
+      const changed = this.#database
+        .prepare(
+          `UPDATE phase_jobs SET lease_until_ms=?
+            WHERE execution_id=? AND status='started' AND lease_owner=? AND lease_epoch=? AND lease_until_ms>?`,
+        )
+        .run(until, execution.id, execution.ownerId, phaseEpoch, renewalNow).changes;
+      if (changed !== 1) throw new Error('implementation phase lease expired before renewal');
+    }
+  }
+  #verifiedCallbackImport(callback: DelegateCallback, execution: SchedulerExecutionRecord) {
+    const imported =
+      callback.delegateRole === 'implementation_worker'
+        ? (this.#database
+            .prepare(
+              "SELECT base_head,result_head FROM implementation_imports WHERE execution_id=? AND status='verified'",
+            )
+            .get(execution.id) as { base_head: string; result_head: string } | undefined)
+        : undefined;
+    const phaseInput = specialistInputEnvelopeSchema.safeParse(execution.packet);
+    if (
+      callback.delegateRole === 'implementation_worker' &&
+      phaseInput.success &&
+      (!imported || imported.base_head !== phaseInput.data.binding.headSha)
+    )
+      throw new Error('delegate callback lacks verified input-to-result import');
+    if (imported && imported.result_head !== callback.headSha)
+      throw new Error('delegate callback import result head mismatch');
+
+    return imported;
+  }
+  getRepairPlanningHandoff(executionId: string): RepairPlanningHandoff | undefined {
+    return readRepairPlanningHandoff(this.#database, executionId);
+  }
+
+  /** Every effect is initiated under current document, execution and phase fences. */
+  dispatchRepairPlanning<T>(
+    authority: SchedulerContainerAuthority,
+    phaseEpoch: number,
+    effect: () => T,
+    capability: symbol,
+  ): T {
+    if (capability !== repairPlanningCapability)
+      throw new Error('repair planning capability required');
+    const execution = this.getSchedulerExecution(authority.id);
+    if (!execution) throw new Error('repair planner execution missing');
+    const assertDocuments = this.#documentAuthority({
+      runId: execution.runId,
+      taskId: execution.taskId,
+      ownerId: authority.ownerId,
+      runLeaseEpoch: authority.runLeaseEpoch,
+      boundary: 'repair.planning_handoff',
+    });
+    return this.#database
+      .transaction(() => {
+        assertDocuments();
+        this.assertRepairPlanningExecution(authority, phaseEpoch, repairPlanningCapability);
+        return { value: effect() };
+      })
+      .immediate().value;
+  }
+
+  assertRepairPlanningExecution(
+    authority: SchedulerContainerAuthority,
+    phaseEpoch: number,
+    capability: symbol,
+  ): void {
+    if (capability !== repairPlanningCapability)
+      throw new Error('repair planning capability required');
+    const execution = this.getSchedulerExecution(authority.id)!;
+    const packet = specialistInputEnvelopeSchema.parse(execution.packet);
+    const now = Date.now();
+    this.assertSchedulerAcceptsWork(execution.id);
+    const run = this.getRun(execution.runId);
+    if (
+      execution.status !== 'active' ||
+      execution.role !== 'feature_planner' ||
+      execution.mode !== 'read_only' ||
+      execution.credentialStatus !== 'revoked' ||
+      execution.deadlineMs <= now ||
+      this.getSchedulerContainer(execution.id)?.status !== 'removal_confirmed' ||
+      execution.ownerId !== authority.ownerId ||
+      execution.workspaceLeaseEpoch !== authority.workspaceLeaseEpoch ||
+      execution.runLeaseEpoch !== authority.runLeaseEpoch ||
+      execution.taskLeaseEpoch !== authority.taskLeaseEpoch ||
+      run?.state !== 'repair_planning' ||
+      run.version !== packet.binding.runVersion
+    )
+      throw new Error('repair planning execution authority rejected');
+    const phase = this.#database
+      .prepare(
+        `SELECT 1 FROM phase_jobs WHERE execution_id=? AND status='started'
+      AND lease_owner=? AND lease_epoch=? AND lease_until_ms>?`,
+      )
+      .get(execution.id, authority.ownerId, phaseEpoch, now);
+    if (!phase) throw new Error('repair planning phase fence rejected');
+    for (const [kind, id, epoch] of [
+      ['workspace', execution.workspaceId, authority.workspaceLeaseEpoch],
+      ['run', execution.runId, authority.runLeaseEpoch],
+      ['task', execution.taskId, authority.taskLeaseEpoch],
+    ] as const)
+      this.#assertResourceLease(kind, id, authority.ownerId, epoch, now);
+  }
+
+  prepareRepairPlanning(
+    input: Omit<RepairPlanningHandoff, 'activated'>,
+    authority: SchedulerContainerAuthority,
+    phaseEpoch: number,
+  ): void {
+    if (input.executionId !== authority.id) throw new Error('repair planning execution mismatch');
+    this.dispatchRepairPlanning(
+      authority,
+      phaseEpoch,
+      () => {
+        const execution = this.getSchedulerExecution(authority.id)!;
+        const packet = specialistInputEnvelopeSchema.parse(execution.packet);
+        if (!packet.task.repairPlanningContext)
+          throw new Error('repair planning input context missing');
+        assertRepairPlanningResult(input.terminal, packet.task.repairPlanningContext);
+        if (
+          input.request.runId !== execution.runId ||
+          input.request.chainTipTaskId !== execution.taskId ||
+          input.request.branchParentSha !== packet.binding.headSha ||
+          input.request.evaluationId !== packet.task.repairPlanningContext.evaluationId ||
+          JSON.stringify(input.request.finding) !== JSON.stringify(input.terminal.findings[0])
+        )
+          throw new Error('repair planning request binding mismatch');
+        const evidence = this.getSecureEvidence(
+          input.resultDigest,
+          execution.runId,
+          execution.taskId,
+        );
+        if (
+          evidence?.deletedAtMs !== null ||
+          evidence.producer !== execution.processIdentity ||
+          evidence.producerRole !== 'feature_planner' ||
+          evidence.headSha !== packet.binding.headSha
+        )
+          throw new Error('repair planning result evidence missing');
+        prepareRepairPlanningHandoff(this.#database, input);
+      },
+      repairPlanningCapability,
+    );
+  }
+
+  activateRepairPlanning(authority: SchedulerContainerAuthority, phaseEpoch: number): void {
+    this.dispatchRepairPlanning(
+      authority,
+      phaseEpoch,
+      () => activateRepairPlanningHandoff(this.#database, authority.id),
+      repairPlanningCapability,
+    );
+  }
+
+  getImplementationWorkspace(runId: string, sourceRoot: string): string {
+    return implementationWorkspace(this.#database, runId, sourceRoot);
+  }
+
+  getImplementationImport(
+    executionId: string,
+  ): { artifactDigest: string; status: string } | undefined {
+    return this.#database
+      .prepare(
+        'SELECT artifact_digest AS artifactDigest,status FROM implementation_imports WHERE execution_id=?',
+      )
+      .get(executionId) as { artifactDigest: string; status: string } | undefined;
+  }
+
+  adoptRepairPlanningHandoff(input: {
+    authority: SchedulerContainerAuthority;
+    phaseLeaseEpoch: number;
+    sourceRoot: string;
+  }): SchedulerExecutionRecord {
+    const original = this.getSchedulerExecution(input.authority.id);
+    if (!original || !this.getRepairPlanningHandoff(original.id))
+      throw new Error('repair planning recovery intent missing');
+    const documents = this.#documentAuthority({
+      runId: original.runId,
+      taskId: original.taskId,
+      ownerId: input.authority.ownerId,
+      runLeaseEpoch: input.authority.runLeaseEpoch,
+      expectedSourceRoot: input.sourceRoot,
+      boundary: 'repair.planning_recovery',
+    });
+    return this.#database
+      .transaction(() => {
+        documents();
+        const current = this.getSchedulerExecution(original.id)!;
+        const packet = specialistInputEnvelopeSchema.parse(current.packet);
+        if (input.phaseLeaseEpoch <= packet.binding.phaseLeaseEpoch)
+          throw new Error('repair planning recovery requires a newer phase lease');
+        this.assertSchedulerAcceptsWork(current.id);
+        // Preserve execution, original input, process and result identity. Only the trusted owner/fences move.
+        this.#database
+          .prepare(
+            `UPDATE scheduler_executions SET owner_id=?,workspace_lease_epoch=?,run_lease_epoch=?,task_lease_epoch=?,updated_at_ms=? WHERE id=?`,
+          )
+          .run(
+            input.authority.ownerId,
+            input.authority.workspaceLeaseEpoch,
+            input.authority.runLeaseEpoch,
+            input.authority.taskLeaseEpoch,
+            Date.now(),
+            current.id,
+          );
+        this.assertRepairPlanningExecution(
+          input.authority,
+          input.phaseLeaseEpoch,
+          repairPlanningCapability,
+        );
+        return this.getSchedulerExecution(current.id)!;
+      })
+      .immediate();
+  }
+
+  adoptImplementationImport(input: {
+    authority: SchedulerContainerAuthority;
+    phaseLeaseEpoch: number;
+    sourceRoot: string;
+  }): SchedulerExecutionRecord {
+    const original = this.getSchedulerExecution(input.authority.id);
+    if (!original) throw new Error('implementation recovery execution missing');
+    const documents = this.#documentAuthority({
+      runId: original.runId,
+      taskId: original.taskId,
+      ownerId: input.authority.ownerId,
+      runLeaseEpoch: input.authority.runLeaseEpoch,
+      expectedSourceRoot: input.sourceRoot,
+      boundary: 'implementation.recovery',
+    });
+    return this.#database
+      .transaction(() => {
+        documents();
+        const now = Date.now();
+        const current = this.getSchedulerExecution(original.id)!;
+        const packet = specialistInputEnvelopeSchema.parse(current.packet);
+        this.assertSchedulerAcceptsWork(current.id);
+        if (
+          !this.getImplementationImport(current.id) ||
+          current.status !== 'active' ||
+          current.role !== 'implementation_worker' ||
+          current.mode !== 'mutating' ||
+          current.credentialStatus !== 'revoked' ||
+          current.deadlineMs <= now ||
+          this.getSchedulerContainer(current.id)?.status !== 'removal_confirmed' ||
+          input.phaseLeaseEpoch <= packet.binding.phaseLeaseEpoch
+        )
+          throw new Error('implementation recovery is not a settled import intent');
+        const phase = this.#database
+          .prepare(
+            `SELECT 1 FROM phase_jobs WHERE execution_id=? AND status='started'
+        AND lease_owner=? AND lease_epoch=? AND lease_until_ms>?`,
+          )
+          .get(current.id, input.authority.ownerId, input.phaseLeaseEpoch, now);
+        if (!phase) throw new Error('implementation recovery phase lease rejected');
+        for (const [kind, id, epoch] of [
+          ['workspace', current.workspaceId, input.authority.workspaceLeaseEpoch],
+          ['run', current.runId, input.authority.runLeaseEpoch],
+          ['task', current.taskId, input.authority.taskLeaseEpoch],
+        ] as const)
+          this.#assertResourceLease(kind, id, input.authority.ownerId, epoch, now);
+        this.#database
+          .prepare(
+            `UPDATE scheduler_executions SET owner_id=?,workspace_lease_epoch=?,
+        run_lease_epoch=?,task_lease_epoch=?,updated_at_ms=? WHERE id=? AND status='active'`,
+          )
+          .run(
+            input.authority.ownerId,
+            input.authority.workspaceLeaseEpoch,
+            input.authority.runLeaseEpoch,
+            input.authority.taskLeaseEpoch,
+            now,
+            current.id,
+          );
+        this.#database
+          .prepare(
+            `INSERT INTO implementation_import_recoveries VALUES(?,?,?,?,?,?,?)
+        ON CONFLICT(execution_id) DO UPDATE SET owner_id=excluded.owner_id,
+        phase_lease_epoch=excluded.phase_lease_epoch,workspace_lease_epoch=excluded.workspace_lease_epoch,
+        run_lease_epoch=excluded.run_lease_epoch,task_lease_epoch=excluded.task_lease_epoch,updated_at_ms=excluded.updated_at_ms`,
+          )
+          .run(
+            current.id,
+            input.authority.ownerId,
+            input.phaseLeaseEpoch,
+            input.authority.workspaceLeaseEpoch,
+            input.authority.runLeaseEpoch,
+            input.authority.taskLeaseEpoch,
+            now,
+          );
+        return this.getSchedulerExecution(current.id)!;
+      })
+      .immediate();
+  }
+
+  /** Reserve only effect initiation; cleanup remains permitted after cancellation. */
+  dispatchSchedulerContainer<T>(
+    authority: SchedulerContainerAuthority,
+    expectedSourceRoot: string,
+    dispatch: () => T,
+    capability: typeof workflowContainerJournalCapability,
+    clock: () => number,
+  ): T {
+    if (capability !== workflowContainerJournalCapability)
+      throw new Error('container journal capability required');
+    const execution = this.getSchedulerExecution(authority.id);
+    if (!execution) throw new Error('specialist execution missing');
+    const assertDocuments = this.#documentAuthority({
+      runId: execution.runId,
+      taskId: execution.taskId,
+      ownerId: authority.ownerId,
+      runLeaseEpoch: authority.runLeaseEpoch,
+      expectedSourceRoot,
+      boundary: 'specialist.dispatch',
+      nowMs: clock(),
+    });
+    return this.#database
+      .transaction(() => {
+        assertDocuments();
+        this.assertSchedulerAcceptsWork(authority.id);
+        const current = this.getSchedulerExecution(authority.id);
+        if (
+          current?.status !== 'active' ||
+          current.deadlineMs <= clock() ||
+          current.ownerId !== authority.ownerId ||
+          current.workspaceLeaseEpoch !== authority.workspaceLeaseEpoch ||
+          current.runLeaseEpoch !== authority.runLeaseEpoch ||
+          current.taskLeaseEpoch !== authority.taskLeaseEpoch
+        )
+          throw new Error('specialist execution authority changed');
+        for (const [kind, resourceId, epoch] of [
+          ['workspace', execution.workspaceId, authority.workspaceLeaseEpoch],
+          ['run', execution.runId, authority.runLeaseEpoch],
+          ['task', execution.taskId, authority.taskLeaseEpoch],
+        ] as const)
+          this.#assertResourceLease(kind, resourceId, authority.ownerId, epoch, clock());
+        const value = dispatch();
+        void Promise.resolve(value).catch(() => undefined);
+        return { value };
+      })
+      .immediate().value;
+  }
+
+  dispatchSchedulerCredentialIssue<T>(
+    id: string,
+    dispatch: () => T,
+    capability: typeof workflowCredentialJournalCapability,
+    nowMs = Date.now(),
+  ): T {
+    if (capability !== workflowCredentialJournalCapability)
+      throw new Error('credential journal capability required');
+    const started = performance.now();
+    const execution = this.getSchedulerExecution(id);
+    if (execution?.status !== 'active') throw new Error('credential execution is not active');
+    const assertDocuments = this.#documentAuthority({
+      runId: execution.runId,
+      taskId: execution.taskId,
+      ownerId: execution.ownerId,
+      runLeaseEpoch: execution.runLeaseEpoch,
+      boundary: 'credential.issue',
+      nowMs,
+    });
+    return this.#database
+      .transaction(() => {
+        assertDocuments();
+        this.assertSchedulerAcceptsWork(id);
+        const dispatchTime = nowMs + Math.max(0, Math.floor(performance.now() - started));
+        for (const [kind, resourceId, epoch] of [
+          ['workspace', execution.workspaceId, execution.workspaceLeaseEpoch],
+          ['run', execution.runId, execution.runLeaseEpoch],
+          ['task', execution.taskId, execution.taskLeaseEpoch],
+        ] as const)
+          this.#assertResourceLease(kind, resourceId, execution.ownerId, epoch, dispatchTime);
+        const current = this.getSchedulerExecution(id);
+        if (
+          current?.status !== 'active' ||
+          current.deadlineMs <= dispatchTime ||
+          current.ownerId !== execution.ownerId ||
+          current.credentialStatus !== 'issuing'
+        )
+          throw new Error('credential execution authority changed');
+        const value = dispatch();
+        void Promise.resolve(value).catch(() => undefined);
+        return { value };
+      })
+      .immediate().value;
+  }
+
   finishSchedulerExecution(input: {
     id: string;
     status: Exclude<SchedulerExecutionStatus, 'active'>;
@@ -3557,12 +4528,31 @@ export class WorkflowStore {
     callback?: unknown;
     nowMs?: number;
   }): SchedulerExecutionRecord {
+    const prior = this.getSchedulerExecution(input.id);
+    if (prior && prior.status !== 'active' && prior.status !== input.status)
+      throw new Error('scheduler terminal replay status changed');
+    let assertDocuments: (() => void) | undefined;
+    if (input.status === 'completed') {
+      const execution = prior;
+      if (!execution) throw new Error('scheduler execution not found');
+      assertDocuments = this.#documentAuthority({
+        runId: execution.runId,
+        taskId: execution.taskId,
+        boundary: 'scheduler.result',
+        ownerId: input.ownerId,
+        runLeaseEpoch: input.runLeaseEpoch,
+        nowMs: input.nowMs,
+      });
+    }
     return this.#database
       .transaction(() => {
+        if (input.status === 'completed') assertExecutionNotInterrupted(this.#database, input.id);
+        assertDocuments?.();
         const nowMs = input.nowMs ?? Date.now();
         const execution = this.getSchedulerExecution(input.id);
         if (execution === undefined) throw new Error('scheduler execution not found');
         if (execution.status !== 'active') {
+          assertSchedulerTerminalReplay(execution, input);
           if (execution.status === 'completed' && input.callback !== undefined) {
             this.#recordSchedulerTerminalCallback(input, nowMs);
           }
@@ -3625,6 +4615,129 @@ export class WorkflowStore {
         return this.getSchedulerExecution(input.id)!;
       })
       .immediate();
+  }
+
+  assertInterruptionCleanup(row: ExecutionInterruption, nowMs = Date.now()): void {
+    new InterruptionCleanupJournal(this.#database).assertOwner(row, nowMs);
+    const current = this.#database
+      .prepare(
+        'SELECT attempt,attempt_deadline_ms FROM execution_interruptions WHERE execution_id=?',
+      )
+      .get(row.execution_id) as { attempt: number; attempt_deadline_ms: number };
+    if (current.attempt !== row.attempt || current.attempt_deadline_ms <= nowMs)
+      throw new Error('cleanup_attempt_expired');
+  }
+  advanceInterruptedContainer(
+    row: ExecutionInterruption,
+    from: SchedulerContainerRecord['status'],
+    to: SchedulerContainerRecord['status'],
+    containerId: string | undefined,
+    capability: typeof workflowContainerJournalCapability,
+  ): SchedulerContainerRecord {
+    if (capability !== workflowContainerJournalCapability)
+      throw new Error('cleanup_capability_required');
+    return this.#database
+      .transaction(() => {
+        this.assertInterruptionCleanup(row);
+        const execution = this.getSchedulerExecution(row.execution_id);
+        const state = this.getSchedulerContainer(row.execution_id);
+        if (
+          execution?.runId !== row.run_id ||
+          !state ||
+          execution.processIdentity !== `docker:${state.name}`
+        )
+          throw new Error('cleanup_identity_changed');
+        if (
+          !(
+            (from === 'create_pending' && to === 'acknowledged') ||
+            (from === 'acknowledged' && to === 'removal_confirmed')
+          )
+        )
+          throw new Error('cleanup_transition_forbidden');
+        if (
+          state.status !== from ||
+          !containerId ||
+          !/^[a-f0-9]{64}$/u.test(containerId) ||
+          (state.containerId !== null && state.containerId !== containerId)
+        )
+          throw new Error('cleanup_container_changed');
+        this.#database
+          .prepare('UPDATE scheduler_containers SET status=?,container_id=? WHERE execution_id=?')
+          .run(to, containerId, row.execution_id);
+        return this.getSchedulerContainer(row.execution_id)!;
+      })
+      .immediate();
+  }
+
+  bindSchedulerStaging(
+    authority: SchedulerContainerAuthority,
+    root: string,
+    capability: typeof workflowContainerJournalCapability,
+    nowMs = Date.now(),
+  ): void {
+    const identity = lstatSync(root, { bigint: true });
+    if (
+      !identity.isDirectory() ||
+      identity.isSymbolicLink() ||
+      Number(identity.uid) !== process.getuid?.()
+    )
+      throw new Error('staging_identity_changed');
+    if (capability !== workflowContainerJournalCapability || !isAbsolute(root))
+      throw new Error('invalid_staging_authority');
+    this.#database
+      .transaction(() => {
+        const execution = this.getSchedulerExecution(authority.id);
+        if (execution?.ownerId !== authority.ownerId || execution.status !== 'active')
+          throw new Error('staging_owner_changed');
+        this.#assertResourceLease(
+          'run',
+          execution.runId,
+          authority.ownerId,
+          authority.runLeaseEpoch,
+          nowMs,
+        );
+        const existing = this.#database
+          .prepare('SELECT root FROM scheduler_staging WHERE execution_id=?')
+          .get(authority.id) as { root: string } | undefined;
+        if (existing && existing.root !== root) throw new Error('staging_identity_changed');
+        this.#database
+          .prepare(
+            'INSERT OR IGNORE INTO scheduler_staging (execution_id,root,created_at_ms,device,inode,uid) VALUES (?,?,?,?,?,?)',
+          )
+          .run(
+            authority.id,
+            root,
+            nowMs,
+            String(identity.dev),
+            String(identity.ino),
+            Number(identity.uid),
+          );
+      })
+      .immediate();
+  }
+
+  getSchedulerStaging(id: string):
+    | {
+        root: string;
+        created_at_ms: number;
+        device: string | null;
+        inode: string | null;
+        uid: number | null;
+      }
+    | undefined {
+    return this.#database
+      .prepare(
+        'SELECT root,created_at_ms,device,inode,uid FROM scheduler_staging WHERE execution_id=?',
+      )
+      .get(id) as
+      | {
+          root: string;
+          created_at_ms: number;
+          device: string | null;
+          inode: string | null;
+          uid: number | null;
+        }
+      | undefined;
   }
 
   getSchedulerExecution(id: string): SchedulerExecutionRecord | undefined {
@@ -3732,6 +4845,85 @@ export class WorkflowStore {
     })();
   }
 
+  #retainedRepairPlan(
+    input: Parameters<WorkflowStore['planRepairDispatch']>[0],
+  ): RepairPlanResult | undefined {
+    const existing = this.getRepairDispatch(input.id);
+    if (existing !== undefined) {
+      if (
+        existing.runId !== input.runId ||
+        existing.taskId !== input.taskId ||
+        existing.findingId !== input.findingId ||
+        existing.ownerRole !== input.ownerRole ||
+        existing.findingDigest !== input.findingDigest ||
+        existing.failureHeadSha !== input.failureHeadSha ||
+        existing.changeDigest !== input.changeDigest ||
+        existing.changeEvidenceMinAtMs !== input.changeEvidenceMinAtMs ||
+        existing.changeEvidenceAtMs !== input.changeEvidenceAtMs ||
+        existing.changeHeadSha !== input.changeHeadSha ||
+        JSON.stringify(existing.packet) !==
+          JSON.stringify(input.packet(existing.taskAttempt, existing.findingAttempt))
+      ) {
+        throw new Error('repair dispatch id is already bound to different immutable input');
+      }
+      return { kind: 'dispatch', dispatch: existing };
+    }
+    const taskEscalation = this.getRepairEscalation(input.runId, 'task', input.taskId);
+    if (taskEscalation !== undefined) {
+      if (
+        taskEscalation.findingId === input.findingId &&
+        taskEscalation.findingDigest !== input.findingDigest
+      ) {
+        throw new Error('repair finding id is already bound to different immutable input');
+      }
+      return { kind: 'escalated', escalation: taskEscalation };
+    }
+    const findingEscalation = this.getRepairEscalation(input.runId, 'finding', input.findingId);
+    if (findingEscalation !== undefined) {
+      if (findingEscalation.findingDigest !== input.findingDigest) {
+        throw new Error('repair finding id is already bound to different immutable input');
+      }
+      return { kind: 'escalated', escalation: findingEscalation };
+    }
+    return undefined;
+  }
+
+  #assertChangedRepairCondition(input: Parameters<WorkflowStore['planRepairDispatch']>[0]): void {
+    const lastDispatch = this.#database
+      .prepare(
+        `SELECT * FROM repair_dispatches WHERE run_id = ? AND finding_id = ?
+           ORDER BY finding_attempt DESC LIMIT 1`,
+      )
+      .get(input.runId, input.findingId) as RepairDispatchRow | undefined;
+    if (lastDispatch?.change_digest === input.changeDigest) {
+      throw new Error('identical repair retry is forbidden');
+    }
+    if (
+      input.changeEvidenceMinAtMs !== null &&
+      input.changeEvidenceMinAtMs <=
+        (lastDispatch?.change_evidence_at_ms ?? input.failureEvidenceAtMs)
+    ) {
+      throw new Error('repair evidence does not prove a newer changed condition');
+    }
+    if (
+      lastDispatch?.finding_digest !== undefined &&
+      lastDispatch.finding_digest !== input.findingDigest
+    ) {
+      throw new Error('repair finding id is already bound to different immutable input');
+    }
+    if (input.requiresHypothesisChange && lastDispatch === undefined) {
+      const previousTaskAttempt = this.#database
+        .prepare(
+          `SELECT hypothesis FROM attempts WHERE run_id = ? AND scope = 'task' AND scope_id = ?
+             ORDER BY attempt DESC LIMIT 1`,
+        )
+        .get(input.runId, input.taskId) as { hypothesis: string } | undefined;
+      if (previousTaskAttempt?.hypothesis.trim() === input.hypothesis.trim()) {
+        throw new Error('repair retry requires a changed hypothesis');
+      }
+    }
+  }
+
   planRepairDispatch(
     input: {
       id: string;
@@ -3765,11 +4957,20 @@ export class WorkflowStore {
       throw new Error('repair mutation requires coordinator capability');
     }
     const nowMs = input.nowMs ?? Date.now();
+    const assertDocuments = this.#documentAuthority({
+      runId: input.runId,
+      taskId: input.taskId,
+      boundary: 'repair.dispatch',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs,
+    });
     return this.#database.transaction((): RepairPlanResult => {
+      assertDocuments();
       if (this.#workspaceForRun(input.runId) !== input.workspaceId) {
         throw new Error('repair workspace does not match the run contract');
       }
-      if (!this.#contractForRun(input.runId).tasks.some((task) => task.id === input.taskId)) {
+      if (!this.getEffectiveTask(input.runId, input.taskId)) {
         throw new Error('repair task does not match the run contract');
       }
       this.#assertResourceLease(
@@ -3785,77 +4986,10 @@ export class WorkflowStore {
       if (run?.state !== 'repair' && run?.state !== 'repair_planning') {
         throw new Error('run is not in a repair state');
       }
-      const existing = this.getRepairDispatch(input.id);
-      if (existing !== undefined) {
-        if (
-          existing.runId !== input.runId ||
-          existing.taskId !== input.taskId ||
-          existing.findingId !== input.findingId ||
-          existing.ownerRole !== input.ownerRole ||
-          existing.findingDigest !== input.findingDigest ||
-          existing.failureHeadSha !== input.failureHeadSha ||
-          existing.changeDigest !== input.changeDigest ||
-          existing.changeEvidenceMinAtMs !== input.changeEvidenceMinAtMs ||
-          existing.changeEvidenceAtMs !== input.changeEvidenceAtMs ||
-          existing.changeHeadSha !== input.changeHeadSha ||
-          JSON.stringify(existing.packet) !==
-            JSON.stringify(input.packet(existing.taskAttempt, existing.findingAttempt))
-        ) {
-          throw new Error('repair dispatch id is already bound to different immutable input');
-        }
-        return { kind: 'dispatch', dispatch: existing };
-      }
-      const taskEscalation = this.getRepairEscalation(input.runId, 'task', input.taskId);
-      if (taskEscalation !== undefined) {
-        if (
-          taskEscalation.findingId === input.findingId &&
-          taskEscalation.findingDigest !== input.findingDigest
-        ) {
-          throw new Error('repair finding id is already bound to different immutable input');
-        }
-        return { kind: 'escalated', escalation: taskEscalation };
-      }
-      const findingEscalation = this.getRepairEscalation(input.runId, 'finding', input.findingId);
-      if (findingEscalation !== undefined) {
-        if (findingEscalation.findingDigest !== input.findingDigest) {
-          throw new Error('repair finding id is already bound to different immutable input');
-        }
-        return { kind: 'escalated', escalation: findingEscalation };
-      }
+      const retained = this.#retainedRepairPlan(input);
+      if (retained) return retained;
       if (input.hypothesis.trim() === '') throw new Error('repair hypothesis is required');
-      const lastDispatch = this.#database
-        .prepare(
-          `SELECT * FROM repair_dispatches WHERE run_id = ? AND finding_id = ?
-           ORDER BY finding_attempt DESC LIMIT 1`,
-        )
-        .get(input.runId, input.findingId) as RepairDispatchRow | undefined;
-      if (lastDispatch?.change_digest === input.changeDigest) {
-        throw new Error('identical repair retry is forbidden');
-      }
-      if (
-        input.changeEvidenceMinAtMs !== null &&
-        input.changeEvidenceMinAtMs <=
-          (lastDispatch?.change_evidence_at_ms ?? input.failureEvidenceAtMs)
-      ) {
-        throw new Error('repair evidence does not prove a newer changed condition');
-      }
-      if (
-        lastDispatch?.finding_digest !== undefined &&
-        lastDispatch.finding_digest !== input.findingDigest
-      ) {
-        throw new Error('repair finding id is already bound to different immutable input');
-      }
-      if (input.requiresHypothesisChange && lastDispatch === undefined) {
-        const previousTaskAttempt = this.#database
-          .prepare(
-            `SELECT hypothesis FROM attempts WHERE run_id = ? AND scope = 'task' AND scope_id = ?
-             ORDER BY attempt DESC LIMIT 1`,
-          )
-          .get(input.runId, input.taskId) as { hypothesis: string } | undefined;
-        if (previousTaskAttempt?.hypothesis.trim() === input.hypothesis.trim()) {
-          throw new Error('repair retry requires a changed hypothesis');
-        }
-      }
+      this.#assertChangedRepairCondition(input);
       const attemptCount = (
         scope: 'task' | 'finding',
         scopeId: string,
@@ -3882,12 +5016,28 @@ export class WorkflowStore {
       };
       const taskAttempts = attemptCount('task', input.taskId, input.maxTaskAttempts);
       const findingAttempts = attemptCount('finding', input.findingId, input.maxFindingAttempts);
-      const exhausted =
-        taskAttempts >= input.maxTaskAttempts
-          ? ({ scope: 'task', scopeId: input.taskId, attempts: taskAttempts } as const)
-          : findingAttempts >= input.maxFindingAttempts
-            ? ({ scope: 'finding', scopeId: input.findingId, attempts: findingAttempts } as const)
-            : undefined;
+      const child = this.getRepairChildIntent(input.taskId);
+      const featureRemaining =
+        child?.status === 'committed'
+          ? this.remainingRepairBudgetForChild(
+              {
+                runId: input.runId,
+                featureId: this.#contractForRun(input.runId).featureId,
+                childId: input.taskId,
+                findingId: input.findingId,
+                policy: this.#contractForRun(input.runId).retryPolicy,
+              },
+              workflowEvaluationMutationCapability,
+            )
+          : undefined;
+      let exhausted: { scope: 'task' | 'finding'; scopeId: string; attempts: number } | undefined;
+      if (taskAttempts >= input.maxTaskAttempts || featureRemaining?.implementationAttempts === 0)
+        exhausted = { scope: 'task', scopeId: input.taskId, attempts: taskAttempts };
+      else if (
+        findingAttempts >= input.maxFindingAttempts ||
+        featureRemaining?.findingAttempts === 0
+      )
+        exhausted = { scope: 'finding', scopeId: input.findingId, attempts: findingAttempts };
       if (exhausted !== undefined) {
         const id = `repair-escalation:${input.runId}:${exhausted.scope}:${exhausted.scopeId}`;
         this.#database
@@ -3966,6 +5116,15 @@ export class WorkflowStore {
     })();
   }
 
+  listActiveRepairDispatches(runId: string, taskId: string): RepairDispatchRecord[] {
+    const rows = this.#database
+      .prepare(
+        "SELECT id FROM repair_dispatches WHERE run_id=? AND task_id=? AND status='dispatched' ORDER BY created_at_ms,id",
+      )
+      .all(runId, taskId) as { id: string }[];
+    return rows.map((row) => this.getRepairDispatch(row.id)!);
+  }
+
   getRepairDispatch(id: string): RepairDispatchRecord | undefined {
     const row = this.#database.prepare('SELECT * FROM repair_dispatches WHERE id = ?').get(id) as
       | RepairDispatchRow
@@ -3991,14 +5150,36 @@ export class WorkflowStore {
       throw new Error('repair mutation requires coordinator capability');
     }
     const nowMs = input.clock();
+    const pending = this.getRepairDispatch(input.id);
+    if (!pending) throw new Error('repair dispatch not found');
+    const assertDocuments = this.#documentAuthority({
+      runId: pending.runId,
+      taskId: pending.taskId,
+      boundary: 'repair.accept',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs,
+    });
     return this.#database.transaction(() => {
+      assertDocuments();
       const before = this.getRepairDispatch(input.id);
       if (before === undefined) throw new Error('repair dispatch not found');
       this.#assertRepairMutationLeases(before, input, nowMs);
       const run = this.getRun(before.runId);
-      if (run?.state !== 'repair' && run?.state !== 'repair_planning') {
-        throw new Error('run is not in a repair state');
-      }
+      const handedOff = this.#database
+        .prepare(
+          `SELECT 1 FROM transitions WHERE run_id=?
+        AND operation='internal.repair_dispatched' AND status='committed'
+        AND json_extract(external_arguments_json,'$.dispatchId')=?
+        AND json_extract(external_arguments_json,'$.taskId')=?`,
+        )
+        .get(before.runId, before.id, before.taskId);
+      if (
+        run?.state !== 'repair' &&
+        run?.state !== 'repair_planning' &&
+        !(handedOff && (run?.state === 'task_verification' || run?.state === 'task_review'))
+      )
+        throw new Error('run is not in a repair state or its verified handoff');
       input.assertExternalState();
       const verifiedAtMs = input.clock();
       this.#assertRepairMutationLeases(before, input, verifiedAtMs);
@@ -4105,7 +5286,18 @@ export class WorkflowStore {
     if (capability !== workflowDeliveryMutationCapability) {
       throw new Error('delivery operations require the internal delivery broker capability');
     }
+    let assertDocuments: (() => void) | undefined;
+    if (this.getDeliveryOperation(input.id)?.status !== 'committed') {
+      assertDocuments = this.#documentAuthority({
+        runId: input.runId,
+        boundary: 'delivery.prepare',
+        ownerId: input.ownerId,
+        runLeaseEpoch: input.runLeaseEpoch,
+        nowMs: input.nowMs,
+      });
+    }
     return this.#database.transaction(() => {
+      assertDocuments?.();
       assertBootstrapDeliveryPolicy(this.#database, input.runId, input.request);
       const contract = this.#contractForRun(input.runId);
       if (
@@ -4304,7 +5496,21 @@ export class WorkflowStore {
     if (capability !== workflowDeliveryMutationCapability) {
       throw new Error('delivery operations require the internal delivery broker capability');
     }
+    const guarded = this.getDeliveryOperation(input.id);
+    if (!guarded) throw new Error('delivery operation not found');
+    let assertDocuments: (() => void) | undefined;
+    if (!(this.#database.inTransaction && this.#documentGuardedOperation === input.id)) {
+      assertDocuments = this.#documentAuthority({
+        runId: guarded.runId,
+        taskId: guarded.taskId,
+        boundary: 'delivery.commit',
+        ownerId: input.ownerId,
+        runLeaseEpoch: input.runLeaseEpoch,
+        nowMs: input.clock(),
+      });
+    }
     return this.#database.transaction(() => {
+      assertDocuments?.();
       const operation = this.getDeliveryOperation(input.id);
       if (operation === undefined) throw new Error('delivery operation not found');
       if (operation.status === 'committed') return operation;
@@ -4348,7 +5554,18 @@ export class WorkflowStore {
     if (capability !== workflowDeliveryMutationCapability) {
       throw new Error('merge observation requires the internal delivery broker capability');
     }
+    const guarded = this.getDeliveryOperation(input.id);
+    if (!guarded) throw new Error('delivery operation not found');
+    const assertDocuments = this.#documentAuthority({
+      runId: guarded.runId,
+      taskId: guarded.taskId,
+      boundary: 'delivery.merge_observation',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: input.nowMs,
+    });
     return this.#database.transaction(() => {
+      assertDocuments();
       const operation = this.getDeliveryOperation(input.id);
       if (operation?.kind !== 'github.merge') {
         throw new Error('merge operation not found');
@@ -4680,23 +5897,80 @@ export class WorkflowStore {
       runLeaseEpoch: number;
       taskLeaseEpoch: number;
       clock: () => number;
+      expectedSourceRoot?: string;
       initiate: () => Promise<unknown>;
     },
     capability?: symbol,
   ): Promise<unknown> {
     if (capability !== workflowDeliveryMutationCapability)
       throw new Error('governed mutation requires broker capability');
+    const guardedOperation = this.getDeliveryOperation(input.id);
+    if (!guardedOperation) throw new Error('delivery operation missing');
+    const assertDocuments = this.#documentAuthority({
+      runId: guardedOperation.runId,
+      taskId: guardedOperation.taskId,
+      boundary: 'delivery.mutate',
+      expectedSourceRoot: input.expectedSourceRoot,
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: input.clock(),
+    });
     let pending!: Promise<unknown>;
     this.#database
       .transaction(() => {
+        assertDocuments();
         const operation = this.getDeliveryOperation(input.id);
         if (operation?.status !== 'prepared') throw new Error('governed operation is not prepared');
         this.#assertDeliveryOperationLeases(operation, input, input.clock());
         this.#assertDeliveryRunState(operation.runId, operation.kind);
-        pending = input.initiate();
+        this.#documentGuardedOperation = input.id;
+        this.#documentGuardedAuthority = assertDocuments;
+        try {
+          pending = input.initiate();
+        } finally {
+          this.#documentGuardedOperation = undefined;
+          this.#documentGuardedAuthority = undefined;
+        }
       })
       .immediate();
     return pending;
+  }
+
+  assertDeliveryMutationDispatch(
+    id: string,
+    fence: {
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+    },
+    nowMs: number,
+    capability: symbol,
+  ): void {
+    if (
+      capability !== workflowDeliveryMutationCapability ||
+      !this.#database.inTransaction ||
+      this.#documentGuardedOperation !== id ||
+      !this.#documentGuardedAuthority
+    )
+      throw new Error('delivery mutation reservation required');
+    this.#documentGuardedAuthority();
+    const operation = this.getDeliveryOperation(id);
+    if (operation?.status !== 'prepared') throw new Error('delivery mutation is not prepared');
+    this.#assertDeliveryOperationLeases(operation, fence, nowMs);
+    this.#assertDeliveryRunState(operation.runId, operation.kind);
+  }
+
+  /** Internal adapters may reuse, but never manufacture, the broker's active writer reservation. */
+  withinDeliveryMutation<T>(runId: string, operation: () => T, capability: symbol): T {
+    if (
+      capability !== workflowDeliveryMutationCapability ||
+      !this.#database.inTransaction ||
+      this.#documentGuardedOperation === undefined ||
+      this.getDeliveryOperation(this.#documentGuardedOperation)?.runId !== runId
+    )
+      throw new Error('delivery mutation reservation required');
+    return operation();
   }
 
   #assertDeliveryOperationLeases(
@@ -4824,7 +6098,16 @@ export class WorkflowStore {
     if (capability !== workflowDeliveryMutationCapability) {
       throw new Error('delivery operations require the internal delivery broker capability');
     }
+    const assertDocuments = this.#documentAuthority({
+      runId: operation.runId,
+      taskId: operation.taskId,
+      boundary: 'delivery.ready',
+      ownerId: fence.ownerId,
+      runLeaseEpoch: fence.runLeaseEpoch,
+      nowMs,
+    });
     this.#database.transaction(() => {
+      assertDocuments();
       this.#assertDeliveryOperationLeases(operation, fence, nowMs);
       this.#assertDeliveryRunState(operation.runId, operation.kind);
       this.#assertDeliveryLineage(operation);
@@ -5330,6 +6613,65 @@ export class WorkflowStore {
     })();
   }
 
+  getPassedPipelineObservation(
+    operationId: string,
+  ): { checkId: string; deadlineMs: number; observedAtMs: number } | undefined {
+    return this.#database
+      .prepare(
+        `SELECT check_id AS checkId, deadline_ms AS deadlineMs,
+      observed_at_ms AS observedAtMs FROM passed_pipeline_observations WHERE operation_id=?`,
+      )
+      .get(operationId) as
+      | { checkId: string; deadlineMs: number; observedAtMs: number }
+      | undefined;
+  }
+
+  recordPassedPipelineObservation(
+    input: {
+      operationId: string;
+      checkId: string;
+      deadlineMs: number;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+    },
+    clock: () => number,
+    capability?: symbol,
+  ): void {
+    if (capability !== workflowDeliveryMutationCapability)
+      throw new Error('pipeline qualification requires delivery broker capability');
+    this.#database
+      .transaction(() => {
+        const operation = this.getDeliveryOperation(input.operationId);
+        if (operation?.status !== 'committed' || operation.kind !== 'github.checks')
+          throw new Error('pipeline qualification requires committed checks');
+        const nowMs = clock();
+        const identity = {
+          ...input,
+          workspaceId: operation.workspaceId,
+          runId: operation.runId,
+          taskId: operation.taskId,
+          nowMs,
+        };
+        this.assertDeliveryWaitReady(identity, capability);
+        if (nowMs >= input.deadlineMs) throw new Error('pipeline qualification deadline expired');
+        const request = operation.request as { requiredChecks: string[] };
+        const result = operation.result as { checks: Record<string, unknown> };
+        if (!request.requiredChecks.every((name) => result.checks[name] === 'success'))
+          throw new Error('pipeline qualification requires successful checks');
+        const wait = this.getWait(operation.runId, input.checkId);
+        if (wait) this.completeDeliveryWait(identity, capability);
+        this.#database
+          .prepare(
+            `INSERT INTO passed_pipeline_observations
+        (operation_id,check_id,deadline_ms,observed_at_ms) VALUES(?,?,?,?)`,
+          )
+          .run(operation.id, input.checkId, input.deadlineMs, nowMs);
+      })
+      .immediate();
+  }
+
   completeDeliveryWait(
     input: {
       workspaceId: string;
@@ -5818,7 +7160,15 @@ export class WorkflowStore {
     if (capability !== workflowFinalizationMutationCapability) {
       throw new Error('feature finalization requires the internal closeout capability');
     }
+    const assertDocuments = this.#documentAuthority({
+      runId: input.runId,
+      boundary: 'finalization.record',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: input.createdAtMs,
+    });
     return this.#database.transaction(() => {
+      assertDocuments();
       const contract = this.#contractForRun(input.runId);
       const run = this.getRun(input.runId);
       if (
@@ -6047,7 +7397,15 @@ export class WorkflowStore {
     if (capability !== workflowFinalizationMutationCapability) {
       throw new Error('feature finalization requires the internal closeout capability');
     }
+    const assertDocuments = this.#documentAuthority({
+      runId: input.runId,
+      boundary: 'finalization.close',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: input.nowMs,
+    });
     return this.#database.transaction(() => {
+      assertDocuments();
       const existing = this.getFeatureFinalization(input.runId);
       if (existing === undefined) throw new Error('final evidence report is not recorded');
       if (existing.status === 'closed') return existing;
@@ -6174,133 +7532,137 @@ export class WorkflowStore {
     if (input.stopDeadlineMs < input.requestedAtMs) {
       throw new Error('cancellation stop deadline precedes the request');
     }
-    return this.#database.transaction(() => {
-      const existing = this.getWorkflowCancellation(input.runId);
-      if (existing !== undefined) {
-        if (
-          existing.id !== input.id ||
-          existing.requestedBy !== input.requestedBy ||
-          existing.reason !== input.reason ||
-          existing.requestedAtMs !== input.requestedAtMs ||
-          existing.stopDeadlineMs !== input.stopDeadlineMs ||
-          serializeDurableJson(existing.retainedEvidence) !==
-            serializeDurableJson(input.retainedEvidence)
-        ) {
-          throw new Error('immutable cancellation request changed');
+    const started = performance.now();
+    return this.#database
+      .transaction(() => {
+        const checkedAt = input.nowMs + Math.max(0, Math.floor(performance.now() - started));
+        const existing = this.getWorkflowCancellation(input.runId);
+        if (existing !== undefined) {
+          if (
+            existing.id !== input.id ||
+            existing.requestedBy !== input.requestedBy ||
+            existing.reason !== input.reason ||
+            existing.requestedAtMs !== input.requestedAtMs ||
+            existing.stopDeadlineMs !== input.stopDeadlineMs ||
+            serializeDurableJson(existing.retainedEvidence) !==
+              serializeDurableJson(input.retainedEvidence)
+          ) {
+            throw new Error('immutable cancellation request changed');
+          }
+          return existing;
         }
-        return existing;
-      }
-      const contract = this.#contractForRun(input.runId);
-      const run = this.getRun(input.runId);
-      const invalidEvidence = input.retainedEvidence.some((reference) => {
-        if (
-          typeof reference !== 'object' ||
-          reference === null ||
-          !('digest' in reference) ||
-          !('mediaType' in reference) ||
-          !('sizeBytes' in reference) ||
-          !('kind' in reference)
-        ) {
-          return true;
-        }
-        const candidate = reference as Record<string, unknown>;
-        return (
-          this.#database
-            .prepare(
-              `SELECT 1 FROM secure_evidence
+        const contract = this.#contractForRun(input.runId);
+        const run = this.getRun(input.runId);
+        const invalidEvidence = input.retainedEvidence.some((reference) => {
+          if (
+            typeof reference !== 'object' ||
+            reference === null ||
+            !('digest' in reference) ||
+            !('mediaType' in reference) ||
+            !('sizeBytes' in reference) ||
+            !('kind' in reference)
+          ) {
+            return true;
+          }
+          const candidate = reference as Record<string, unknown>;
+          return (
+            this.#database
+              .prepare(
+                `SELECT 1 FROM secure_evidence
                WHERE digest = ? AND run_id = ? AND workspace_id = ?
                  AND contract_version = ? AND policy_digest = ?
                  AND media_type = ? AND size_bytes = ? AND kind = ?
                  AND accepted_at_ms IS NOT NULL AND deleted_at_ms IS NULL
                LIMIT 1`,
-            )
-            .get(
-              candidate.digest,
-              input.runId,
-              contract.workspaceId,
-              contract.contractVersion,
-              contract.policyDigest,
-              candidate.mediaType,
-              candidate.sizeBytes,
-              candidate.kind,
-            ) === undefined
-        );
-      });
-      if (invalidEvidence) {
-        throw new Error('cancellation retained evidence is not recorded');
-      }
-      const cancellable = new Set<WorkflowState>([
-        'approved',
-        'scheduling',
-        'implementing',
-        'task_verification',
-        'task_review',
-        'repair',
-        'task_accepted',
-        'integration',
-        'feature_evaluation',
-        'repair_planning',
-        'pipeline',
-        'waiting',
-        'approval_waiting',
-        'delivery',
-        'finalizing',
-        'recovering',
-        'escalated',
-      ]);
-      if (run === undefined || !cancellable.has(run.state)) {
-        throw new Error('workflow run is not cancellable');
-      }
-      const preparedMerge = this.#database
-        .prepare(
-          `SELECT 1 FROM delivery_operations
+              )
+              .get(
+                candidate.digest,
+                input.runId,
+                contract.workspaceId,
+                contract.contractVersion,
+                contract.policyDigest,
+                candidate.mediaType,
+                candidate.sizeBytes,
+                candidate.kind,
+              ) === undefined
+          );
+        });
+        if (invalidEvidence) {
+          throw new Error('cancellation retained evidence is not recorded');
+        }
+        const cancellable = new Set<WorkflowState>([
+          'approved',
+          'scheduling',
+          'implementing',
+          'task_verification',
+          'task_review',
+          'repair',
+          'task_accepted',
+          'integration',
+          'feature_evaluation',
+          'repair_planning',
+          'pipeline',
+          'waiting',
+          'approval_waiting',
+          'delivery',
+          'finalizing',
+          'recovering',
+          'escalated',
+        ]);
+        if (run === undefined || !cancellable.has(run.state)) {
+          throw new Error('workflow run is not cancellable');
+        }
+        const preparedMerge = this.#database
+          .prepare(
+            `SELECT 1 FROM delivery_operations
            WHERE run_id = ? AND status = 'prepared'
              AND (kind = 'github.merge' OR kind LIKE 'feature.github.%') LIMIT 1`,
-        )
-        .get(input.runId);
-      if (preparedMerge !== undefined || run.mergeVerified) {
-        throw new Error(
-          'verified or prepared merge must reconcile to finalizing before cancellation',
+          )
+          .get(input.runId);
+        if (preparedMerge !== undefined || run.mergeVerified) {
+          throw new Error(
+            'verified or prepared merge must reconcile to finalizing before cancellation',
+          );
+        }
+        this.#assertResourceLease(
+          'workspace',
+          contract.workspaceId,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          checkedAt,
         );
-      }
-      this.#assertResourceLease(
-        'workspace',
-        contract.workspaceId,
-        input.ownerId,
-        input.workspaceLeaseEpoch,
-        input.nowMs,
-      );
-      this.#assertResourceLease(
-        'run',
-        input.runId,
-        input.ownerId,
-        input.runLeaseEpoch,
-        input.nowMs,
-      );
-      this.#database
-        .prepare(
-          `INSERT INTO workflow_cancellations
+        this.#assertResourceLease(
+          'run',
+          input.runId,
+          input.ownerId,
+          input.runLeaseEpoch,
+          checkedAt,
+        );
+        this.#database
+          .prepare(
+            `INSERT INTO workflow_cancellations
            (id, run_id, requested_by, reason, requested_at_ms, stop_deadline_ms, status,
             owned_work_stopped, incomplete_cleanup_json, retained_evidence_json, completed_at_ms)
            VALUES (?, ?, ?, ?, ?, ?, 'requested', 0, '[]', ?, NULL)`,
-        )
-        .run(
-          input.id,
-          input.runId,
-          input.requestedBy,
-          input.reason,
-          input.requestedAtMs,
-          input.stopDeadlineMs,
-          serializeDurableJson(input.retainedEvidence),
-        );
-      this.#database
-        .prepare(
-          `UPDATE runs SET state = 'cancelling', version = version + 1, updated_at_ms = ?
+          )
+          .run(
+            input.id,
+            input.runId,
+            input.requestedBy,
+            input.reason,
+            input.requestedAtMs,
+            input.stopDeadlineMs,
+            serializeDurableJson(input.retainedEvidence),
+          );
+        this.#database
+          .prepare(
+            `UPDATE runs SET state = 'cancelling', version = version + 1, updated_at_ms = ?
            WHERE id = ? AND state = ?`,
-        )
-        .run(input.nowMs, input.runId, run.state);
-      return this.getWorkflowCancellation(input.runId)!;
-    })();
+          )
+          .run(checkedAt, input.runId, run.state);
+        return this.getWorkflowCancellation(input.runId)!;
+      })
+      .immediate();
   }
 
   completeWorkflowCancellation(
@@ -6563,6 +7925,27 @@ export class WorkflowStore {
     input: Omit<EvaluationRecord, 'result'> & { result: unknown },
     capability?: symbol,
   ): EvaluationRecord {
+    if (capability !== workflowEvaluationMutationCapability)
+      throw new Error('evaluation records require the internal evaluator capability');
+    const assertDocuments = this.#documentAuthority({
+      runId: input.runId,
+      taskId: input.taskId,
+      boundary: 'evaluation.record',
+      ownerId: input.evaluatorRole,
+      nowMs: input.createdAtMs,
+    });
+    return this.#database
+      .transaction(() => {
+        assertDocuments();
+        return this.#recordEvaluation(input, capability);
+      })
+      .immediate();
+  }
+
+  #recordEvaluation(
+    input: Omit<EvaluationRecord, 'result'> & { result: unknown },
+    capability?: symbol,
+  ): EvaluationRecord {
     if (capability !== workflowEvaluationMutationCapability) {
       throw new Error('evaluation records require the internal evaluator capability');
     }
@@ -6614,8 +7997,16 @@ export class WorkflowStore {
     if (capability !== workflowEvaluationMutationCapability) {
       throw new Error('evaluation records require the internal evaluator capability');
     }
+    const assertDocuments = this.#documentAuthority({
+      runId: input.runId,
+      taskId: input.taskId,
+      boundary: 'evaluation.accept',
+      ownerId: input.evaluatorRole,
+      nowMs: input.createdAtMs,
+    });
     return this.#database.transaction(() => {
-      const record = this.recordEvaluation(input, capability);
+      assertDocuments();
+      const record = this.#recordEvaluation(input, capability);
       for (const digest of new Set(evidenceDigests)) {
         const secure = this.getSecureEvidence(digest, input.runId, input.taskId);
         if (secure === undefined || secure.deletedAtMs !== null) {
@@ -6727,112 +8118,130 @@ export class WorkflowStore {
     if (capability !== workflowEvaluationMutationCapability) {
       throw new Error('repair-child intent requires the internal evaluator capability');
     }
+    const assertDocuments = this.#documentAuthority({
+      runId: input.runId,
+      taskId: input.chainTipTaskId,
+      boundary: 'repair.child_prepare',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: input.createdAtMs,
+    });
     const contract = this.#contractForRun(input.runId);
     if (contract.workspaceId !== input.workspaceId) {
       throw new Error('repair-child workspace differs from the run contract');
     }
-    const run = this.getRun(input.runId);
-    if (run?.state !== 'repair_planning') {
-      throw new Error('repair children require the repair_planning state');
-    }
-    this.#assertResourceLease(
-      'workspace',
-      input.workspaceId,
-      input.ownerId,
-      input.workspaceLeaseEpoch,
-      input.createdAtMs,
-    );
-    this.#assertResourceLease(
-      'run',
-      input.runId,
-      input.ownerId,
-      input.runLeaseEpoch,
-      input.createdAtMs,
-    );
-    this.#assertResourceLease(
-      'task',
-      input.chainTipTaskId,
-      input.ownerId,
-      input.taskLeaseEpoch,
-      input.createdAtMs,
-    );
     const requestJson = serializeDurableJson(input.request);
     const request = input.request as Record<string, unknown>;
-    return this.#database.transaction(() => {
-      if (
-        typeof request.featureId !== 'string' ||
-        typeof request.finding !== 'object' ||
-        request.finding === null ||
-        typeof (request.finding as Record<string, unknown>).id !== 'string'
-      ) {
-        throw new Error('repair-child budget request is malformed');
-      }
-      const remaining = this.remainingRepairBudgetForChild(
-        {
-          runId: input.runId,
-          featureId: request.featureId,
-          childId: input.id,
-          findingId: (request.finding as Record<string, unknown>).id as string,
-          policy: contract.retryPolicy,
-        },
-        workflowEvaluationMutationCapability,
-      );
-      if (JSON.stringify(request.remainingRetryBudget) !== JSON.stringify(remaining)) {
-        throw new Error('repair-child retry reservation changed before prepare');
-      }
-      this.#database
-        .prepare(
-          `INSERT OR IGNORE INTO repair_child_budget_reservations
-           (child_id, run_id, finding_id, created_at_ms) VALUES (?, ?, ?, ?)`,
-        )
-        .run(
-          input.id,
-          input.runId,
-          (request.finding as Record<string, unknown>).id,
+    return this.#database
+      .transaction(() => {
+        const run = this.getRun(input.runId);
+        if (run?.state !== 'repair_planning') {
+          throw new Error('repair children require the repair_planning state');
+        }
+        this.#assertResourceLease(
+          'workspace',
+          input.workspaceId,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
           input.createdAtMs,
         );
-      this.#database
-        .prepare(
-          `INSERT OR IGNORE INTO repair_child_intents
+        this.#assertResourceLease(
+          'run',
+          input.runId,
+          input.ownerId,
+          input.runLeaseEpoch,
+          input.createdAtMs,
+        );
+        this.#assertResourceLease(
+          'task',
+          input.chainTipTaskId,
+          input.ownerId,
+          input.taskLeaseEpoch,
+          input.createdAtMs,
+        );
+        assertDocuments();
+        const owners = queryRunInventory(this.#database, {
+          workspaceId: input.workspaceId,
+          taskId: input.id,
+        });
+        if (owners.active.some((owner) => owner.id !== input.runId))
+          throw new Error('run_admission_conflict');
+
+        if (
+          typeof request.featureId !== 'string' ||
+          typeof request.finding !== 'object' ||
+          request.finding === null ||
+          typeof (request.finding as Record<string, unknown>).id !== 'string'
+        ) {
+          throw new Error('repair-child budget request is malformed');
+        }
+        const remaining = this.remainingRepairBudgetForChild(
+          {
+            runId: input.runId,
+            featureId: request.featureId,
+            childId: input.id,
+            findingId: (request.finding as Record<string, unknown>).id as string,
+            policy: contract.retryPolicy,
+          },
+          workflowEvaluationMutationCapability,
+        );
+        if (JSON.stringify(request.remainingRetryBudget) !== JSON.stringify(remaining)) {
+          throw new Error('repair-child retry reservation changed before prepare');
+        }
+        this.#database
+          .prepare(
+            `INSERT OR IGNORE INTO repair_child_budget_reservations
+           (child_id, run_id, finding_id, created_at_ms) VALUES (?, ?, ?, ?)`,
+          )
+          .run(
+            input.id,
+            input.runId,
+            (request.finding as Record<string, unknown>).id,
+            input.createdAtMs,
+          );
+        this.#database
+          .prepare(
+            `INSERT OR IGNORE INTO repair_child_intents
          (id, workspace_id, run_id, sequence, finding_digest, chain_tip_task_id, request_json,
           status, owner_id, workspace_lease_epoch, run_lease_epoch, task_lease_epoch, result_json,
           created_at_ms, updated_at_ms)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?, ?, ?, NULL, ?, ?)`,
-        )
-        .run(
-          input.id,
-          input.workspaceId,
-          input.runId,
-          input.sequence,
-          input.findingDigest,
-          input.chainTipTaskId,
-          requestJson,
-          input.ownerId,
-          input.workspaceLeaseEpoch,
-          input.runLeaseEpoch,
-          input.taskLeaseEpoch,
-          input.createdAtMs,
-          input.createdAtMs,
-        );
-      const record = this.getRepairChildIntent(input.id);
-      if (
-        record === undefined ||
-        record.workspaceId !== input.workspaceId ||
-        record.runId !== input.runId ||
-        record.sequence !== input.sequence ||
-        record.findingDigest !== input.findingDigest ||
-        record.chainTipTaskId !== input.chainTipTaskId ||
-        record.ownerId !== input.ownerId ||
-        record.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
-        record.runLeaseEpoch !== input.runLeaseEpoch ||
-        record.taskLeaseEpoch !== input.taskLeaseEpoch ||
-        record.createdAtMs !== input.createdAtMs ||
-        serializeDurableJson(record.request) !== requestJson
-      ) {
-        throw new Error('repair-child identity already exists with different content');
-      }
-      return record;
-    })();
+          )
+          .run(
+            input.id,
+            input.workspaceId,
+            input.runId,
+            input.sequence,
+            input.findingDigest,
+            input.chainTipTaskId,
+            requestJson,
+            input.ownerId,
+            input.workspaceLeaseEpoch,
+            input.runLeaseEpoch,
+            input.taskLeaseEpoch,
+            input.createdAtMs,
+            input.createdAtMs,
+          );
+        const record = this.getRepairChildIntent(input.id);
+        if (
+          record === undefined ||
+          record.workspaceId !== input.workspaceId ||
+          record.runId !== input.runId ||
+          record.sequence !== input.sequence ||
+          record.findingDigest !== input.findingDigest ||
+          record.chainTipTaskId !== input.chainTipTaskId ||
+          record.ownerId !== input.ownerId ||
+          record.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+          record.runLeaseEpoch !== input.runLeaseEpoch ||
+          record.taskLeaseEpoch !== input.taskLeaseEpoch ||
+          record.createdAtMs !== input.createdAtMs ||
+          serializeDurableJson(record.request) !== requestJson
+        ) {
+          throw new Error('repair-child identity already exists with different content');
+        }
+        return record;
+      })
+      .immediate();
   }
 
   finalizeRepairChildIntent(
@@ -6851,8 +8260,19 @@ export class WorkflowStore {
     if (capability !== workflowEvaluationMutationCapability) {
       throw new Error('repair-child intent requires the internal evaluator capability');
     }
+    const started = performance.now();
     const before = this.getRepairChildIntent(input.id);
     if (before === undefined) throw new Error('repair-child intent not found');
+    let assertDocuments: (() => void) | undefined;
+    if (input.status === 'committed')
+      assertDocuments = this.#documentAuthority({
+        runId: before.runId,
+        taskId: before.chainTipTaskId,
+        boundary: 'repair.child_commit',
+        ownerId: input.ownerId,
+        runLeaseEpoch: input.runLeaseEpoch,
+        nowMs: input.updatedAtMs,
+      });
     this.#assertResourceLease(
       'workspace',
       before.workspaceId,
@@ -6892,6 +8312,12 @@ export class WorkflowStore {
       return before;
     }
     return this.#database.transaction(() => {
+      assertDocuments?.();
+      if (input.status === 'committed')
+        this.#assertRepairChildFence({
+          ...input,
+          nowMs: input.updatedAtMs + Math.max(0, Math.floor(performance.now() - started)),
+        });
       this.#database
         .prepare(
           `UPDATE repair_child_intents SET status = ?, result_json = ?, updated_at_ms = ?
@@ -6997,6 +8423,27 @@ export class WorkflowStore {
     }
     const intent = this.getRepairChildIntent(input.id);
     if (intent === undefined) throw new Error('repair-child intent not found');
+    this.verifyPlanningDocuments({
+      runId: intent.runId,
+      taskId: intent.chainTipTaskId,
+      boundary: 'repair.child_effect',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: input.nowMs,
+    });
+    return this.#assertRepairChildFence(input);
+  }
+
+  #assertRepairChildFence(input: {
+    id: string;
+    ownerId: string;
+    workspaceLeaseEpoch: number;
+    runLeaseEpoch: number;
+    taskLeaseEpoch: number;
+    nowMs: number;
+  }): RepairChildIntentRecord {
+    const intent = this.getRepairChildIntent(input.id);
+    if (!intent) throw new Error('repair-child intent not found');
     if (this.getRun(intent.runId)?.state !== 'repair_planning') {
       throw new Error('repair children require the repair_planning state');
     }
@@ -7024,6 +8471,84 @@ export class WorkflowStore {
       input.nowMs,
     );
     return intent;
+  }
+
+  dispatchRepairChildMutation<T>(
+    input: {
+      id: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs: number;
+    },
+    dispatch: (intent: RepairChildIntentRecord) => T,
+    capability?: symbol,
+  ): T {
+    if (capability !== workflowEvaluationMutationCapability) {
+      throw new Error('repair-child intent requires the internal evaluator capability');
+    }
+    const intent = this.getRepairChildIntent(input.id);
+    if (intent === undefined) throw new Error('repair-child intent not found');
+    const started = performance.now();
+    const assertDocuments = this.#documentAuthority({
+      runId: intent.runId,
+      taskId: intent.chainTipTaskId,
+      boundary: 'repair.child_effect',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: input.nowMs,
+    });
+    return this.#database
+      .transaction(() => {
+        assertDocuments();
+        input = {
+          ...input,
+          nowMs: input.nowMs + Math.max(0, Math.floor(performance.now() - started)),
+        };
+        const current = this.getRepairChildIntent(input.id);
+        if (
+          current?.status !== 'prepared' ||
+          current.sequence !== this.countRepairChildIntents(current.runId)
+        )
+          throw new Error('repair-child dispatch position changed');
+        if (this.getRun(current.runId)?.state !== 'repair_planning') {
+          throw new Error('repair children require the repair_planning state');
+        }
+        if (
+          current.ownerId !== input.ownerId ||
+          current.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+          current.runLeaseEpoch !== input.runLeaseEpoch ||
+          current.taskLeaseEpoch !== input.taskLeaseEpoch
+        ) {
+          throw new Error('repair-child fencing token changed');
+        }
+        this.#assertResourceLease(
+          'workspace',
+          current.workspaceId,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          input.nowMs,
+        );
+        this.#assertResourceLease(
+          'run',
+          current.runId,
+          input.ownerId,
+          input.runLeaseEpoch,
+          input.nowMs,
+        );
+        this.#assertResourceLease(
+          'task',
+          current.chainTipTaskId,
+          input.ownerId,
+          input.taskLeaseEpoch,
+          input.nowMs,
+        );
+        const value = dispatch(current);
+        void Promise.resolve(value).catch(() => undefined);
+        return { value };
+      })
+      .immediate().value;
   }
 
   adoptPreparedRepairChildIntent(
@@ -7359,8 +8884,15 @@ export class WorkflowStore {
     approvedAtMs?: number;
   }): PlanApproval {
     const contract = executionContractForApproval(input.contract);
+    const verified = verifyDocumentsForApproval(this.#database, {
+      runId: input.runId,
+      boundary: 'approval.create',
+      ownerId: input.approverId,
+      nowMs: input.approvedAtMs,
+    });
     this.#assertEvidenceReferences(input.evidence);
     return this.#database.transaction(() => {
+      assertDocumentApprovalCandidate(this.#database, input.runId, verified.materialDigest);
       const storedContract = this.#contractForRun(input.runId);
       if (
         storedContract.contractVersion !== contract.contractVersion ||
@@ -7450,6 +8982,12 @@ export class WorkflowStore {
     const approval = this.getPlanApproval(approvalId);
     if (approval === undefined) throw new Error('approval not found');
     if (approval.status === 'invalidated') return approval;
+    this.verifyPlanningDocuments({
+      runId: approval.runId,
+      boundary: 'approval.resume',
+      ownerId: 'approval-revalidation',
+      nowMs,
+    });
     const reason = approvalInvalidationReason(approval, contractInput);
     return reason === undefined ? approval : this.invalidatePlanApproval(approvalId, reason, nowMs);
   }
@@ -7491,6 +9029,49 @@ export class WorkflowStore {
 
   assertRunLease(runId: string, ownerId: string, epoch: number, nowMs = Date.now()): void {
     this.#assertLease(runId, ownerId, epoch, nowMs);
+  }
+
+  dispatchTransitionMutation<T>(
+    transition: TransitionRecord,
+    dispatch: (current: TransitionRecord) => T,
+    clock: () => number,
+  ): T {
+    if (transition?.status !== 'prepared') throw new Error('transition is not prepared');
+    const cleanup =
+      !transition.operation.startsWith('beads.') &&
+      ['cancelling', 'cancelled', 'escalated', 'recovering'].includes(transition.to);
+    const assertDocuments = cleanup
+      ? undefined
+      : this.#documentAuthority({
+          runId: transition.runId,
+          boundary: 'transition.dispatch',
+          ownerId: transition.leaseOwnerId,
+          runLeaseEpoch: transition.leaseEpoch,
+          nowMs: clock(),
+        });
+    return this.#database
+      .transaction(() => {
+        assertDocuments?.();
+        const current = this.getTransition(transition.id);
+        if (
+          current?.status !== 'prepared' ||
+          !isDeepStrictEqual(current, transition) ||
+          this.getRun(transition.runId)?.state !== transition.from
+        )
+          throw new Error('transition dispatch authority changed');
+        if (!cleanup && !runAcceptsWork(this.#database, transition.runId))
+          throw new Error('transition run is cancelled or closed');
+        this.assertTransitionLeases(
+          current,
+          transition.leaseOwnerId,
+          transition.leaseEpoch,
+          clock(),
+        );
+        const value = dispatch(current);
+        void Promise.resolve(value).catch(() => undefined);
+        return { value };
+      })
+      .immediate().value;
   }
 
   assertTransitionLeases(
@@ -7634,7 +9215,7 @@ export class WorkflowStore {
   ): void {
     const callback = delegateCallbackSchema.parse(input.callback);
     if (callback.delegationId !== input.id) throw new Error('terminal callback execution mismatch');
-    this.recordDelegateCallbackAndTransition(
+    this.#recordDelegateCallbackAndTransition(
       { callback, target: delegateCallbackTarget(callback), ownerId: input.ownerId, nowMs },
       workflowGovernedPersistenceCapability,
     );
@@ -8309,6 +9890,11 @@ export class WorkflowStore {
       );
       CREATE INDEX IF NOT EXISTS delivery_operations_run_status
         ON delivery_operations(run_id, status, created_at_ms);
+      CREATE TABLE IF NOT EXISTS passed_pipeline_observations (
+        operation_id TEXT PRIMARY KEY REFERENCES delivery_operations(id),
+        check_id TEXT NOT NULL, deadline_ms INTEGER NOT NULL, observed_at_ms INTEGER NOT NULL,
+        CHECK(observed_at_ms < deadline_ms)
+      );
       CREATE TABLE IF NOT EXISTS delivery_approved_heads (
         workspace_id TEXT NOT NULL,
         run_id TEXT NOT NULL REFERENCES runs(id),

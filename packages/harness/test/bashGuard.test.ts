@@ -1,7 +1,64 @@
+import { execFileSync } from 'node:child_process';
 import { describe, it, expect } from 'vitest';
 import { validateBashCommand, buildAllowlist } from '../src/security/bashGuard.js';
 
 describe('BashGuard', () => {
+  describe('explicit compatibility allowlist', () => {
+    it.each(['||', '|&', '|', '&&', ';'])('preserves strict decisions across %s', (separator) => {
+      const allowlist = new Set(['echo', 'pwd']);
+      const whitespace = '\t\r\n\u00a0';
+      const prefix = 'env FOO=bar command /usr/bin/echo value';
+      expect(
+        validateBashCommand(`${prefix}${whitespace}${separator}${whitespace}/bin/pwd`, allowlist),
+      ).toEqual({ allowed: true });
+      expect(
+        validateBashCommand(`${prefix}${whitespace}${separator}${whitespace}unlisted`, allowlist),
+      ).toMatchObject({ allowed: false, matched: 'unlisted' });
+    });
+
+    it('ignores empty and whitespace-only separator segments', () => {
+      const allowlist = new Set(['echo', 'pwd']);
+      expect(validateBashCommand('; \t; echo value;\u00a0; pwd ;', allowlist)).toEqual({
+        allowed: true,
+      });
+      expect(validateBashCommand('; \t; echo value;\u00a0; unlisted ;', allowlist)).toMatchObject({
+        allowed: false,
+        matched: 'unlisted',
+      });
+    });
+
+    it('bounds compiled-validator processing of long internal whitespace', () => {
+      // Static code validates command data; it never executes that command.
+      const childProgram = `
+          const { validateBashCommand } = await import(process.argv[1]);
+          const spaces = ' '.repeat(200000);
+          const allowlist = new Set(['echo']);
+          console.log(JSON.stringify({
+            permitted: validateBashCommand('echo' + spaces + 'value', allowlist),
+            denied: validateBashCommand('unlisted' + spaces + 'value', allowlist),
+          }));
+        `;
+      const output = execFileSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          childProgram,
+          new URL('../dist/security/bashGuard.js', import.meta.url).href,
+        ],
+        { encoding: 'utf8', env: {}, timeout: 5000, killSignal: 'SIGKILL' },
+      );
+      expect(JSON.parse(output)).toEqual({
+        permitted: { allowed: true },
+        denied: {
+          allowed: false,
+          reason: 'Command "unlisted" is not in the allowed command list',
+          matched: 'unlisted',
+        },
+      });
+    }, 10000);
+  });
+
   // -----------------------------------------------------------------------
   // Allowed commands
   // -----------------------------------------------------------------------

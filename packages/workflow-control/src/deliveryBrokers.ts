@@ -1,3 +1,4 @@
+import type { DeliveryDocumentSource } from './documentApproval.js';
 import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 
@@ -152,13 +153,17 @@ export interface DeliveryFence {
 }
 
 export interface DeliveryMutationPort {
-  observe(request: DeliveryRequest): Promise<ExternalObservation>;
+  observe(
+    request: DeliveryRequest,
+    documents?: DeliveryDocumentSource,
+  ): Promise<ExternalObservation>;
   mutate(
     request: DeliveryRequest,
     verifiedMergePrecondition?: {
       reviewEventIdentity: string;
       verifiedObservationDigest: string;
     },
+    documents?: DeliveryDocumentSource & { assertDispatch: () => void },
   ): Promise<unknown>;
 }
 
@@ -436,6 +441,34 @@ function monotonicClock(clock: () => number): () => number {
   };
 }
 
+function pipelineCheckResult(
+  operation: DeliveryOperationRecord,
+  request: Extract<DeliveryRequest, { kind: 'github.checks' }>,
+) {
+  const result = operation.result as Record<string, unknown> | null;
+  const checks = result?.checks;
+  const eventIdentity = result?.eventIdentity;
+  if (
+    typeof checks !== 'object' ||
+    checks === null ||
+    Array.isArray(checks) ||
+    typeof eventIdentity !== 'string' ||
+    eventIdentity === ''
+  ) {
+    throw new Error('GitHub checks result has invalid durable wait evidence');
+  }
+  const checkRecord = checks as Record<string, unknown>;
+  if (
+    !sameOrderedSet(Object.keys(checkRecord), request.requiredChecks) ||
+    Object.values(checkRecord).some(
+      (value) => value !== 'pending' && value !== 'success' && value !== 'failure',
+    )
+  ) {
+    throw new Error('GitHub checks result changes the approved check set');
+  }
+  return { checkRecord, eventIdentity };
+}
+
 export class DurableDeliveryBroker {
   readonly #store: WorkflowStore;
   readonly #contract: ExecutionContract;
@@ -542,20 +575,20 @@ export class DurableDeliveryBroker {
     if (request.kind === 'github.merge') {
       return this.#executeProviderAttestedMerge(request, operation, fence);
     }
-    const before = await this.#port.observe(request);
+    const before = await this.#observeDelivery(request, fence);
     if (before.kind === 'conflict') return this.#escalate(operation, fence, before.result);
     if (before.kind === 'unchanged') {
       this.#assertReady(operation, fence);
-      const fresh = await this.#port.observe(request);
+      const fresh = await this.#observeDelivery(request, fence);
       if (fresh.kind === 'conflict') return this.#escalate(operation, fence, fresh.result);
       if (fresh.kind === 'unchanged') {
         this.#assertReady(operation, fence);
         this.#fault('before_mutation', operation);
-        await this.#port.mutate(request);
+        await this.#mutateDelivery(request, operation, fence);
         this.#fault('after_mutation', operation);
       }
     }
-    const after = await this.#port.observe(request);
+    const after = await this.#observeDelivery(request, fence);
     if (after.kind === 'conflict') return this.#escalate(operation, fence, after.result);
     if (after.kind !== 'expected') throw new Error('delivery mutation result remains ambiguous');
     let durableResult: unknown;
@@ -656,19 +689,19 @@ export class DurableDeliveryBroker {
     operation: DeliveryOperationRecord,
     fence: DeliveryFence,
   ): Promise<DeliveryOperationRecord> {
-    let observed = await this.#port.observe(request);
+    let observed = await this.#observeDelivery(request, fence);
     if (observed.kind === 'conflict') return this.#escalate(operation, fence, observed.result);
     if (observed.kind === 'unchanged') {
       this.#assertReady(operation, fence);
-      observed = await this.#port.observe(request);
+      observed = await this.#observeDelivery(request, fence);
       if (observed.kind === 'conflict') return this.#escalate(operation, fence, observed.result);
       if (observed.kind === 'unchanged') {
         this.#assertReady(operation, fence);
-        await this.#port.mutate(request);
+        await this.#mutateDelivery(request, operation, fence);
         this.#fault('after_replay_mutation', operation);
       }
     }
-    const after = await this.#port.observe(request);
+    const after = await this.#observeDelivery(request, fence);
     if (after.kind !== 'expected') {
       if (after.kind === 'conflict') return this.#escalate(operation, fence, after.result);
       throw new Error('replayed delivery mutation remains ambiguous');
@@ -691,13 +724,8 @@ export class DurableDeliveryBroker {
     );
   }
 
-  recordPipelineObservation(input: {
-    operationId: string;
-    fence: DeliveryFence;
-    nextPollAtMs: number;
-    absoluteDeadlineMs: number;
-  }): PipelineObservationDecision {
-    const operation = this.#store.getDeliveryOperation(input.operationId);
+  #committedChecks(operationId: string) {
+    const operation = this.#store.getDeliveryOperation(operationId);
     if (
       operation === undefined ||
       operation.status !== 'committed' ||
@@ -705,6 +733,16 @@ export class DurableDeliveryBroker {
     ) {
       throw new Error('pipeline observation requires a committed GitHub checks operation');
     }
+    return operation;
+  }
+
+  recordPipelineObservation(input: {
+    operationId: string;
+    fence: DeliveryFence;
+    nextPollAtMs: number;
+    absoluteDeadlineMs: number;
+  }): PipelineObservationDecision {
+    const operation = this.#committedChecks(input.operationId);
     this.#store.assertRunUsesContract(operation.runId, this.#contract);
     const request = githubChecksRequestSchema.parse(operation.request);
     assertRequestWithinContract(
@@ -727,27 +765,7 @@ export class DurableDeliveryBroker {
       },
       workflowDeliveryMutationCapability,
     );
-    const result = operation.result as Record<string, unknown> | null;
-    const checks = result?.checks;
-    const eventIdentity = result?.eventIdentity;
-    if (
-      typeof checks !== 'object' ||
-      checks === null ||
-      Array.isArray(checks) ||
-      typeof eventIdentity !== 'string' ||
-      eventIdentity === ''
-    ) {
-      throw new Error('GitHub checks result has invalid durable wait evidence');
-    }
-    const checkRecord = checks as Record<string, unknown>;
-    if (
-      !sameOrderedSet(Object.keys(checkRecord), request.requiredChecks) ||
-      Object.values(checkRecord).some(
-        (value) => value !== 'pending' && value !== 'success' && value !== 'failure',
-      )
-    ) {
-      throw new Error('GitHub checks result changes the approved check set');
-    }
+    const { checkRecord, eventIdentity } = pipelineCheckResult(operation, request);
     const checkId = deriveDeliveryRequestDigest([
       request.repository,
       request.pullRequestNumber,
@@ -763,10 +781,23 @@ export class DurableDeliveryBroker {
     if (this.#store.getDeliveryWaitEscalation(request.runId, checkId) !== undefined) {
       throw new Error('pipeline wait is already terminally escalated');
     }
+    const qualification = this.#store.getPassedPipelineObservation(operation.id);
+    if (qualification && (qualification.checkId !== checkId || existing !== undefined))
+      throw new Error('pipeline qualification replay conflicts with durable wait');
+    if (qualification) return { kind: 'passed', checkId };
     const effectiveDeadline = Math.min(
       existing?.absoluteDeadlineMs ?? input.absoluteDeadlineMs,
       input.absoluteDeadlineMs,
     );
+    const observationTime = this.#clock();
+    const maximumDeadline =
+      operation.createdAtMs + this.#contract.retryPolicy.waitDeadlineSeconds * 1000;
+    if (
+      !Number.isFinite(effectiveDeadline) ||
+      effectiveDeadline > maximumDeadline ||
+      observationTime >= effectiveDeadline
+    )
+      throw new Error('pipeline observation deadline expired or exceeds immutable retry deadline');
     if (
       existing !== undefined &&
       existing.workspaceId === request.workspaceId &&
@@ -794,12 +825,14 @@ export class DurableDeliveryBroker {
       return { kind: 'failed', checkId, failedChecks };
     }
     if (request.requiredChecks.every((check) => checkRecord[check] === 'success')) {
-      if (existing !== undefined) this.#completeWait(request, checkId, input.fence);
+      this.#store.recordPassedPipelineObservation(
+        { operationId: operation.id, checkId, deadlineMs: effectiveDeadline, ...input.fence },
+        this.#clock,
+        workflowDeliveryMutationCapability,
+      );
       return { kind: 'passed', checkId };
     }
     const nowMs = this.#clock();
-    const maximumDeadline =
-      operation.createdAtMs + this.#contract.retryPolicy.waitDeadlineSeconds * 1000;
     if (
       input.nextPollAtMs <= nowMs ||
       input.nextPollAtMs >= input.absoluteDeadlineMs ||
@@ -896,7 +929,7 @@ export class DurableDeliveryBroker {
     fence: DeliveryFence,
   ): Promise<DeliveryOperationRecord> {
     let operation = initialOperation;
-    let observed = await this.#port.observe(request);
+    let observed = await this.#observeDelivery(request, fence);
     if (observed.kind === 'conflict') return this.#escalate(operation, fence, observed.result);
     if (observed.kind === 'expected') {
       if (operation.verifiedObservationDigest === null) {
@@ -929,7 +962,7 @@ export class DurableDeliveryBroker {
       });
     }
     this.#assertReady(operation, fence);
-    observed = await this.#port.observe(request);
+    observed = await this.#observeDelivery(request, fence);
     if (observed.kind === 'conflict') return this.#escalate(operation, fence, observed.result);
     if (observed.kind === 'expected') {
       return this.#commitObservedResult(operation, fence, observed.result);
@@ -943,17 +976,61 @@ export class DurableDeliveryBroker {
     }
     this.#assertReady(operation, fence);
     this.#fault('before_mutation', operation);
-    await this.#port.mutate(request, {
+    await this.#mutateDelivery(request, operation, fence, {
       reviewEventIdentity: String(
         (operation.verifiedObservation as { reviewEventIdentity: unknown }).reviewEventIdentity,
       ),
       verifiedObservationDigest: operation.verifiedObservationDigest!,
     });
     this.#fault('after_mutation', operation);
-    const after = await this.#port.observe(request);
+    const after = await this.#observeDelivery(request, fence);
     if (after.kind === 'conflict') return this.#escalate(operation, fence, after.result);
     if (after.kind !== 'expected') throw new Error('delivery merge result remains ambiguous');
     return this.#commitObservedResult(operation, fence, after.result);
+  }
+
+  #deliveryDocuments(request: DeliveryRequest, fence: DeliveryFence) {
+    return this.#store.verifyDeliveryDocumentSource({
+      runId: request.runId,
+      taskId: request.taskId,
+      ownerId: fence.ownerId,
+      runLeaseEpoch: fence.runLeaseEpoch,
+      boundary: 'delivery.source',
+      nowMs: this.#clock(),
+    });
+  }
+
+  #observeDelivery(request: DeliveryRequest, fence: DeliveryFence) {
+    return this.#port.observe(request, this.#deliveryDocuments(request, fence));
+  }
+
+  #mutateDelivery(
+    request: DeliveryRequest,
+    operation: DeliveryOperationRecord,
+    fence: DeliveryFence,
+    merge?: { reviewEventIdentity: string; verifiedObservationDigest: string },
+  ) {
+    const documents = this.#deliveryDocuments(request, fence);
+    return this.#store.guardGovernedMutation(
+      {
+        id: operation.id,
+        ...fence,
+        clock: this.#clock,
+        expectedSourceRoot: documents.sourceRoot,
+        initiate: () =>
+          this.#port.mutate(request, merge, {
+            ...documents,
+            assertDispatch: () =>
+              this.#store.assertDeliveryMutationDispatch(
+                operation.id,
+                fence,
+                this.#clock(),
+                workflowDeliveryMutationCapability,
+              ),
+          }),
+      },
+      workflowDeliveryMutationCapability,
+    );
   }
 
   #commitObservedResult(

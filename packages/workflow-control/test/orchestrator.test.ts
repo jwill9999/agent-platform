@@ -1,3 +1,5 @@
+import { deriveContractMaterialDigest } from '../src/planning.js';
+import { documentFixture } from './documentFixture.js';
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -24,7 +26,10 @@ import {
   type OfficialBeadsDoltClient,
   type SpecialistProcessExecutor,
 } from '../src/index.js';
-import { workflowContainerJournalCapability } from '../src/storage.js';
+import {
+  workflowCredentialJournalCapability,
+  workflowContainerJournalCapability,
+} from '../src/storage.js';
 import { schedulerDockerFixture } from './schedulerDockerFixture.js';
 
 const roots: string[] = [];
@@ -60,7 +65,7 @@ const contract: ExecutionContract = {
       assignedRole: 'implementation_worker',
       branchParent: 'feature/schedule',
       allowedPaths: ['packages/workflow-control'],
-      allowedOperations: ['workspace.patch', 'process.test'],
+      allowedOperations: ['workspace.read', 'workspace.patch', 'process.test'],
     },
     {
       id: 'schedule-feature.2',
@@ -69,7 +74,7 @@ const contract: ExecutionContract = {
       assignedRole: 'implementation_worker',
       branchParent: 'task/schedule-feature.1',
       allowedPaths: ['packages/workflow-control'],
-      allowedOperations: ['workspace.patch', 'process.test'],
+      allowedOperations: ['workspace.read', 'workspace.patch', 'process.test'],
     },
   ],
   qualityGates: ['test'],
@@ -124,8 +129,10 @@ async function setup(
     observe: async (leaseId) => (credentialTombstones.has(leaseId) ? 'revoked' : 'active'),
     conformance: async () => 'test-generation',
   });
+  const publishDocuments = await documentFixture(contract, root, sourceRoot);
   const contractId = store.createContract(contract);
   store.createRun(contractId, state, 'run-schedule');
+  publishDocuments(store, 'run-schedule', true);
   store.recordEvidence({
     ...evidence[0]!,
     producer: 'planner',
@@ -171,7 +178,7 @@ async function setup(
           return { stdout: `${'a'.repeat(40)}\n`, stderr: '' };
         }
         if (executable === 'git' && args[0] === 'diff') {
-          return { stdout: 'packages/workflow-control/src/orchestrator.ts\n', stderr: '' };
+          return { stdout: 'packages/workflow-control/src/orchestrator.ts\0', stderr: '' };
         }
         if (executable === 'git') return { stdout: '', stderr: '' };
         if (args[0] === 'stop' || args[0] === 'rm') return { stdout: '', stderr: '' };
@@ -201,7 +208,7 @@ async function setup(
     image: 'workflow-codex:test',
     credentialBroker,
     egressNetwork: 'workflow-model-egress',
-    containerUser: '501:20',
+    containerUser: `${process.getuid!()}:${process.getgid!()}`,
     executor,
     clock: options.clock ?? (() => 1000),
     cancellationSettleMs: 20,
@@ -288,7 +295,8 @@ describe('Beads-authoritative scheduling', () => {
       kind: 'review' as const,
     };
     const contractId = store.createContract(contract);
-    store.createRun(contractId, 'approved', 'other-run');
+    // Seed historical conflicting ownership to test downstream defenses.
+    store.createRunForTest(contractId, 'approved', 'other-run');
     store.recordEvidence({
       ...foreignEvidence,
       producer: 'planner',
@@ -500,6 +508,35 @@ describe('Beads-authoritative scheduling', () => {
     store.close();
   });
 
+  it('rejects substituted scheduler input before credentials or container dispatch', async () => {
+    const { store, orchestrator, launcher, credentialBroker, transport } =
+      await setup('scheduling');
+    const workspaceLeaseEpoch = orchestrator.acquireWorkspace(1000, 1000);
+    const runLeaseEpoch = orchestrator.acquireRun('run-schedule', 1000, 1000);
+    const packet = orchestrator.createTaskPacket({
+      runId: 'run-schedule',
+      taskId: 'schedule-feature.1',
+      evidence,
+    });
+    const originalLaunch = launcher.launch.bind(launcher);
+    const issue = vi.spyOn(credentialBroker, 'issue');
+    vi.spyOn(launcher, 'launch').mockImplementation((input, reservation) =>
+      originalLaunch({ ...input, objective: 'substituted instructions' }, reservation),
+    );
+    await expect(
+      orchestrator.launchTask({
+        packet,
+        workspaceLeaseEpoch,
+        runLeaseEpoch,
+        claimTransitionId: 'substituted-claim',
+        deadlineMs: 2000,
+      }),
+    ).rejects.toThrow('specialist input differs from durable scheduler input');
+    expect(issue).not.toHaveBeenCalled();
+    expect(transport.calls.some((call) => ['create', 'start'].includes(call[0]!))).toBe(false);
+    store.close();
+  });
+
   it('launches bounded packets through the isolated launcher and releases capacity', async () => {
     const { store, orchestrator } = await setup('scheduling');
     const workspaceLeaseEpoch = orchestrator.acquireWorkspace(1000, 1000);
@@ -624,7 +661,7 @@ describe('Beads-authoritative scheduling', () => {
       observe: async () => (active ? 'active' : 'revoked'),
       conformance: async () => 'test-generation',
     });
-    const issuing = broker.issue(stagingRoot, executionId, 'test-generation');
+    const issuing = broker.issue(stagingRoot, executionId, 'test-generation', 1000);
     await broker.revoke(executionId);
     releaseIssue();
     await expect(issuing).rejects.toThrow();
@@ -695,7 +732,9 @@ if (command === 'conformance') {
     createExecution(successfulId, 'mutating');
     const stagingRoot = await mkdtemp(join(tmpdir(), 'workflow-command-broker-'));
     roots.push(stagingRoot);
-    await expect(broker.issue(stagingRoot, successfulId, 'generation-A')).resolves.toMatchObject({
+    await expect(
+      broker.issue(stagingRoot, successfulId, 'generation-A', 1000),
+    ).resolves.toMatchObject({
       leaseId: `specialist:${successfulId}`,
       generation: 'generation-A',
     });
@@ -704,14 +743,14 @@ if (command === 'conformance') {
 
     const wrongLeaseId = '99999999-9999-4999-8999-999999999999';
     createExecution(wrongLeaseId, 'read_only');
-    await expect(broker.issue(stagingRoot, wrongLeaseId, 'generation-A')).rejects.toThrow(
+    await expect(broker.issue(stagingRoot, wrongLeaseId, 'generation-A', 1000)).rejects.toThrow(
       'requested lease id',
     );
     expect(first.store.getSchedulerExecution(wrongLeaseId)?.credentialStatus).toBe('revoked');
 
     const wrongRevokeLeaseId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
     createExecution(wrongRevokeLeaseId, 'read_only');
-    await broker.issue(stagingRoot, wrongRevokeLeaseId, 'generation-A');
+    await broker.issue(stagingRoot, wrongRevokeLeaseId, 'generation-A', 1000);
     await expect(broker.revoke(wrongRevokeLeaseId)).rejects.toThrow('generation-pinned revocation');
     expect(first.store.getSchedulerExecution(wrongRevokeLeaseId)?.credentialStatus).toBe(
       'revoking',
@@ -719,7 +758,7 @@ if (command === 'conformance') {
 
     const wrongStatusGenerationId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
     createExecution(wrongStatusGenerationId, 'read_only');
-    await broker.issue(stagingRoot, wrongStatusGenerationId, 'generation-A');
+    await broker.issue(stagingRoot, wrongStatusGenerationId, 'generation-A', 1000);
     await expect(broker.revoke(wrongStatusGenerationId)).rejects.toThrow(
       'generation-pinned lease status',
     );
@@ -767,7 +806,7 @@ if (command === 'conformance') {
     const executor: SpecialistProcessExecutor = async (_executable, args) => {
       if (args[0] === 'rm') {
         cancelled = true;
-        clock = 1005;
+        clock = 2000;
         rejectStart?.(new Error('container removed'));
         signalCleanup();
         if (!settles) await cleanupAllowed;
@@ -783,8 +822,8 @@ if (command === 'conformance') {
       executor,
       clock: () => clock,
     });
-    const workspaceLeaseEpoch = orchestrator.acquireWorkspace(1000, 1000);
-    const runLeaseEpoch = orchestrator.acquireRun('run-schedule', 1000, 1000);
+    const workspaceLeaseEpoch = orchestrator.acquireWorkspace(5000, 1000);
+    const runLeaseEpoch = orchestrator.acquireRun('run-schedule', 5000, 1000);
     const packet = orchestrator.createTaskPacket({
       runId: 'run-schedule',
       taskId: 'schedule-feature.1',
@@ -800,15 +839,15 @@ if (command === 'conformance') {
         workspaceLeaseEpoch,
         runLeaseEpoch,
         claimTransitionId: 'claim-timeout-transition',
-        deadlineMs: 1005,
+        deadlineMs: 2000,
       });
       const rejected = expect(launched).rejects.toThrow('timed out');
       await started;
       const [execution] = store.listActiveSchedulerExecutions(contract.workspaceId);
       expect(execution).toBeDefined();
       expect(cancelled).toBe(false);
-      clock = 1005;
-      await vi.advanceTimersByTimeAsync(5);
+      clock = 2000;
+      await vi.advanceTimersByTimeAsync(1000);
       if (!settles) {
         await cleanupStarted;
         // The fixture holds removal pending. Expire cancel's bounded wait, then the
@@ -835,7 +874,7 @@ if (command === 'conformance') {
             id: execution!.id,
             role: packet.assignedRole,
             mode: 'mutating',
-            deadlineMs: 1005,
+            deadlineMs: 2000,
             cancelled: true,
           }),
         ).resolves.toBe(true);
@@ -915,7 +954,13 @@ if (command === 'conformance') {
     const workspaceLeaseEpoch = orchestrator.acquireWorkspace(1000, 1000);
     const runLeaseEpoch = orchestrator.acquireRun('run-schedule', 1000, 1000);
     const contractId = store.createContract(contract);
-    store.createRun(contractId, 'implementing', 'other-active-run');
+    // Seed historical conflicting ownership to test downstream defenses.
+    store.createRunForTest(contractId, 'implementing', 'other-active-run');
+    store.seedLineageApprovalForTest({
+      runId: 'other-active-run',
+      materialDigest: deriveContractMaterialDigest(contract),
+      nowMs: 0,
+    });
     const otherRunLease = store.acquireLease('run', 'other-active-run', 'owner-1', 1000, 1000);
     const otherTaskLease = store.acquireLease('task', 'schedule-feature.2', 'owner-1', 1000, 1000);
     store.createSchedulerExecution({
@@ -1139,7 +1184,7 @@ if (command === 'conformance') {
         conformance: async () => 'test-generation',
       }),
       egressNetwork: 'workflow-model-egress',
-      containerUser: '501:20',
+      containerUser: `${process.getuid!()}:${process.getgid!()}`,
       executor: transport.executor,
       clock: () => 1100,
     });
@@ -1253,7 +1298,7 @@ if (command === 'conformance') {
         image: 'workflow-codex:test',
         credentialBroker: first.credentialBroker,
         egressNetwork: 'workflow-model-egress',
-        containerUser: '501:20',
+        containerUser: `${process.getuid!()}:${process.getgid!()}`,
         executor: first.transport.executor,
         clock: () => 1100,
       }),
@@ -1389,4 +1434,59 @@ if (command === 'conformance') {
     ).toThrow('before credential revocation');
     store.close();
   });
+});
+
+it('recovers revocation after a crash between never-issued credential transitions', async () => {
+  const first = await setup('scheduling');
+  const workspaceLeaseEpoch = first.orchestrator.acquireWorkspace(100, 1000);
+  const runLeaseEpoch = first.orchestrator.acquireRun('run-schedule', 100, 1000);
+  const taskLeaseEpoch = first.orchestrator.acquireTask('schedule-feature.1', 100, 1000);
+  const executionId = '55555555-5555-4555-8555-555555555555';
+  first.store.createSchedulerExecution({
+    id: executionId,
+    workspaceId: contract.workspaceId,
+    runId: 'run-schedule',
+    taskId: 'schedule-feature.1',
+    role: 'implementation_worker',
+    mode: 'mutating',
+    deadlineMs: 1500,
+    ownerId: 'owner-1',
+    workspaceLeaseEpoch,
+    runLeaseEpoch,
+    taskLeaseEpoch,
+    processIdentity: `docker:workflow-specialist-${executionId}`,
+    credentialLeaseId: `specialist:${executionId}`,
+    packet: { taskId: 'schedule-feature.1' },
+    nowMs: 1000,
+  });
+  first.store.advanceSchedulerCredential(
+    { id: executionId, leaseId: `specialist:${executionId}`, from: ['pending'], to: 'revoking' },
+    workflowCredentialJournalCapability,
+  );
+  const path = join(first.root, 'workflow.sqlite');
+  first.store.close();
+  const store = new WorkflowStore(path);
+  let externalCalls = 0;
+  const broker = RevocableSpecialistCredentialBroker.createForTest({
+    store,
+    issue: async () => {
+      throw new Error('never issue');
+    },
+    revoke: async () => {
+      externalCalls++;
+    },
+    observe: async () => {
+      externalCalls++;
+      return 'revoked';
+    },
+    conformance: async () => 'unused',
+  });
+  try {
+    expect(store.getSchedulerExecution(executionId)?.credentialBrokerGeneration).toBeNull();
+    await broker.revoke(executionId);
+    expect(store.getSchedulerExecution(executionId)?.credentialStatus).toBe('revoked');
+    expect(externalCalls).toBe(0);
+  } finally {
+    store.close();
+  }
 });

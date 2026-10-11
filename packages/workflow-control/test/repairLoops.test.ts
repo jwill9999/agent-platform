@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
@@ -20,7 +21,7 @@ import { workflowRepairMutationCapability } from '../src/storage.js';
 
 const roots: string[] = [];
 const policyDigest = `sha256:${'a'.repeat(64)}`;
-const workspaceId = `sha256:${'b'.repeat(64)}`;
+let workspaceId = `sha256:${'b'.repeat(64)}`;
 const failureHead = 'a'.repeat(40);
 const repairedHead = 'b'.repeat(40);
 const otherHead = 'c'.repeat(40);
@@ -107,8 +108,11 @@ async function setup(overrides?: Partial<ExecutionContract['retryPolicy']>) {
   };
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
+  const publishDocuments = await documentFixture(effectiveContract, root);
+  workspaceId = effectiveContract.workspaceId;
   const contractId = store.createContract(effectiveContract);
   const run = store.createRun(contractId, 'repair', 'run-repair');
+  publishDocuments(store, 'run-repair', true);
   const ownerId = 'repair-owner';
   const fence = {
     workspaceLeaseEpoch: store.acquireLease('workspace', workspaceId, ownerId, 1000, 1000).epoch,
@@ -424,8 +428,9 @@ describe('DurableRepairCoordinator', () => {
 
   it('rejects cross-run, cross-task, and wrong-producer evidence bindings', async () => {
     const { store, coordinator } = await setup();
-    const contractId = store.createContract(contract);
-    store.createRun(contractId, 'repair', 'other-run');
+    const contractId = store.createContract(store.getExecutionContract('run-repair'));
+    // Seed historical conflicting ownership to test downstream defenses.
+    store.createRunForTest(contractId, 'repair', 'other-run');
     const crossRun = evidence('9');
     const crossTask = evidence('a');
     const wrongProducer = evidence('b');
@@ -865,7 +870,7 @@ describe('DurableRepairCoordinator', () => {
       'stale or expired workspace',
     );
     expect(() => coordinator.accept('dispatch-fenced', acceptedResult(verifierEvidence))).toThrow(
-      'stale or expired workspace',
+      'document_lease_stale',
     );
     expect(() =>
       coordinator.dispatch({
@@ -874,7 +879,7 @@ describe('DurableRepairCoordinator', () => {
         hypothesis: 'stale owner retry',
         change: { kind: 'hypothesis', value: 'stale owner retry' },
       }),
-    ).toThrow('stale or expired workspace');
+    ).toThrow('document_lease_stale');
 
     const current = DurableRepairCoordinator.createForTest({
       store,
@@ -907,7 +912,7 @@ describe('DurableRepairCoordinator', () => {
         hypothesis: 'expired repair',
         change: { kind: 'hypothesis', value: 'expired repair' },
       }),
-    ).toThrow('stale or expired workspace');
+    ).toThrow('document_lease_stale');
     store.close();
   });
 
@@ -1126,4 +1131,42 @@ describe('DurableRepairCoordinator', () => {
     });
     recoveredStore.close();
   });
+});
+
+it('retains the original finding budget while binding a subsequent failure to newer evidence', async () => {
+  const { store, coordinator } = await setup();
+  const first = evidence('a', 'review'),
+    next = evidence('b', 'review');
+  recordEvidence(store, first, 'code_reviewer', { createdAtMs: 1000, headSha: failureHead });
+  recordEvidence(store, next, 'code_reviewer', { createdAtMs: 1100, headSha: repairedHead });
+  const original = finding('review', 'code_reviewer', first, 'repeated-finding');
+  coordinator.dispatch({
+    dispatchId: 'first-attempt',
+    finding: original,
+    hypothesis: 'first fix',
+    change: { kind: 'hypothesis', value: 'first fix' },
+  });
+  coordinator.cancel('first-attempt', 'later verification failed');
+  expect(() =>
+    coordinator.dispatch({
+      dispatchId: 'bad-attempt',
+      finding: original,
+      observation: { ...original, evidence: [next], producerRole: 'test_runner' },
+      hypothesis: 'second fix',
+      change: { kind: 'hypothesis', value: 'second fix' },
+    }),
+  ).toThrow('observation changes finding identity');
+  const retry = coordinator.dispatch({
+    dispatchId: 'second-attempt',
+    finding: original,
+    observation: { ...original, evidence: [next], summary: 'still failing after first repair' },
+    hypothesis: 'second fix',
+    change: { kind: 'hypothesis', value: 'second fix' },
+  });
+  expect(retry).toMatchObject({
+    kind: 'dispatch',
+    dispatch: { findingAttempt: 2, failureHeadSha: repairedHead },
+    packet: { canonicalFinding: original, evidence: [next], remainingBudget: { finding: 0 } },
+  });
+  store.close();
 });

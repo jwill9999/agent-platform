@@ -131,6 +131,80 @@ function treeEvidence(
 }
 
 describe('LocalGitDeliveryPort', () => {
+  it('commits the verified task worktree and rejects changed normative blobs in an adopted tree', async () => {
+    const { root, port } = await setupGit();
+    const path = 'reviewed-spec.md';
+    const bytes = 'Approved requirements\n';
+    await writeFile(join(root, path), bytes);
+    git(root, ['add', path]);
+    git(root, ['commit', '-qm', 'approved documents']);
+    const parentSha = git(root, ['rev-parse', 'HEAD']).trim();
+    const taskRoot = `${root}-task`;
+    roots.push(taskRoot);
+    git(root, ['worktree', 'add', '-b', 'task/delivery-feature.7', taskRoot]);
+    const documents = {
+      sourceRoot: taskRoot,
+      assertDispatch: () => undefined, // Standalone adapter fixture; broker tests exercise the real fence.
+      manifest: {
+        version: 1 as const,
+        workspaceId,
+        repository: 'example/repository',
+        sourceRevision: parentSha,
+        files: [
+          {
+            path,
+            kind: 'specification' as const,
+            taskIds: ['delivery-feature.7'],
+            sizeBytes: Buffer.byteLength(bytes),
+            digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+          },
+        ],
+      },
+    };
+    await writeFile(join(root, path), 'Unapproved canonical changes\n');
+    await writeFile(
+      join(taskRoot, 'packages/workflow-control/src/base.ts'),
+      'export const base = 2;\n',
+    );
+    const request: DeliveryRequest = {
+      ...binding(),
+      kind: 'git.commit',
+      ref: 'refs/heads/task/delivery-feature.7',
+      parentSha,
+      ...treeEvidence(taskRoot, parentSha),
+      changedFiles: ['packages/workflow-control/src/base.ts'],
+      message: 'delivery-feature.7 implement',
+      authorName: 'Agent Platform',
+      authorEmail: 'agent@example.com',
+      authoredAtUnix: 1700000000,
+    };
+    const result = (await port.mutate(request, undefined, documents)) as { sha: string };
+    expect(git(taskRoot, ['show', `${result.sha}:${path}`])).toBe(bytes);
+    await expect(port.observe(request, documents)).resolves.toMatchObject({ kind: 'expected' });
+    // Caller-approved tree metadata cannot authorize a changed normative blob.
+    await writeFile(join(taskRoot, path), 'Changed requirements\n');
+    const changed = {
+      ...request,
+      parentSha: result.sha,
+      ...treeEvidence(taskRoot, result.sha),
+      changedFiles: [path],
+    };
+    await expect(port.mutate(changed, undefined, documents)).rejects.toThrow(
+      'approved document bytes',
+    );
+    expect(git(taskRoot, ['rev-parse', request.ref]).trim()).toBe(result.sha);
+    // Simulate an externally-created candidate: reconciliation must reject it as well.
+    const external = LocalGitDeliveryPort.createForTest({
+      workspaceRoot: taskRoot,
+      remoteName: 'origin',
+      remote: new MemoryRemoteRefClient(null),
+      gitBinary: '/usr/bin/git',
+    });
+    const adopted = (await external.mutate(changed)) as { sha: string };
+    expect(adopted.sha).not.toBe(result.sha);
+    await expect(port.observe(changed, documents)).resolves.toMatchObject({ kind: 'conflict' });
+  });
+
   it('captures and freezes the reviewed production dispatch methods', async () => {
     const { parentSha, port } = await setupGit();
     const githubClient: NarrowGitHubDeliveryClient = {
@@ -153,11 +227,12 @@ describe('LocalGitDeliveryPort', () => {
       redirected = true;
       return { sha: '9'.repeat(40) };
     };
-    (CompositeDeliveryMutationPort.prototype as { mutate?: () => Promise<unknown> }).mutate =
-      async () => {
-        redirected = true;
-        return { sha: '8'.repeat(40) };
-      };
+    (
+      CompositeDeliveryMutationPort.prototype as unknown as { mutate?: () => Promise<unknown> }
+    ).mutate = async () => {
+      redirected = true;
+      return { sha: '8'.repeat(40) };
+    };
 
     try {
       await composite.mutate(createRefRequest(parentSha));
@@ -167,8 +242,9 @@ describe('LocalGitDeliveryPort', () => {
       });
       expect(Object.isFrozen(composite)).toBe(true);
     } finally {
-      delete (CompositeDeliveryMutationPort.prototype as { mutate?: () => Promise<unknown> })
-        .mutate;
+      delete (
+        CompositeDeliveryMutationPort.prototype as unknown as { mutate?: () => Promise<unknown> }
+      ).mutate;
     }
   });
 

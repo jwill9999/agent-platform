@@ -1,0 +1,33 @@
+{
+  "reviewId": "document-binding-round2",
+  "runId": "proposed-document-binding",
+  "plannerId": "coordinator-planner",
+  "criticId": "isolated-plan-critic-round2",
+  "contractVersion": 1,
+  "policyDigest": "sha256:7343dacd2a810a02bb3aefc6962ab568b075dfe31099fbe43be4de20998d5a9e",
+  "materialDigest": "sha256:0ec6f078ef119f50b0a8d0e032204897d9e39884209583be480597f4428069a1",
+  "verdict": "approved",
+  "summary": "No unresolved plan findings identified in the supplied plan, specification, verification material and source evidence. DB-R1-01 is addressed at the design level: a durably committed, fenced verification attempt precedes reads and effects; unresolved attempts prevent recovered authority, including after original bytes are restored; recovery requires explicit invalidation and fresh critique/approval. Required compound failure, restart, concurrency and migration tests cover that protocol. The plan also requires an exhaustive approval-consumer inventory and negative tests before completion. This verdict assesses the proposed design only; implementation and test results remain unproven. It grants no owner approval or implementation authority. Delivery remains a feature-branch review PR with human-controlled integration and no automatic merge or pilot execution.",
+  "evidence": [
+    {
+      "digest": "sha256:0eb57cb15418bfb56078767db226c1c4e38b47840f7310d406ea9d4d755aace8",
+      "mediaType": "text/markdown",
+      "sizeBytes": 16374,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:7ed8ef3aafe61e082e5bd649254400f31f92936ae1541618620d7ded1df28a25",
+      "mediaType": "text/markdown",
+      "sizeBytes": 3609,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:86ba87f34604abf79ec0d382fcdebdc3b1d856ea05b670adf029f227661d4f27",
+      "mediaType": "text/markdown",
+      "sizeBytes": 7703,
+      "kind": "artifact"
+    }
+  ],
+  "findings": [],
+  "humanDecision": null
+}

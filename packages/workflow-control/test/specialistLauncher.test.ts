@@ -63,6 +63,28 @@ describe('specialist launcher', () => {
     await expect(readFile(join(workspace.codexHome, 'auth.json'), 'utf8')).resolves.toBe('{}\n');
   });
 
+  it.each(['new-subtree', 'nested/deeper/new.ts'])(
+    'stages an absent approved destination: %s',
+    async (path) => {
+      const source = await mkdtemp(join(tmpdir(), 'workflow-source-'));
+      cleanup.push(source);
+      await writeFile(join(source, 'unapproved.txt'), 'excluded');
+      const workspace = await prepareSpecialistWorkspace(source, [path]);
+      cleanup.push(join(workspace.root, '..'));
+      await expect(stat(join(workspace.root, path))).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(stat(join(workspace.root, 'unapproved.txt'))).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
+      await mkdir(join(workspace.root, 'nested/deeper'), { recursive: true });
+      await writeFile(join(workspace.root, path), 'new');
+      await expect(stat(join(source, path))).rejects.toMatchObject({ code: 'ENOENT' });
+      await symlink(source, join(source, 'alias'));
+      await expect(prepareSpecialistWorkspace(source, ['alias/missing.ts'])).rejects.toThrow(
+        'symlinks',
+      );
+    },
+  );
+
   it('builds a hardened codex exec container invocation with only private mounts', async () => {
     const privateRoot = await mkdtemp(join(tmpdir(), 'workflow-specialist-'));
     cleanup.push(privateRoot);
@@ -84,8 +106,9 @@ describe('specialist launcher', () => {
       promptFile,
       egressNetwork: 'workflow-model-egress',
       role: 'implementation_worker',
+      allowedOperations: ['workspace.read', 'workspace.patch', 'process.test', 'artifact.write'],
       runId: 'run-1',
-      containerUser: '501:20',
+      containerUser: `${process.getuid!()}:${process.getgid!()}`,
     });
     expect(launch.args).toEqual(
       expect.arrayContaining([
@@ -97,7 +120,7 @@ describe('specialist launcher', () => {
         '--network',
         'workflow-model-egress',
         '--user',
-        '501:20',
+        `${process.getuid!()}:${process.getgid!()}`,
         'sh',
         '-c',
       ]),
@@ -116,8 +139,12 @@ describe('specialist launcher', () => {
         promptFile,
         egressNetwork: 'workflow-model-egress',
         role,
+        allowedOperations:
+          role === 'implementation_worker'
+            ? ['workspace.read', 'workspace.patch']
+            : ['workspace.read'],
         runId: 'preapproval-review',
-        containerUser: '501:20',
+        containerUser: `${process.getuid!()}:${process.getgid!()}`,
       });
       expect(reviewer.args).toContain(`${canonicalWorkspaceRoot}:/workspace:ro`);
       expect(reviewer.args).not.toContain(`${canonicalWorkspaceRoot}:/workspace:rw`);
@@ -133,7 +160,7 @@ describe('specialist launcher', () => {
     await writeFile(join(outside, 'secret.txt'), 'secret');
     await symlink(join(outside, 'secret.txt'), join(source, 'escape'));
     await expect(prepareSpecialistWorkspace(source, ['escape'])).rejects.toThrow(
-      'escapes the repository',
+      'symlinks are forbidden',
     );
     await expect(prepareSpecialistWorkspace(source, ['.git'])).rejects.toThrow('forbidden');
   });
@@ -149,6 +176,7 @@ describe('specialist launcher', () => {
       promptFile: join(root, 'prompt'),
       egressNetwork: 'host',
       role: 'implementation_worker',
+      allowedOperations: ['workspace.read', 'workspace.patch', 'process.test', 'artifact.write'],
       runId: 'run-1',
     };
     await expect(buildDockerSpecialistLaunch(request)).rejects.toThrow(

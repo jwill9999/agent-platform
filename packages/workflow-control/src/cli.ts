@@ -1,5 +1,13 @@
 #!/usr/bin/env node
+import { discoverCanonicalRuns } from './runDiscovery.js';
+import {
+  runDevelopmentCommand,
+  classifyDevelopmentError,
+  developmentExitCode,
+} from './developmentHost.js';
 import { resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { realpathSync, existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
 
@@ -20,7 +28,7 @@ import {
 
 function usage(): never {
   throw new Error(
-    'usage: workflow-control <migrate|status|timeline|coordinator|host-conformance|phase-runtime|standalone-conformance|bootstrap-preflight> <database-path> [run-id|runtime-config.json] [bootstrap-policy.json]',
+    'usage: workflow-control discover <codex-home> <workspace-root> <task-id> [material-digest] [policy-digest]; workflow-control <migrate|status|timeline|validate-documents|coordinator|host-conformance|phase-runtime|standalone-conformance|bootstrap-preflight> <database-path> [run-id|runtime-config.json] [task-id|bootstrap-policy.json]',
   );
 }
 
@@ -52,12 +60,75 @@ export async function runPhaseRuntimeCli(
   runtime.start();
 }
 
+function validateDocumentsCommand(path: string, runId: string, taskId: string): string {
+  if (!existsSync(resolve(path)))
+    return JSON.stringify({ passed: false, reason: 'document_database_missing' });
+  let validationStore: WorkflowStore | undefined;
+  try {
+    validationStore = new WorkflowStore(resolve(path));
+    const binding = validationStore.verifyPlanningDocuments({
+      runId,
+      taskId: taskId,
+      ownerId: 'operator-validation',
+      boundary: 'operator.validate',
+    });
+    return JSON.stringify({ passed: true, runId, taskId: taskId, binding });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const reasons = new Set([
+      'document_run_missing',
+      'document_manifest_required',
+      'document_publication_missing',
+      'document_task_unknown',
+      'document_approval_required',
+      'document_verification_unresolved',
+      'document_approval_changed',
+      'document_attempt_stale',
+      'planning_documents_changed',
+    ]);
+    return JSON.stringify({
+      passed: false,
+      reason: reasons.has(message) ? message : 'document_validation_failed',
+    });
+  } finally {
+    validationStore?.close();
+  }
+}
+
+function discoverCommand(args: readonly string[], path: string, runId: string | undefined): string {
+  if (!runId || !args[3] || args.length > 6) usage();
+  return JSON.stringify(
+    discoverCanonicalRuns({
+      codexHome: path,
+      workspaceRoot: runId,
+      taskId: args[3],
+      ...(args[4] === undefined ? {} : { materialDigest: args[4] }),
+      ...(args[5] === undefined ? {} : { policyDigest: args[5] }),
+    }),
+  );
+}
+
 export function runCli(args: readonly string[]): string {
   const [command, path, runId] = args;
   if (command === undefined || path === undefined) usage();
+  if (command === 'discover') return discoverCommand(args, path, runId);
+  if (command === 'validate-documents') {
+    if (!runId || !args[3] || args.length !== 4) usage();
+    return validateDocumentsCommand(path, runId, args[3]);
+  }
   const store = new WorkflowStore(resolve(path));
   try {
-    if (command === 'migrate') return JSON.stringify({ ok: true, database: resolve(path) });
+    if (command === 'migrate') {
+      if (runId !== undefined) {
+        const workspaceId = `sha256:${createHash('sha256').update(realpathSync(runId)).digest('hex')}`;
+        store.bindWorkspaceIdentity(workspaceId);
+      }
+      return JSON.stringify({
+        ok: true,
+        database: resolve(path),
+        workspaceBound: runId !== undefined,
+      });
+    }
     if ((command === 'status' || command === 'timeline') && runId !== undefined) {
       const journal = new ContinuationJournal(resolve(path));
       try {
@@ -137,6 +208,13 @@ if (
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
   try {
+    if (process.argv[2]?.startsWith('development-')) {
+      if (process.argv.length !== 4 || !process.argv[3]) usage();
+      process.stdout.write(
+        JSON.stringify(await runDevelopmentCommand(process.argv[2], process.argv[3])) + '\n',
+      );
+      process.exit(0);
+    }
     if (process.argv[2] === 'bootstrap-preflight') {
       const [database, runId, policyPath] = process.argv.slice(3);
       if (!database || !runId || !policyPath) usage();
@@ -149,9 +227,26 @@ if (
     if (process.argv[2] === 'phase-runtime' || process.argv[2] === 'standalone-conformance')
       await runPhaseRuntimeCli(process.argv.slice(3), process.argv[2] === 'standalone-conformance');
     else if (process.argv[2] === 'coordinator') await runCoordinatorCli(process.argv.slice(3));
-    else process.stdout.write(`${runCli(process.argv.slice(2))}\n`);
+    else {
+      const result = runCli(process.argv.slice(2));
+      process.stdout.write(`${result}\n`);
+      if (process.argv[2] === 'validate-documents' && JSON.parse(result).passed !== true)
+        process.exitCode = 1;
+    }
   } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exitCode = 1;
+    if (process.argv[2]?.startsWith('development-')) {
+      process.stderr.write(
+        JSON.stringify({
+          code: classifyDevelopmentError(error),
+          recoveryAction:
+            'inspect development-status and the private configuration; retry development-recover after resolving the cause',
+        }) + '\n',
+      );
+      const code = classifyDevelopmentError(error);
+      process.exitCode = developmentExitCode(code);
+    } else {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      process.exitCode = 1;
+    }
   }
 }

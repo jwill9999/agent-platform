@@ -391,3 +391,23 @@ export {
   observeBootstrapCandidate,
   type BootstrapPolicy,
 } from './bootstrapPolicy.js';
+
+export {
+  prepareReviewSnapshot,
+  prepareSupervisedReview,
+  executeSupervisedReview,
+  type ReviewSnapshot,
+  type SupervisedReviewRequest,
+  type PreparedSupervisedReview,
+} from './supervisedReview.js';
+
+export {
+  planningDocumentSchema,
+  planningDocumentsSchema,
+  canonicalPlanningDocuments,
+  planningDocumentsDigest,
+  publishPlanningDocumentObjects,
+  type PlanningDocuments,
+} from './planningDocuments.js';
+
+export { discoverCanonicalRuns, type RunInventory } from './runDiscovery.js';

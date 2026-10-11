@@ -16,14 +16,19 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 
+import { JOURNEY_CALL_ID, JOURNEY_MODEL, startJourneyProvider } from './support/providerJourney.js';
 import { getOpenPort } from './support/runtime.js';
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
-const GIT_BINARY = '/usr/bin/git';
+const GIT_BINARY = process.env.AGENT_PLATFORM_E2E_GIT_BINARY ?? '/usr/bin/git';
 const HOST_ONLY_CANARY_ENV = 'HOST_ONLY_CANARY';
 const HOST_ONLY_CANARY_VALUE = ['host', 'only', 'packaged', 'vm', 'e2e', 'canary'].join('-');
 const VM_E2E_MARKER_COMMAND = 'pwd';
+const JOURNEY_COMMAND = "printf 'approved change\\n' >> journey.txt";
+const JOURNEY_BEFORE = 'original content\n';
+const JOURNEY_AFTER = `${JOURNEY_BEFORE}approved change\n`;
+const JOURNEY_FINAL = 'Evaluation turn finished';
 const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 type VmFixtureHealth = 'ready' | 'failed';
@@ -110,6 +115,631 @@ test.describe('packaged Electron macOS VM command runner', () => {
   });
 });
 
+const journeyCases = (['node-double', 'provider-http'] as const).flatMap((reasoning) =>
+  (['approve', 'reject'] as const).flatMap((decision) =>
+    (reasoning === 'provider-http' ? [false, true] : [false]).map((reload) => ({
+      reasoning,
+      decision,
+      reload,
+      failFirst: false,
+    })),
+  ),
+);
+journeyCases.push({
+  reasoning: 'provider-http',
+  decision: 'approve',
+  reload: false,
+  failFirst: true,
+});
+for (const { reasoning, decision, reload, failFirst } of journeyCases) {
+  test(`Project Chat disposable edit: ${decision} with backend evidence (${reasoning}${reload ? ', reload recovery' : ''}${failFirst ? ', transient retry' : ''})`, async () => {
+    const fixture = await createVmFixture({ health: 'ready' });
+    const file = join(fixture.projectDir, 'journey.txt');
+    writeFileSync(file, JOURNEY_BEFORE);
+    const provider =
+      reasoning === 'provider-http'
+        ? await startJourneyProvider(JOURNEY_COMMAND, JOURNEY_FINAL, { failFirst })
+        : undefined;
+    let app: ElectronApplication | undefined;
+    let approval: ApprovalEvidence | undefined;
+    let audits: AuditEvidence[] = [];
+    const duplicateResumes: Array<{ status: number; body: unknown }> = [];
+    let messages: Array<{ role: string; content: string }> = [];
+    const streams: Array<{ status: number; events: unknown[] }> = [];
+    const captures: Promise<void>[] = [];
+    const milestones: Array<{ event: string; at: string }> = [];
+    const mark = (event: string) => milestones.push({ event, at: new Date().toISOString() });
+    let tracing = false;
+    try {
+      app = await launchVmFixture(fixture, {
+        command: JOURNEY_COMMAND,
+        finalText: JOURNEY_FINAL,
+        providerURL: provider?.baseURL,
+      });
+      if (provider) await configureJourneyModel(fixture);
+      await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
+      tracing = true;
+      const page = await app.firstWindow();
+      page.on('response', (response) => {
+        if (!response.headers()['content-type']?.includes('application/x-ndjson')) return;
+        captures.push(
+          response
+            .text()
+            .then((body) => {
+              const events = body
+                .split('\n')
+                .filter(Boolean)
+                .map((line) => {
+                  try {
+                    return JSON.parse(line) as unknown;
+                  } catch {
+                    return { type: 'unparsed_event' };
+                  }
+                });
+              streams.push({ status: response.status(), events });
+            })
+            .catch(() => {
+              streams.push({ status: response.status(), events: [{ type: 'capture_failed' }] });
+            }),
+        );
+      });
+      await openProject(page);
+      if (fixture.realVmRuntimeDir) startRealVmRunner(fixture);
+      await sendChatMessage(page, '/init');
+      await expect(page.getByRole('button', { name: 'Approve instructions' })).toBeVisible();
+      await page.getByRole('button', { name: 'Approve instructions' }).click();
+      await expect(page.getByText('Project instructions approved').last()).toBeVisible();
+      mark('project_onboarding_approved');
+      await sendChatMessage(page, 'Append one line saying approved change to journey.txt.');
+      const card = page.getByTestId('approval-card').last();
+      await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+      expect(readFileSync(file, 'utf8')).toBe(JOURNEY_BEFORE);
+      const pending = await readEvidence<ApprovalEvidence>(fixture, 'approval-requests');
+      approval = pending.find((row) => row.toolName === 'sys_bash');
+      expect(approval?.status).toBe('pending');
+      if (provider) {
+        expect(provider.requests).toHaveLength(1);
+        expect(provider.requests[0]?.messages.some((m) => m.role === 'tool')).toBe(false);
+      }
+      mark('approval_pending_file_unchanged');
+      if (reload) {
+        await Promise.all(captures);
+        await page.reload();
+        await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+        const restored = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
+          (row) => row.id === approval?.id,
+        );
+        expect(restored).toEqual(approval);
+        expect(readFileSync(file, 'utf8')).toBe(JOURNEY_BEFORE);
+        expect(provider?.requests).toHaveLength(1);
+        mark('pending_approval_restored_after_reload');
+      }
+      await card
+        .getByRole('button', { name: decision === 'approve' ? 'Approve' : 'Deny', exact: true })
+        .click();
+      await expect(card).toContainText(
+        decision === 'approve' ? 'Approved action completed' : 'Denied',
+        { timeout: 20_000 },
+      );
+      const hasEvent = (type: string, code?: string) =>
+        streams
+          .flatMap((stream) => stream.events)
+          .some((event) => {
+            if (typeof event !== 'object' || event === null) return false;
+            const row = event as { type?: string; code?: string };
+            return row.type === type && (code === undefined || row.code === code);
+          });
+      expect(hasEvent('approval_required')).toBe(true);
+      // The denial card updates before the resume response is received. Promise.all(captures)
+      // only covers responses already observed, so wait for the terminal stream evidence itself.
+      await expect
+        .poll(() =>
+          hasEvent(
+            decision === 'approve' ? 'tool_result' : 'error',
+            decision === 'reject' ? 'APPROVAL_REJECTED' : undefined,
+          ),
+        )
+        .toBe(true);
+      await Promise.all(captures);
+      approval = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
+        (row) => row.id === approval?.id,
+      );
+      audits = (await readEvidence<AuditEvidence>(fixture, 'tool-executions')).filter(
+        (row) => row.sessionId === approval?.sessionId && row.toolName === 'sys_bash',
+      );
+      expect(approval?.status).toBe(decision === 'approve' ? 'approved' : 'rejected');
+      expect(approval?.resumedAtMs).toEqual(expect.any(Number));
+      expect(readFileSync(file, 'utf8')).toBe(
+        decision === 'approve' ? JOURNEY_AFTER : JOURNEY_BEFORE,
+      );
+      const successes = audits.filter((row) => row.status === 'success');
+      expect(successes).toHaveLength(decision === 'approve' ? 1 : 0);
+      if (decision === 'reject') expect(audits.some((row) => row.status === 'denied')).toBe(true);
+      await Promise.all(captures);
+      await expect
+        .poll(
+          () =>
+            readBackendEvents(fixture).filter(
+              (row) => row.sessionId === approval?.sessionId && row.kind === 'task_end',
+            ).length,
+        )
+        .toBe(2);
+      const lifecycle = readBackendEvents(fixture).filter(
+        (row) => row.sessionId === approval?.sessionId,
+      );
+      const starts = lifecycle.filter((row) => row.kind === 'task_start');
+      expect(starts).toHaveLength(2);
+      expect(new Set(starts.map((row) => row.runId)).size).toBe(2);
+      for (const start of starts) {
+        expect(start.runId).toEqual(expect.any(String));
+        expect(start.correlationId).toEqual(expect.any(String));
+        const ends = lifecycle.filter(
+          (row) => row.kind === 'task_end' && row.runId === start.runId,
+        );
+        expect(ends).toHaveLength(1);
+        expect(ends[0]?.correlationId).toBe(start.correlationId);
+        expect(Number.isFinite(Date.parse(start.at ?? ''))).toBe(true);
+        expect(Date.parse(ends[0]?.at ?? '')).toBeGreaterThanOrEqual(Date.parse(start.at!));
+      }
+      if (provider) {
+        expect(provider.errors).toEqual([]);
+        expect(provider.attempts.map((attempt) => attempt.status)).toEqual(
+          failFirst ? [503, 200, 200] : [200, 200],
+        );
+        expect(provider.requests).toHaveLength(2);
+        const result = provider.requests[1]?.messages.find(
+          (m) => m.role === 'tool' && m.tool_call_id === JOURNEY_CALL_ID,
+        );
+        expect(result).toBeDefined();
+        await expect(page.getByText(JOURNEY_FINAL).last()).toBeVisible();
+        messages = await readEvidence<{ role: string; content: string }>(
+          fixture,
+          `sessions/${approval!.sessionId}/messages`,
+        );
+        expect(
+          messages.filter((m) => m.role === 'assistant' && m.content === JOURNEY_FINAL),
+        ).toHaveLength(1);
+        expect(JSON.stringify(result?.content)).toContain(
+          decision === 'reject' ? 'APPROVAL_REJECTED' : 'The command completed successfully.',
+        );
+      }
+      if (reload) {
+        const messagesBefore = messages;
+        const auditsBefore = audits;
+        await Promise.all(
+          [0, 1].map(async () => {
+            const response = await fetch(
+              `http://127.0.0.1:${fixture.backendPort}/v1/sessions/${approval!.sessionId}/resume`,
+              {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ approvalRequestId: approval!.id }),
+                signal: AbortSignal.timeout(5_000),
+              },
+            );
+            const body = (await response.json()) as { data?: ApprovalEvidence };
+            duplicateResumes.push({ status: response.status, body });
+            expect(response.status).toBe(200);
+            expect(body.data?.id).toBe(approval!.id);
+            expect(body.data?.resumedAtMs).toBe(approval!.resumedAtMs);
+          }),
+        );
+        messages = await readEvidence(fixture, `sessions/${approval!.sessionId}/messages`);
+        audits = (await readEvidence<AuditEvidence>(fixture, 'tool-executions')).filter(
+          (row) => row.sessionId === approval!.sessionId && row.toolName === 'sys_bash',
+        );
+        expect(messages).toEqual(messagesBefore);
+        expect(audits).toEqual(auditsBefore);
+        expect(provider?.requests).toHaveLength(2);
+        expect(readFileSync(file, 'utf8')).toBe(
+          decision === 'approve' ? JOURNEY_AFTER : JOURNEY_BEFORE,
+        );
+        mark('duplicate_completed_resumes_no_new_effect');
+      }
+      mark('turn_settled_file_and_audit_verified');
+    } finally {
+      // Snapshot durable evidence even when a UI assertion fails; never repair or manufacture it.
+      approval =
+        (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests').catch(() => [])).find(
+          (row) => row.toolName === 'sys_bash',
+        ) ?? approval;
+      audits = (
+        await readEvidence<AuditEvidence>(fixture, 'tool-executions').catch(() => audits)
+      ).filter((row) => row.toolName === 'sys_bash');
+      if (app && tracing) {
+        const tracePath = test.info().outputPath('journey-trace.zip');
+        await app.context().tracing.stop({ path: tracePath });
+        await test
+          .info()
+          .attach('journey-browser-trace', { path: tracePath, contentType: 'application/zip' });
+      }
+      await app?.close();
+      await provider?.close();
+      await Promise.all(captures);
+      stopRealVmRunner(fixture);
+      if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
+      try {
+        const backendEvents = readBackendEvents(fixture);
+        const evaluation = {
+          decision,
+          reasoning,
+          reload,
+          duplicateResumes,
+          sourceRevision: execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], {
+            cwd: repoRoot,
+            encoding: 'utf8',
+          }).trim(),
+          providerRequests: provider?.requests,
+          providerErrors: provider?.errors,
+          providerAttempts: provider?.attempts,
+          failFirst,
+          messages,
+          passed: milestones.some(
+            (entry) => entry.event === 'turn_settled_file_and_audit_verified',
+          ),
+          executionMode: `${reasoning}-${fixture.realVmRuntimeDir ? 'real-vm' : 'fixture-runner'}`,
+          before: JOURNEY_BEFORE,
+          after: existsSync(file) ? readFileSync(file, 'utf8') : null,
+          approval,
+          audits,
+          milestones,
+          backendEvents,
+          streams,
+          limitations: [
+            provider
+              ? 'Real provider factory, SDK and reasoning; HTTP responses scripted. Ordinary chat excludes evaluator nodes.'
+              : 'Model reasoning node is deterministic; evaluator nodes are disabled by existing E2E mode.',
+            'Default runner is a fixed-command test double, not VM isolation evidence.',
+            'Internal harness graph trace is not exported as a complete durable span timeline.',
+            'Resume may use a new run identifier; approval/session identifiers link the phases.',
+          ],
+        };
+        const evidencePath = test.info().outputPath('journey-evaluation.json');
+        writeFileSync(
+          evidencePath,
+          JSON.stringify(evaluation, null, 2).replaceAll(fixture.tempRoot, '<disposable-root>'),
+        );
+        await test
+          .info()
+          .attach('journey-evaluation', { path: evidencePath, contentType: 'application/json' });
+        await test.info().attach('journey-summary', {
+          body: Buffer.from(
+            [
+              `# Project Chat ${decision} evaluation`,
+              `Result: ${evaluation.passed ? 'PASS' : 'FAIL — inspect evidence and Playwright trace'}`,
+              `Mode: ${evaluation.executionMode}`,
+              `Backend events captured: ${backendEvents.length}`,
+              `Durable approval: ${approval?.status ?? 'unavailable'}`,
+              `Tool audit records: ${audits.length}`,
+              ...evaluation.limitations,
+            ].join('\n\n'),
+          ),
+          contentType: 'text/markdown',
+        });
+      } finally {
+        rmSync(fixture.tempRoot, { recursive: true, force: true });
+      }
+    }
+  });
+}
+
+for (const { policy, unavailableFiles, action } of [
+  { policy: 'ask', unavailableFiles: false, action: 'shell-write' },
+  { policy: 'auto', unavailableFiles: false, action: 'shell-write' },
+  { policy: 'block', unavailableFiles: false, action: 'shell-write' },
+  { policy: 'block', unavailableFiles: true, action: 'shell-write' },
+  { policy: 'ask', unavailableFiles: false, action: 'direct-write' },
+  { policy: 'auto', unavailableFiles: false, action: 'direct-write' },
+  { policy: 'ask', unavailableFiles: false, action: 'direct-revoked' },
+  { policy: 'block', unavailableFiles: false, action: 'direct-write' },
+  { policy: 'block', unavailableFiles: false, action: 'direct-read' },
+  { policy: 'block', unavailableFiles: false, action: 'network' },
+] as const) {
+  test(`Project Chat permission policy: ${action} ${policy} with ${unavailableFiles ? 'unavailable file listing' : 'persisted backend effects'}`, async () => {
+    const fixture = await createVmFixture({ health: 'ready' });
+    const file = join(fixture.projectDir, 'journey.txt');
+    writeFileSync(file, JOURNEY_BEFORE);
+    const revoked = action === 'direct-revoked';
+    const directWrite = action === 'direct-write' || revoked;
+    const readOnly = action === 'direct-read';
+    const denied = (policy === 'block' && !readOnly) || revoked;
+    const needsApproval = revoked || (!denied && !readOnly && !(directWrite && policy === 'auto'));
+    const policyKey = action === 'network' ? 'network' : 'workspaceWrite';
+    const toolName = directWrite ? 'sys_write_file' : readOnly ? 'sys_read_file' : 'sys_bash';
+    const toolArgs = directWrite
+      ? { path: file, content: JOURNEY_AFTER }
+      : readOnly
+        ? { path: file }
+        : { command: action === 'network' ? 'curl https://example.invalid' : JOURNEY_COMMAND };
+    const provider = await startJourneyProvider(JOURNEY_COMMAND, JOURNEY_FINAL, {
+      toolCall: { name: toolName, args: toolArgs },
+    });
+    let app: ElectronApplication | undefined;
+    let tracing = false;
+    let passed = false;
+    let savedPolicy: unknown;
+    let approvals: ApprovalEvidence[] = [];
+    let audits: AuditEvidence[] = [];
+    let messages: Array<{ role: string; content: string }> = [];
+    const readPolicy = async () => {
+      const res = await fetch(`http://127.0.0.1:${fixture.backendPort}/v1/settings`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      expect(res.ok).toBe(true);
+      const body = (await res.json()) as { data: { executionPolicy: Record<string, string> } };
+      return body.data.executionPolicy;
+    };
+    try {
+      app = await launchVmFixture(fixture, {
+        providerURL: provider.baseURL,
+        // A file cannot contain workspace directories: exercise the real API failure path.
+        workspaceRoot: unavailableFiles ? join(file, 'workspace') : undefined,
+      });
+      await configureJourneyModel(fixture);
+      await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
+      tracing = true;
+      const page = await app.firstWindow();
+      await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeVisible();
+      await page.waitForLoadState('load');
+      await page.goto(`http://127.0.0.1:${fixture.rendererPort}/settings/workspace`);
+      const selector = page.getByRole('combobox', {
+        name: action === 'network' ? /Network commands/ : /Workspace writes/,
+      });
+      await expect(selector).toBeVisible();
+      // Force a real settings mutation even when the requested mode is the default.
+      await selector.selectOption(policy === 'ask' ? 'block' : 'ask');
+      await expect
+        .poll(async () => (await readPolicy())[policyKey])
+        .toBe(policy === 'ask' ? 'block' : 'ask');
+      await expect(selector).toBeEnabled();
+      await selector.selectOption(policy);
+      await expect.poll(async () => (await readPolicy())[policyKey]).toBe(policy);
+      await page.reload();
+      await expect(selector).toHaveValue(policy);
+      if (unavailableFiles) {
+        await expect(page.getByText('File listing unavailable. Refresh to retry.')).toBeVisible();
+        await expect(page.getByText('No workspace files yet')).toHaveCount(0);
+        await expect(page.getByText('0 files', { exact: true })).toHaveCount(0);
+        const refreshedListing = page.waitForResponse((response) =>
+          response.url().endsWith('/api/v1/workspace/files'),
+        );
+        await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+        expect((await refreshedListing).status()).toBe(500);
+        await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+        await expect(page.getByText('File listing unavailable. Refresh to retry.')).toBeVisible();
+        await expect(selector).toHaveValue(policy);
+      }
+      savedPolicy = await readPolicy();
+      await page.goto(`http://127.0.0.1:${fixture.rendererPort}/`);
+      await openProject(page);
+      if (fixture.realVmRuntimeDir) startRealVmRunner(fixture);
+      await sendChatMessage(page, '/init');
+      await page.getByRole('button', { name: 'Approve instructions' }).click();
+      await expect(page.getByText('Project instructions approved').last()).toBeVisible();
+      await sendChatMessage(
+        page,
+        readOnly
+          ? 'Read journey.txt.'
+          : action === 'network'
+            ? 'Inspect the example endpoint.'
+            : 'Write the approved change to journey.txt.',
+      );
+      if (needsApproval) {
+        const card = page.getByTestId('approval-card');
+        await expect(card).toHaveCount(1);
+        await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+        expect(readFileSync(file, 'utf8')).toBe(JOURNEY_BEFORE);
+        approvals = await readEvidence<ApprovalEvidence>(fixture, 'approval-requests');
+        expect(approvals).toHaveLength(1);
+        expect(approvals[0]?.status).toBe('pending');
+        expect(provider.requests).toHaveLength(1);
+        if (revoked) {
+          const chatURL = page.url();
+          await page.goto(`http://127.0.0.1:${fixture.rendererPort}/settings/workspace`);
+          await selector.selectOption('block');
+          await expect.poll(async () => (await readPolicy()).workspaceWrite).toBe('block');
+          await page.reload();
+          await expect(selector).toHaveValue('block');
+          await page.goto(chatURL);
+          await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+          expect(readFileSync(file, 'utf8')).toBe(JOURNEY_BEFORE);
+        }
+        await card.getByRole('button', { name: 'Approve', exact: true }).click();
+        if (!revoked) await expect(card).toContainText('Approved action completed');
+      }
+      await expect(page.getByText(JOURNEY_FINAL).last()).toBeVisible();
+      await expect(page.getByPlaceholder('Ask about this Project...')).toBeEnabled();
+      expect(provider.errors).toEqual([]);
+      expect(provider.requests).toHaveLength(2);
+      expect(provider.attempts.map((attempt) => attempt.status)).toEqual([200, 200]);
+      approvals = await readEvidence<ApprovalEvidence>(fixture, 'approval-requests');
+      audits = (await readEvidence<AuditEvidence>(fixture, 'tool-executions')).filter(
+        (row) => row.toolName === toolName,
+      );
+      expect(audits.filter((row) => row.status === 'success')).toHaveLength(denied ? 0 : 1);
+      expect(readFileSync(file, 'utf8')).toBe(denied || readOnly ? JOURNEY_BEFORE : JOURNEY_AFTER);
+      if (denied) expect(audits.filter((row) => row.status === 'denied')).toHaveLength(1);
+      if (denied && !revoked) {
+        expect(approvals).toHaveLength(0);
+        await expect(page.getByTestId('approval-card')).toHaveCount(0);
+      } else if (needsApproval) {
+        expect(approvals).toHaveLength(1);
+        expect(approvals[0]?.status).toBe('approved');
+        expect(approvals[0]?.resumedAtMs).toEqual(expect.any(Number));
+      } else {
+        expect(approvals).toHaveLength(0);
+        await expect(page.getByTestId('approval-card')).toHaveCount(0);
+      }
+      const result = provider.requests[1]?.messages.find(
+        (m) => m.role === 'tool' && m.tool_call_id === JOURNEY_CALL_ID,
+      );
+      expect(JSON.stringify(result?.content)).toContain(
+        denied
+          ? 'DENIED'
+          : readOnly
+            ? JOURNEY_BEFORE.trim()
+            : directWrite
+              ? 'written'
+              : 'The command completed successfully.',
+      );
+      const sessionId = audits[0]?.sessionId;
+      expect(sessionId).toEqual(expect.any(String));
+      messages = await readEvidence(fixture, `sessions/${sessionId}/messages`);
+      expect(
+        messages.filter((m) => m.role === 'assistant' && m.content === JOURNEY_FINAL),
+      ).toHaveLength(1);
+      await expect
+        .poll(
+          () =>
+            readBackendEvents(fixture).filter(
+              (row) => row.sessionId === sessionId && row.kind === 'task_end',
+            ).length,
+        )
+        .toBe(needsApproval ? 2 : 1);
+      if (denied) {
+        const activity = await openToolActivity(page);
+        await expect(activity).toContainText('Denied');
+      }
+      if (action === 'network') {
+        expect(existsSync(join(fixture.projectDir, '.runner-invocations'))).toBe(false);
+      }
+      passed = true;
+    } finally {
+      approvals = await readEvidence<ApprovalEvidence>(fixture, 'approval-requests').catch(
+        () => approvals,
+      );
+      audits = (
+        await readEvidence<AuditEvidence>(fixture, 'tool-executions').catch(() => audits)
+      ).filter((row) => row.toolName === toolName);
+      savedPolicy = await readPolicy().catch(() => savedPolicy);
+      try {
+        if (app && tracing) {
+          const trace = test.info().outputPath('policy-trace.zip');
+          await app.context().tracing.stop({ path: trace });
+          await test
+            .info()
+            .attach('policy-browser-trace', { path: trace, contentType: 'application/zip' });
+        }
+      } finally {
+        await app?.close();
+        await provider.close();
+        stopRealVmRunner(fixture);
+        if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
+        try {
+          const evidence = {
+            policy,
+            action,
+            unavailableFiles,
+            savedPolicy,
+            passed,
+            approvals,
+            audits,
+            messages,
+            before: JOURNEY_BEFORE,
+            after: readFileSync(file, 'utf8'),
+            providerRequests: provider.requests,
+            providerErrors: provider.errors,
+            backendEvents: readBackendEvents(fixture),
+            sourceRevision: execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], {
+              cwd: repoRoot,
+              encoding: 'utf8',
+            }).trim(),
+            limitations: [
+              'External HTTP provider and fixed-command runner fixtures; no live-model or real VM claim.',
+              'Direct file modes test the write-policy scope; shell Auto retains explicit high-risk approval precedence.',
+            ],
+          };
+          const path = test.info().outputPath('policy-evaluation.json');
+          writeFileSync(
+            path,
+            JSON.stringify(evidence, null, 2).replaceAll(fixture.tempRoot, '<disposable-root>'),
+          );
+          await test.info().attach('policy-evaluation', { path, contentType: 'application/json' });
+        } finally {
+          rmSync(fixture.tempRoot, { recursive: true, force: true });
+        }
+      }
+    }
+  });
+}
+
+type ApprovalEvidence = {
+  id: string;
+  sessionId: string;
+  runId: string;
+  toolName: string;
+  status: string;
+  resumedAtMs?: number | null;
+};
+type AuditEvidence = { id: string; sessionId: string; toolName: string; status: string };
+
+async function configureJourneyModel(fixture: VmFixture): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        try {
+          return (await fetch(`http://127.0.0.1:${fixture.backendPort}/health/ready`)).ok;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+  const configs = await readEvidence<{ id: string }>(fixture, 'model-configs');
+  expect(configs).toHaveLength(1);
+  const configured = await fetch(
+    `http://127.0.0.1:${fixture.backendPort}/v1/model-configs/${configs[0]!.id}`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'ollama', model: JOURNEY_MODEL }),
+    },
+  );
+  expect(configured.ok).toBe(true);
+}
+
+async function readEvidence<T>(fixture: VmFixture, resource: string): Promise<T[]> {
+  const response = await fetch(`http://127.0.0.1:${fixture.backendPort}/v1/${resource}?limit=100`, {
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error(`Evidence request failed: ${response.status}`);
+  return ((await response.json()) as { data: T[] }).data;
+}
+
+function readBackendEvents(fixture: VmFixture) {
+  const file = join(fixture.runtimeDir, 'logs', 'backend.stdout.log');
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .flatMap((line) => {
+      try {
+        const row = JSON.parse(line) as {
+          ts?: string;
+          level?: string;
+          service?: string;
+          correlationId?: string;
+          event?: { kind?: string; sessionId?: string; runId?: string; toolId?: string };
+        };
+        if (!row.event) return [];
+        return [
+          {
+            at: row.ts,
+            level: row.level,
+            service: row.service,
+            correlationId: row.correlationId,
+            kind: row.event.kind,
+            sessionId: row.event.sessionId,
+            runId: row.event.runId,
+            toolId: row.event.toolId,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    });
+}
+
 async function createVmFixture(options: { health: VmFixtureHealth }): Promise<VmFixture> {
   const tempRoot = mkdtempSync(join(tmpdir(), 'agent-platform-electron-vm-e2e-'));
   const runtimeDir = join(tempRoot, 'runtime');
@@ -165,13 +795,19 @@ async function createVmFixture(options: { health: VmFixtureHealth }): Promise<Vm
 
 async function launchVmFixture(
   fixture: VmFixture,
-  options: { finalText?: string } = {},
+  options: {
+    finalText?: string;
+    command?: string;
+    providerURL?: string;
+    workspaceRoot?: string;
+  } = {},
 ): Promise<ElectronApplication> {
   return electron.launch({
     cwd: desktopDir,
     args: ['.'],
     env: {
       ...process.env,
+      WORKSPACE_ROOT: options.workspaceRoot ?? join(fixture.tempRoot, 'workspace'),
       AGENT_OPENAI_API_KEY: 'sk-test-key',
       AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
       AGENT_PLATFORM_DESKTOP_BACKEND_PORT: String(fixture.backendPort),
@@ -180,16 +816,30 @@ async function launchVmFixture(
       AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(fixture.rendererPort),
       AGENT_PLATFORM_DESKTOP_RESOURCES_DIR: fixture.resourcesDir,
       AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: fixture.runtimeDir,
+      AGENT_PLATFORM_DESKTOP_LOG_DIR: join(fixture.runtimeDir, 'logs'),
       AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(fixture.runtimeDir, 'tmp'),
       AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([fixture.projectDir]),
-      AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: options.finalText ?? 'VM command complete',
-      AGENT_PLATFORM_E2E_MOCK_LLM_TOOL_CALL_JSON: JSON.stringify({
-        name: 'sys_bash',
-        args: { command: VM_E2E_MARKER_COMMAND },
-      }),
+      AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: options.providerURL
+        ? ''
+        : (options.finalText ?? 'VM command complete'),
+      AGENT_PLATFORM_E2E_MOCK_LLM_TOOL_CALL_JSON: options.providerURL
+        ? ''
+        : JSON.stringify({
+            name: 'sys_bash',
+            args: { command: options.command ?? VM_E2E_MARKER_COMMAND },
+          }),
+      ...(options.providerURL
+        ? {
+            OLLAMA_BASE_URL: options.providerURL,
+            NODE_OPTIONS: `--require=${join(desktopDir, 'e2e/support/provider-network-guard.cjs')}`,
+            AGENT_ANTHROPIC_API_KEY: '',
+            OPENAI_API_KEY: '',
+            ANTHROPIC_API_KEY: '',
+          }
+        : {}),
       SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
       [HOST_ONLY_CANARY_ENV]: HOST_ONLY_CANARY_VALUE,
-      CI: process.env.CI,
+      ...(process.env.CI ? { CI: process.env.CI } : {}),
     },
   });
 }
@@ -273,6 +923,12 @@ function writePackagedVmResources(resourcesDir: string, health: VmFixtureHealth)
       "  console.log(JSON.stringify({ ok: false, mode: 'macos-vm', state: 'unavailable', message: 'E2E VM unavailable' }));",
       '  process.exit(0);',
       '}',
+      `if (args[0] === 'exec' && command === ${JSON.stringify(JOURNEY_COMMAND.replace('journey.txt', '/workspace/journey.txt'))}) {`,
+      "  const fs = require('node:fs');",
+      "  const path = require('node:path');",
+      "  fs.appendFileSync(path.join(option('--workspace'), 'journey.txt'), 'approved change\\n');",
+      '}',
+      "if (args[0] === 'exec') require('node:fs').appendFileSync(require('node:path').join(option('--workspace'), '.runner-invocations'), command + '\\n');",
       'console.log(JSON.stringify({',
       '  ok: true,',
       "  mode: 'macos-vm',",

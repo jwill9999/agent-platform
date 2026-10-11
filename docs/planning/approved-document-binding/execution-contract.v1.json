@@ -1,0 +1,163 @@
+{
+  "featureId": "agent-platform-pilot-zero.16",
+  "contractVersion": 1,
+  "policyDigest": "sha256:7343dacd2a810a02bb3aefc6962ab568b075dfe31099fbe43be4de20998d5a9e",
+  "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+  "objective": "Proposed bounded document-approval enforcement repair; planning approval is not implementation or live-run authority.",
+  "requirements": [
+    "DB-1: Typed manifest and complete task/spec/verification mappings.",
+    "DB-2: Bounded exact-byte publication using trusted regular files.",
+    "DB-3: Contract, critique and approval bind the same manifest.",
+    "DB-4: Every authority boundary denies changed or unverifiable material.",
+    "DB-5: Workers consume verified immutable snapshots with identity binding.",
+    "DB-6: Durable restart, partial publication and inherited approval handling.",
+    "DB-7: Historical v1 reads remain compatible; legacy execution fails closed.",
+    "DB-8: All required verification and safe evidence pass before sign-off.",
+    "Normative review input: docs/planning/approved-document-binding/plan.md sha256:0eb57cb15418bfb56078767db226c1c4e38b47840f7310d406ea9d4d755aace8",
+    "Normative review input: docs/tasks/agent-platform-pilot-zero.16.md sha256:7ed8ef3aafe61e082e5bd649254400f31f92936ae1541618620d7ded1df28a25",
+    "Normative review input: docs/testing/approved-document-binding.md sha256:86ba87f34604abf79ec0d382fcdebdc3b1d856ea05b670adf029f227661d4f27"
+  ],
+  "nonGoals": [
+    "Product UI/permission changes",
+    "Framework or dependency upgrades",
+    "New managed orchestration stages",
+    "Pilot launch, staging or production delivery",
+    "Paid model benchmarks"
+  ],
+  "acceptanceCriteria": [
+    "DB-1 through DB-8 satisfied",
+    "DB-T01 through DB-T11 and required regressions pass at exact revision",
+    "Independent critique has no unresolved findings",
+    "Owner approval and feature integration precede task closure"
+  ],
+  "constraints": {
+    "architecture": [
+      "Repository workflow-control only; preserve existing role/lease/broker enforcement"
+    ],
+    "security": [
+      "No mutable-path substitution or silent reapproval",
+      "Fail closed for unbound legacy execution",
+      "Trusted quiescent host; no hostile-host containment claim"
+    ],
+    "allowedPaths": [
+      "packages/workflow-control/src",
+      "packages/workflow-control/test",
+      "docs/planning/approved-document-binding",
+      "docs/tasks/agent-platform-pilot-zero.16.md",
+      "docs/testing/approved-document-binding.md",
+      "docs/reviews",
+      "docs/workflow-control-planning.md",
+      "docs/workflow-control-persistence.md",
+      ".agents/skills/feature-planning/SKILL.md",
+      ".agents/skills/feature-implementation/SKILL.md",
+      ".agents/skills/orchestration/SKILL.md",
+      "session.md"
+    ]
+  },
+  "authority": {
+    "deliveryTarget": "feature/harness-backlog-review",
+    "allowedActions": [
+      "workspace.read",
+      "workspace.patch",
+      "process.test",
+      "artifact.write",
+      "beads.read",
+      "beads.mutate",
+      "git.read",
+      "git.commit",
+      "git.push",
+      "github.read",
+      "github.deliver",
+      "workflow.transition",
+      "workflow.delegate_callback"
+    ],
+    "github": {
+      "repository": "jwill9999/agent-platform",
+      "base": "feature/harness-backlog-review",
+      "mergeMethod": "merge",
+      "requiredChecks": [
+        "verify",
+        "desktop-e2e",
+        "e2e",
+        "docker",
+        "SonarCloud Code Analysis",
+        "markdownlint",
+        "lychee",
+        "deps:check-cycles",
+        "GitGuardian Security Checks"
+      ]
+    }
+  },
+  "tasks": [
+    {
+      "id": "agent-platform-pilot-zero.16",
+      "dependsOn": [],
+      "risk": "high",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "task/approved-document-binding-plan",
+      "allowedPaths": [
+        "packages/workflow-control/src",
+        "packages/workflow-control/test",
+        "docs/planning/approved-document-binding",
+        "docs/tasks/agent-platform-pilot-zero.16.md",
+        "docs/testing/approved-document-binding.md",
+        "docs/reviews",
+        "docs/workflow-control-planning.md",
+        "docs/workflow-control-persistence.md",
+        ".agents/skills/feature-planning/SKILL.md",
+        ".agents/skills/feature-implementation/SKILL.md",
+        ".agents/skills/orchestration/SKILL.md",
+        "session.md"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "workflow.delegate_callback"
+      ]
+    }
+  ],
+  "qualityGates": [
+    "Build, typecheck and lint",
+    "721 prior package tests are baseline evidence, not results for this proposal",
+    "DB-T01\u201311 plus full package regressions",
+    "Independent plan and code critique",
+    "Required hosted checks and human feature-merge decision"
+  ],
+  "retryPolicy": {
+    "implementationAttempts": 2,
+    "findingAttempts": 2,
+    "infrastructureAttempts": 2,
+    "waitDeadlineSeconds": 300
+  },
+  "repairTaskPolicy": {
+    "idPattern": "agent-platform-pilot-zero.16.repair.<sequence>",
+    "maxChildren": 0,
+    "allowedRoles": ["implementation_worker"],
+    "allowedPaths": [
+      "packages/workflow-control/src",
+      "packages/workflow-control/test",
+      "docs/planning/approved-document-binding",
+      "docs/tasks/agent-platform-pilot-zero.16.md",
+      "docs/testing/approved-document-binding.md",
+      "docs/reviews",
+      "docs/workflow-control-planning.md",
+      "docs/workflow-control-persistence.md",
+      ".agents/skills/feature-planning/SKILL.md",
+      ".agents/skills/feature-implementation/SKILL.md",
+      ".agents/skills/orchestration/SKILL.md",
+      "session.md"
+    ],
+    "authorityMayExpand": false
+  },
+  "escalationPolicy": [
+    "Unclear scope or authority returns to owner; no repeated approval for unchanged authorized work",
+    "Required test infeasibility or unmapped approval path blocks completion",
+    "No automatic merge, staging, pilot or permission expansion"
+  ]
+}

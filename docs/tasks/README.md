@@ -16,10 +16,9 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
    - Every **upstream** task in the spec’s table is done **and**
    - Beads `bd ready` / dependency graph agrees (if not, fix Beads first).
 
-   During an active autonomous workflow-control run, the journaled Beads broker performs claim,
-   dependency, close, and Dolt-sync mutations. Child specs must not instruct agents to bypass it with
-   direct write-capable Beads MCP or CLI commands. Direct mutations are for manual workflows outside
-   an active run.
+   Native developer tasks use ordinary authorized Beads MCP/CLI operations. Only transitions
+   deliberately owned by an explicit managed prototype run use that run's journaled broker;
+   unrelated developer tickets do not need managed discovery/readiness first.
 
 5. **Git (mandatory)** — **Never commit directly to `main`.**
    - **Naming:** **`feature/<feature-name>`** and **`task/<task-name>`** (e.g. `feature/agent-platform-persistence`, `task/agent-platform-mov.1`).
@@ -31,7 +30,9 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
      wait for the segment-tip PR. A **segment-tip** task closes only after its PR to `feature` merges
      and all required hosted checks pass. When a spec requires a PR per ticket, use the segment-tip
      rule. If a required gate fails, the task is not done.
-   - **Release:** when ready, run integration testing and ensure CI/CD pipelines are green, then merge
+   - **Release:** run integration testing and ensure required CI/CD pipelines are green. Merge only
+     with actual owner-granted merge/destination authority, reusing valid existing authorization;
+     passing gates alone grant none. Then merge
      **`feature/<feature-name>` → protected `staging`** via PR. Merge **`staging` → `main`** only with
      explicit human approval.
 

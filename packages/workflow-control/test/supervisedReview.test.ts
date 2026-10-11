@@ -1,0 +1,122 @@
+import { createHash } from 'node:crypto';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { afterEach, expect, it } from 'vitest';
+
+import { prepareReviewSnapshot, prepareSupervisedReview } from '../src/supervisedReview.js';
+import { supervisedReviewConfigSchema, readReviewConfig } from '../src/supervisedReviewCli.js';
+
+const cleanup: string[] = [];
+afterEach(async () => {
+  await Promise.all(cleanup.splice(0).map((p) => rm(p, { recursive: true, force: true })));
+});
+async function source() {
+  const root = await mkdtemp(join(tmpdir(), 'review-test-'));
+  cleanup.push(root);
+  await writeFile(join(root, 'plan.md'), 'original');
+  return root;
+}
+it('binds review evidence to copied content independently of later source edits', async () => {
+  const root = await source();
+  const first = await prepareReviewSnapshot(root, ['plan.md']);
+  cleanup.push(dirname(first.root));
+  await writeFile(join(root, 'plan.md'), 'changed');
+  const second = await prepareReviewSnapshot(root, ['plan.md']);
+  cleanup.push(dirname(second.root));
+  expect(first.materialDigest).not.toBe(second.materialDigest);
+  expect(await readFile(join(first.root, 'plan.md'), 'utf8')).toBe('original');
+  expect(await readFile(join(first.codexHome, 'config.toml'), 'utf8')).toContain(
+    'sandbox_mode = "read-only"',
+  );
+});
+it('keeps UTF-16 manifest ordering and material identity independent of input order', async () => {
+  const root = await source();
+  const names = ['é.md', 'a.md', 'Z.md'];
+  for (const name of names) await writeFile(join(root, name), name);
+  const first = await prepareReviewSnapshot(root, names);
+  cleanup.push(dirname(first.root));
+  const second = await prepareReviewSnapshot(root, [...names].reverse());
+  cleanup.push(dirname(second.root));
+  expect(first.manifest.map((entry) => entry.path)).toEqual(['Z.md', 'a.md', 'é.md']);
+  expect(first.manifest).toEqual(second.manifest);
+  expect(first.materialDigest).toBe(second.materialDigest);
+  expect(first.materialDigest).toBe(
+    createHash('sha256').update(JSON.stringify(first.manifest)).digest('hex'),
+  );
+});
+it('rejects credential/configuration directories even when nested in evidence', async () => {
+  const root = await source();
+  await mkdir(join(root, 'docs', '.codex'), { recursive: true });
+  await writeFile(join(root, 'docs', '.codex', 'config.toml'), 'unsafe');
+  await expect(prepareReviewSnapshot(root, ['docs'])).rejects.toThrow('forbidden');
+  await expect(prepareReviewSnapshot(root, ['.'])).rejects.toThrow('forbidden');
+});
+it('rejects mutable images before staging or reading authentication', async () => {
+  await expect(
+    prepareSupervisedReview({
+      sourceRoot: '/missing',
+      evidencePaths: ['plan.md'],
+      image: 'latest',
+      modelAuthFile: '/missing',
+      egressNetwork: 'none',
+      question: 'Review',
+    }),
+  ).rejects.toThrow('immutable');
+});
+
+it('rejects unbounded execution and unexpected configuration', () => {
+  const config = {
+    sourceRoot: '/evidence',
+    evidencePaths: ['plan.md'],
+    image: 'image',
+    modelAuthFile: '/auth',
+    egressNetwork: 'review-egress',
+    question: 'Review',
+    timeoutMs: 600001,
+    maxOutputBytes: 4096,
+  };
+  expect(supervisedReviewConfigSchema.safeParse(config).success).toBe(false);
+  expect(
+    supervisedReviewConfigSchema.safeParse({ ...config, timeoutMs: 1000, mcp_servers: {} }).success,
+  ).toBe(false);
+});
+
+it('rejects innocent aliases to forbidden files and symlinked ancestors', async () => {
+  const root = await source();
+  await mkdir(join(root, '.codex'));
+  await writeFile(join(root, '.codex', 'config.toml'), 'sensitive');
+  await symlink(join(root, '.codex', 'config.toml'), join(root, 'innocent.md'));
+  await symlink(join(root, '.codex'), join(root, 'docs'));
+  await expect(prepareReviewSnapshot(root, ['innocent.md'])).rejects.toThrow('symlink');
+  await expect(prepareReviewSnapshot(root, ['docs/config.toml'])).rejects.toThrow('symlink');
+});
+
+it('reads coordinator JSON from stdin and rejects oversized or malformed input', async () => {
+  async function* input(...chunks: string[]) {
+    yield* chunks;
+  }
+  await expect(readReviewConfig(input('{"question":', '"review"}'))).resolves.toEqual({
+    question: 'review',
+  });
+  await expect(readReviewConfig(input('/arbitrary/config.json'))).rejects.toThrow();
+  await expect(readReviewConfig(input('x'.repeat(1_000_001)))).rejects.toThrow('input limit');
+});
+
+it('rejects malformed UTF-8 rather than reviewing text different from the bound bytes', async () => {
+  const root = await source();
+  await writeFile(join(root, 'plan.md'), Buffer.from([0xc3, 0x28]));
+  const auth = join(root, 'auth.json');
+  await writeFile(auth, '{}');
+  await expect(
+    prepareSupervisedReview({
+      sourceRoot: root,
+      evidencePaths: ['plan.md'],
+      image: 'sha256:' + 'a'.repeat(64),
+      modelAuthFile: auth,
+      egressNetwork: 'review-egress',
+      proxyUrl: 'http://model-proxy:8080',
+      question: 'review',
+    }),
+  ).rejects.toThrow('encoded data');
+});

@@ -1,0 +1,54 @@
+[
+  {
+    "findingId": "MVP-CRIT-001",
+    "disposition": "corrected",
+    "reason": "Added exact Project Chat host to contract, relevant task and repair boundaries; source and component are in the manifest.",
+    "decidedBy": "mvp-planner",
+    "evidence": [
+      {
+        "digest": "sha256:2e27de25bd33ad993c423449c0ab1ba5ddcab8c785eb74bb9538ef544b77cb3c",
+        "sizeBytes": 23272,
+        "mediaType": "application/json",
+        "kind": "artifact"
+      },
+      {
+        "digest": "sha256:4413abd356fd9895c9632b44712cf3b6769ef1235534da3dcbecea3b1746da85",
+        "sizeBytes": 12706,
+        "mediaType": "text/plain",
+        "kind": "artifact"
+      },
+      {
+        "digest": "sha256:31d6c63bbdac6fc2df3de87e1b91d619b45d1b2182c9eca65ff007fea737fcf1",
+        "sizeBytes": 62643,
+        "mediaType": "text/plain",
+        "kind": "artifact"
+      }
+    ]
+  },
+  {
+    "findingId": "MVP-CRIT-002",
+    "disposition": "corrected",
+    "reason": "Every normative plan/spec is SHA256-bound inside canonical contract requirements. Mandatory preflight mismatch blocks execution and requires revised critique and owner approval.",
+    "decidedBy": "mvp-planner",
+    "evidence": [
+      {
+        "digest": "sha256:2e27de25bd33ad993c423449c0ab1ba5ddcab8c785eb74bb9538ef544b77cb3c",
+        "sizeBytes": 23272,
+        "mediaType": "application/json",
+        "kind": "artifact"
+      },
+      {
+        "digest": "sha256:4413abd356fd9895c9632b44712cf3b6769ef1235534da3dcbecea3b1746da85",
+        "sizeBytes": 12706,
+        "mediaType": "text/plain",
+        "kind": "artifact"
+      },
+      {
+        "digest": "sha256:31d6c63bbdac6fc2df3de87e1b91d619b45d1b2182c9eca65ff007fea737fcf1",
+        "sizeBytes": 62643,
+        "mediaType": "text/plain",
+        "kind": "artifact"
+      }
+    ]
+  }
+]

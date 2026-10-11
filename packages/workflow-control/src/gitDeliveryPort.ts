@@ -1,3 +1,6 @@
+import { assertBootstrapExecutablePin } from './bootstrapAdapterRuntime.js';
+import type { WorkflowStore } from './storage.js';
+import type { DeliveryDocumentSource } from './documentApproval.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
@@ -37,6 +40,7 @@ export interface BrokeredRemoteRefClient {
     ref: string;
     expectedOldSha: string | null;
     newSha: string;
+    objectSourceRoot?: string;
   }): Promise<void>;
 }
 
@@ -79,6 +83,7 @@ function parseChangedPaths(output: Buffer): string[] {
 export class LocalGitDeliveryPort implements DeliveryMutationPort {
   readonly #workspaceRoot: string;
   readonly #sourceRoot: string;
+  readonly #documents: (DeliveryDocumentSource & { assertDispatch?: () => void }) | undefined;
   readonly #bootstrap:
     | {
         policy: BootstrapPolicy;
@@ -90,13 +95,18 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
   readonly #observeRemoteRef: BrokeredRemoteRefClient['observeRef'];
   readonly #pushRemoteRef: BrokeredRemoteRefClient['pushCas'];
   readonly #gitBinary: string;
+  readonly #gitPin?: { path: string; digest: string };
   readonly #gitCommonDir: string;
 
+  readonly #ownedSourceRoot?: string;
   private constructor(input: {
     workspaceRoot: string;
+    ownedSourceRoot?: string;
     remoteName: string;
     remote: BrokeredRemoteRefClient;
     gitBinary?: string;
+    gitPin?: { path: string; digest: string };
+    documents?: DeliveryDocumentSource & { assertDispatch?: () => void };
     bootstrap?: {
       policy: BootstrapPolicy;
       assertAuthority: () => void;
@@ -104,12 +114,36 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     };
   }) {
     this.#workspaceRoot = realpathSync(input.workspaceRoot);
+    this.#ownedSourceRoot = input.ownedSourceRoot;
     this.#bootstrap = input.bootstrap;
-    this.#sourceRoot = input.bootstrap?.policy.sourceRoot ?? this.#workspaceRoot;
+    this.#documents = input.documents;
+    this.#sourceRoot = realpathSync(
+      input.ownedSourceRoot ??
+        input.documents?.sourceRoot ??
+        input.bootstrap?.policy.sourceRoot ??
+        this.#workspaceRoot,
+    );
+    if (
+      input.bootstrap &&
+      input.documents &&
+      realpathSync(input.bootstrap.policy.sourceRoot) !== this.#sourceRoot
+    )
+      throw new Error('bootstrap document source differs from approved policy');
+    if (
+      input.ownedSourceRoot &&
+      input.documents &&
+      realpathSync(input.documents.sourceRoot) !== this.#workspaceRoot
+    )
+      throw new Error('owned workspace document identity mismatch');
     this.#remoteName = input.remoteName;
     this.#observeRemoteRef = input.remote.observeRef.bind(input.remote);
     this.#pushRemoteRef = input.remote.pushCas.bind(input.remote);
-    this.#gitBinary = input.gitBinary ?? (process.platform === 'win32' ? 'git' : '/usr/bin/git');
+    this.#gitPin = input.gitPin;
+    if (this.#gitPin) assertBootstrapExecutablePin(this.#gitPin);
+    this.#gitBinary =
+      input.gitPin?.path ??
+      input.gitBinary ??
+      (process.platform === 'win32' ? 'git' : '/usr/bin/git');
     const topLevel = realpathSync(this.#git(['rev-parse', '--show-toplevel']).trim());
     if (topLevel !== this.#sourceRoot) {
       throw new Error('Git delivery workspace is not the canonical repository top-level');
@@ -121,6 +155,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
   }
 
   static create(input: {
+    gitPin?: { path: string; digest: string };
     workspaceRoot: string;
     remoteName: string;
     remote: BrokeredRemoteRefClient;
@@ -128,11 +163,26 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     return new LocalGitDeliveryPort(input);
   }
 
+  static createForWorkflow(input: {
+    store: WorkflowStore;
+    runId: string;
+    workspaceRoot: string;
+    gitPin: { path: string; digest: string };
+    remoteName: string;
+    remote: BrokeredRemoteRefClient;
+  }): LocalGitDeliveryPort {
+    const root = realpathSync(input.workspaceRoot);
+    const ownedSourceRoot = input.store.getImplementationWorkspace(input.runId, root);
+    if (ownedSourceRoot === root) throw new Error('broker-owned delivery workspace unavailable');
+    return new LocalGitDeliveryPort({ ...input, ownedSourceRoot });
+  }
+
   static createForTest(input: {
     workspaceRoot: string;
     remoteName: string;
     remote: BrokeredRemoteRefClient;
     gitBinary?: string;
+    gitPin?: { path: string; digest: string };
   }): LocalGitDeliveryPort {
     if (process.env.NODE_ENV !== 'test') {
       throw new Error('test Git delivery configuration is unavailable outside the test runtime');
@@ -193,28 +243,53 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     return { ref, sha: newSha };
   }
 
-  async observe(request: DeliveryRequest): Promise<ExternalObservation> {
+  #forDocuments(
+    documents: DeliveryDocumentSource & { assertDispatch?: () => void },
+  ): LocalGitDeliveryPort {
+    const port = new LocalGitDeliveryPort({
+      workspaceRoot: this.#workspaceRoot,
+      remoteName: this.#remoteName,
+      remote: { observeRef: this.#observeRemoteRef, pushCas: this.#pushRemoteRef },
+      gitBinary: this.#gitBinary,
+      gitPin: this.#gitPin,
+      bootstrap: this.#bootstrap,
+      documents,
+      ownedSourceRoot: this.#ownedSourceRoot,
+    });
+    if (port.#gitCommonDir !== this.#gitCommonDir)
+      throw new Error('delivery document source belongs to another repository');
+    return port;
+  }
+
+  #assertDocumentTree(tree: string): void {
+    for (const file of this.#documents?.manifest.files ?? []) {
+      const mode = this.#git(['ls-tree', tree, '--', file.path]);
+      if (!/^100(?:644|755) blob /u.test(mode))
+        throw new Error('delivery tree document is missing or not a regular file');
+      const bytes = this.#gitBuffer(['show', `${tree}:${file.path}`]);
+      if (
+        bytes.length !== file.sizeBytes ||
+        `sha256:${createHash('sha256').update(bytes).digest('hex')}` !== file.digest
+      )
+        throw new Error('delivery tree differs from approved document bytes');
+    }
+  }
+
+  async observe(
+    request: DeliveryRequest,
+    documents?: DeliveryDocumentSource,
+  ): Promise<ExternalObservation> {
+    if (documents) return this.#forDocuments(documents).observe(request);
     this.#assertBootstrap(request);
     this.#assertNoReplacementMetadata();
     if (!request.kind.startsWith('git.'))
       throw new Error('local Git port received a GitHub request');
     const gitRequest = request as GitDeliveryRequest;
-    if (gitRequest.kind === 'git.push') {
-      this.#assertSafeLocalConfig();
-      const remoteSha = await this.#observeRemoteRef({
-        workspaceRoot: this.#workspaceRoot,
-        repository: gitRequest.repository,
-        remoteName: this.#remoteName,
-        ref: gitRequest.ref,
-      });
-      if (remoteSha === gitRequest.newSha) {
-        return { kind: 'expected', result: { ref: gitRequest.ref, sha: remoteSha } };
-      }
-      if (remoteSha === gitRequest.expectedRemoteSha) {
-        return { kind: 'unchanged', result: { ref: gitRequest.ref, sha: remoteSha } };
-      }
-      return { kind: 'conflict', result: { ref: gitRequest.ref, sha: remoteSha } };
-    }
+    if (gitRequest.kind !== 'git.commit')
+      this.#assertDocumentTree(
+        gitRequest.kind === 'git.push' ? gitRequest.newSha : gitRequest.parentSha,
+      );
+    if (gitRequest.kind === 'git.push') return this.#observePush(gitRequest);
     const refSha = this.#readRef(gitRequest.ref);
     if (gitRequest.kind === 'git.create_ref') {
       if (refSha === gitRequest.parentSha) {
@@ -241,13 +316,42 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     }
   }
 
-  async mutate(request: DeliveryRequest): Promise<unknown> {
+  async #observePush(
+    request: Extract<GitDeliveryRequest, { kind: 'git.push' }>,
+  ): Promise<ExternalObservation> {
+    this.#assertSafeLocalConfig();
+    const remoteSha = await this.#observeRemoteRef({
+      workspaceRoot: this.#workspaceRoot,
+      repository: request.repository,
+      remoteName: this.#remoteName,
+      ref: request.ref,
+    });
+    if (remoteSha === request.newSha) {
+      return { kind: 'expected', result: { ref: request.ref, sha: remoteSha } };
+    }
+    if (remoteSha === request.expectedRemoteSha) {
+      return { kind: 'unchanged', result: { ref: request.ref, sha: remoteSha } };
+    }
+    return { kind: 'conflict', result: { ref: request.ref, sha: remoteSha } };
+  }
+
+  async mutate(
+    request: DeliveryRequest,
+    _merge?: Parameters<DeliveryMutationPort['mutate']>[1],
+    documents?: DeliveryDocumentSource & { assertDispatch: () => void },
+  ): Promise<unknown> {
+    if (documents) return this.#forDocuments(documents).mutate(request);
     this.#assertBootstrap(request);
     this.#assertNoReplacementMetadata();
     if (!request.kind.startsWith('git.'))
       throw new Error('local Git port received a GitHub request');
     const gitRequest = request as GitDeliveryRequest;
+    if (gitRequest.kind !== 'git.commit')
+      this.#assertDocumentTree(
+        gitRequest.kind === 'git.push' ? gitRequest.newSha : gitRequest.parentSha,
+      );
     if (gitRequest.kind === 'git.create_ref') {
+      this.#documents?.assertDispatch?.();
       this.#git(['update-ref', gitRequest.ref, gitRequest.parentSha, '0'.repeat(40)]);
       return { ref: gitRequest.ref, sha: gitRequest.parentSha };
     }
@@ -257,6 +361,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       if (gitRequest.expectedRemoteSha !== null) {
         this.#git(['merge-base', '--is-ancestor', gitRequest.expectedRemoteSha, gitRequest.newSha]);
       }
+      this.#documents?.assertDispatch?.();
       await this.#pushRemoteRef({
         workspaceRoot: this.#workspaceRoot,
         repository: gitRequest.repository,
@@ -264,6 +369,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
         ref: gitRequest.ref,
         expectedOldSha: gitRequest.expectedRemoteSha,
         newSha: gitRequest.newSha,
+        ...(this.#ownedSourceRoot ? { objectSourceRoot: this.#ownedSourceRoot } : {}),
       });
       return { ref: gitRequest.ref, sha: gitRequest.newSha };
     }
@@ -290,6 +396,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       this.#git(['add', '-A', '--', '.'], indexEnvironment);
       const treeSha = this.#git(['write-tree'], indexEnvironment).trim();
       if (treeSha !== request.treeSha) throw new Error('workspace tree differs from approved tree');
+      this.#assertDocumentTree(treeSha);
       this.#assertTreeSafety(treeSha, request.changedFiles);
       this.#assertDiff(request.parentSha, treeSha, request.diffDigest, request.changedFiles);
       const identityEnvironment = {
@@ -301,12 +408,14 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
         GIT_COMMITTER_DATE: `${request.authoredAtUnix} +0000`,
       };
       this.#assertBootstrap(request);
+      this.#documents?.assertDispatch?.();
       const commitSha = this.#git(
         ['commit-tree', treeSha, '-p', request.parentSha],
         identityEnvironment,
         `${request.message}\n`,
       ).trim();
       this.#assertBootstrap(request);
+      this.#documents?.assertDispatch?.();
       this.#git(['update-ref', request.ref, commitSha, request.parentSha]);
       this.#assertExactCommit(request, commitSha);
       return { ref: request.ref, sha: commitSha, treeSha };
@@ -331,6 +440,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     ) {
       throw new Error('task ref does not contain the approved exact commit');
     }
+    this.#assertDocumentTree(request.treeSha);
     this.#assertTreeSafety(request.treeSha, request.changedFiles);
     this.#assertDiff(request.parentSha, request.treeSha, request.diffDigest, request.changedFiles);
   }
@@ -479,12 +589,15 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     extraEnvironment: NodeJS.ProcessEnv = {},
     input?: string,
   ): Buffer {
+    if (this.#gitPin) assertBootstrapExecutablePin(this.#gitPin);
     return execFileSync(
       this.#gitBinary,
       [
         '--no-replace-objects',
         '-c',
         'core.hooksPath=/dev/null',
+        '-c',
+        'core.fsmonitor=false',
         '-c',
         'commit.gpgSign=false',
         '-c',
@@ -531,8 +644,8 @@ export function createProductionBootstrapGitPort(input: {
 export class CompositeDeliveryMutationPort implements ProductionDeliveryMutationPort {
   readonly workspaceRoot: string;
   readonly repository: string;
-  readonly observe: (request: DeliveryRequest) => Promise<ExternalObservation>;
-  readonly mutate: (request: DeliveryRequest) => Promise<unknown>;
+  readonly observe: DeliveryMutationPort['observe'];
+  readonly mutate: DeliveryMutationPort['mutate'];
 
   private constructor(git: LocalGitDeliveryPort, github: GitHubDeliveryPort) {
     this.workspaceRoot = git.workspaceRoot;
@@ -541,10 +654,12 @@ export class CompositeDeliveryMutationPort implements ProductionDeliveryMutation
     const mutateGit = git.mutate.bind(git);
     const observeGitHub = github.observe.bind(github);
     const mutateGitHub = github.mutate.bind(github);
-    this.observe = (request) =>
-      request.kind.startsWith('git.') ? observeGit(request) : observeGitHub(request);
-    this.mutate = (request) =>
-      request.kind.startsWith('git.') ? mutateGit(request) : mutateGitHub(request);
+    this.observe = (request, documents) =>
+      request.kind.startsWith('git.') ? observeGit(request, documents) : observeGitHub(request);
+    this.mutate = (request, merge, documents) =>
+      request.kind.startsWith('git.')
+        ? mutateGit(request, merge, documents)
+        : mutateGitHub(request, merge);
   }
 
   static create(

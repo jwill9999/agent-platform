@@ -1,0 +1,186 @@
+{
+  "featureId": "agent-platform-pilot-zero.17",
+  "contractVersion": 1,
+  "policyDigest": "sha256:6328cd546f68372b107c458b2300edfc41dfacdefdf6172be3a07031ca7b5ed5",
+  "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+  "objective": "PROPOSED standalone execution prerequisite repair. Schema validation is not runtime policy or approval.",
+  "requirements": [
+    "R1 authoritative discovery and atomic admission",
+    "R2 bounded journaled implementation import",
+    "R3 explicit phase authority and typed coordinator receipts",
+    "R4 actual host executable and runtime feasibility"
+  ],
+  "nonGoals": [
+    "Live pilot",
+    "Desktop resumption",
+    "Staging or production",
+    "Merge",
+    "A2A or packaging",
+    "Application behavior or dependency changes"
+  ],
+  "acceptanceCriteria": [
+    "R1-R4 and SP-01 through SP-13 satisfied with declared boundaries",
+    "Independent code review and exact-head gates pass",
+    "Feature integration before closing .17"
+  ],
+  "constraints": {
+    "architecture": [
+      "Preserve existing journal, state machine and clean runtime boundaries"
+    ],
+    "security": [
+      "No authority expansion or silent direct fallback",
+      "Unknown ownership blocks execution"
+    ],
+    "allowedPaths": [
+      "packages/workflow-control/src",
+      "packages/workflow-control/test",
+      "docs/planning/standalone-pilot",
+      "docs/testing/standalone-pilot-prerequisites.md",
+      "docs/reviews",
+      "docs/tasks/agent-platform-pilot-zero.17.md",
+      "docs/workflow-control-orchestrator.md",
+      "docs/workflow-control-continuations.md",
+      "session.md"
+    ]
+  },
+  "authority": {
+    "deliveryTarget": "feature/harness-backlog-review",
+    "allowedActions": [
+      "workspace.read",
+      "workspace.patch",
+      "process.test",
+      "artifact.write",
+      "beads.read",
+      "beads.mutate",
+      "git.read",
+      "git.commit",
+      "git.push",
+      "github.read"
+    ],
+    "github": {
+      "repository": "jwill9999/agent-platform",
+      "base": "feature/harness-backlog-review",
+      "mergeMethod": "merge",
+      "requiredChecks": [
+        "verify",
+        "desktop-e2e"
+      ]
+    }
+  },
+  "tasks": [
+    {
+      "id": "agent-platform-pilot-zero.17",
+      "dependsOn": [],
+      "risk": "high",
+      "assignedRole": "implementation_worker",
+      "phaseRoles": {
+        "task_verification": "test_runner",
+        "task_review": "code_reviewer"
+      },
+      "branchParent": "feature/harness-backlog-review",
+      "allowedPaths": [
+        "packages/workflow-control/src",
+        "packages/workflow-control/test",
+        "docs/planning/standalone-pilot",
+        "docs/testing/standalone-pilot-prerequisites.md",
+        "docs/reviews",
+        "docs/tasks/agent-platform-pilot-zero.17.md",
+        "docs/workflow-control-orchestrator.md",
+        "docs/workflow-control-continuations.md",
+        "session.md"
+      ],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "beads.read",
+        "beads.mutate",
+        "git.read",
+        "git.commit",
+        "git.push",
+        "github.read"
+      ]
+    }
+  ],
+  "qualityGates": [
+    "SP-01 through SP-13",
+    "Build, typecheck, lint, full workflow-control suite",
+    "Exact-head hosted required checks resolved before execution",
+    "Independent review and owner integration"
+  ],
+  "retryPolicy": {
+    "implementationAttempts": 2,
+    "findingAttempts": 2,
+    "infrastructureAttempts": 2,
+    "waitDeadlineSeconds": 300
+  },
+  "repairTaskPolicy": {
+    "idPattern": "agent-platform-pilot-zero.17.repair.<sequence>",
+    "maxChildren": 0,
+    "allowedRoles": [
+      "implementation_worker"
+    ],
+    "allowedPaths": [
+      "packages/workflow-control/src",
+      "packages/workflow-control/test",
+      "docs/planning/standalone-pilot",
+      "docs/testing/standalone-pilot-prerequisites.md",
+      "docs/reviews",
+      "docs/tasks/agent-platform-pilot-zero.17.md",
+      "docs/workflow-control-orchestrator.md",
+      "docs/workflow-control-continuations.md",
+      "session.md"
+    ],
+    "authorityMayExpand": false
+  },
+  "escalationPolicy": [
+    "Stop for unknown ownership, changed authority or source",
+    "Do not launch with proposed policy digest; bind actual operator policy and approval first",
+    "Stop after bounded retries or missing required test feasibility"
+  ],
+  "planningDocuments": {
+    "version": 1,
+    "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+    "repository": "jwill9999/agent-platform",
+    "sourceRevision": "a8586aa425fc4907ef7aa374ff2d283d6eb0a1cd",
+    "files": [
+      {
+        "path": "docs/tasks/agent-platform-pilot-zero.17.md",
+        "kind": "specification",
+        "taskIds": [
+          "agent-platform-pilot-zero.17"
+        ],
+        "sizeBytes": 3308,
+        "digest": "sha256:7c9ad3f084f61f7ccd00b5696ffc18457ed7b46e6c0be4c6e7cfe43b49fbd089"
+      },
+      {
+        "path": "docs/testing/standalone-pilot-prerequisites.md",
+        "kind": "verification",
+        "taskIds": [
+          "agent-platform-pilot-zero.17"
+        ],
+        "sizeBytes": 5233,
+        "digest": "sha256:1e8994a0e0b73d3845218804e5deb388388bf1b900a19c71d0b5c34747dcaa18"
+      },
+      {
+        "path": "docs/planning/standalone-pilot/plan.md",
+        "kind": "design",
+        "taskIds": [
+          "agent-platform-pilot-zero.17"
+        ],
+        "sizeBytes": 11163,
+        "digest": "sha256:7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+      },
+      {
+        "path": "docs/planning/standalone-pilot/planning-policy.md",
+        "kind": "reference",
+        "taskIds": [
+          "agent-platform-pilot-zero.17"
+        ],
+        "sizeBytes": 1061,
+        "digest": "sha256:6328cd546f68372b107c458b2300edfc41dfacdefdf6172be3a07031ca7b5ed5"
+      }
+    ]
+  }
+}

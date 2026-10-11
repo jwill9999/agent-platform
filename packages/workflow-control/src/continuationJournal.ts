@@ -1,3 +1,5 @@
+import { assertExecutionNotInterrupted } from './executionInterruptions.js';
+import { verifyDocumentBoundary, assertDocumentAuthority } from './documentApproval.js';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 
@@ -8,6 +10,7 @@ import { delegateCallbackSchema, delegateCallbackTarget } from './governedOperat
 import { runAcceptsWork } from './workCancellation.js';
 import {
   enqueuePhaseJob,
+  phaseActionForCallback,
   executePhaseActionSchema,
   initializePhaseJobSchema,
 } from './phaseJobs.js';
@@ -20,7 +23,7 @@ import {
 
 export const continuationSignal = new EventEmitter();
 
-export const continuationActionSchema = z.discriminatedUnion('kind', [
+export const continuationActionSchema = z.union([
   z.object({ kind: z.literal('blocked'), reason: z.string().min(1) }).strict(),
   z.object({ kind: z.literal('approval_required'), eventId: z.string().min(1) }).strict(),
   executePhaseActionSchema,
@@ -139,6 +142,9 @@ export class ContinuationJournal {
     this.#database.pragma('busy_timeout = 5000');
   }
 
+  phaseAction(callback: unknown) {
+    return phaseActionForCallback(callback, this.#database);
+  }
   close(): void {
     this.#database.close();
   }
@@ -366,6 +372,22 @@ export class ContinuationJournal {
   }
 
   /** Next action and callback consumption share a transaction and a unique job identity. */
+  #assertApprovalConsumption(job: ContinuationJob, eventId: string): void {
+    const callback = delegateCallbackSchema.parse(JSON.parse(job.callback_json ?? 'null'));
+    if (callback.approvalIntent?.eventId !== eventId) {
+      throw new Error('continuation approval does not match durable callback');
+    }
+    const parent = this.#database
+      .prepare('SELECT state, version FROM runs WHERE id = ?')
+      .get(job.run_id) as { state: string; version: number };
+    if (
+      parent.state !== delegateCallbackTarget(callback) ||
+      parent.version !== callback.parentRunVersion + 1
+    ) {
+      throw new Error('continuation parent changed after callback');
+    }
+  }
+
   consume(
     id: string,
     executionId: string,
@@ -374,9 +396,24 @@ export class ContinuationJournal {
     nowMs: number,
   ): void {
     const action = continuationActionSchema.parse(actionInput);
+    let verified: ReturnType<typeof verifyDocumentBoundary> | undefined;
+    if (action.kind === 'execute_phase') {
+      const pending = this.get(id);
+      if (pending?.status !== 'consumed')
+        verified = verifyDocumentBoundary(this.#database, {
+          runId: action.runId,
+          taskId: action.taskId,
+          boundary: 'phase.enqueue',
+          ownerId: executionId,
+          nowMs,
+        });
+    }
     this.#database
       .transaction(() => {
+        if (action.kind === 'execute_phase' && verified)
+          assertDocumentAuthority(this.#database, action.runId, verified.approvalId);
         const job = this.get(id);
+        if (job) assertExecutionNotInterrupted(this.#database, job.execution_id);
         if (job !== undefined && !runAcceptsWork(this.#database, job.run_id))
           throw new Error('continuation run is cancelled');
         if (job?.status === 'consumed') {
@@ -397,21 +434,8 @@ export class ContinuationJournal {
         ) {
           throw new Error('continuation consumption fence rejected');
         }
-        if (action.kind === 'approval_required') {
-          const callback = delegateCallbackSchema.parse(JSON.parse(job.callback_json ?? 'null'));
-          if (callback.approvalIntent?.eventId !== action.eventId) {
-            throw new Error('continuation approval does not match durable callback');
-          }
-          const parent = this.#database
-            .prepare('SELECT state, version FROM runs WHERE id = ?')
-            .get(job.run_id) as { state: string; version: number };
-          if (
-            parent.state !== delegateCallbackTarget(callback) ||
-            parent.version !== callback.parentRunVersion + 1
-          ) {
-            throw new Error('continuation parent changed after callback');
-          }
-        }
+        if (action.kind === 'approval_required')
+          this.#assertApprovalConsumption(job, action.eventId);
         if (action.kind === 'execute_phase') enqueuePhaseJob(this.#database, id, action, nowMs);
         this.#database
           .prepare(

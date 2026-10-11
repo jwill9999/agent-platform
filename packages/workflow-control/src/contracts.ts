@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  canonicalPlanningDocuments,
+  planningDocumentsSchema,
+  planningDocumentsDigest,
+} from './planningDocuments.js';
 
 export const EXECUTION_CONTRACT_VERSION = 1 as const;
 
@@ -73,6 +78,8 @@ export const taskContractSchema = z
       .object({
         task_verification: z.literal('test_runner').optional(),
         task_review: z.literal('code_reviewer').optional(),
+        feature_evaluation: z.literal('feature_evaluator').optional(),
+        repair_planning: z.literal('feature_planner').optional(),
       })
       .strict()
       .optional(),
@@ -96,6 +103,7 @@ export const taskContractSchema = z
 export const executionContractSchema = z
   .object({
     featureId: identifierSchema,
+    planningDocuments: planningDocumentsSchema.transform(canonicalPlanningDocuments).optional(),
     contractVersion: z.literal(EXECUTION_CONTRACT_VERSION),
     policyDigest: digestSchema,
     workspaceId: digestSchema,
@@ -141,7 +149,34 @@ export const executionContractSchema = z
   .strict()
   .superRefine((contract, context) => {
     const taskIds = new Set(contract.tasks.map((task) => task.id));
-    const allowedContractPaths = contract.constraints.allowedPaths;
+    const documents = contract.planningDocuments;
+    if (documents !== undefined) {
+      if (
+        documents.workspaceId !== contract.workspaceId ||
+        documents.repository !== contract.authority.github.repository
+      )
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'planning document identity mismatch',
+        });
+      if (documents.files.some((file) => file.taskIds.some((id) => !taskIds.has(id))))
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'planning document references unknown task',
+        });
+      for (const taskId of taskIds) {
+        for (const kind of ['specification', 'verification']) {
+          if (!documents.files.some((file) => file.kind === kind && file.taskIds.includes(taskId)))
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'planning document task coverage missing',
+            });
+        }
+      }
+    }
+  })
+  .superRefine((contract, context) => {
+    const taskIds = new Set(contract.tasks.map((task) => task.id));
     if (taskIds.size !== contract.tasks.length) {
       context.addIssue({ code: z.ZodIssueCode.custom, message: 'task ids must be unique' });
     }
@@ -162,6 +197,11 @@ export const executionContractSchema = z
           });
         }
       }
+    }
+  })
+  .superRefine((contract, context) => {
+    const allowedContractPaths = contract.constraints.allowedPaths;
+    for (const [index, task] of contract.tasks.entries()) {
       for (const path of task.allowedPaths) {
         if (!allowedContractPaths.some((allowedPath) => isPathWithin(path, allowedPath))) {
           context.addIssue({
@@ -181,7 +221,8 @@ export const executionContractSchema = z
         }
       }
     }
-
+  })
+  .superRefine((contract, context) => {
     const visiting = new Set<string>();
     const visited = new Set<string>();
     const tasksById = new Map(contract.tasks.map((task) => [task.id, task]));
@@ -201,10 +242,38 @@ export const executionContractSchema = z
     }
   });
 
+export const repairPlanningContextSchema = z
+  .object({
+    evaluationId: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    headSha: z.string().regex(/^[a-f0-9]{40}$/u),
+    summary: z.string().min(1),
+    failedCriteria: z
+      .array(
+        z
+          .object({
+            criterion: z.string().min(1),
+            summary: z.string().min(1),
+            evidence: z.array(evidenceReferenceSchema).min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+
 export const taskPacketSchema = z
   .object({
     runId: identifierSchema,
     taskId: identifierSchema,
+    documentBinding: z
+      .object({
+        approvalId: identifierSchema,
+        snapshotPath: z.literal('/run/approved-documents'),
+        materialDigest: digestSchema,
+        manifestDigest: digestSchema,
+      })
+      .strict()
+      .optional(),
     contractVersion: z.literal(EXECUTION_CONTRACT_VERSION),
     policyDigest: digestSchema,
     assignedRole: workflowRoleSchema,
@@ -214,6 +283,27 @@ export const taskPacketSchema = z
     allowedOperations: z.array(workflowOperationSchema),
     retryBudget: retryBudgetSchema,
     evidence: z.array(evidenceReferenceSchema),
+    repairPlanningContext: repairPlanningContextSchema.optional(),
+    repairChildContext: z
+      .object({
+        childId: identifierSchema,
+        parentTaskId: identifierSchema,
+        evaluationId: digestSchema,
+        failedCriterion: z.string().min(1),
+        summary: z.string().min(1),
+        hypothesis: z.string().min(1),
+      })
+      .strict()
+      .optional(),
+    repairContext: z
+      .object({
+        dispatchId: identifierSchema,
+        failureHeadSha: z.string().regex(/^[a-f0-9]{40}$/u),
+        summary: z.string().min(1),
+        hypothesis: z.string().min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -250,6 +340,46 @@ export type EvidenceReference = z.infer<typeof evidenceReferenceSchema>;
 export type WorkflowOperation = z.infer<typeof workflowOperationSchema>;
 export type WorkflowRole = z.infer<typeof workflowRoleSchema>;
 
+/** An evaluator must classify each approved criterion exactly once, including failed outcomes. */
+export function assertExactCriterionPartition(
+  result: AgentResult,
+  approved: readonly string[],
+): void {
+  const reported = [...result.acceptanceCriteria.passed, ...result.acceptanceCriteria.failed];
+  if (
+    new Set(reported).size !== reported.length ||
+    reported.length !== approved.length ||
+    reported.some((criterion) => !approved.includes(criterion))
+  )
+    throw new Error('evaluation must classify each approved criterion exactly once');
+}
+
+/** Evaluation verdict and callback intent must describe the same criterion outcome. */
+export function assertFeatureEvaluationResult(
+  result: AgentResult,
+  approved: readonly string[],
+): void {
+  assertExactCriterionPartition(result, approved);
+  const failed = result.acceptanceCriteria.failed;
+  if (failed.length === 0) {
+    if (
+      result.status !== 'passed' ||
+      result.recommendedTransition !== 'continue' ||
+      result.findings.length
+    )
+      throw new Error('evaluation terminal contradicts its criterion outcomes');
+  } else if (
+    result.status !== 'needs_repair' ||
+    result.recommendedTransition !== 'repair' ||
+    result.findings.some(
+      (finding) =>
+        finding.acceptanceCriterion !== undefined && !failed.includes(finding.acceptanceCriterion),
+    )
+  ) {
+    throw new Error('evaluation terminal contradicts its criterion outcomes');
+  }
+}
+
 /** Shared acceptance semantics for phase results and final brokered task acceptance. */
 export function assertAgentResultAccepted(
   resultInput: unknown,
@@ -277,12 +407,29 @@ export function assertAgentResultAccepted(
 export function assertTaskPacketWithinContract(
   contractInput: unknown,
   packetInput: unknown,
-  phase?: 'task_verification' | 'task_review',
+  phase?: 'task_verification' | 'task_review' | 'feature_evaluation' | 'repair_planning',
 ): void {
   const contract = executionContractSchema.parse(contractInput);
   const packet = taskPacketSchema.parse(packetInput);
   const task = contract.tasks.find((candidate) => candidate.id === packet.taskId);
   if (task === undefined) throw new Error('task packet references an unknown task');
+  assertTaskPacketWithinTaskAuthority(contract, packet, task, phase);
+}
+
+/** Containment only. Dynamic task authority must be resolved from the committed journal by the caller. */
+export function assertTaskPacketWithinTaskAuthority(
+  contract: ExecutionContract,
+  packetInput: unknown,
+  task: ExecutionContract['tasks'][number],
+  phase?: 'task_verification' | 'task_review' | 'feature_evaluation' | 'repair_planning',
+): void {
+  const packet = taskPacketSchema.parse(packetInput);
+  if (task.id !== packet.taskId) throw new Error('task packet task authority mismatch');
+  if (
+    contract.planningDocuments &&
+    packet.documentBinding?.manifestDigest !== planningDocumentsDigest(contract.planningDocuments)
+  )
+    throw new Error('task packet document binding mismatch');
   if (packet.contractVersion !== contract.contractVersion) throw new Error('stale task packet');
   if (packet.policyDigest !== contract.policyDigest) throw new Error('stale task packet policy');
   if (packet.assignedRole !== (phase === undefined ? task.assignedRole : task.phaseRoles?.[phase]))

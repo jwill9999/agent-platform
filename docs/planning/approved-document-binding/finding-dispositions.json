@@ -1,0 +1,22 @@
+[
+  {
+    "findingId": "DB-R1-01",
+    "disposition": "corrected",
+    "reason": "Persist a fenced attempt before verification; unresolved attempts quarantine prior approval across restart even after bytes are restored. Explicit recovery invalidates before fresh authority. DB-T07/08 now require compound failure/restart/concurrency/migration tests. Independently re-reviewed in document-binding-round2.",
+    "decidedBy": "coordinator-planner",
+    "evidence": [
+      {
+        "digest": "sha256:0eb57cb15418bfb56078767db226c1c4e38b47840f7310d406ea9d4d755aace8",
+        "mediaType": "text/markdown",
+        "sizeBytes": 16374,
+        "kind": "artifact"
+      },
+      {
+        "digest": "sha256:86ba87f34604abf79ec0d382fcdebdc3b1d856ea05b670adf029f227661d4f27",
+        "mediaType": "text/markdown",
+        "sizeBytes": 7703,
+        "kind": "artifact"
+      }
+    ]
+  }
+]

@@ -4,7 +4,6 @@ import { pathToFileURL } from 'node:url';
 import { ContinuationJournal, type ContinuationAction } from './continuationJournal.js';
 import { delegateCallbackSchema } from './governedOperations.js';
 import { specialistTerminalResult } from './specialistTerminalResult.js';
-import { phaseActionForCallback } from './phaseJobs.js';
 
 /** Executed in a real parent continuation process; no conversation message is injected. */
 export function runParentContinuation(args: readonly string[]): void {
@@ -33,7 +32,7 @@ export function runParentContinuation(args: readonly string[]): void {
       } else if (callback.terminalStatus === 'blocked') {
         action = { kind: 'blocked', reason: 'specialist_reported_blocker' };
       } else {
-        action = phaseActionForCallback(callback);
+        action = journal.phaseAction(callback);
       }
     }
     try {
