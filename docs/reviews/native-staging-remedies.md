@@ -159,6 +159,33 @@ three workflow blocks syntax and diff checks. The parent resolver test still pas
 No VM/model call is repeated for these script/test changes. Fresh actual hosted Sonar and all
 current-head pipelines remain required; no closure of the e3 hosted result is manufactured.
 
+## Second hosted Sonar result and bounded repair
+
+Actual `bdcb34b3` analysis reduces open issues from 41 to 12. Reliability/security ratings improve
+to 3 but still fail the required 1; duplicated new lines are 5.5% against the 3% limit. Remaining
+reports include two argument-tampering traces, two type/constant-check bugs and minor regex/string
+style findings. Preserve this failed result and its direct API evidence as
+`pr292-sonar-bdcb-issues.json`; no merge readiness is implied.
+
+Independent trace review found no accepted option/ref injection through the strict lowercase
+40-hex SHA guards, but the actual hosted findings still require disposition. Critics approve a
+bounded implementation plan: validated SHA data through fixed-argument Git batch/fetch stdin;
+minimal builtin-only protected-source bootstrap rather than duplicated full dispatchers; reuse
+complete Git/API helpers only after all six protected controls are bound and privately copied.
+Preserve exact blob framing, missing-object failure, all authenticated route/identity boundaries,
+run/job/receipt/current-head fences and source immutability. Do not normalize unsafe input into
+acceptance, suppress reports, pad code to reduce density or weaken scan/protection rules.
+The second-pass implementation is source-reviewed by both distinct critics with no remaining
+actionable findings. The minimal bootstrap binds all six protected control blobs before private
+helper imports; Git batch/fetch input uses fixed arguments and strictly validated SHA stdin.
+Binary bytes, object framing/type/size, missing-object failures and existing provenance fences
+are preserved. One critic requested malformed scalar bootstrap-ref coverage; those direct option,
+branch and newline-SHA tests now assert rejection before directory creation or network access.
+The critics independently passed seven and four focused controls. The complete affected suite
+passes 28 tests, zero failures/cancellations/skips, in 92.435 seconds. After the final test-only
+scalar-input amendment, two relevant API/fetch controls pass. Fresh actual hosted Sonar remains
+required; source approval and local tests do not clear the failed hosted gate.
+
 ## Pending delivery gates
 
 Actual policy-adoption full scan and VM, protected archive

@@ -27,7 +27,7 @@ export function validateDataRepoPath(repo) {
 function safeTreePath(path) {
   return (
     typeof path === 'string' &&
-    /^[\w.\/-]+$/.test(path) &&
+    /^[\w./-]+$/.test(path) &&
     path.split('/').every((part) => part && part !== '.' && part !== '..') &&
     !path.startsWith('-')
   );
@@ -54,7 +54,7 @@ export function validateGitArguments(args) {
         values[1] === '--format=%P' &&
         sha(values[2])) ||
       (values.length === 1 &&
-        /^[a-f0-9]{40}:[\w.\/-]+$/.test(values[0]) &&
+        /^[a-f0-9]{40}:[\w./-]+$/.test(values[0]) &&
         safeTreePath(values[0].slice(41))),
   };
   // The raw diff has six fixed flags followed by two immutable identities and --.
@@ -101,9 +101,56 @@ export function git(repo, ...args) {
   );
 }
 
+export function readObjectBatch(repo, value, expectedType = null) {
+  if (!sha(value)) throw new Error('Invalid object identity');
+  const output = execFileSync(
+    GIT_EXECUTABLE,
+    [
+      '-c',
+      'core.hooksPath=/dev/null',
+      '-c',
+      'core.attributesFile=/dev/null',
+      '-C',
+      validateDataRepoPath(repo),
+      'cat-file',
+      '--batch',
+    ],
+    {
+      input: value + '\n',
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: 30_000,
+      env: {
+        PATH: SYSTEM_PATH,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_TERMINAL_PROMPT: '0',
+      },
+    },
+  );
+  return decodeObjectBatch(output, value, expectedType);
+}
+export function decodeObjectBatch(output, value, expectedType = null) {
+  if (!Buffer.isBuffer(output) || !sha(value))
+    throw new Error('Invalid batch object bytes/identity');
+  const headerEnd = output.indexOf(10);
+  if (headerEnd < 0 || headerEnd > 100) throw new Error('Malformed Git object header');
+  const header = /^([a-f0-9]{40}) (blob|tree|commit|tag) (0|[1-9]\d*)$/.exec(
+    output.subarray(0, headerEnd).toString('utf8'),
+  );
+  if (header?.[1] !== value || (expectedType && header[2] !== expectedType))
+    throw new Error('Missing or wrong Git object identity/type');
+  const bytes = Number(header[3]);
+  if (
+    !Number.isSafeInteger(bytes) ||
+    bytes < 0 ||
+    output.length !== headerEnd + 1 + bytes + 1 ||
+    output.at(-1) !== 10
+  )
+    throw new Error('Malformed Git object size/framing');
+  return { type: header[2], content: output.subarray(headerEnd + 1, headerEnd + 1 + bytes) };
+}
 export function assertCommit(repo, value) {
-  if (!sha(value) || git(repo, 'cat-file', '-t', value).toString().trim() !== 'commit')
-    throw new Error('Invalid or missing commit identity');
+  readObjectBatch(repo, value, 'commit');
 }
 
 export function treeEntry(repo, commit, path) {

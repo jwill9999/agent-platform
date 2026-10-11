@@ -31,7 +31,13 @@ New hosted Sonar result at `e3c8523f` fails reliability/security ratings with 41
 The bounded resolver-test temporary-path correction passes 12 tests and independent review.
 Archive executable/argument/API-route and reported quality repairs now pass 26 affected tests,
 plus final revised negative controls, and both independent critics approve source delivery. Fresh
-hosted Sonar and all exact-head CI remain required; previous source approval does not waive the failed hosted gate. See current review results.
+hosted Sonar and all exact-head CI remain required; previous source approval does not waive the failed hosted gate.
+Actual repaired `bdcb34b3` analysis reduces open issues to 12 but remains failed, including 5.5%
+duplication. A further independently critiqued bounded refactor uses fixed Git argv with validated
+SHA stdin and narrows builtin-only bootstrap before reusing protected helpers. Both distinct critics approve the implemented second pass with no remaining findings, including
+the added scalar bootstrap denial controls. All 28 affected tests pass, followed by two controls
+for the final test-only amendment. New hosted qualification remains required; no stage merge.
+See current review results.
 
 Fresh official runner 2.337.0 on native APFS is online as dev 23 with the four required labels;
 old ExFAT installation is preserved, old idle Listener stopped gracefully, fresh credentials used

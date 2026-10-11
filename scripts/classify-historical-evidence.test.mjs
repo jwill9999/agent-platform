@@ -16,6 +16,9 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import {
   classifyHistoricalEvidence,
+  assertCommit,
+  readObjectBatch,
+  decodeObjectBatch,
   git,
   validateDataRepoPath,
   validateGitArguments,
@@ -317,6 +320,91 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       } finally {
         process.env.PATH = before;
       }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  test('Git batch object reads preserve binary payloads and reject missing or malformed framing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'git-object-batch-'));
+    const env = { PATH: '/usr/bin:/bin', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' };
+    try {
+      execFileSync('/usr/bin/git', ['init', '-q', root], { env });
+      const payload = Buffer.from([0, 10, 255, 67, 0, 10]);
+      const hash = execFileSync('/usr/bin/git', ['-C', root, 'hash-object', '-w', '--stdin'], {
+        env,
+        input: payload,
+        encoding: 'utf8',
+      }).trim();
+      assert.ok(readObjectBatch(root, hash, 'blob').content.equals(payload));
+      assert.throws(() => assertCommit(root, hash), /type/);
+      // cat-file --batch exits zero for a missing object; parse its response,
+      // never treat the subprocess exit code as existence/type evidence.
+      assert.throws(() => readObjectBatch(root, 'a'.repeat(40), 'commit'), /Missing/);
+      assert.throws(() => readObjectBatch(root, '--help'), /identity/);
+      const response = Buffer.concat([
+        Buffer.from(`${hash} blob ${payload.length}\n`),
+        payload,
+        Buffer.from('\n'),
+      ]);
+      assert.ok(decodeObjectBatch(response, hash, 'blob').content.equals(payload));
+      for (const invalid of [
+        response.subarray(0, -1),
+        Buffer.concat([response, Buffer.from('extra')]),
+        Buffer.from(`${hash} blob 999999999999999999999\n`),
+        Buffer.from(`${hash} missing\n`),
+        Buffer.from('not a header\n'),
+      ])
+        assert.throws(() => decodeObjectBatch(invalid, hash));
+      const nonAsciiHeader = Buffer.from(response);
+      nonAsciiHeader[0] |= 128;
+      assert.throws(() => decodeObjectBatch(nonAsciiHeader, hash));
+      assert.throws(() => decodeObjectBatch(response, 'b'.repeat(40)), /identity/);
+      assert.throws(() => decodeObjectBatch(response, hash, 'commit'), /type/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  test('Git fetch stdin accepts exact immutable refspec data without argument interpretation', () => {
+    const root = mkdtempSync(join(tmpdir(), 'git-fetch-stdin-'));
+    const source = join(root, 'source.git');
+    const target = join(root, 'target.git');
+    const env = {
+      PATH: '/usr/bin:/bin',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_AUTHOR_NAME: 'stdin-fixture',
+      GIT_AUTHOR_EMAIL: 'stdin@example.invalid',
+      GIT_COMMITTER_NAME: 'stdin-fixture',
+      GIT_COMMITTER_EMAIL: 'stdin@example.invalid',
+    };
+    const run = (...args) =>
+      execFileSync('/usr/bin/git', ['-c', 'core.hooksPath=/dev/null', ...args], {
+        env,
+        encoding: 'utf8',
+      }).trim();
+    try {
+      run('init', '-q', source);
+      writeFileSync(join(source, 'inert.txt'), 'inert data\n');
+      run('-C', source, 'add', '.');
+      run('-C', source, 'commit', '-qm', 'inert source');
+      const hash = run('-C', source, 'rev-parse', 'HEAD');
+      run('init', '--bare', '-q', '--', target);
+      execFileSync(
+        '/usr/bin/git',
+        [
+          '-c',
+          'core.hooksPath=/dev/null',
+          '-C',
+          target,
+          'fetch',
+          '--no-tags',
+          '--no-recurse-submodules',
+          '--stdin',
+          source,
+        ],
+        { env, input: hash + '\n', stdio: ['pipe', 'pipe', 'pipe'] },
+      );
+      assert.equal(readObjectBatch(target, hash, 'commit').type, 'commit');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

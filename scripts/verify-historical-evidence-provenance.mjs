@@ -40,84 +40,39 @@ export function validateDataRepoPath(repo) {
     throw new Error('Invalid absolute data repository path');
   return repo;
 }
-function safeTreePath(path) {
-  return (
-    typeof path === 'string' &&
-    /^[\w.\/-]+$/.test(path) &&
-    path.split('/').every((part) => part && part !== '.' && part !== '..') &&
-    !path.startsWith('-')
-  );
+export function validateBootstrapControlRequest(commit, path) {
+  if (!sha(commit) || !CONTROL_PATHS.includes(path))
+    throw new Error('Invalid protected bootstrap object request');
 }
-export function validateGitArguments(args) {
-  if (!Array.isArray(args) || !args.every((arg) => typeof arg === 'string'))
-    throw new Error('Invalid Git argument types');
-  const [command, ...values] = args;
-  const shape = {
-    'cat-file': () => values.length === 2 && ['-t', 'blob'].includes(values[0]) && sha(values[1]),
-    'ls-tree': () =>
-      values.length === 4 &&
-      values[0] === '-z' &&
-      sha(values[1]) &&
-      values[2] === '--' &&
-      safeTreePath(values[3]),
-    'merge-base': () =>
-      values.length === 3 && values[0] === '--is-ancestor' && sha(values[1]) && sha(values[2]),
-    'rev-parse': () => values.length === 1 && ['HEAD', 'staging'].includes(values[0]),
-    'update-ref': () => values.length === 2 && values[0] === 'refs/heads/staging' && sha(values[1]),
-    show: () =>
-      (values.length === 3 &&
-        values[0] === '-s' &&
-        values[1] === '--format=%P' &&
-        sha(values[2])) ||
-      (values.length === 1 &&
-        /^[a-f0-9]{40}:[\w.\/-]+$/.test(values[0]) &&
-        safeTreePath(values[0].slice(41))),
-  };
-  // The raw diff has six fixed flags followed by two immutable identities and --.
-  if (command === 'diff') {
-    if (
-      values.length !== 9 ||
-      values.slice(0, 6).join(' ') !==
-        '--raw -z --no-renames --no-ext-diff --no-textconv --no-abbrev' ||
-      !sha(values[6]) ||
-      !sha(values[7]) ||
-      values[8] !== '--'
-    )
-      throw new Error('Unsupported Git argument shape');
-    return args;
-  }
-  if (!Object.hasOwn(shape, command) || !shape[command]())
-    throw new Error('Unsupported Git argument shape');
-  return args;
-}
-
-function git(repo, ...args) {
-  return execFileSync(
-    GIT_EXECUTABLE,
-    [
-      '-c',
-      'core.hooksPath=/dev/null',
-      '-c',
-      'core.attributesFile=/dev/null',
-      '-C',
-      validateDataRepoPath(repo),
-      ...validateGitArguments(args),
-    ],
-    {
-      maxBuffer: 16 * 1024 * 1024,
-      timeout: 30_000,
-      env: {
-        PATH: SYSTEM_PATH,
-        GIT_CONFIG_NOSYSTEM: '1',
-        GIT_CONFIG_GLOBAL: '/dev/null',
-        GIT_TERMINAL_PROMPT: '0',
-      },
+function readProtectedControl(repo, commit, path) {
+  validateDataRepoPath(repo);
+  validateBootstrapControlRequest(commit, path);
+  const options = {
+    timeout: 30_000,
+    maxBuffer: 16 * 1024 * 1024,
+    env: {
+      PATH: SYSTEM_PATH,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_TERMINAL_PROMPT: '0',
     },
-  );
-}
-function assertCommit(repo, value) {
-  if (!sha(value) || git(repo, 'cat-file', '-t', value).toString().trim() !== 'commit')
-    throw new Error('Invalid or missing protected commit');
+  };
+  const prefix = [
+    '-c',
+    'core.hooksPath=/dev/null',
+    '-c',
+    'core.attributesFile=/dev/null',
+    '-C',
+    repo,
+  ];
+  const entry = execFileSync(
+    GIT_EXECUTABLE,
+    [...prefix, 'ls-tree', '-z', commit, '--', path],
+    options,
+  ).toString();
+  const match = /^100644 blob [a-f0-9]{40}\t([^\0]+)\0$/.exec(entry);
+  if (match?.[1] !== path) throw new Error(`Missing regular protected control: ${path}`);
+  return execFileSync(GIT_EXECUTABLE, [...prefix, 'show', `${commit}:${path}`], options);
 }
 function validateTarget(pr, head, base) {
   if (
@@ -135,34 +90,15 @@ function validateTarget(pr, head, base) {
     throw new Error('Wrong repository, target or stale PR head/base');
 }
 export function githubApiUrl(path) {
-  if (typeof path !== 'string' || path.length > 256 || /[^\x20-\x7e]/.test(path))
-    throw new Error('Invalid GitHub API route');
-  const id = '[1-9]\\d*';
-  const page = '(?:\\?per_page=100&page=([1-9]\\d*))?';
-  const routes = [
-    new RegExp(`^pulls/(${id})$`),
-    /^git\/ref\/heads\/staging$/,
-    new RegExp(`^actions/runs/(${id})$`),
-    new RegExp(`^actions/runs/(${id})/attempts/(${id})/jobs${page}$`),
-    new RegExp(`^actions/runs/(${id})/artifacts${page}$`),
-    new RegExp(`^actions/artifacts/(${id})/zip$`),
-  ];
-  const match = routes.map((route) => route.exec(path)).find(Boolean);
-  const workflow =
-    /^actions\/workflows\/promptfoo-code-scan\.yml\/runs\?event=pull_request&head_sha=([a-f0-9]{40})(?:&per_page=100&page=([1-9]\d*))?$/.exec(
-      path,
-    );
-  if (!match && !workflow) throw new Error('Unsupported GitHub API route/query');
-  const numeric = match
-    ? match.slice(1).filter((value) => value !== undefined)
-    : [workflow[2]].filter((value) => value !== undefined);
-  if (numeric.some((value) => !Number.isSafeInteger(Number(value)) || Number(value) < 1))
-    throw new Error('Invalid numeric GitHub API identity');
-  const pagination = /(?:[?&])per_page=100&page=([1-9]\d*)$/.exec(path);
-  if (pagination && Number(pagination[1]) > 20) throw new Error('Invalid bounded API page');
+  if (typeof path !== 'string' || path.length > 32 || /[^\x20-\x7e]/.test(path))
+    throw new Error('Invalid bootstrap GitHub API route');
+  if (path === 'git/ref/heads/staging')
+    return 'https://api.github.com/repos/jwill9999/agent-platform/git/ref/heads/staging';
+  const match = /^pulls\/([1-9]\d*)$/.exec(path);
+  if (!match || !Number.isSafeInteger(Number(match[1])))
+    throw new Error('Unsupported bootstrap GitHub API route/identity');
   return new URL(path, 'https://api.github.com/repos/jwill9999/agent-platform/').href;
 }
-
 async function githubJson(path, token) {
   const response = await fetch(githubApiUrl(path), {
     headers: {
@@ -173,13 +109,12 @@ async function githubJson(path, token) {
     redirect: 'error',
     signal: AbortSignal.timeout(30_000),
   });
-  if (!response.ok) throw new Error(`GitHub read failed: ${response.status}`);
+  if (!response.ok) throw new Error(`GitHub bootstrap read failed: ${response.status}`);
   return response.json();
 }
-export function fetchObjects(repo, refs, token) {
+export function fetchObjects(repo, protectedTip, token) {
   validateDataRepoPath(repo);
-  if (!Array.isArray(refs) || refs.length < 1 || refs.length > 4 || !refs.every(sha))
-    throw new Error('Invalid requested object identity');
+  if (!sha(protectedTip)) throw new Error('Invalid protected bootstrap object identity');
   mkdirSync(repo);
   const env = {
     PATH: SYSTEM_PATH,
@@ -191,8 +126,7 @@ export function fetchObjects(repo, refs, token) {
     GIT_CONFIG_VALUE_0:
       'AUTHORIZATION: basic ' + Buffer.from('x-access-token:' + token).toString('base64'),
   };
-  const args = ['-c', 'core.hooksPath=/dev/null'];
-  execFileSync(GIT_EXECUTABLE, [...args, 'init', '--bare', repo], {
+  execFileSync(GIT_EXECUTABLE, ['-c', 'core.hooksPath=/dev/null', 'init', '--bare', '--', repo], {
     env,
     stdio: 'pipe',
     timeout: 30_000,
@@ -200,16 +134,23 @@ export function fetchObjects(repo, refs, token) {
   execFileSync(
     GIT_EXECUTABLE,
     [
-      ...args,
+      '-c',
+      'core.hooksPath=/dev/null',
       '-C',
       repo,
       'fetch',
       '--no-tags',
       '--no-recurse-submodules',
-      `https://github.com/${REPOSITORY}.git`,
-      ...refs,
+      '--stdin',
+      'https://github.com/jwill9999/agent-platform.git',
     ],
-    { env, stdio: 'pipe', timeout: 120_000, maxBuffer: 16 * 1024 * 1024 },
+    {
+      env,
+      input: protectedTip + '\n',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 120_000,
+      maxBuffer: 16 * 1024 * 1024,
+    },
   );
 }
 
@@ -230,15 +171,29 @@ export async function loadProtectedHelpers({
   protectedTip,
   localRoot = dirname(dirname(fileURLToPath(import.meta.url))),
 }) {
-  assertCommit(repo, protectedTip);
+  if (!sha(protectedTip)) throw new Error('Invalid protected commit identity');
+  validateDataRepoPath(repo);
+  const type = execFileSync(
+    GIT_EXECUTABLE,
+    ['-c', 'core.hooksPath=/dev/null', '-C', repo, 'cat-file', '--batch-check=%(objecttype)'],
+    {
+      input: protectedTip + '\n',
+      env: {
+        PATH: SYSTEM_PATH,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_TERMINAL_PROMPT: '0',
+      },
+      timeout: 30_000,
+      maxBuffer: 1024,
+    },
+  ).toString();
+  if (type !== 'commit\n') throw new Error('Missing or wrong protected commit type');
   if (!lstatSync(localRoot).isDirectory() || lstatSync(localRoot).isSymbolicLink())
     throw new Error('Unsafe local control root');
   const protectedBytes = new Map();
   for (const path of CONTROL_PATHS) {
-    const entry = git(repo, 'ls-tree', '-z', protectedTip, '--', path).toString();
-    const match = /^100644 blob [a-f0-9]{40}\t([^\0]+)\0$/.exec(entry);
-    if (match?.[1] !== path) throw new Error(`Missing regular protected control: ${path}`);
-    const bytes = git(repo, 'show', `${protectedTip}:${path}`);
+    const bytes = readProtectedControl(repo, protectedTip, path);
     validateLocalControl(localRoot, path, bytes);
     protectedBytes.set(path, bytes);
   }
@@ -334,6 +289,7 @@ export async function verifyHistoricalEvidenceProvenance({
   const helpers = await loadProtectedHelpers({ repo, protectedTip, localRoot });
   try {
     const { qualifyHistoricalEvidence } = helpers.qualifier;
+    const { assertCommit, git } = helpers.classifier;
     validateTarget(pr, pr.head?.sha, protectedTip);
     assertCommit(repo, adoptionCommit);
     git(repo, 'merge-base', '--is-ancestor', adoptionCommit, protectedTip);
@@ -407,12 +363,11 @@ export async function verifyHistoricalEvidenceProvenance({
   }
 }
 
-async function paginated(path, key, token) {
+async function paginated(path, key, read) {
   const values = [];
   for (let page = 1; page <= 20; page++) {
-    const response = await githubJson(
+    const response = await read(
       `${path}${path.includes('?') ? '&' : '?'}per_page=100&page=${page}`,
-      token,
     );
     if (!Array.isArray(response[key])) throw new Error('Malformed GitHub enumeration');
     values.push(...response[key]);
@@ -435,8 +390,8 @@ export function decodeReceiptZip(zip) {
   return JSON.parse(bytes.toString('utf8'));
 }
 
-async function downloadReceipt(run, name, token) {
-  const all = await paginated(`actions/runs/${run.id}/artifacts`, 'artifacts', token);
+async function downloadReceipt(run, name, token, read, apiUrl) {
+  const all = await paginated(`actions/runs/${run.id}/artifacts`, 'artifacts', read);
   const matches = all.filter((entry) => entry.name === name);
   if (
     matches.length !== 1 ||
@@ -447,7 +402,7 @@ async function downloadReceipt(run, name, token) {
   )
     throw new Error('Missing or ambiguous run-bound receipt artifact');
   const artifact = matches[0];
-  const response = await fetch(githubApiUrl(`actions/artifacts/${artifact.id}/zip`), {
+  const response = await fetch(apiUrl(`actions/artifacts/${artifact.id}/zip`), {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
     redirect: 'manual',
     signal: AbortSignal.timeout(30_000),
@@ -564,51 +519,60 @@ async function main() {
   const pr = await githubJson(`pulls/${prText}`, token);
   const tip = await githubJson('git/ref/heads/staging', token);
   validateTarget(pr, pr.head?.sha, tip.object?.sha);
-  const automaticRun = await githubJson(`actions/runs/${automaticText}`, token);
-  const dispatchRun = await githubJson(`actions/runs/${dispatchText}`, token);
-  const candidates = await paginated(
-    `actions/workflows/promptfoo-code-scan.yml/runs?event=pull_request&head_sha=${pr.head.sha}`,
-    'workflow_runs',
-    token,
-  );
-  const latest = candidates
-    .filter(
-      (run) =>
-        run.head_sha === pr.head.sha &&
-        run.event === 'pull_request' &&
-        run.pull_requests?.some((entry) => entry.number === pr.number),
-    )
-    .sort((a, b) => b.id - a.id)[0];
-  if (!latest || latest.id !== automaticRun.id || latest.run_attempt !== automaticRun.run_attempt)
-    throw new Error('Automatic proof is not the latest current-head attempt');
-  const automaticJobs = await paginated(
-    `actions/runs/${automaticText}/attempts/${automaticRun.run_attempt}/jobs`,
-    'jobs',
-    token,
-  );
-  const dispatchJobs = await paginated(
-    `actions/runs/${dispatchText}/attempts/${dispatchRun.run_attempt}/jobs`,
-    'jobs',
-    token,
-  );
-  const automaticReceipt = await downloadReceipt(
-    automaticRun,
-    `automatic-archive-${pr.number}-${pr.head.sha}-${automaticRun.run_attempt}`,
-    token,
-  );
-  const dispatchReceipt = await downloadReceipt(
-    dispatchRun,
-    `archive-provenance-${pr.number}-${pr.head.sha}-${dispatchRun.run_attempt}`,
-    token,
-  );
   const directory = mkdtempSync(join(tmpdir(), 'archive-provenance-'));
+  let helpers;
   try {
-    if (!sha(automaticReceipt.workflowSource)) throw new Error('Invalid automatic merge identity');
     const repo = join(directory, 'objects.git');
-    fetchObjects(
-      repo,
-      [tip.object.sha, pr.head.sha, automaticReceipt.workflowSource, adoptionCommit],
+    fetchObjects(repo, tip.object.sha, token);
+    helpers = await loadProtectedHelpers({ repo, protectedTip: tip.object.sha });
+    const read = (path) => helpers.qualifier.githubJson(path, token);
+    const automaticRun = await read(`actions/runs/${automaticText}`);
+    const dispatchRun = await read(`actions/runs/${dispatchText}`);
+    const candidates = await paginated(
+      `actions/workflows/promptfoo-code-scan.yml/runs?event=pull_request&head_sha=${pr.head.sha}`,
+      'workflow_runs',
+      read,
+    );
+    const latest = candidates
+      .filter(
+        (run) =>
+          run.head_sha === pr.head.sha &&
+          run.event === 'pull_request' &&
+          run.pull_requests?.some((entry) => entry.number === pr.number),
+      )
+      .sort((a, b) => b.id - a.id)[0];
+    if (!latest || latest.id !== automaticRun.id || latest.run_attempt !== automaticRun.run_attempt)
+      throw new Error('Automatic proof is not the latest current-head attempt');
+    const automaticJobs = await paginated(
+      `actions/runs/${automaticText}/attempts/${automaticRun.run_attempt}/jobs`,
+      'jobs',
+      read,
+    );
+    const dispatchJobs = await paginated(
+      `actions/runs/${dispatchText}/attempts/${dispatchRun.run_attempt}/jobs`,
+      'jobs',
+      read,
+    );
+    const automaticReceipt = await downloadReceipt(
+      automaticRun,
+      `automatic-archive-${pr.number}-${pr.head.sha}-${automaticRun.run_attempt}`,
       token,
+      read,
+      helpers.qualifier.githubApiUrl,
+    );
+    const dispatchReceipt = await downloadReceipt(
+      dispatchRun,
+      `archive-provenance-${pr.number}-${pr.head.sha}-${dispatchRun.run_attempt}`,
+      token,
+      read,
+      helpers.qualifier.githubApiUrl,
+    );
+    if (!sha(automaticReceipt.workflowSource)) throw new Error('Invalid automatic merge identity');
+    helpers.qualifier.fetchObjects(
+      repo,
+      [pr.head.sha, automaticReceipt.workflowSource, adoptionCommit],
+      token,
+      { existing: true },
     );
     const result = await verifyHistoricalEvidenceProvenance({
       repo,
@@ -627,13 +591,14 @@ async function main() {
       protectedTip: tip.object.sha,
       automaticRun,
       dispatchRun,
-      read: (path) => githubJson(path, token),
-      enumerate: (path, key) => paginated(path, key, token),
+      read,
+      enumerate: (path, key) => paginated(path, key, read),
     });
     if (process.env.ARCHIVE_VERIFIED_OUTPUT)
       writeFileSync(process.env.ARCHIVE_VERIFIED_OUTPUT, JSON.stringify(result, null, 2) + '\n');
     console.log(JSON.stringify(result));
   } finally {
+    helpers?.cleanup();
     rmSync(directory, { recursive: true, force: true });
   }
 }

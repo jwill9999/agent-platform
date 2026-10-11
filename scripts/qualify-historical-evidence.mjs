@@ -267,8 +267,8 @@ export function qualifyHistoricalEvidence({ repo, base, head, context }) {
 export function githubApiUrl(path) {
   if (typeof path !== 'string' || path.length > 256 || /[^\x20-\x7e]/.test(path))
     throw new Error('Invalid GitHub API route');
-  const id = '[1-9]\\d*';
-  const page = '(?:\\?per_page=100&page=([1-9]\\d*))?';
+  const id = String.raw`[1-9]\d*`;
+  const page = String.raw`(?:\?per_page=100&page=([1-9]\d*))?`;
   const routes = [
     new RegExp(`^pulls/(${id})$`),
     /^git\/ref\/heads\/staging$/,
@@ -283,10 +283,9 @@ export function githubApiUrl(path) {
       path,
     );
   if (!match && !workflow) throw new Error('Unsupported GitHub API route/query');
-  const numeric = match
-    ? match.slice(1).filter((value) => value !== undefined)
-    : [workflow[2]].filter((value) => value !== undefined);
-  if (numeric.some((value) => !Number.isSafeInteger(Number(value)) || Number(value) < 1))
+  const numeric = match ? match.slice(1) : [workflow[2]];
+  const numericIds = numeric.filter((value) => typeof value === 'string');
+  if (numericIds.some((value) => !Number.isSafeInteger(Number(value)) || Number(value) < 1))
     throw new Error('Invalid numeric GitHub API identity');
   const pagination = /(?:[?&])per_page=100&page=([1-9]\d*)$/.exec(path);
   if (pagination && Number(pagination[1]) > 20) throw new Error('Invalid bounded API page');
@@ -307,11 +306,18 @@ export async function githubJson(path, token) {
   return response.json();
 }
 
-export function fetchObjects(repo, refs, token) {
+function createObjectRepository(repo, env) {
+  mkdirSync(repo, { recursive: false });
+  execFileSync(GIT_EXECUTABLE, ['-c', 'core.hooksPath=/dev/null', 'init', '--bare', '--', repo], {
+    env,
+    stdio: 'pipe',
+    timeout: 30_000,
+  });
+}
+export function fetchObjects(repo, refs, token, { existing = false } = {}) {
   validateDataRepoPath(repo);
   if (!Array.isArray(refs) || refs.length < 1 || refs.length > 4 || !refs.every(sha))
     throw new Error('Invalid requested object identities');
-  mkdirSync(repo, { recursive: false });
   const env = {
     PATH: SYSTEM_PATH,
     GIT_CONFIG_NOSYSTEM: '1',
@@ -322,25 +328,27 @@ export function fetchObjects(repo, refs, token) {
     GIT_CONFIG_VALUE_0:
       'AUTHORIZATION: basic ' + Buffer.from('x-access-token:' + token).toString('base64'),
   };
-  const args = ['-c', 'core.hooksPath=/dev/null'];
-  execFileSync(GIT_EXECUTABLE, [...args, 'init', '--bare', repo], {
-    env,
-    stdio: 'pipe',
-    timeout: 30_000,
-  });
+  if (!existing) createObjectRepository(repo, env);
   execFileSync(
     GIT_EXECUTABLE,
     [
-      ...args,
+      '-c',
+      'core.hooksPath=/dev/null',
       '-C',
       repo,
       'fetch',
       '--no-tags',
       '--no-recurse-submodules',
-      `https://github.com/${REPOSITORY}.git`,
-      ...refs,
+      '--stdin',
+      'https://github.com/jwill9999/agent-platform.git',
     ],
-    { env, stdio: 'pipe', timeout: 120_000, maxBuffer: 16 * 1024 * 1024 },
+    {
+      env,
+      input: refs.join('\n') + '\n',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 120_000,
+      maxBuffer: 16 * 1024 * 1024,
+    },
   );
 }
 

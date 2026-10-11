@@ -10,7 +10,7 @@ import { sha256 } from './classify-historical-evidence.mjs';
 import {
   fetchObjects as bootstrapFetchObjects,
   githubApiUrl as bootstrapApiUrl,
-  validateGitArguments as bootstrapGitArguments,
+  validateBootstrapControlRequest as bootstrapControlRequest,
   validateDataRepoPath as bootstrapRepoPath,
 } from './verify-historical-evidence-provenance.mjs';
 import { fixture } from './classify-historical-evidence.test.mjs';
@@ -372,9 +372,11 @@ test('GitHub endpoint contract rejects traversal, forged routes and unsafe ident
     `actions/workflows/promptfoo-code-scan.yml/runs?event=pull_request&head_sha=${sha}&per_page=100&page=1&extra=1`,
   ];
   for (const validate of [githubApiUrl, bootstrapApiUrl]) {
-    for (const path of supported)
+    for (const path of validate === bootstrapApiUrl ? supported.slice(0, 2) : supported)
       assert.equal(validate(path), `https://api.github.com/repos/jwill9999/agent-platform/${path}`);
     for (const path of unsafe) assert.throws(() => validate(path), /route|query|identity|page/);
+    if (validate === bootstrapApiUrl)
+      for (const path of supported.slice(2)) assert.throws(() => validate(path), /route/);
   }
   let calls = 0;
   const original = globalThis.fetch;
@@ -406,12 +408,23 @@ test('both fetch bootstraps reject malicious refs and repository paths before cr
         assert.throws(() => fetch(output, refs, 'unit-token-never-sent'), /identit/);
       assert.throws(() => fetch('--directory', ['a'.repeat(40)], 'unit-token'), /absolute/);
     }
+    for (const tip of [
+      '--upload-pack=' + join(root, 'evil'),
+      'refs/heads/staging',
+      'a'.repeat(40) + '\n',
+    ]) {
+      assert.throws(() => bootstrapFetchObjects(output, tip, 'unit-token-never-sent'), /identity/);
+      assert.equal(existsSync(output), false);
+    }
     assert.equal(existsSync(output), false);
     assert.throws(() => bootstrapRepoPath(root + '/../outside'), /absolute/);
-    assert.throws(
-      () => bootstrapGitArguments(['show', '--ext-diff', 'a'.repeat(40)]),
-      /Unsupported/,
-    );
+    for (const [commit, path] of [
+      ['--help', 'scripts/classify-historical-evidence.mjs'],
+      ['a'.repeat(40), '../outside'],
+      ['a'.repeat(40), 'scripts/candidate-helper.mjs'],
+    ])
+      assert.throws(() => bootstrapControlRequest(commit, path), /Invalid/);
+    bootstrapControlRequest('a'.repeat(40), 'scripts/classify-historical-evidence.mjs');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
