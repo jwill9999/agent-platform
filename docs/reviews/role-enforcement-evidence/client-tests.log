@@ -1,0 +1,22 @@
+
+ RUN  v2.1.9 <workspace>/packages/workflow-control
+
+ ✓ test/roleTools.integration.test.ts (12 tests) 215174ms
+   ✓ captures enforced client tools for 'feature_planner' 15863ms
+   ✓ captures enforced client tools for 'plan_critic' 15707ms
+   ✓ captures enforced client tools for 'repo_explorer' 15710ms
+   ✓ captures enforced client tools for 'implementation_worker' 21108ms
+   ✓ captures enforced client tools for 'code_reviewer' 15751ms
+   ✓ captures enforced client tools for 'test_runner' 20993ms
+   ✓ captures enforced client tools for 'qa_evaluator' 21006ms
+   ✓ captures enforced client tools for 'feature_evaluator' 15639ms
+   ✓ captures enforced client tools for 'implementation_read' 15679ms
+   ✓ captures enforced client tools for 'implementation_patch' 20789ms
+   ✓ captures enforced client tools for 'implementation_test' 16034ms
+   ✓ captures enforced client tools for 'implementation_artifact' 20893ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  17:19:38
+   Duration  215.70s (transform 189ms, setup 0ms, collect 248ms, tests 215.17s, environment 0ms, prepare 44ms)
+

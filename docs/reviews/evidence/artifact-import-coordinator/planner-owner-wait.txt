@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 <checkout>/packages/workflow-control
+
+ ✓ test/phaseRuntime.test.ts (61 tests | 60 skipped) 375ms
+   ✓ waits for live predecessor leases without charging retained-handoff recovery or launching a worker 375ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 60 skipped (61)
+   Start at  21:43:06
+   Duration  1.08s (transform 346ms, setup 0ms, collect 475ms, tests 375ms, environment 0ms, prepare 41ms)
+

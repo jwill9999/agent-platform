@@ -1,0 +1,19 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/implementationImport.integration.test.ts (9 tests) 488242ms
+   ✓ qualifies import through production runtime, Docker, credential broker and retained evidence 10606ms
+   ✓ qualifies verify-review through production runtime, Docker, credential broker and retained evidence 27647ms
+   ✓ qualifies coordinators through production runtime, Docker, credential broker and retained evidence 47336ms
+   ✓ qualifies repair-verifier through production runtime, Docker, credential broker and retained evidence 67785ms
+   ✓ qualifies repair-reviewer through production runtime, Docker, credential broker and retained evidence 71909ms
+   ✓ qualifies repair-feature through production runtime, Docker, credential broker and retained evidence 95628ms
+   ✓ qualifies lost-close-ack through production runtime, Docker, credential broker and retained evidence 48173ms
+   ✓ qualifies no-hosted-checks through production runtime, Docker, credential broker and retained evidence 49078ms
+   ✓ qualifies late-first-checks through production runtime, Docker, credential broker and retained evidence 70080ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  21:57:17
+   Duration  488.71s (transform 199ms, setup 0ms, collect 271ms, tests 488.24s, environment 0ms, prepare 48ms)
+

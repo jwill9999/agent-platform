@@ -1,0 +1,46 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "77903b3d-6dd3-4ca1-a3f3-e2788f187987",
+  "materialDigest": "dcf980a13928daafcaac9ea4afaa4a8d53eff3cc4f29c56c0bd9d978173df15b",
+  "manifest": [
+    {
+      "path": "packages/workflow-control/src/reviewProxy.ts",
+      "digest": "07c70cc17e872106aea6278847fd685a591815779a3f8c7d648b30b5af1069cd"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReview.ts",
+      "digest": "b3da89c784e24f6c104579f545af8f09857d3c6fe35923c8abd8b199179b1b8b"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0d0d8-0a75-7423-9f58-0990155499cd"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "- **High \u2014 `packages/workflow-control/src/supervisedReview.ts`, `stopAndRemoveReview`:** Creation and start use `trusted.launch.environment`, but removal uses `env: {}`. If the launch environment selects a Docker daemon or context, cleanup can target a different daemon. A \u201cno such container\u201d response then deletes staging while the actual reviewer may still run. **Correction:** Use the same Docker connection configuration for creation, start, and removal; confirm settlement on that daemon before deleting staging.\n\n- **High \u2014 `packages/workflow-control/src/supervisedReview.ts`, `preparedReviews`:** The supposedly trusted launch is the same mutable object returned to callers. After preparation, callers can change the executable, arguments, or environment and execution will use those changes. The WeakMap validates object identity, not the approved launch contents. **Correction:** Store a private deep copy of the launch and expose only separate review metadata.\n\n- **Medium \u2014 `packages/workflow-control/src/reviewProxy.ts`, upstream response callback:** `incoming.pipe(response)` has no upstream response error handler. A connection reset after headers can emit an unhandled error on `incoming`, potentially terminating the gateway and interrupting other reviews. **Correction:** Handle response stream errors and destroy the downstream response on truncation; use coordinated stream cleanup.\n\nThe routing shown fixes the HTTPS hostname, port, TLS server name, and endpoint paths, rejects redirects, and prevents client-selected upstreams. Completion requires both a completed turn and nonempty review text, and acknowledged creation is followed by cleanup in `finally`.\n\n**Missing evidence:** `specialistLauncher.ts`, Docker environment/network provisioning, and failure-path tests are needed to verify isolation, daemon selection, and recovery behavior.\n\nThis review is not human approval or pilot acceptance."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 11292,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 440,
+          "reasoning_output_tokens": 76
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

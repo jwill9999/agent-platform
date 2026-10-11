@@ -1,0 +1,87 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "b3a4323e-8b1d-4399-846e-040126d24aa7",
+  "materialDigest": "265b00dda1926bcb8f83f82fe40d6154d5d0d4cdd2284e2b3b11dd4bbb8e0df5",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "packages/workflow-control/src/anchoredFileMutation.ts",
+      "digest": "8736a42bc008e0b0ba951b0fce83fd834432c2b50ecacfc495596d6f9164125f"
+    },
+    {
+      "path": "packages/workflow-control/src/gitDeliveryPort.ts",
+      "digest": "123f1536dd305eb501eb632fb36424df8a53fc50cd364adcb95a3e55744f47b0"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationImport.ts",
+      "digest": "3ca8afe7305f58642add484e343311b26f6ce6fdf344e72d8d00dfc25f7eaab1"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationOutput.ts",
+      "digest": "a216e04ab4246beeb6b774254388113fd527622c3fcfdd9c689113f9d0d4ba51"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "700252413dc62674fc7004bf6ee229e2883113c73472cda67a8c0644de57161a"
+    },
+    {
+      "path": "packages/workflow-control/src/secureEvidence.ts",
+      "digest": "3b0b0be3b09931f1de2b90c85a60ec8612cbd84c4a6e45ab741312dd6076212e"
+    },
+    {
+      "path": "packages/workflow-control/src/sourceGit.ts",
+      "digest": "1306d1e0a6d7fc628164d4eea231ccf923a136f2342ea446d2b60ec69faa9db4"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "c09892fb4a58968da3c6e0b01f68ba21df4197980d26ae00d1c91d984f02abd1"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistOutputManifest.ts",
+      "digest": "64c9dd79ff56ef6215ac1dfa0fd9826d959b7596eda189cf9f8248ff158dc204"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistTerminalResult.ts",
+      "digest": "14b1ce372f1e1223935ddb8455c7f7a8a25c89c80e8bc06d72c547d27384553f"
+    },
+    {
+      "path": "packages/workflow-control/src/standaloneCoordinators.ts",
+      "digest": "90cb27c42a8e53966c7e242046fe79e5979fcd89dcc416d36a705ce3e6e458e9"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "deb1929fc6c6b11d0c0776c13c8010b933191f9afb6ab3a78a6abf74ccf140ea"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/implementationResponses.mjs",
+      "digest": "4a904d7b3d2494b4215f958d5e78d57713c58217a799ef5a3e0f2edd369b82ca"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.integration.test.ts",
+      "digest": "4e48a10d404d807c7fe2f2d36610959382b8949c0bccd8c546477e5fc75550b8"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.test.ts",
+      "digest": "2eaee93c1fdae2c8600b222bf6bd3ef12055348b41cf65ffbebfaabb2ccae75a"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "a5c323de920266628198d5fd519170ca95a84e3e061108eafa4672d83693e6e9"
+    },
+    {
+      "path": "packages/workflow-control/test/sourceGit.test.ts",
+      "digest": "d8289f3340009cb6172d80b465c927be43b5adb1f8f60f7e9aa728aee569b2cb"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistLauncher.test.ts",
+      "digest": "333a0e8a83fd7b9df05e0bcf613f9103330b6ab4613a773f6c6ba1769908e003"
+    }
+  ],
+  "formalApproval": false,
+  "messages": [
+    "- **High \u2014 Published remote head is lost during import.**  \n  **Location:** `packages/workflow-control/src/storage.ts`, `importImplementation \u2192 commitApprovedHead`; `packages/workflow-control/src/standaloneCoordinators.ts`, `#pipeline`.  \n  Import unconditionally sets `published_sha=NULL`. Pipeline then uses that value as `expectedRemoteSha`. If the task branch already exists remotely, the next push incorrectly requires remote absence and conflicts\u2014even when the remote still contains the previously approved published head.  \n  **Correction:** Retain the last published SHA separately from the current imported SHA and use it as the push CAS precondition. Add a test importing onto an already published task branch and then publishing the imported head.\n\n- **Medium \u2014 Runtime tests still require mutation of the original checkout.**  \n  **Location:** `packages/workflow-control/test/phaseRuntime.test.ts`, tests \u201cimports actual worker bytes\u2026\u201d, \u201cretains ordinary long code identifiers\u2026\u201d, and \u201creconciles a verified import under a new owner\u2026\u201d.  \n  The first two assert imported content under `f.config.sourceRoot`, although the importer now deliberately preserves that directory. The recovery test likewise checks the original checkout\u2019s HEAD against the imported head; that assertion throws, causing recovery to block instead of completing. These assertions contradict the new workspace architecture and cannot substantiate successful recovery. The fixture launcher also omits `executionSourceRoot`, so subsequent workers would copy the original checkout.  \n  **Correction:** Resolve the registered workspace for imported-content/head assertions and fixture launches. Independently assert that the original checkout remains unchanged.\n\n- **Medium \u2014 Source Git observations honor replacement metadata.**  \n  **Location:** `packages/workflow-control/src/sourceGit.ts`, `TrustedSourceGit.run` and `assertSafeIndex`; `packages/workflow-control/src/implementationImport.ts`, `createImportWorkspace`.  \n  Unlike `LocalGitDeliveryPort`, this adapter neither disables replacement objects nor rejects replacement refs/grafts. An original repository with replacement metadata can therefore pass HEAD checks while Git interprets that SHA using substituted content or ancestry. The private clone does not normally transfer replacement refs, so source checks and the execution checkout can interpret the same approved SHA differently, causing unexpected import failures or inconsistent verification.  \n  **Correction:** Disable replacement objects consistently and reject graft/replacement metadata before source verification and cloning. Test that such metadata cannot alter the approved-base interpretation.\n\n**Missing evidence:** No executed test results were supplied. The connected test covers one implementation import, but does not demonstrate a subsequent verifier/reviewer receiving the registered imported checkout, publication over an existing remote branch, or production-runtime crash recovery using that checkout. The unit crash tests establish adapter behavior with substituted authority checks, not those complete production paths.\n\nThis review is not human approval."
+  ]
+}

@@ -1,0 +1,87 @@
+diff --git a/packages/workflow-control/src/localCredentialBrokerCli.ts b/packages/workflow-control/src/localCredentialBrokerCli.ts
+index 2b2fef9..f987e83 100644
+--- a/packages/workflow-control/src/localCredentialBrokerCli.ts
++++ b/packages/workflow-control/src/localCredentialBrokerCli.ts
+@@ -55,6 +55,35 @@ function createAdapter(configFile: string, rest: string[]) {
+   return { adapter: output };
+ }
+ 
++function parseBrokerArguments(command: string | undefined, rest: string[]) {
++  const values = new Map<string, string>();
++  for (let i = 0; i < rest.length; i += 2) {
++    const name = rest[i],
++      value = rest[i + 1];
++    if (!name || !value || values.has(name)) throw new Error('invalid broker arguments');
++    values.set(name, value);
++  }
++  const allowed: Record<string, string[]> = {
++    issue: ['--execution-id', '--lease-id', '--generation', '--output'],
++    revoke: ['--lease-id', '--generation'],
++    status: ['--lease-id', '--generation'],
++    conformance: ['--protocol', '--max-probe-ttl-seconds'],
++  };
++  if (
++    !command ||
++    values.size !== allowed[command]?.length ||
++    [...values.keys()].some((k) => !allowed[command]!.includes(k))
++  )
++    throw new Error('invalid broker command');
++  if (
++    command === 'conformance' &&
++    (values.get('--protocol') !== 'revoke-wins-v1' ||
++      values.get('--max-probe-ttl-seconds') !== '30')
++  )
++    throw new Error('unsupported conformance protocol');
++  return values;
++}
++
+ export async function runLocalBrokerCli(args: string[]) {
+   const [configFile, command, ...rest] = args;
+   if (!configFile || !isAbsolute(configFile)) throw new Error('absolute trusted config required');
+@@ -82,31 +111,7 @@ export async function runLocalBrokerCli(args: string[]) {
+     process.once('SIGINT', stop);
+     return;
+   }
+-  const values = new Map<string, string>();
+-  for (let i = 0; i < rest.length; i += 2) {
+-    const name = rest[i],
+-      value = rest[i + 1];
+-    if (!name || !value || values.has(name)) throw new Error('invalid broker arguments');
+-    values.set(name, value);
+-  }
+-  const allowed: Record<string, string[]> = {
+-    issue: ['--execution-id', '--lease-id', '--generation', '--output'],
+-    revoke: ['--lease-id', '--generation'],
+-    status: ['--lease-id', '--generation'],
+-    conformance: ['--protocol', '--max-probe-ttl-seconds'],
+-  };
+-  if (
+-    !command ||
+-    values.size !== allowed[command]?.length ||
+-    [...values.keys()].some((k) => !allowed[command]!.includes(k))
+-  )
+-    throw new Error('invalid broker command');
+-  if (
+-    command === 'conformance' &&
+-    (values.get('--protocol') !== 'revoke-wins-v1' ||
+-      values.get('--max-probe-ttl-seconds') !== '30')
+-  )
+-    throw new Error('unsupported conformance protocol');
++  const values = parseBrokerArguments(command, rest);
+   const body =
+     command === 'conformance'
+       ? { operation: command }
+diff --git a/packages/workflow-control/test/fixtures/roleCapabilityProbe.mjs b/packages/workflow-control/test/fixtures/roleCapabilityProbe.mjs
+index d9ae42f..6aa8427 100644
+--- a/packages/workflow-control/test/fixtures/roleCapabilityProbe.mjs
++++ b/packages/workflow-control/test/fixtures/roleCapabilityProbe.mjs
+@@ -9,8 +9,7 @@ let step = 0;
+ const events = [];
+ const patch =
+   '*** Begin Patch\n*** Add File: /workspace/unauthorized.txt\n+changed\n*** Update File: /workspace/source.txt\n@@\n-original\n+modified\n*** End Patch';
+-const securityCommand =
+-  "node -e 'const fs=require('\\''fs'\\''),net=require('\\''net'\\''); const write=p=>{try{fs.writeFileSync(p,'\\''attempt'\\'');return true}catch(e){if(!['\\''EROFS'\\'','\\''EACCES'\\'','\\''EPERM'\\''].includes(e.code))throw e;return false}}; const r={sourceRead:fs.readFileSync('\\''/workspace/source.txt'\\'','\\''utf8'\\''),sourceWrite:write('\\''/workspace/shell-source.txt'\\''),configWrite:write('\\''/codex-home/config.toml'\\''),authWrite:write('\\''/codex-home/auth.json'\\''),rootWrite:write('\\''/etc/role-probe'\\''),dockerSocket:fs.existsSync('\\''/var/run/docker.sock'\\'')}; const socket=net.createConnection({host:'\\''127.0.0.1'\\'',port:8999}); const done=allowed=>{r.network=allowed;fs.writeFileSync('\\''/scratch/security-result.json'\\'',JSON.stringify(r));socket.destroy()};socket.once('\\''connect'\\'',()=>done(true));socket.once('\\''error'\\'',()=>done(false));socket.setTimeout(1000,()=>done(true));'";
++const securityCommand = String.raw`node -e 'const fs=require('\''fs'\''),net=require('\''net'\''); const write=p=>{try{fs.writeFileSync(p,'\''attempt'\'');return true}catch(e){if(!['\''EROFS'\'','\''EACCES'\'','\''EPERM'\''].includes(e.code))throw e;return false}}; const r={sourceRead:fs.readFileSync('\''/workspace/source.txt'\'','\''utf8'\''),sourceWrite:write('\''/workspace/shell-source.txt'\''),configWrite:write('\''/codex-home/config.toml'\''),authWrite:write('\''/codex-home/auth.json'\''),rootWrite:write('\''/etc/role-probe'\''),dockerSocket:fs.existsSync('\''/var/run/docker.sock'\'')}; const socket=net.createConnection({host:'\''127.0.0.1'\'',port:8999}); const done=allowed=>{r.network=allowed;fs.writeFileSync('\''/scratch/security-result.json'\'',JSON.stringify(r));socket.destroy()};socket.once('\''connect'\'',()=>done(true));socket.once('\''error'\'',()=>done(false));socket.setTimeout(1000,()=>done(true));'`;
+ const calls = [
+   {
+     type: 'custom_tool_call',

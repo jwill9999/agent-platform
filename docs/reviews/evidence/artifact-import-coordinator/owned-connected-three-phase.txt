@@ -1,0 +1,12 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/implementationImport.integration.test.ts (2 tests) 40310ms
+   ✓ qualifies import through production runtime, Docker, credential broker and retained evidence 10998ms
+   ✓ qualifies verify-review through production runtime, Docker, credential broker and retained evidence 29311ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  19:43:04
+   Duration  40.72s (transform 202ms, setup 0ms, collect 275ms, tests 40.31s, environment 0ms, prepare 35ms)
+

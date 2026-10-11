@@ -1,0 +1,122 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "a4648aa7-b3f3-4620-ba32-46a53bf53f3e",
+  "materialDigest": "f02348c23f6d69e4f2ce33302c41667cdab14aef7bff595aafe769df82ba6bd0",
+  "manifest": [
+    {
+      "path": "docs/planning/approved-document-binding/plan.md",
+      "digest": "0eb57cb15418bfb56078767db226c1c4e38b47840f7310d406ea9d4d755aace8"
+    },
+    {
+      "path": "docs/testing/approved-document-binding.md",
+      "digest": "86ba87f34604abf79ec0d382fcdebdc3b1d856ea05b670adf029f227661d4f27"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrap.ts",
+      "digest": "28a14eb8234e3245ca77171d4f0f62ad769ac0ee11ffcbc025b44571f347851e"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrapJournal.ts",
+      "digest": "cee896a2f19d4906527b93383b461dd787ed8410f38aee7b0888ccb6b8310218"
+    },
+    {
+      "path": "packages/workflow-control/src/cli.ts",
+      "digest": "97abb9b0c2ac2866784a2acaeca087588b693dc8b7fed65339315e27729b6781"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "digest": "f0bef2a856d326f9a9acad7f7bb484576a8134d48ce51b8637d6ff11b5901b71"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "360a1c9bf53a4ceac2be4413dec1492eff1ca1a7e282699aaa17bb3153d6a0dc"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "digest": "3f653db511485538ed89e924963cd8d537e732b3a3a8cb9937937b3167e5d92b"
+    },
+    {
+      "path": "packages/workflow-control/src/index.ts",
+      "digest": "b591ecffe8c6723a44be7e4761aacbd45d90eecb638320cc98fd0f1853349e4e"
+    },
+    {
+      "path": "packages/workflow-control/src/orchestrator.ts",
+      "digest": "9941c960a629546c61a4d985bb73d193ebdfc1fc70dc3c3afa06cfe8dd9af336"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "2caa395a24eea2c161065822eff4b538f6baf02bc8c120a5e3d3b79a48c94044"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "57e93aa558c25dbf451bf187292bfb0051b0961ff2287c978e745fb2e4ef38aa"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/planningDocuments.ts",
+      "digest": "90f6f554e0396c9f825a2293b6a31e395c24b42229301d0137eac73ec269056a"
+    },
+    {
+      "path": "packages/workflow-control/src/preapprovalMaterial.ts",
+      "digest": "3bae6ba1d08c276f64ccfcfb81d620a7317ce7e23184e92180a8863ff3945bf7"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "4cd1e2457fec96467f04fed785edaf6b259d2b9c910f916752cebd5a26e444f4"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "5663fa27c89602c9561862cbd00ddbf5e7a73b765a8aed9e72a5ba0468cd17a5"
+    },
+    {
+      "path": "packages/workflow-control/test/documentApproval.test.ts",
+      "digest": "ec6c67d753764447e91fa9abc59e59f8616b987d2a804b97e1e6b6cee7b7ee0f"
+    },
+    {
+      "path": "packages/workflow-control/test/planningDocuments.test.ts",
+      "digest": "f48a57ef4a524bb2cc2f7db69e6c17c5691872e067f4ff7a18ad3e5f2285c0f9"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0d5f5-9e86-7ef2-abda-91603801a907"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "{\n  \"verdict\": \"changes_required\",\n  \"findings\": [\n    {\n      \"severity\": \"high\",\n      \"file\": \"packages/workflow-control/src/storage.ts\",\n      \"line\": null,\n      \"reason\": \"guardGovernedMutation settles document verification before acquiring its dispatch transaction. That transaction checks leases and run state but does not recheck the plan approval or unresolved document attempts. Another connection can invalidate the approval\u2014or leave a pending attempt after failed invalidation\u2014between verification and dispatch, and the first connection still initiates the effect. Similar separation exists in several guarded persistence methods.\",\n      \"proposedFix\": \"Carry the exact verification attempt and approval generation into the effect transaction. Atomically check that authority remains active and no intervening pending or failed attempt exists before dispatch or adoption. Add a two-connection test that pauses after successful verification and invalidates or quarantines authority before dispatch.\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \"packages/workflow-control/src/storage.ts\",\n      \"line\": null,\n      \"reason\": \"finishSchedulerExecution verifies documents only when input.status is 'completed'. If the stored execution is already completed, however, any supplied callback is passed to #recordSchedulerTerminalCallback regardless of input.status. Calling it with status 'escalated' and a callback therefore reaches the private callback transition without document verification. Changed documents or an unresolved verification attempt can be bypassed while the approval row remains active.\",\n      \"proposedFix\": \"Reject terminal-status mismatches on replay and verify documents whenever a callback can be newly committed, including callbacks attached to previously completed executions. Test this path with changed bytes and with a durable pending attempt.\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \"packages/workflow-control/src/documentApproval.ts\",\n      \"line\": null,\n      \"reason\": \"Publication accepts sourceRoot independently of the manifest's workspaceId, repository and sourceRevision. Neither publication function verifies those claims against a repository. Subsequent verification always reads the publication's fixed source_root; most mutation boundaries do not resolve the currently accepted task workspace. An unchanged publication directory can therefore validate while the workspace used for delivery contains different normative documents.\",\n      \"proposedFix\": \"Resolve publication provenance and the current task source through trusted repository/workspace bindings. Verify the declared publication revision and repository identity, and resolve the authoritative task workspace at each execution boundary rather than treating the original publication directory as permanently authoritative.\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \"packages/workflow-control/src/specialistLauncher.ts\",\n      \"line\": null,\n      \"reason\": \"After stageApprovedDocuments creates the snapshot, credential issuance, launch construction and Docker creation occur before container start. Subsequent #assertCanStart calls verify source and artifact objects, but never the actual snapshot directory or binding.json being mounted. Substituting staged snapshot bytes during that interval is not detected; a read-only container mount only prevents subsequent container writes.\",\n      \"proposedFix\": \"Verify the exact snapshot file set, bytes and binding against the durable contract, packet and approval immediately before container start. Include snapshot substitution during credential issuance or Docker creation in the launcher tests.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"packages/workflow-control/src/documentApproval.ts\",\n      \"line\": null,\n      \"reason\": \"recoverDocumentVerification can recover a live owner's pending attempt. runLeaseEpoch is optional, assertFence returns immediately when it is absent, and recovery never checks the pending attempt owner's liveness or fencing generation. Even a caller holding a lease is not required to prove that it supersedes the attempt. Recovery can consequently invalidate unchanged authority during legitimate concurrent verification.\",\n      \"proposedFix\": \"Require a durable recovery fence and atomically establish that the pending owner is dead or superseded before recovery. Define equivalent durable ownership for approval and operator attempts that currently have no run lease.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"packages/workflow-control/src/phaseJobs.ts\",\n      \"line\": null,\n      \"reason\": \"claim permanently blocks a job on every verification exception, including document_verification_unresolved caused by another live verifier and transient SQLite contention. Legitimate concurrent verification of unchanged documents can therefore terminally block queued work without any document mismatch.\",\n      \"proposedFix\": \"Distinguish temporary contention/live pending verification from invalid authority. Leave the job retryable for temporary conditions and reserve terminal blocking for durable invalidation or other definitive failures.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"packages/workflow-control/src/bootstrap.ts\",\n      \"line\": null,\n      \"reason\": \"terminalize begins with assertStored, which requires an active approval through assertApproved. Once document verification invalidates that approval, this bootstrap cancellation/cleanup entry point cannot proceed. This contradicts the requirement that cancellation and cleanup remain possible after authority is lost.\",\n      \"proposedFix\": \"Separate historical bootstrap identity and attestation validation from execution authorization. Permit terminalization through the existing cancellation and cleanup fences even when document approval is invalidated.\"\n    }\n  ],\n  \"coverageLimitations\": [\n    \"Static review of supplied evidence only; no commands, tests or external actions were executed. Line numbers are null because findings identify function-level locations without verified numbered source.\",\n    \"No completed enforcement inventory or connected DB-T04/DB-T10 evidence was supplied. The supplied tests predominantly exercise the verifier directly.\",\n    \"Delivery, reconciliation, authorization, secure-evidence and governed-composition implementations were not supplied, so complete authority-consumer coverage and nested-transaction compatibility cannot be established.\",\n    \"No true process-crash/concurrent-owner execution evidence was supplied. Closing one store while another SQLite connection remains open does not establish the required process-termination recovery scenario.\",\n    \"The conditional Docker test does not establish that the required mount scenario ran; no execution report or immutable image digest was supplied.\",\n    \"This review does not constitute owner approval.\"\n  ]\n}"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 162453,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1525,
+          "reasoning_output_tokens": 291
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

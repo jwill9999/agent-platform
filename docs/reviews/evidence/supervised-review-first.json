@@ -1,0 +1,96 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "43286eeb-6fd3-47f1-85a1-e635bfeec008",
+  "materialDigest": "384045f3436885c90dd39023149c7f3aaaf31870b094f6207251c554c2e8d56b",
+  "manifest": [
+    {
+      "path": ".agents/skills/documentation/SKILL.md",
+      "digest": "a3e7410e3cd3a8e9fc4bf6066a0c5fd7990f4c60246c4c017be0ada03f0075fd"
+    },
+    {
+      "path": ".agents/skills/feature-implementation/SKILL.md",
+      "digest": "1565a4919c819e5697385ac280f54aad6b78d994730f27320ad589163668bb37"
+    },
+    {
+      "path": ".agents/skills/feature-planning/SKILL.md",
+      "digest": "05be5147a9f73fd9aec712298b357d4c56fa7a0394906e96b80828139cdaf007"
+    },
+    {
+      "path": ".agents/skills/orchestration/SKILL.md",
+      "digest": "7e97190e112784b1fba509335edc9066daf0bf55a550d04e758acf392fca771d"
+    },
+    {
+      "path": ".agents/skills/plan-critique/SKILL.md",
+      "digest": "17d3a1de5e7e6f3d07fdb2c21ae6f1bb05d5e41eca44dfe7520a79e93bcddbd9"
+    },
+    {
+      "path": ".agents/skills/playwright-quality-gate/SKILL.md",
+      "digest": "5a130b1311b00d49d4e26747e7ec3395801698e710a44469b77d1a5d7740ab05"
+    },
+    {
+      "path": "docs/README.md",
+      "digest": "57c70201a7835497c0cb1fcc0b1fae33aa8d74cf520bfff76b566489096603ec"
+    },
+    {
+      "path": "docs/adr/0004-codex-development-orchestration-control-plane.md",
+      "digest": "1c90f6d5ff79f5d27f5bb3d3376df012914901e2bb9737252ad9512a9cc9582c"
+    },
+    {
+      "path": "docs/agent-instructions-shared.md",
+      "digest": "211947ac88b85c9ac46a62ccd913ea2211ea64736d34837916cbc79ed0feb3f1"
+    },
+    {
+      "path": "docs/tasks/README.md",
+      "digest": "c013a084ff06ad5f00f7c84b2d0d357f3f7446399f3a439f17052fa3f379d002"
+    },
+    {
+      "path": "docs/tasks/_template.md",
+      "digest": "b981346a0ad0922edf9d0be3901a2ecc5acd76b8ec30a13917fa76763169a5f3"
+    },
+    {
+      "path": "docs/workflow-control-planning.md",
+      "digest": "610c5b3b7bed72230c6c06aecb40a945f6ec0786abec7e1258037278cc6bda48"
+    },
+    {
+      "path": "docs/workflow-control-security.md",
+      "digest": "72393fb277b52a1f49e947a0924075922c3c3f03f6455018fd021d3d4dd3aa3e"
+    },
+    {
+      "path": "docs/workflow-control-supervised-review.md",
+      "digest": "dd515e6bdb12292c7298d1b1a52204d138775fd43f8af3a24d1047c262551163"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "4352f833a4fd57cccc4d8f583b3e3e914418455c30507c8549591bbb74615834"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "a26a4043857448cc758bf7301dbcd2891e362f1633ae42aaf9e45b650a2e30fa"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReview.ts",
+      "digest": "5854dbf5cf1a0d2ba87b393b2f6f35f8e45bb568a8aa2a0e7462e74ccd4b1a04"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReviewCli.ts",
+      "digest": "b215e3398208780dac8501b0c5dd4a94e2b950a616f195a82b107d63394766f1"
+    }
+  ],
+  "formalApproval": false,
+  "eventTypes": [
+    "thread.started",
+    "item.completed",
+    "turn.started",
+    "item.completed",
+    "item.completed",
+    "turn.completed"
+  ],
+  "messages": [
+    "I\u2019ll review the inline evidence only and separate code defects, documentation contradictions, and missing verification evidence. No external connector, shell-execution, or browser tool is exposed in this session; I will invoke no tools.",
+    "**Correction required.** Four findings follow from the supplied evidence. References identify files and exact code or instruction lines; source line numbers were not supplied.\n\n1. **Medium \u2014 Code defect: symlink resolution bypasses forbidden evidence-path checks.**  \n   **Evidence:** `supervisedReview.ts`, `prepareReviewSnapshot`: checks `path.split('/')` for forbidden names. `specialistLauncher.ts`, `populateSpecialistWorkspace`: subsequently calls `realpath(resolve(canonicalSource, allowedPath))` before copying.  \n   An innocuously named symlink to an in-repository `.codex/config.toml` passes the requested-path check. Its resolved regular file is copied under the innocent name, so the staged-path check also passes. This contradicts the documented rejection of configuration paths and symbolic links. Repository containment still prevents resolving outside the source root.  \n   **Correction:** Reject symlinks in every requested path component and validate resolved repository-relative components against the forbidden-path policy before copying. Add negative coverage for file aliases and symlinked ancestor directories.\n\n2. **Medium \u2014 Code defect: cleanup can mistake pending container creation for confirmed absence.**  \n   **Evidence:** `supervisedReview.ts`, `stopAndRemoveReview`: treats `/no such (?:container|object)/iu` as successful cleanup and deletes staging. `specialistLauncher.ts`, `executeDockerSpecialist`: executes `docker run` with a client timeout.  \n   If the client terminates while daemon-side creation is pending, removal can report absence before creation finishes, leaving an orphan container after staging is deleted. The managed launcher explicitly handles this uncertainty: `#settleOwned` throws `\"specialist create remains ambiguous\"` for an unacknowledged creation with no observed container.  \n   **Correction:** Use acknowledged container creation and ownership-bound settlement for standalone reviews too. Preserve staging and report uncertain cleanup when creation cannot be conclusively reconciled.\n\n3. **High \u2014 Documentation/enforcement gap: approval does not necessarily bind the detailed handoff documents.**  \n   **Evidence:** `feature-planning/SKILL.md`: \u201cPublication must preserve the reviewed content.\u201d `docs/README.md`: material changes require renewed critique and approval. `planning.ts`, `deriveContractMaterialDigest`: hashes only the parsed execution contract. `contracts.ts`, `executionContractSchema`: has no required content-addressed document manifest.  \n   Task specifications or verification plans can change without changing either contract digest. Consequently, digest comparison alone cannot establish that implementation uses the reviewed detailed requirements and tests. The standalone snapshot digest covers supplied files, but the shown code does not bind it into contract approval.  \n   **Correction:** Require a content-addressed handoff manifest within the approved contract material and verify its artifacts during publication and implementation handoff.\n\n4. **Medium \u2014 Documentation contradiction: the Playwright workflow requires PRs for intermediate tasks.**  \n   **Evidence:** `playwright-quality-gate/SKILL.md`, Task Workflow: \u201cOpen the task PR\u201d and \u201cOnly then close the Beads task and merge the task branch into its feature branch.\u201d `docs/tasks/README.md`, Git rules: \u201cIntermediate tasks do not get their own PR\u201d; only the segment tip opens the integration PR.  \n   Following the quality skill literally either breaks the branch policy or blocks intermediate tasks on nonexistent PRs.  \n   **Correction:** Distinguish intermediate-task local testing, review and pushed-revision evidence from segment-tip PR, hosted-check and merge obligations. Preserve the final connected feature-integration gate.\n\nThe supplied skills otherwise describe the requested sequence: requirements and focused questions, Beads-linked specifications, layered verification, distinct critique, human approval, explicit task/branch selection, and orchestration readiness.\n\n**Unavailable evidence:** No test sources, raw test results, live reviewer trace, installed-image configuration, or credential/egress qualification evidence were supplied. Reported test successes therefore remain documentation claims for this review. No concrete execution contract or Beads records were supplied to assess an actual implementation handoff.\n\nNo tools were invoked or state changed. No external connector, shell-execution, or browser tool is exposed here; other tool interfaces are available. This review concerns supplied material digest `384045f3436885c90dd39023149c7f3aaaf31870b094f6207251c554c2e8d56b`, whose hash I did not independently recompute. It is **not formal contract approval**."
+  ]
+}

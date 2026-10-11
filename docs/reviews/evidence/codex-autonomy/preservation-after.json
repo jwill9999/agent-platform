@@ -1,0 +1,17 @@
+{
+  "expectedTrackingAppends": [
+    {
+      "path": "/Users/letuscode/projects/agent-platform/.beads/interactions.jsonl",
+      "originalPrefixPreserved": true,
+      "appendedBytes": 1495,
+      "reason": "Authorized Beads audit append only"
+    }
+  ],
+  "protectedFiles": 789,
+  "pausedDirtyFiles": 13,
+  "otherWorktrees": 11,
+  "dirtyStatusEntries": 109,
+  "globalGuidanceFiles": 10,
+  "pausedAutomations": 4,
+  "mismatches": []
+}

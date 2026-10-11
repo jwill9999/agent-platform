@@ -1,0 +1,31 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/activeSpecialistSettlement.integration.test.ts (4 tests) 5878ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > runs public publication/approval/coordinator/launcher/result/restart and rejects changed fixture-spec.md 1730ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > runs public publication/approval/coordinator/launcher/result/restart and rejects changed fixture-tests.md 1507ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > confirms durable success settlement and independent daemon absence 1141ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > confirms durable cancel settlement and independent daemon absence 977ms
+ ✓ test/documentApproval.test.ts (106 tests) 26774ms
+   ✓ verifies unchanged journal and objects on repeated boundaries without new approval 409ms
+   ✓ validates persisted task material through the operator command and returns safe blocked reasons 367ms
+   ✓ quarantines actual process death at before-read, including restored bytes 390ms
+   ✓ quarantines actual process death at failed-invalidation, including restored bytes 353ms
+   ✓ prevents a second process from accepting a pending attempt and fences the old verifier after takeover 323ms
+   ✓ keeps snapshot tamper denial durable when settlement fails: false 442ms
+   ✓ keeps snapshot tamper denial durable when settlement fails: true 486ms
+   ✓ rejects wrong task, approval, source and packet identities before creating a snapshot 376ms
+   ✓ checks accepted task worktree bytes instead of publication bytes 393ms
+   ✓ checks accepted run worktree bytes instead of publication bytes 346ms
+   ✓ checks accepted import worktree bytes instead of publication bytes 351ms
+   ✓ rejects 'changed' material before 'finalization.close' can persist authority 313ms
+   ✓ cannot authorize partial object or receipt publication and retries publication idempotently 394ms
+   ✓ rejects incoming lineage whose worktree changed before the ledger exists 303ms
+   ✓ consumes the approved snapshot in a real read-only container then rejects changed spec.md after restart 646ms
+   ✓ consumes the approved snapshot in a real read-only container then rejects changed tests.md after restart 605ms
+
+ Test Files  2 passed (2)
+      Tests  110 passed (110)
+   Start at  03:01:17
+   Duration  27.26s (transform 269ms, setup 0ms, collect 517ms, tests 32.65s, environment 0ms, prepare 96ms)
+

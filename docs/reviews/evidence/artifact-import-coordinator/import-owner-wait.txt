@@ -1,0 +1,11 @@
+
+ RUN  v2.1.9 <checkout>/packages/workflow-control
+
+ ✓ test/phaseRuntime.test.ts (61 tests | 60 skipped) 4524ms
+   ✓ standalone phase runtime production orchestration with fixture launcher transport > reconciles a verified import under a new owner without relaunching the worker 4523ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 60 skipped (61)
+   Start at  21:45:25
+   Duration  5.22s (transform 327ms, setup 0ms, collect 444ms, tests 4.52s, environment 0ms, prepare 44ms)
+

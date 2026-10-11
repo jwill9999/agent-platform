@@ -1,0 +1,23 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/roleTools.integration.test.ts (12 tests) 214770ms
+   ✓ captures enforced client tools for 'feature_planner' 15863ms
+   ✓ captures enforced client tools for 'plan_critic' 15671ms
+   ✓ captures enforced client tools for 'repo_explorer' 15670ms
+   ✓ captures enforced client tools for 'implementation_worker' 21126ms
+   ✓ captures enforced client tools for 'code_reviewer' 15715ms
+   ✓ captures enforced client tools for 'test_runner' 21006ms
+   ✓ captures enforced client tools for 'qa_evaluator' 20926ms
+   ✓ captures enforced client tools for 'feature_evaluator' 15818ms
+   ✓ captures enforced client tools for 'implementation_read' 15708ms
+   ✓ captures enforced client tools for 'implementation_patch' 20721ms
+   ✓ captures enforced client tools for 'implementation_test' 15823ms
+   ✓ captures enforced client tools for 'implementation_artifact' 20724ms
+ ✓ test/roleEnforcement.integration.test.ts (13 tests) 2865ms
+
+ Test Files  2 passed (2)
+      Tests  25 passed (25)
+   Start at  22:28:24
+   Duration  218.38s (transform 287ms, setup 0ms, collect 464ms, tests 217.63s, environment 0ms, prepare 71ms)
+

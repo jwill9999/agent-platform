@@ -1,0 +1,74 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "54fc596d-8f4e-45ed-a66c-3e2f0cd01a1d",
+  "materialDigest": "71c1c58326a710f3ab8d4944a4a255cb450803e676dfb7d123f07c2a37abcd4c",
+  "manifest": [
+    {
+      "path": "apps/desktop/e2e/packaged-vm-command.e2e.ts",
+      "digest": "085a767be4f5ba981f9b954840bbf3d35b76060629d296aa0b066e6d9ba3e147"
+    },
+    {
+      "path": "packages/workflow-control/review-runtime/Dockerfile",
+      "digest": "3179dc00045bd0e268b077809f480422123cc00a8b047a37e2740aa6ac2ec1c3"
+    },
+    {
+      "path": "packages/workflow-control/src/reviewProxy.ts",
+      "digest": "070145d1e2618a1e6fa9a073b47f8d4666318d225de5103cf74f6f610ca0f369"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "a26a4043857448cc758bf7301dbcd2891e362f1633ae42aaf9e45b650a2e30fa"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReview.ts",
+      "digest": "114bb347eb1d8bcd41fc89b889fc6b74d8ce0c95511ab9baa7aec166f5123412"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReviewCli.ts",
+      "digest": "a47a2484df52f99f0699999d7b08bc777ba90c4bc75d782c763fde2cd7f4896e"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/reviewerCapabilityProbe.mjs",
+      "digest": "0b4257fd1daac53a19639977c7fca35f39882b2f229cae7ccce1aeff4c47ecc2"
+    },
+    {
+      "path": "packages/workflow-control/test/reviewProxy.test.ts",
+      "digest": "8471b4464169e56f5ad278f7e07c9ec213907a52eb8857bdc0946fb0ad8ce2b0"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.test.ts",
+      "digest": "646539f5a701d395bcd437e6ca196972ee9b791772f798999bf9badfd45f0e90"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0d423-02c0-79a2-8d09-7d2ad6a33834"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "No confirmed correctness or security regressions in the supplied repairs. The live-event polling preserves the rejection assertion; denied-audit and unchanged-file assertions remain intact.\n\nMissing evidence: executable isolation-test results, image smoke-test output, and tests covering successful proxy forwarding, redirect rejection, and reviewer execution/cleanup failures. The supplied tests do not independently substantiate those runtime claims."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 38384,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 227,
+          "reasoning_output_tokens": 148
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

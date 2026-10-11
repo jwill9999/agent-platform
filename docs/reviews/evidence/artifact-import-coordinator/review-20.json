@@ -1,0 +1,92 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "0871ac4a-1732-4a89-88ac-1718779ccf14",
+  "materialDigest": "c6ca8fd4824024aced16d490d7b637bc0bc28e315b4c75d61c0d67cf6aef25fe",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "docs/workflow-control-evidence-evaluation.md",
+      "digest": "048905692a7bb1c78693edefc2d86406922da300e3551758bc364e9efaa83974"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "7039d0753b708fe95f451d9f5eff6acf90e46f684397eaa83c4fda45338ecf3d"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "digest": "23e53b93abf0bf0103ee9464860a92418970f779d3831d5e2c55872cfbbd4caa"
+    },
+    {
+      "path": "packages/workflow-control/src/effectiveTaskAuthority.ts",
+      "digest": "db1363ec26939bb2e2b1bf2f49a02e540692f23e2b575eef7f46beab17867ad4"
+    },
+    {
+      "path": "packages/workflow-control/src/featureEvaluation.ts",
+      "digest": "b86a10ae6bd62d28e6a21a6bd9077baea455c161da64cd55c2e84feb185865c2"
+    },
+    {
+      "path": "packages/workflow-control/src/integrationGate.ts",
+      "digest": "9e45c3d12452be2cb9aaec9eba377aacfdb3ac8ba11aa0b54d7f3cf3cb1475bd"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "015778ef080523286677eb7462ecfb3c57fea3787e06d38ed644af01e1581c07"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "cb509ee042e2d964cade9d94a9401f8ccd4b23f224f4b9fc1c770f7d4db46f25"
+    },
+    {
+      "path": "packages/workflow-control/src/repairChildContract.ts",
+      "digest": "c6eaaa3e4e52d77c7bd3bebefdf9d9d0ce14787d2563375bee12208568308cae"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanning.ts",
+      "digest": "dfef7a6525bd4b8f93fe0a559e6607efd02ef63ba387e1fe60e3b5f1b7e9178a"
+    },
+    {
+      "path": "packages/workflow-control/src/repairPlanningJournal.ts",
+      "digest": "4297d40a531435d82b9095f9894f04f6b7df41cd264c06009af1f85f1f3d7ff9"
+    },
+    {
+      "path": "packages/workflow-control/src/standaloneCoordinators.ts",
+      "digest": "8733428908ab8f700d299edf1997d3f033074ae045ad069450d7f16702671661"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "9e0d3be1fccd982ea28129588233d0f820639b5e7a7f443a226ba54c1633cc26"
+    },
+    {
+      "path": "packages/workflow-control/test/effectiveTaskAuthority.test.ts",
+      "digest": "6a0b5a2ff2307f4fc75e8978344438c0179e1746259b6db41fc3846953fd54d7"
+    },
+    {
+      "path": "packages/workflow-control/test/evaluationCriteria.test.ts",
+      "digest": "a50526764c74d65ce44c2ba1ae24ce92129fedf77b7bddd0c4a2149b5697be89"
+    },
+    {
+      "path": "packages/workflow-control/test/featureEvaluation.test.ts",
+      "digest": "1dd4f54a76c2584bac86aa08ff2e986acfed23b92324255e6de0e3aee15c426c"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseJobs.test.ts",
+      "digest": "5c28dd8c2e00cd0c2cb29e50fd1a3cf5e82f1fc0920fe6f3aaee773c34ac70d9"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "a806dedf48ab92afdad5709d1b94ca7cd6a7b16157fe6d12cdf74f8c6acfacbc"
+    },
+    {
+      "path": "packages/workflow-control/test/repairPlanning.test.ts",
+      "digest": "21bb7945672a9dfeb7e96c088eb3d8433fdff8b26c943166b2ffcf381a9e94e2"
+    }
+  ],
+  "formalApproval": false,
+  "review": 20,
+  "messages": [
+    "1. **High \u2014 Repair-child commitment can race cancellation.**  \n   **Evidence:** `packages/workflow-control/src/featureEvaluation.ts` (`execute`); `packages/workflow-control/src/storage.ts` (`finalizeRepairChildIntent`, `requestWorkflowCancellation`).  \n   After the final asynchronous observation, finalization checks documents and leases but does not recheck that the run remains in `repair_planning`. Cancellation can enter `cancelling` while that observation is pending without invalidating those leases or documents. Finalization then commits the child and installs its approved head after cancellation.  \n   **Correction:** Revalidate run state and current intent fences inside the finalization transaction. Retain uncertain effects for reconciliation. Add a regression that cancels during the final observation.\n\n2. **Medium \u2014 Standalone repair planning still requires predecessor-only permissions.**  \n   **Evidence:** `packages/workflow-control/src/repairPlanning.ts` (`buildRepairChildRequest`); `packages/workflow-control/src/effectiveTaskAuthority.ts` (`assertChildPermissions`); `packages/workflow-control/test/featureEvaluation.test.ts`.  \n   The resolver and broker permit implementation children under the frozen feature contract and repair policy, including after a QA-only predecessor. However, the production request builder requires implementation operations on the predecessor and intersects paths with that predecessor. Consequently, the explicitly supported QA-to-implementation repair can fail before reaching the broker.  \n   **Correction:** Derive child permissions from the approved feature/repair envelope, with explicit required-operation checks against that envelope. Exercise this case through the production request builder.\n\nThe evaluator contradiction repair addresses the reported status/criterion/transition inconsistency in the supplied runtime path. No actionable defect was identified in the schema extraction itself.\n\nEvidence limits: Static review only; tests were not executed and reported passing results were not independently verified. The supplied tests do not establish connected production qualification. Implementations of imported dependencies\u2014including the terminal parser, coordinator receipt verifier, and Git delivery port\u2014were not supplied."
+  ]
+}

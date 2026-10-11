@@ -1,0 +1,68 @@
+{
+  "supporting_sources": [
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/initial-spec.md",
+      "sha256": "1b6526b67c3cf25a698d1b4415f2c2e74b575785d7edebc7726e4d7ddd813525",
+      "manifest_match": true
+    },
+    {
+      "path": "docs/reviews/codex-autonomy-removal-review-2026-10-09.md",
+      "sha256": "38b40b7d2d3e7f93ac4ca21731836de4e0aec72987cf50a9411cd59a3397bba7",
+      "manifest_match": true
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/supporting-audit.md",
+      "sha256": "d5f67422e75225594d6dc0f93a9808c17e22ac9b6990566070fec4b2d05a6ef1",
+      "manifest_match": true
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/paused-checkpoint.md",
+      "sha256": "1d18146415edb5d92fd93e38c346560d81816c7a789b380d2aa3614fb7d97917",
+      "manifest_match": true
+    }
+  ],
+  "profile_config_checks": [
+    {
+      "path": ".codex/config.toml",
+      "toml_valid": true,
+      "top_level_keys": ["agents"],
+      "custom_permission_or_concurrency_overrides": []
+    },
+    {
+      "path": ".codex/agents/code-reviewer.toml",
+      "toml_valid": true,
+      "top_level_keys": ["name", "description", "developer_instructions"],
+      "custom_permission_or_concurrency_overrides": []
+    },
+    {
+      "path": ".codex/agents/feature-planner.toml",
+      "toml_valid": true,
+      "top_level_keys": ["name", "description", "developer_instructions"],
+      "custom_permission_or_concurrency_overrides": []
+    },
+    {
+      "path": ".codex/agents/implementation-worker.toml",
+      "toml_valid": true,
+      "top_level_keys": ["name", "description", "developer_instructions"],
+      "custom_permission_or_concurrency_overrides": []
+    },
+    {
+      "path": ".codex/agents/plan-critic.toml",
+      "toml_valid": true,
+      "top_level_keys": ["name", "description", "developer_instructions"],
+      "custom_permission_or_concurrency_overrides": []
+    },
+    {
+      "path": ".codex/agents/repo-explorer.toml",
+      "toml_valid": true,
+      "top_level_keys": ["name", "description", "developer_instructions"],
+      "custom_permission_or_concurrency_overrides": []
+    },
+    {
+      "path": ".codex/agents/test-runner.toml",
+      "toml_valid": true,
+      "top_level_keys": ["name", "description", "developer_instructions"],
+      "custom_permission_or_concurrency_overrides": []
+    }
+  ]
+}

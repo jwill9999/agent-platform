@@ -1,0 +1,21 @@
+{
+  "reviewer": "/root/runner_plan_critic",
+  "verdict": "correction_required",
+  "findings": [
+    {
+      "id": "G01",
+      "severity": "medium",
+      "requirement": "AUT-01/03",
+      "finding": "Planning any-uncertainty clause reintroduces routine owner escalation.",
+      "disposition": "Rewritten to only material owner-intent/behavior/delivery/reserved-action or required-input decisions."
+    },
+    {
+      "id": "G02",
+      "severity": "medium",
+      "requirement": "AUT-01/08",
+      "finding": "Active feature-staging clauses infer merge authority from green gates.",
+      "disposition": "Shared/task/template/decisions require actual owner-granted merge/destination authority, reusable existing grants; green gates alone grant none."
+    }
+  ],
+  "tools": "Read-only diff/source/search/hash; no state edits/tests/subagents."
+}

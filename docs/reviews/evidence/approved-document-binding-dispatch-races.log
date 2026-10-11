@@ -1,0 +1,56 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+Preparing worktree (checking out 'task/delivery-feature.7')
+ ✓ test/storage.test.ts (26 tests) 13282ms
+   ✓ WorkflowStore > uses CAS versions, idempotency keys, and fenced commits 522ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_claim after suspended observations in execution and recovery 2278ms
+   ✓ JournaledMutationBroker recovery > guards beads.task_close after suspended observations in execution and recovery 2363ms
+   ✓ JournaledMutationBroker recovery > guards beads.dolt_push after suspended observations in execution and recovery 2256ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_prepare without duplicate mutation 352ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_prepare without duplicate mutation 353ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_external_mutation without duplicate mutation 365ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_external_mutation without duplicate mutation 371ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary before_local_commit without duplicate mutation 356ms
+   ✓ JournaledMutationBroker recovery > recovers fault boundary after_local_commit without duplicate mutation 408ms
+   ✓ JournaledMutationBroker recovery > commits an externally applied close without repeating it and escalates contradictions 580ms
+   ✓ JournaledMutationBroker recovery > brokers beads.task_claim through the pinned official adapter 353ms
+   ✓ JournaledMutationBroker recovery > brokers beads.task_close through the pinned official adapter 362ms
+   ✓ JournaledMutationBroker recovery > brokers beads.dolt_push through the pinned official adapter 353ms
+ ✓ test/deliveryBrokers.test.ts (34 tests) 39323ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with none changed 2219ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with documents changed 1335ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with approval changed 1410ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with lease changed 1321ms
+   ✓ DurableDeliveryBroker > guards a real Git commit from the accepted task worktree with expiry changed 2256ms
+   ✓ DurableDeliveryBroker > denies delivery dispatch when approval changes at the last boundary 507ms
+   ✓ DurableDeliveryBroker > denies delivery dispatch when lease changes at the last boundary 495ms
+   ✓ DurableDeliveryBroker > denies delivery dispatch when cancellation changes at the last boundary 630ms
+   ✓ DurableDeliveryBroker > persists an attested zero-thread snapshot before the immediate merge re-observation 1994ms
+   ✓ DurableDeliveryBroker > rejects a provider review-event race after persisting the merge snapshot 1668ms
+   ✓ DurableDeliveryBroker > rejects unresolved threads and resolved threads without matching durable dispositions 3020ms
+   ✓ DurableDeliveryBroker > recovers response loss only after a durable verified merge precondition 1987ms
+   ✓ DurableDeliveryBroker > escalates an already-merged result without a durable verified precondition 1667ms
+   ✓ DurableDeliveryBroker > migrates a legacy prepared merge and completes verified recovery 2435ms
+   ✓ DurableDeliveryBroker > journals an approved mutation and replays it without a second side effect 724ms
+   ✓ DurableDeliveryBroker > requires durable broker-approved head lineage for every commit and push 2883ms
+   ✓ DurableDeliveryBroker > escalates a stale external state exactly once without mutation 398ms
+   ✓ DurableDeliveryBroker > recovers a crash after the external mutation without repeating it 711ms
+   ✓ DurableDeliveryBroker > requires atomic recovery adoption before a higher-fence execute replay 342ms
+   ✓ DurableDeliveryBroker > retries recovery idempotently after crashing immediately after adoption 671ms
+   ✓ DurableDeliveryBroker > rejects preparation and commit outside the operation state matrix 923ms
+   ✓ DurableDeliveryBroker > escalates corrupt journal rows without suppressing later recovery 1964ms
+   ✓ DurableDeliveryBroker > keeps the delivery journal capability internal 495ms
+   ✓ DurableDeliveryBroker > durably escalates undefined and cyclic port results instead of wedging prepared work 821ms
+   ✓ DurableDeliveryBroker > persists pipeline backoff, completes on success, and escalates an expired wait once 4385ms
+   ✓ DurableDeliveryBroker > rejects reconciliation through a broker bound to a different exact contract 362ms
+
+ Test Files  2 passed (2)
+      Tests  60 passed (60)
+   Start at  02:56:29
+   Duration  39.89s (transform 291ms, setup 0ms, collect 686ms, tests 52.61s, environment 0ms, prepare 81ms)
+

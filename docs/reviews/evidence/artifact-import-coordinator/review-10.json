@@ -1,0 +1,131 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "3541e879-c587-42ba-8df4-b6bf8ff9f148",
+  "materialDigest": "1ff85055252c73bf5dd9fbf14e62e7dc81f2646e5c7afcb3fb504271332b586b",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "docs/reviews/artifact-import-coordinator-qualification.md",
+      "digest": "57d6f385fcd6f6842ae3f1b2db07008d001114854b16b7f4e08b83c9a580f000"
+    },
+    {
+      "path": "packages/workflow-control/src/anchoredFileMutation.ts",
+      "digest": "8736a42bc008e0b0ba951b0fce83fd834432c2b50ecacfc495596d6f9164125f"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "857a74db3766861208935b584d10e3c6a28eb0c6f5fad1506940436d9c5764d5"
+    },
+    {
+      "path": "packages/workflow-control/src/coordinatorProcess.ts",
+      "digest": "9e4dea5f930aa158b26f1af2bead64553c48e9b3db46d59f0fa2d610fa4891aa"
+    },
+    {
+      "path": "packages/workflow-control/src/coordinatorReceipts.ts",
+      "digest": "ade5d3eab9e12ca2adcc78e9eba5104279a0fb4a881aadd8b3c4cc495bc8ec93"
+    },
+    {
+      "path": "packages/workflow-control/src/coordinatorTransport.ts",
+      "digest": "9d507a2519d73913991ec38e603336db2ffd2fa7deaa2e43e7816f1f84077b8a"
+    },
+    {
+      "path": "packages/workflow-control/src/deliveryBrokers.ts",
+      "digest": "a41a58c77ae5d708c3d17b79d4f26782c6f165a0acada62c4463c24a440e1188"
+    },
+    {
+      "path": "packages/workflow-control/src/gitDeliveryPort.ts",
+      "digest": "123f1536dd305eb501eb632fb36424df8a53fc50cd364adcb95a3e55744f47b0"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationImport.ts",
+      "digest": "e0d70e0b1f79c85ca9e15b902e4ccdf5bb0f307faeb1ee8575f6305f6e207a12"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationOutput.ts",
+      "digest": "a216e04ab4246beeb6b774254388113fd527622c3fcfdd9c689113f9d0d4ba51"
+    },
+    {
+      "path": "packages/workflow-control/src/integrationGate.ts",
+      "digest": "5be060ddb62de93e3f5dab330aff5626c33d127c81e1e18331744459e72729c7"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "05e4199519b08a8bd3a3b280b99cde228b3502244474d0c91d245be514ddb24d"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "413962d2a9eea7802b403bc9ef45be14e361e6601747164aab78d0fb7d3f96f6"
+    },
+    {
+      "path": "packages/workflow-control/src/repairLoops.ts",
+      "digest": "33558fcf791d2e756ec91df8b36ea575c2242925cd13b3a3946612a70c077276"
+    },
+    {
+      "path": "packages/workflow-control/src/secureEvidence.ts",
+      "digest": "3b0b0be3b09931f1de2b90c85a60ec8612cbd84c4a6e45ab741312dd6076212e"
+    },
+    {
+      "path": "packages/workflow-control/src/sourceGit.ts",
+      "digest": "d5e4fc571788fec8a6d4f34dae85fb8e1eceb344f0bdc06d04900290545f6533"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "c09892fb4a58968da3c6e0b01f68ba21df4197980d26ae00d1c91d984f02abd1"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistOutputManifest.ts",
+      "digest": "64c9dd79ff56ef6215ac1dfa0fd9826d959b7596eda189cf9f8248ff158dc204"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistTerminalResult.ts",
+      "digest": "14b1ce372f1e1223935ddb8455c7f7a8a25c89c80e8bc06d72c547d27384553f"
+    },
+    {
+      "path": "packages/workflow-control/src/standaloneCoordinators.ts",
+      "digest": "02ff54a5e36e16913cf0522220672f632cf55bb99d9cde2656c197b352b1dc66"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "d5fa38d0e1a2f76792e547ba75214d5c8571763635a8531392e0d45cda386d0a"
+    },
+    {
+      "path": "packages/workflow-control/test/developmentWorkflowFixture.ts",
+      "digest": "155364b8a625b470dfe8de4c651ddb0392023e0e92bf9dd632319e4a2f24eff8"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/implementationResponses.mjs",
+      "digest": "8bf8352ef5e9eefd807c5b4ed41421c0633059504b3095920b3960014f4ba58f"
+    },
+    {
+      "path": "packages/workflow-control/test/gitDeliveryPort.test.ts",
+      "digest": "bad398d1b71be7d2d9bb3a1ec66e204bbdf8a6ac0648b0274e325fde641a4285"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.integration.test.ts",
+      "digest": "b4271171f67a0ccd50d4b9a7c76a99963b3b38e8170d5e481a9bec1d4384d33e"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.test.ts",
+      "digest": "72ec187e5d92e49817571122b4716bd1c0362cbc2e5441aa12253916919d073c"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "5dfa61e479d6fa196dc1b58dd30797e5f4fd0cf32ddb8a36336820d602b59601"
+    },
+    {
+      "path": "packages/workflow-control/test/sourceGit.test.ts",
+      "digest": "c7f523e402c24d46255f6829216bff0cc0efebd70c4f39bc1e9473e34cc10b30"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistLauncher.test.ts",
+      "digest": "333a0e8a83fd7b9df05e0bcf613f9103330b6ab4613a773f6c6ba1769908e003"
+    }
+  ],
+  "formalApproval": false,
+  "messages": [
+    "Confirmed defects from the supplied source:\n\n1. **High \u2014 All pipeline, delivery and finalization jobs fail during broker construction.**  \n   **Evidence:** `packages/workflow-control/src/standaloneCoordinators.ts`, `execute()`; `deliveryBrokers.ts`, `DurableDeliveryBroker` constructor.  \n   The composition supplies `approvedParentShas: {}`, but the constructor requires a valid parent SHA for every contract task. Contracts require at least one task, so construction always throws before reconciliation or phase execution.  \n   **Correction:** Populate the policy from authoritative, immutable task-parent records. Add a production-composition test that reaches an actual pipeline operation.\n\n2. **High \u2014 Recoverable coordinator errors permanently disable automatic reconciliation.**  \n   **Evidence:** `packages/workflow-control/src/phaseRuntime.ts`, `#startCoordinator()` and coordinator branch of `#recover()`; `phaseJobs.ts`, `claimRecovery()`.  \n   Any coordinator exception\u2014including a lost external acknowledgement or service shutdown\u2014marks the phase job `blocked`. Recovery only selects `started` jobs. A prepared external operation can therefore remain unresolved indefinitely after an ordinary transport failure, despite the broker having reconciliation support.  \n   **Correction:** Preserve uncertain work as recoverable under the same execution identity, with durable bounded retries. Reserve terminal blocking for established conflicts or exhausted recovery.\n\n3. **High \u2014 Pipeline recovery restarts polling instead of recovering the completed decision.**  \n   **Evidence:** `packages/workflow-control/src/standaloneCoordinators.ts`, `#pipeline()`, `#awaitChecks()`, `#transition()`; `deliveryBrokers.ts`, `recordPipelineObservation()`; `storage.ts`, `completeDeliveryWait()` and `prepareDeliveryOperation()`.  \n   Successful polling deletes the wait. A crash before phase completion then re-enters `#pipeline()` with no durable polling position and starts at `pollAttempt: 0`, potentially replaying the original committed pending observation. Additionally, if the pipeline transition was prepared before the crash, the preceding `delivery.execute()` calls fail because `prepareDeliveryOperation()` rejects any prepared transition\u2014even for committed-operation replay. Recovery never reaches the transition adoption code.  \n   **Correction:** Recover the stable pipeline transition first. Persist the successful checks operation and terminal polling decision so recovery can reuse them without restarting the poll sequence.\n\n4. **High \u2014 A second repair of the same finding is rejected despite remaining budget.**  \n   **Evidence:** `packages/workflow-control/src/standaloneCoordinators.ts`, `#repair()`; `repairLoops.ts`, `findingDigest()`; `storage.ts`, `planRepairDispatch()`.  \n   Repair dispatch reuses the specialist\u2019s finding ID but builds its evidence from the latest execution-bound result. `findingDigest()` includes that evidence, while storage rejects a changed digest for an existing finding ID. When verification reports the same unresolved finding after a repair, its new evidence changes the digest and prevents the next attempt. Cancelling the earlier dispatch does not remove this constraint.  \n   **Correction:** Separate stable finding identity from attempt-specific failure evidence and head. Preserve per-finding budget accounting while allowing explicitly bound subsequent observations.\n\n5. **Medium \u2014 Closeout authority expires during otherwise healthy finalization.**  \n   **Evidence:** `packages/workflow-control/src/standaloneCoordinators.ts`, `#finalizing()`; `phaseRuntime.ts`, `#runCoordinator()` heartbeat.  \n   Finalization acquires a 30-second `closeout` lease once. The heartbeat renews workspace, run, task and phase leases, but never closeout. Several adapter calls can collectively exceed 30 seconds, causing finalization writes to reject the fence even while the coordinator remains healthy.  \n   **Correction:** Renew the closeout lease under its existing owner/epoch throughout finalization, and stop dispatch when renewal fails.\n\nTechnical gaps and missing evidence, separate from those defects:\n\n- **Repair planning and feature delivery remain incomplete.** `phaseRuntime.ts::#packet()` still rejects `repair_planning`; `StandaloneCoordinators` provides no integrated-head feature-delivery sequence. These are qualification blockers, not passing paths.\n- **Receipt execution binding needs stronger proof.** `coordinatorReceipts.ts` checks authoritative records, material, heads and some versions, but does not verify that their operation identities belong to the receipt\u2019s execution ID or recorded lease epochs. `phaseJobs.ts` wraps them with the current execution/fences afterward. Supply negative tests for substituting prior operations and document which bindings must survive recovery.\n- **Process settlement is not demonstrated by the supplied tests.** `coordinatorProcess.ts` sends group `SIGKILL`, but completion waits on the direct child\u2019s `close`, not explicit descendant termination. Supply descendant-with-closed-stdio, gate cancellation and shutdown tests before claiming complete settlement.\n- The supplied connected Docker test stops at `task_accepted`. It does not exercise coordinator acceptance, repeated repair, pipeline restart boundaries, merge reconciliation or finalization.\n\nStatic review only; no commands executed or state changed. This is not human approval."
+  ]
+}

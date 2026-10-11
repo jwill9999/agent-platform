@@ -1,0 +1,34 @@
+{
+  "scope": "read-only canonical-host prerequisite inspection; not broker conformance or live launch",
+  "observedAtEpochMs": 1790433419816,
+  "sourceRevision": "5d26b34c279eb2d7c6766b4060363ebcd28e1351",
+  "canonicalWorkspace": "/Users/letuscode/projects/agent-platform",
+  "journalReadMode": "SQLite URI mode=ro; no WorkflowStore constructor",
+  "runStates": [
+    [
+      "cancelled",
+      4
+    ]
+  ],
+  "unexpiredLeaseCount": 0,
+  "workflowVariableNames": [],
+  "runtimeConfigFiles": [],
+  "brokerSearchDirectories": [
+    "/Users/letuscode/.local/bin",
+    "/usr/local/bin",
+    "/Users/letuscode/.codex/bin"
+  ],
+  "brokerNamedCandidates": [],
+  "git": {
+    "path": "/Users/letuscode/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback/git",
+    "digest": "sha256:26a755d0ab5dddc2689ae3e8a8c3520041d0075a860156d5d8c13cc4fdecb85d",
+    "version": "git version 2.53.0"
+  },
+  "dockerVersion": "29.8.0",
+  "limitations": [
+    "Search is bounded; absence here is not proof no broker exists anywhere",
+    "No credential contents read or issued; no conformance command invoked",
+    "Journal observation is a point-in-time snapshot, not a lease or proof about in-memory grants",
+    "Existing reviewer image/account access does not qualify managed workers"
+  ]
+}

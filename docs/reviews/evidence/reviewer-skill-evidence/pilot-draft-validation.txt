@@ -1,0 +1,8 @@
+{
+  "schema": "PASS",
+  "committedDocumentBindings": "PASS",
+  "sourceRevision": "81357d5b7e4e6bc1813a00f0db3280418a3ea6d7",
+  "documents": 6,
+  "materialDigest": "sha256:7f983dd807f5c2cec9e400db05740356ee70f6bb4c1d430c3e83cb3726f48524",
+  "authority": "DRAFT ONLY: planning policy; no persisted approval, launch, installed role/coordinator policy or managed runner qualification"
+}

@@ -1,0 +1,181 @@
+{
+  "observer": "/root/native_adoption_check",
+  "completed_at": "2026-10-09T03:06:02.627021+01:00",
+  "scope": "Owner-authorized disposable native developer read/write/validate/repair smoke; no product or paused prototype execution",
+  "verdict": "PASS for bounded native adoption/acceptance smoke; standalone profile activation and full product-ticket acceptance not tested",
+  "repository": "/Users/letuscode/.codex/worktrees/codex-developer-autonomy/agent-platform",
+  "branch_from_assignment": "task/codex-autonomy-guidance",
+  "branch_independently_queried": false,
+  "source_documents_read": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "5d0433314b371ad2d7a31da7e0fe6851c89f26f915db3364ddfe5102919ef26f"
+    },
+    {
+      "path": "docs/agent-instructions-shared.md",
+      "sha256": "09da29e4e3d9fc59e6a946e95b5594ff7e1ecb079d410b35fc3e761dd1c00502"
+    },
+    {
+      "path": "docs/development/codex-development.md",
+      "sha256": "5f3b3835fe39fe46c725847c89b9080d6573577cc7ee4265d124c32baa4f850a"
+    },
+    {
+      "path": ".codex/config.toml",
+      "sha256": "7d18b8fc4837ccb81201fc06cfe12c90e70abb21514bf5aeeb872b6dea861af0"
+    },
+    {
+      "path": ".codex/agents/code-reviewer.toml",
+      "sha256": "31b79e24a6f493f97dddb27dbe0bed211836a75199a5d2ae575eb8864c4d66a4"
+    },
+    {
+      "path": ".codex/agents/feature-planner.toml",
+      "sha256": "765ef98522ba69dd264ce3e0557215741a0ea63622bfc9aca03f375374bc9c01"
+    },
+    {
+      "path": ".codex/agents/implementation-worker.toml",
+      "sha256": "ec951e2f6e9d7fa4fa27456510ac1323fcf9be6a9b3a26d11c4bb2b6f866e869"
+    },
+    {
+      "path": ".codex/agents/plan-critic.toml",
+      "sha256": "2efa01addfcbba26e83b72af9bd471a1862ff2ef20a9806c18270a11847cf153"
+    },
+    {
+      "path": ".codex/agents/repo-explorer.toml",
+      "sha256": "2f641a56e6c7c9b5b7a9d768c166dbcd4ebb89ce68171c8ae9ba26cffca2f51f"
+    },
+    {
+      "path": ".codex/agents/test-runner.toml",
+      "sha256": "532e25bb125f5da0604c696d52bdf24e88a815fb7f8f2b16108808cc2831829f"
+    },
+    {
+      "path": ".agents/skills/feature-planning/SKILL.md",
+      "sha256": "d17fae690fe98b869b1a81a01fddd96003fd2fb6fea2d0005e845e95d393dfde"
+    },
+    {
+      "path": ".agents/skills/feature-implementation/SKILL.md",
+      "sha256": "bd93558bf8359086dc3ea5244a0405b57f540b1fd40c7a3c20b4a8f47898bf49"
+    },
+    {
+      "path": ".agents/skills/plan-critique/SKILL.md",
+      "sha256": "0b46b0a05c2106f9c25d4daec900e9c4fcdda56c0df2dffba43edfd587fd2924"
+    },
+    {
+      "path": ".agents/skills/orchestration/SKILL.md",
+      "sha256": "4f2309e2a8ccadf562f9341e538563b047db9e291bee2cac9e07eec3694fb35a"
+    },
+    {
+      "path": "docs/adr/0005-native-codex-development.md",
+      "sha256": "df687789b187345b14ff879a820f934c2268b59c9b05a82ba89dca5ae9b02b0e"
+    },
+    {
+      "path": "docs/tasks/agent-platform-codex-autonomy-plan.md",
+      "sha256": "3d2e89ff977f99ef7667baad91b28a60d1a964cf417393f961ffa93c9458ecaa"
+    },
+    {
+      "path": "docs/planning/codex-developer-autonomy/plan.md",
+      "sha256": "4810a4ed5e97d3eff3ac76c4425b63b97e7a37f46b1a291a6236fa9785da96df"
+    },
+    {
+      "path": "docs/planning/codex-developer-autonomy/inventory.md",
+      "sha256": "64b35de2ad796846720dfaf43535a398d3df493262790960c013722d56532863"
+    },
+    {
+      "path": "docs/planning/codex-developer-autonomy/global-follow-ups.md",
+      "sha256": "8ec70af8d0a6e71836621e3fc5777c36252b8422cf536136680d8d79b2f79d2f"
+    },
+    {
+      "path": "docs/testing/codex-developer-autonomy.md",
+      "sha256": "f0cb02832a58ae4ef51274bc77a59ffbf44f641b8e5cd52a0a90a6d3234574c0"
+    }
+  ],
+  "supporting_manifest": "/Users/letuscode/.codex/worktrees/codex-developer-autonomy/agent-platform/docs/reviews/evidence/codex-autonomy/supporting-manifest.json",
+  "all_four_full_supporting_copies_read_and_hash_verified": true,
+  "startup_permissions_supplied": {
+    "sandbox_mode": "danger-full-access",
+    "approval_policy": "never",
+    "network_access": "enabled",
+    "concurrency_slots": 5,
+    "origin": "Inherited developer instructions in this native collaboration child; not derived from repository TOML or a standalone config loader"
+  },
+  "tools_actually_invoked": ["functions.exec", "tools.exec_command"],
+  "observed_effects": [
+    "Read full repository supporting material with cat/sed",
+    "Created one disposable text fixture using Python exclusive open",
+    "Read fixture and retained intentional failing validation exit 1",
+    "Repaired fixture once using Python write_text",
+    "Read final fixture and passed exact-byte validation exit 0",
+    "Parsed project config and all six profiles with Python tomllib",
+    "Verified four copied supporting-source SHA-256 hashes"
+  ],
+  "fixture": {
+    "path": "/Users/letuscode/.codex/autonomy-cleanup-20261009/native-adoption-smoke/fixture.txt",
+    "initial_contents": "native-route=pending\n",
+    "final_contents": "native-route=ready\n",
+    "repairs": 1,
+    "final_sha256": "59017caf67c74ad171dc25091c045eea061914d4908ca05a57e116285c252b1d"
+  },
+  "tool_command_results": [
+    {
+      "operation": "initial_write",
+      "tool_chunk_id": "ce5b33",
+      "exit_code": 0,
+      "artifact": "initial-write.json"
+    },
+    {
+      "operation": "intentional_initial_validation",
+      "tool_chunk_id": "ebeb4e",
+      "exit_code": 1,
+      "artifact": "validation-failure.json"
+    },
+    {
+      "operation": "single_repair",
+      "tool_chunk_id": "ecdc88",
+      "exit_code": 0,
+      "artifact": "repair.json"
+    },
+    {
+      "operation": "final_validation_and_toml_source_checks",
+      "tool_chunk_id": "079b19",
+      "exit_code": 0,
+      "artifacts": ["validation-pass.json", "source-and-profile-check.json"]
+    }
+  ],
+  "intermediate_authorization_questions": 0,
+  "repository_default_observations": {
+    "seven_toml_files_parse": true,
+    "six_profiles_count": 6,
+    "custom_sandbox_approval_network_or_concurrency_overrides": false,
+    "profiles_express_procedural_responsibilities": true
+  },
+  "semantic_route_assessment": [
+    {
+      "source": "docs/agent-instructions-shared.md / Native developer workflow",
+      "finding": "Existing agreed end-to-end scope covers routine file/subtask/test/repair/retry/review/CI phases; managed discovery/isolation/gateway/budget/admission/exact-material approval are not ordinary developer prerequisites."
+    },
+    {
+      "source": "docs/development/codex-development.md",
+      "finding": "Native tools operate under actual session permissions; product security and paused prototype guards remain separate; merge/global/spend/launch boundaries preserved."
+    },
+    {
+      "source": ".agents/skills/feature-planning and feature-implementation",
+      "finding": "Reuse existing authorization through reviewed planning-to-implementation; substantive source-aware critique remains; real intent changes and missing required inputs require clarification."
+    },
+    {
+      "source": ".agents/skills/plan-critique",
+      "finding": "Independent source inspection uses available native tools; read-only responsibility is procedural and does not claim technical isolation."
+    },
+    {
+      "source": ".agents/skills/orchestration and ADR0005",
+      "finding": "Prototype procedures are explicitly paused and opt-in; ADR0005 supersedes default developer policy without weakening prototype runtime enforcement."
+    }
+  ],
+  "custom_gate_calls": 0,
+  "limitations": [
+    "Fresh native collaboration child inherited parent session/tool context. Repository instructions were explicitly read from current source; no fresh standalone Codex process or profile-loader activation was demonstrated.",
+    "Supplied unrestricted filesystem permission and native read/write effects are observed; no blanket network capability claim is inferred because no network probe was performed.",
+    "No repository source/product test, connected product journey, hosted pipeline or later representative product ticket V-06 was run by this observer.",
+    "No browser, connector, paid external gateway or managed prototype was invoked.",
+    "Global settings/skills/memories were not changed; stale global guidance proposals remain for owner discussion."
+  ],
+  "preservation": "Only files under the explicitly owned native-adoption-smoke directory were written; no repository, Beads, Git, global config/skill/memory, external app or other worktree mutation was issued."
+}

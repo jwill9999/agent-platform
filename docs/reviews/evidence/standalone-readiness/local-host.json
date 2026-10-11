@@ -1,0 +1,188 @@
+{
+  "source": "29b96baaa929238ded1aa0c771be1d982f6ef30f",
+  "featureMerge": "c9729617759be0cb0d3c89f7cb3b18f914553914",
+  "integrity": "ok",
+  "tables": {
+    "runs": {
+      "countBefore": 4,
+      "countAfter": 4,
+      "rowsUnchanged": true
+    },
+    "contracts": {
+      "countBefore": 4,
+      "countAfter": 4,
+      "rowsUnchanged": true
+    },
+    "leases": {
+      "countBefore": 7,
+      "countAfter": 7,
+      "rowsUnchanged": true
+    }
+  },
+  "ready": {
+    "service": {
+      "singleton": 1,
+      "service_id": "2f45e704-328e-48ac-8c7f-741ebbbefad6",
+      "config_digest": "d82223173232134b4be9be28313b33bb8c7eed6c13812adb8ca8fac6a6e1f027",
+      "pid": 37157,
+      "epoch": 1,
+      "lease_until_ms": 1790553010841,
+      "code": "ready",
+      "observed_at_ms": 1790552996462,
+      "stop_requested": 0,
+      "recovery_requested": 0,
+      "ready_until_ms": 1790553000842,
+      "process_identity": "a512eacec79e9de1685311d2abf40d9cc87c9e2e71754d51b96914ace3aff10b"
+    },
+    "effectiveCode": "ready",
+    "interruptions": []
+  },
+  "discovery": {
+    "status": "absent",
+    "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+    "taskId": "agent-platform-pilot-zero.17",
+    "active": [],
+    "terminal": [],
+    "leases": [
+      {
+        "resourceType": "workspace",
+        "resourceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+        "ownerId": "bootstrap:5e395946-9109-42c6-8b42-7309e71d02cc",
+        "epoch": 10,
+        "expiresAtMs": 1788773281224,
+        "expired": true
+      }
+    ]
+  },
+  "stopped": {
+    "service": {
+      "singleton": 1,
+      "service_id": "2f45e704-328e-48ac-8c7f-741ebbbefad6",
+      "config_digest": "d82223173232134b4be9be28313b33bb8c7eed6c13812adb8ca8fac6a6e1f027",
+      "pid": null,
+      "epoch": 1,
+      "lease_until_ms": 0,
+      "code": "stopped",
+      "observed_at_ms": 1790552996462,
+      "stop_requested": 1,
+      "recovery_requested": 0,
+      "ready_until_ms": 1790553000842,
+      "process_identity": "a512eacec79e9de1685311d2abf40d9cc87c9e2e71754d51b96914ace3aff10b"
+    },
+    "effectiveCode": "stopped",
+    "interruptions": []
+  },
+  "files": [
+    {
+      "path": "packages/workflow-control/dist/cli.js",
+      "sha256": "80aa0800729393ed5c7bc3d35cffb34442a1ad09f66e0e63cb34e594dfacd6b3"
+    },
+    {
+      "path": "packages/workflow-control/dist/developmentHost.js",
+      "sha256": "cc4e0e2222093441cc69c34fc7d15390b88838367c62dd1ecf1f201449da7509"
+    },
+    {
+      "path": "packages/workflow-control/dist/reviewProxy.js",
+      "sha256": "cd8f7b04ed3743c3d08538a1364459c1ee5f98d92e6c163c75eab401bd12068f"
+    }
+  ],
+  "workflowConfigured": false,
+  "preservationAudit": {
+    "capturedAt": "2026-09-29T15:39:28.787713+00:00",
+    "timing": "Retrospective read-only comparison on 29 September; not a digest captured during the 28 September migration.",
+    "algorithm": "sqlite-table-v1 / SHA-256; canonicalization in linked report",
+    "beforeSource": "readiness-20260928/before.sqlite (retained pre-migration backup)",
+    "afterSource": "workflow.sqlite (canonical journal at capturedAt)",
+    "algorithmChecks": {
+      "rowOrderInvariant": true,
+      "sameCountMutationDetected": true,
+      "duplicateMultiplicityPreserved": true,
+      "typeDistinctionPreserved": true
+    },
+    "tables": {
+      "runs": {
+        "before": {
+          "rowCount": 4,
+          "columns": [
+            "id",
+            "contract_id",
+            "state",
+            "version",
+            "merge_verified",
+            "created_at_ms",
+            "updated_at_ms"
+          ],
+          "sha256": "4b97956dd397a4ebb9157e8fa096f9e327821868f69b996a51066cb563384d0c"
+        },
+        "after": {
+          "rowCount": 4,
+          "columns": [
+            "id",
+            "contract_id",
+            "state",
+            "version",
+            "merge_verified",
+            "created_at_ms",
+            "updated_at_ms"
+          ],
+          "sha256": "4b97956dd397a4ebb9157e8fa096f9e327821868f69b996a51066cb563384d0c"
+        },
+        "match": true
+      },
+      "contracts": {
+        "before": {
+          "rowCount": 4,
+          "columns": [
+            "id",
+            "feature_id",
+            "contract_version",
+            "policy_digest",
+            "workspace_id",
+            "body_json",
+            "created_at_ms"
+          ],
+          "sha256": "522b91cf4a558889c0e084433c4b1f012aab844f9a0dfe8d12da9ecc71c1605e"
+        },
+        "after": {
+          "rowCount": 4,
+          "columns": [
+            "id",
+            "feature_id",
+            "contract_version",
+            "policy_digest",
+            "workspace_id",
+            "body_json",
+            "created_at_ms"
+          ],
+          "sha256": "522b91cf4a558889c0e084433c4b1f012aab844f9a0dfe8d12da9ecc71c1605e"
+        },
+        "match": true
+      },
+      "leases": {
+        "before": {
+          "rowCount": 7,
+          "columns": [
+            "resource_type",
+            "resource_id",
+            "owner_id",
+            "epoch",
+            "expires_at_ms"
+          ],
+          "sha256": "818b73fed19cbe4d87930c5a3802b49837973fde7b1dc2dff69ab229772ff0b9"
+        },
+        "after": {
+          "rowCount": 7,
+          "columns": [
+            "resource_type",
+            "resource_id",
+            "owner_id",
+            "epoch",
+            "expires_at_ms"
+          ],
+          "sha256": "818b73fed19cbe4d87930c5a3802b49837973fde7b1dc2dff69ab229772ff0b9"
+        },
+        "match": true
+      }
+    }
+  }
+}
