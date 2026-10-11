@@ -66,7 +66,12 @@ or main commits. Repository documentation uses the normal task-to-feature and fe
 pull request workflow. The owner's subsequent voice instruction explicitly authorizes this
 documentation integration and two-branch cleanup after passing checks and resolved reviews.
 
-The full specification is mirrored in the Agent Platform Notion hub with source revision and hash.
+The full specification and session at `d1bbb33d8b1ca96b8088c75b491f83f16740a90b` were published
+and read back against their source hashes in the Agent Platform Notion hub; the receipt is
+`visibility-integration-publication-d1.json` in the consolidation evidence directory. That receipt
+qualifies only that revision. This review correction requires a new complete publication/readback
+after commit and push, recorded against its actual revision before merging. A prior mirror or
+this handoff text is not proof that a later revision has been synchronized.
 No runtime code, dependency, security policy or Git branch rename is required by this task.
 
 ## Tests and verification

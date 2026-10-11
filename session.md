@@ -25,8 +25,14 @@ and reviews pass, then require fresh protected staging full scan, actual package
 all checks/reviews before guarded squash. Verify the staging tree, recovery-protect and remove
 only the two delivered visibility branches, refresh mirrors/Beads and close after Dolt sync.
 The owner may review the live backlog in parallel; the next product priority remains undecided.
-Earlier continuation sections below are
-retained historical snapshots; do not repeat their completed merges or resume orchestration.
+The immediately following PR299 and final-quality-repair sections are preserved pre-completion
+snapshots. Their pending review, publication and hosted-clearance steps were subsequently completed:
+PR299 merged into its feature at `583da680ae84e79cb8723b808792c8321d9b4c7e`, then PR286
+merged into staging at `3a22ac8f45d2257fe1a9200e936e4bd2923c9eae`. Statements below that
+PR286 is unmerged or that those repair gates remain pending are superseded by those verified
+deliveries. They do not describe active work. The visibility documentation delivery above is still
+active; paused orchestration remains deferred. Consult live Beads and current PR state before
+acting on any other dated historical section.
 
 ## Current PR299 detailed-analysis follow-up
 
