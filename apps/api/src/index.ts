@@ -38,17 +38,16 @@ const diagnosticStore =
             : Number(process.env.DIAGNOSTICS_MAX_EVENTS),
       })
     : undefined;
-// Intentionally detached: diagnostic readiness must not delay server.listen or prevent startup.
-if (diagnosticStore) void observeDiagnosticReadiness(diagnosticStore);
+// Register observers synchronously; diagnostic readiness must not delay server.listen.
+if (diagnosticStore) observeDiagnosticReadiness(diagnosticStore);
 
-async function observeDiagnosticReadiness(store: ReturnType<typeof createDiagnosticStore>) {
-  try {
-    await store.ready;
-    const health = store.health();
-    if (health.state === 'disabled') log.warn('diagnostics.disabled', { code: health.reason });
-  } catch {
-    log.warn('diagnostics.disabled', { code: 'storage_unavailable' });
-  }
+function observeDiagnosticReadiness(store: ReturnType<typeof createDiagnosticStore>): void {
+  void store.ready
+    .then(() => {
+      const health = store.health();
+      if (health.state === 'disabled') log.warn('diagnostics.disabled', { code: health.reason });
+    })
+    .catch(() => log.warn('diagnostics.disabled', { code: 'storage_unavailable' }));
 }
 if (diagnosticsRequested && !diagnosticAccess) {
   log.warn('diagnostics.disabled', { code: 'invalid_local_configuration' });

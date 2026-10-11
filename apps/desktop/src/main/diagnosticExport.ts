@@ -54,7 +54,7 @@ async function destination(deps: DiagnosticExportDependencies) {
 }
 async function save(
   deps: DiagnosticExportDependencies,
-  content: () => unknown | Promise<unknown>,
+  content: () => unknown,
 ): Promise<DesktopWorkspaceExportResult> {
   const selected = await destination(deps);
   if (selected.canceled || !selected.filePath) return { ok: true, status: 'cancelled' };

@@ -21,7 +21,8 @@ Hosted Sonar failed on complexity/style and the browser-install command. Indepen
 bounded refactors passed 34 core tests, 120 report-equivalence comparisons, 40 web tests, 21 desktop
 tests, six CLI tests, four fresh connected journeys and a full 222-test API rerun. An earlier API
 timeout is retained alongside the unchanged focused and full rerun passes. Fresh hosted analysis
-is still required. No bypass, merge or closure. See results
+passed at `035ac26e` with no Critical findings; two final startup/type cleanups require their own
+hosted requalification. No bypass, merge or closure. See results
 for the retained first failure and source-backed minor-warning dispositions.
 See [results](docs/reviews/agent-observability-mvp-results.md) and
 [usage](docs/development/diagnostics.md) for evidence and limits. Next: push the reviewed quality repair to PR302, refresh its changed full mirrors, and qualify

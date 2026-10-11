@@ -179,6 +179,14 @@ the original failure remains evidence. The uncontended full API rerun passed all
 Fresh exact-head hosted analysis remains required. Sourcery skipped the initial hosted review;
 independent source review supplies the recorded critique, not a claim that Sourcery ran.
 
+The next hosted analysis at `035ac26e881e90c440d45e1e6b5bf24c71252acc` passed the Sonar
+quality gate: all three ratings were 1, duplication was 0.0%, hotspots were 100% reviewed, and
+no Critical findings remained. One startup-style Major and one redundant-type Minor remained;
+a final bounded repair uses a detached promise continuation and simplifies an `unknown` union.
+Startup still proceeds independently of diagnostics, and export validation is unchanged. The two
+intentional minor warnings above remain disclosed. This earlier hosted pass is not a substitute
+for the final repair revision's own analysis.
+
 ## Remaining qualification
 
 Connected T06/T07/T12 and local quality/regression checks passed. Complete normal commit/push,
