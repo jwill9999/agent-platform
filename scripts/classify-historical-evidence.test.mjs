@@ -1,0 +1,515 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import test from 'node:test';
+import {
+  classifyHistoricalEvidence,
+  assertCommit,
+  isAncestor,
+  readObjectBatch,
+  decodeObjectBatch,
+  decodeHashObjectIdentity,
+  hashObjectIdentity,
+  git,
+  validateDataRepoPath,
+  validateGitArguments,
+  POLICY_PATH,
+  REVIEW_PATH,
+  SELECTION,
+  sha256,
+  SOURCE,
+  validatePolicy,
+  WORKFLOW_PATH,
+} from './classify-historical-evidence.mjs';
+import { CONTROL_PATHS } from './qualify-historical-evidence.mjs';
+
+const sourceRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+export function fixture(transformContents, { omitReview = false } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'historical-evidence-test-'));
+  const run = (...args) =>
+    execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-C', root, ...args], {
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH,
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_AUTHOR_NAME: 'Archive unit fixture',
+        GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+        GIT_COMMITTER_NAME: 'Archive unit fixture',
+        GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+      },
+    }).trim();
+  run('init', '-q');
+  const paths = JSON.parse(readFileSync(join(sourceRoot, POLICY_PATH), 'utf8')).files.map(
+    (file) => file.path,
+  );
+  const contents = paths.map((path, i) =>
+    Buffer.from(
+      path.endsWith('.json') ? JSON.stringify({ inertFixture: i }) + '\n' : `inert fixture ${i}\n`,
+    ),
+  );
+  if (transformContents) transformContents(contents, paths);
+  const target = paths.findIndex((path) => !path.endsWith('.json'));
+  const padding = 3_958_506 - contents.reduce((sum, value) => sum + value.length, 0);
+  contents[target] = Buffer.concat([contents[target], Buffer.alloc(padding, 32)]);
+  const policy = {
+    version: 1,
+    sourceRevision: SOURCE,
+    selectionManifestSha256: SELECTION,
+    count: 220,
+    bytes: 3_958_506,
+    files: paths.map((path, i) => ({
+      path,
+      mode: '100644',
+      blob: '0'.repeat(40),
+      sha256: sha256(contents[i]),
+      bytes: contents[i].length,
+    })),
+  };
+  // execFileSync input is provided separately because git arguments are data only.
+  for (let i = 0; i < paths.length; i++)
+    policy.files[i].blob = execFileSync('git', ['-C', root, 'hash-object', '-w', '--stdin'], {
+      input: contents[i],
+      encoding: 'utf8',
+    }).trim();
+  for (const path of CONTROL_PATHS) {
+    const output = join(root, path);
+    mkdirSync(dirname(output), { recursive: true });
+    if (path !== POLICY_PATH && path !== REVIEW_PATH)
+      writeFileSync(
+        output,
+        path === WORKFLOW_PATH ? 'name: trusted fixture\n' : readFileSync(join(sourceRoot, path)),
+      );
+  }
+  const policyBytes = Buffer.from(JSON.stringify(policy, null, 2) + '\n');
+  writeFileSync(join(root, POLICY_PATH), policyBytes);
+  const review = {
+    version: 1,
+    verdict: 'approved-inert-retention-with-limits',
+    reviewer: 'independent-unit-fixture-not-production-approval',
+    sourceRevision: SOURCE,
+    selectionManifestSha256: SELECTION,
+    allowlistSha256: sha256(policyBytes),
+    files: 220,
+    bytes: 3_958_506,
+    jsonFiles: 139,
+    evidenceSha256: 'a'.repeat(64),
+    coverage: ['unit', 'fixture', 'only'],
+    limits: ['unit', 'not real review', 'not pilot evidence'],
+  };
+  if (!omitReview) writeFileSync(join(root, REVIEW_PATH), JSON.stringify(review) + '\n');
+  writeFileSync(join(root, 'README.md'), 'base\n');
+  run('add', '.');
+  run('commit', '-qm', 'protected fixture');
+  const base = run('rev-parse', 'HEAD');
+  for (let i = 0; i < paths.length; i++) {
+    const output = join(root, paths[i]);
+    mkdirSync(dirname(output), { recursive: true });
+    writeFileSync(output, contents[i]);
+  }
+  run('add', '.');
+  run('commit', '-qm', 'exact archive fixture');
+  const head = run('rev-parse', 'HEAD');
+  const merge = run(
+    'commit-tree',
+    run('rev-parse', `${head}^{tree}`),
+    '-p',
+    base,
+    '-p',
+    head,
+    '-m',
+    'merge fixture',
+  );
+  return {
+    root,
+    run,
+    policy,
+    review,
+    base,
+    head,
+    merge,
+    paths,
+    contents,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  test('complete 220 Git-object additions classify as archive, including paths beyond API first page', () => {
+    const f = fixture();
+    try {
+      const result = classifyHistoricalEvidence({ repo: f.root, base: f.base, head: f.head });
+      assert.equal(result.route, 'archive');
+      assert.equal(result.files, 220);
+      assert.equal(result.bytes, 3_958_506);
+      const reverse = classifyHistoricalEvidence({ repo: f.root, base: f.head, head: f.base });
+      assert.equal(reverse.route, 'full');
+      assert.equal(reverse.reason, 'base-is-not-head-ancestor');
+    } finally {
+      f.cleanup();
+    }
+  });
+  test('partial, empty, authored bookkeeping, deletions and renamed/mode-changed payloads require full scan', async (t) => {
+    const f = fixture();
+    try {
+      for (const [name, change] of [
+        ['empty', () => f.base],
+        [
+          'partial',
+          () => {
+            rmSync(join(f.root, f.paths[219]));
+            return null;
+          },
+        ],
+        [
+          'authored',
+          () => {
+            writeFileSync(join(f.root, 'session.md'), 'bookkeeping\n');
+            return null;
+          },
+        ],
+        [
+          'edited',
+          () => {
+            writeFileSync(join(f.root, f.paths[0]), '{}\n');
+            return null;
+          },
+        ],
+        [
+          'deletion',
+          () => {
+            rmSync(join(f.root, 'README.md'));
+            return null;
+          },
+        ],
+        [
+          'executable',
+          () => {
+            chmodSync(join(f.root, f.paths[0]), 0o755);
+            return null;
+          },
+        ],
+        [
+          'symlink',
+          () => {
+            rmSync(join(f.root, f.paths[0]));
+            symlinkSync('/etc/passwd', join(f.root, f.paths[0]));
+            return null;
+          },
+        ],
+        [
+          'workflow-self-authorization',
+          () => {
+            writeFileSync(join(f.root, WORKFLOW_PATH), 'name: forged\n');
+            return null;
+          },
+        ],
+        [
+          'rename',
+          () => {
+            f.run('mv', f.paths[0], `${f.paths[0]}.renamed`);
+            return null;
+          },
+        ],
+      ])
+        await t.test(name, () => {
+          f.run('reset', '--hard', f.head);
+          f.run('clean', '-fd');
+          let head = change();
+          if (!head) {
+            f.run('add', '-A');
+            f.run('commit', '-qm', name);
+            head = f.run('rev-parse', 'HEAD');
+          }
+          assert.equal(
+            classifyHistoricalEvidence({ repo: f.root, base: f.base, head }).route,
+            'full',
+          );
+        });
+    } finally {
+      f.cleanup();
+    }
+  });
+  test('malformed policies, duplicate/unsafe paths and identity errors fail closed', () => {
+    const f = fixture();
+    try {
+      for (const mutate of [
+        (p) => p.files.push(p.files[0]),
+        (p) => (p.files[1] = p.files[0]),
+        (p) => (p.files[0].path = 'docs/reviews/../evil.json'),
+        (p) => (p.files[0].path += '\n'),
+        (p) => (p.files[0].mode = '120000'),
+        (p) => (p.files[0].blob = 'invalid'),
+        (p) => (p.files[0].sha256 = 'invalid'),
+        (p) => p.files[0].bytes++,
+        (p) => (p.sourceRevision = 'a'.repeat(40)),
+      ]) {
+        const p = structuredClone(f.policy);
+        mutate(p);
+        assert.throws(() => validatePolicy(p));
+      }
+      assert.throws(() =>
+        classifyHistoricalEvidence({ repo: f.root, base: f.base, head: 'a'.repeat(40) }),
+      );
+      assert.throws(() =>
+        classifyHistoricalEvidence({ repo: f.root, base: '--help', head: f.head }),
+      );
+    } finally {
+      f.cleanup();
+    }
+  });
+  test('Git argument contract rejects options, unsafe revisions and repository paths before execution', () => {
+    const root = mkdtempSync(join(tmpdir(), 'git-contract-negative-'));
+    const hash = 'a'.repeat(40);
+    try {
+      for (const repo of [
+        'relative.git',
+        '--upload-pack=evil',
+        root + '/../outside',
+        '/',
+        join(root, 'bad\npath'),
+        join(root, 'bad\0path'),
+      ])
+        assert.throws(() => validateDataRepoPath(repo));
+      for (const args of [
+        ['config', 'core.hooksPath', join(root, 'evil')],
+        ['cat-file', '-t', '--help'],
+        ['cat-file', 'blob', hash, '--batch'],
+        ['ls-tree', '-z', hash, '--', '../outside'],
+        ['ls-tree', '-z', hash, '--', '-command'],
+        ['show', `${hash}:../outside`],
+        ['show', '--ext-diff', hash],
+        ['merge-base', '--is-ancestor', hash, '--help'],
+        ['rev-parse', '--git-path', 'hooks'],
+        ['update-ref', 'refs/heads/main', hash],
+        [
+          'diff',
+          '--raw',
+          '-z',
+          '--no-renames',
+          '--ext-diff',
+          '--no-textconv',
+          '--no-abbrev',
+          hash,
+          hash,
+          '--',
+        ],
+        ['constructor'],
+      ]) {
+        assert.throws(() => validateGitArguments(args));
+        assert.throws(() => git(root, ...args), /Unsupported|Invalid/);
+      }
+      validateGitArguments(['cat-file', '-t', hash]);
+      validateGitArguments(['ls-tree', '-z', hash, '--', 'docs/reviews/evidence.json']);
+      const sentinel = join(root, 'untrusted-path-executed');
+      writeFileSync(join(root, 'git'), '#!/bin/sh\n/usr/bin/touch ' + sentinel + '\n');
+      chmodSync(join(root, 'git'), 0o755);
+      const before = process.env.PATH;
+      try {
+        process.env.PATH = root;
+        // The fixed executable runs, reports no repository, and never executes
+        // the candidate PATH binary or inherits its search directory.
+        assert.throws(() => git(root, 'rev-parse', 'HEAD'));
+        assert.equal(existsSync(sentinel), false);
+      } finally {
+        process.env.PATH = before;
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  test('Git batch object reads preserve binary payloads and reject missing or malformed framing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'git-object-batch-'));
+    const env = { PATH: '/usr/bin:/bin', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' };
+    try {
+      execFileSync('/usr/bin/git', ['init', '-q', root], { env });
+      const payload = Buffer.from([0, 10, 255, 67, 0, 10]);
+      const hash = execFileSync('/usr/bin/git', ['-C', root, 'hash-object', '-w', '--stdin'], {
+        env,
+        input: payload,
+        encoding: 'utf8',
+      }).trim();
+      const actual = readObjectBatch(root, hash, 'blob');
+      assert.ok(actual.content.equals(payload));
+      assert.equal(actual.objectId, hash);
+      assert.throws(() => assertCommit(root, hash), /type/);
+      // cat-file --batch exits zero for a missing object; parse its response,
+      // never treat the subprocess exit code as existence/type evidence.
+      assert.throws(() => readObjectBatch(root, 'a'.repeat(40), 'commit'), /Missing/);
+      assert.throws(() => readObjectBatch(root, '--help'), /identity/);
+      const response = Buffer.concat([
+        Buffer.from(`${hash} blob ${payload.length}\n`),
+        payload,
+        Buffer.from('\n'),
+      ]);
+      const decoded = decodeObjectBatch(response, hash, 'blob');
+      assert.ok(decoded.content.equals(payload));
+      assert.equal(decoded.objectId, hash);
+      const tampered = Buffer.from(response);
+      tampered[response.indexOf(10) + 1] ^= 1;
+      assert.throws(() => decodeObjectBatch(tampered, hash, 'blob'), /content identity/);
+      const forgedHeader = Buffer.concat([
+        Buffer.from(`${'b'.repeat(40)} blob ${payload.length}\n`),
+        payload,
+        Buffer.from('\n'),
+      ]);
+      assert.throws(
+        () => decodeObjectBatch(forgedHeader, 'b'.repeat(40), 'blob'),
+        /content identity/,
+      );
+      for (const invalid of [
+        response.subarray(0, -1),
+        Buffer.concat([response, Buffer.from('extra')]),
+        Buffer.from(`${hash} blob 999999999999999999999\n`),
+        Buffer.from(`${hash} missing\n`),
+        Buffer.from('not a header\n'),
+      ])
+        assert.throws(() => decodeObjectBatch(invalid, hash));
+      const nonAsciiHeader = Buffer.from(response);
+      nonAsciiHeader[0] |= 128;
+      assert.throws(() => decodeObjectBatch(nonAsciiHeader, hash));
+      assert.throws(() => decodeObjectBatch(response, 'b'.repeat(40)), /identity/);
+      assert.throws(() => decodeObjectBatch(response, hash, 'commit'), /type/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  test('native Git content hashing uses exact binary bytes and rejects malformed computed identities', () => {
+    const payload = Buffer.from([0, 10, 255, 67, 0, 10]);
+    const expected = execFileSync(
+      '/usr/bin/git',
+      ['hash-object', '--stdin', '-t', 'blob', '--no-filters'],
+      {
+        cwd: '/',
+        input: payload,
+        env: { PATH: '/usr/bin:/bin', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' },
+      },
+    );
+    assert.equal(hashObjectIdentity('blob', payload), decodeHashObjectIdentity(expected));
+    const changed = Buffer.from(payload);
+    changed[0] ^= 1;
+    assert.notEqual(hashObjectIdentity('blob', changed), decodeHashObjectIdentity(expected));
+    for (const invalid of [
+      Buffer.alloc(0),
+      expected.subarray(0, -1),
+      Buffer.concat([expected, Buffer.from('\n')]),
+      Buffer.from('A'.repeat(40) + '\n'),
+      Buffer.from('a'.repeat(40) + '\r\n'),
+      Buffer.from('a'.repeat(39) + '\0\n'),
+      Buffer.from('missing\n'),
+      expected.toString(),
+    ])
+      assert.throws(() => decodeHashObjectIdentity(invalid), /Malformed computed/);
+    for (const type of ['--help', 'blob\n', 'commit --literally', null])
+      assert.throws(() => hashObjectIdentity(type, payload), /type\/payload/);
+    assert.throws(() => hashObjectIdentity('blob', payload.toString()), /type\/payload/);
+  });
+  test('Git fetch stdin accepts exact immutable refspec data without argument interpretation', () => {
+    const root = mkdtempSync(join(tmpdir(), 'git-fetch-stdin-'));
+    const source = join(root, 'source.git');
+    const target = join(root, 'target.git');
+    const env = {
+      PATH: '/usr/bin:/bin',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_AUTHOR_NAME: 'stdin-fixture',
+      GIT_AUTHOR_EMAIL: 'stdin@example.invalid',
+      GIT_COMMITTER_NAME: 'stdin-fixture',
+      GIT_COMMITTER_EMAIL: 'stdin@example.invalid',
+    };
+    const run = (...args) =>
+      execFileSync('/usr/bin/git', ['-c', 'core.hooksPath=/dev/null', ...args], {
+        env,
+        encoding: 'utf8',
+      }).trim();
+    try {
+      run('init', '-q', source);
+      writeFileSync(join(source, 'inert.txt'), 'inert data\n');
+      run('-C', source, 'add', '.');
+      run('-C', source, 'commit', '-qm', 'inert source');
+      const hash = run('-C', source, 'rev-parse', 'HEAD');
+      run('init', '--bare', '-q', '--', target);
+      execFileSync(
+        '/usr/bin/git',
+        [
+          '-c',
+          'core.hooksPath=/dev/null',
+          '-C',
+          target,
+          'fetch',
+          '--no-tags',
+          '--no-recurse-submodules',
+          '--stdin',
+          source,
+        ],
+        { env, input: hash + '\n', stdio: ['pipe', 'pipe', 'pipe'] },
+      );
+      assert.equal(readObjectBatch(target, hash, 'commit').type, 'commit');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+  test('dedicated ancestry argv terminates options and only status one is a negative ancestry result', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ancestry-command-contract-'));
+    const env = {
+      PATH: '/usr/bin:/bin',
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: '/dev/null',
+      GIT_AUTHOR_NAME: 'ancestry-fixture',
+      GIT_AUTHOR_EMAIL: 'ancestry@example.invalid',
+      GIT_COMMITTER_NAME: 'ancestry-fixture',
+      GIT_COMMITTER_EMAIL: 'ancestry@example.invalid',
+    };
+    const run = (...args) =>
+      execFileSync('/usr/bin/git', ['-c', 'core.hooksPath=/dev/null', '-C', root, ...args], {
+        env,
+        encoding: 'utf8',
+      }).trim();
+    try {
+      run('init', '-q');
+      writeFileSync(join(root, 'data.txt'), 'base\n');
+      run('add', '.');
+      run('commit', '-qm', 'base');
+      const base = run('rev-parse', 'HEAD');
+      writeFileSync(join(root, 'data.txt'), 'head\n');
+      run('add', '.');
+      run('commit', '-qm', 'head');
+      const head = run('rev-parse', 'HEAD');
+      assert.equal(assertCommit(root, base), base);
+      assert.equal(assertCommit(root, head), head);
+      assert.equal(isAncestor(root, base, head), true);
+      assert.equal(isAncestor(root, head, base), false);
+      assert.throws(() => isAncestor(root, 'a'.repeat(40), head), /Missing or wrong Git object/);
+      for (const value of [
+        '--help',
+        '--is-ancestor',
+        'refs/heads/staging',
+        base + '\n',
+        '../outside',
+        'A'.repeat(40),
+      ]) {
+        assert.throws(() => isAncestor(root, value, head), /Invalid ancestry/);
+        assert.throws(() => isAncestor(root, base, value), /Invalid ancestry/);
+      }
+      assert.throws(() => isAncestor('relative.git', base, head), /absolute/);
+      assert.throws(
+        () => validateGitArguments(['merge-base', '--is-ancestor', base, head]),
+        /Unsupported/,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+}

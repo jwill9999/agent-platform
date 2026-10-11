@@ -1,3 +1,45 @@
+# Task: Stage reviewed inert evidence artifacts
+
+**Beads issue:** `agent-platform-native-staging-evidence`  
+**Parent:** `agent-platform-native-staging-integration`
+
+## Current continuation — 11 October 2026
+
+PR287 and PR289 are delivered to the retained evidence feature at `2ad1a88a`.
+Protected policy/runner adoption PR293 is now merged at `3ab2f53d`; its genuine ordinary full
+scan, actual packaged VM and fourteen executed gates passed with independent artifact review.
+This qualifies policy adoption, not evidence PR288 or the final native development baseline.
+The original evidence manifest remains exact from `2ad1a88a` and identifies all 220 immutable
+source additions from `6ca3cd1b`, totaling 3,958,506 bytes with 139 JSON files.
+
+The next prerequisite is [authored bookkeeping](agent-platform-native-staging-bookkeeping.md).
+Its new Beads blocking edge is authoritative. It delivers formatting rules, metadata and complete
+historical session/spec bodies separately through ordinary full analysis. No archive payload enters
+that segment. The one-line official Agent Zero URL repair is already in qualified staging.
+This task stays in progress; the original specification below is a complete historical snapshot.
+
+After bookkeeping is protected and verified, reconcile PR288 to the exact archive-only scope.
+Recovery-protect retained original refs before guarded ref changes. Require independent source
+review, original path/mode/blob/SHA-256/byte checks, current automatic archive qualification,
+separate `workflow_dispatch` provenance from actual protected staging and the complete trusted
+merge verifier using qualified adoption `3ab2f53d` plus retained adoption CI evidence.
+Context/app identity alone and adoption ancestry alone do not establish qualification.
+All current protected checks, actual packaged VM and review/security findings must also clear.
+Never count optional dispatch-only skips, stale attempts, cancellation, mocked/no-files analysis,
+or a partial/mixed archive diff as successful archive delivery.
+
+Verify actual staging merge SHA/tree and every original artifact byte before closing/readback/sync
+of this issue. The archive-policy task's own archive-delivery definition of done remains applicable.
+Parent integration remains in progress until full PR286 delivery and preservation/mirror/Dolt proof.
+No main, paused PR283 or prototype branch integration, pilot, paid call or artifact deletion.
+
+## Historical original evidence specification — source 2ad1a88a
+
+The entire original specification is retained verbatim as text. Offline-runner and scanner-blocker
+statements describe that historical snapshot, not the current qualified adoption.
+
+<!-- prettier-ignore -->
+```text
 # Task: Stage reviewed inert evidence within security scan limits
 
 **Beads:** `agent-platform-native-staging-evidence`  
@@ -115,3 +157,5 @@ integration depends on this evidence delivery; no deferred prototype readiness t
 No live pilot, prototype resumption, paid model call, retained-work deletion or main promotion.
 After the entire feature baseline reaches staging, review the live product backlog with the owner;
 the next product priority is still undecided. Existing optional prototype code is retained and paused.
+
+```

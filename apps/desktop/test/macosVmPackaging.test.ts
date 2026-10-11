@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import type { ExecFileSyncOptionsWithBufferEncoding } from 'node:child_process';
 import {
   existsSync,
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -74,6 +75,7 @@ function writePreparedAssets(dir: string): void {
 
 function writeHelper(path: string): void {
   writeFileSync(path, '#!/bin/sh\n');
+  chmodSync(path, 0o755);
 }
 
 describe('macOS VM runtime packaging', () => {
@@ -144,5 +146,20 @@ describe('macOS VM runtime packaging', () => {
         quietExecOptions,
       );
     }).toThrow(/macOS VM kernel checksum mismatch/);
+  });
+
+  it('rejects a non-executable explicit helper without invoking Swift discovery', () => {
+    const root = makeTempDir();
+    const assetsDir = join(root, 'assets');
+    const helper = join(root, 'not-executable');
+    writePreparedAssets(assetsDir);
+    writeFileSync(helper, 'not executable');
+    expect(() =>
+      execFileSync(
+        process.execPath,
+        [packageScript, '--skip-build', '--assets-dir', assetsDir, '--helper', helper],
+        quietExecOptions,
+      ),
+    ).toThrow(/executable file/);
   });
 });
