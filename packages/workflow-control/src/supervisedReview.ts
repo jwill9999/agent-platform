@@ -36,6 +36,35 @@ export interface ReviewSnapshot {
 
 const forbidden = new Set(['.git', '.beads', '.codex', '.ssh', 'node_modules']);
 
+function isForbiddenReviewPath(path: string): boolean {
+  return (
+    path === '.' ||
+    path === '' ||
+    path.split('/').some((part) => part === '' || part === '.') ||
+    path.split('/').includes(REVIEW_SKILL_NAMESPACE) ||
+    (path.split('/').includes('.agents') && !isReviewSkillPath(path)) ||
+    isAbsolute(path) ||
+    path.split('/').includes('..') ||
+    path.split('/').some((part) => forbidden.has(part) || part.startsWith('.env'))
+  );
+}
+
+async function validateReviewSourcePath(canonicalRoot: string, path: string): Promise<void> {
+  if (isForbiddenReviewPath(path)) {
+    throw new Error('review evidence includes a forbidden path');
+  }
+  let current = canonicalRoot;
+  for (const component of path.split('/')) {
+    current = join(current, component);
+    if ((await lstat(current)).isSymbolicLink())
+      throw new Error('review evidence symlinks are forbidden');
+  }
+  const resolved = relative(canonicalRoot, await realpath(resolve(canonicalRoot, path)));
+  if (resolved.split('/').some((part) => forbidden.has(part) || part.startsWith('.env'))) {
+    throw new Error('resolved review evidence includes a forbidden path');
+  }
+}
+
 /** Trusted coordinator supplies approved evidence paths; model output never selects host mounts. */
 export async function prepareReviewSnapshot(
   sourceRoot: string,
@@ -43,28 +72,7 @@ export async function prepareReviewSnapshot(
 ): Promise<ReviewSnapshot> {
   const canonicalRoot = await realpath(sourceRoot);
   for (const path of paths) {
-    if (
-      path === '.' ||
-      path === '' ||
-      path.split('/').some((part) => part === '' || part === '.') ||
-      path.split('/').includes(REVIEW_SKILL_NAMESPACE) ||
-      (path.split('/').includes('.agents') && !isReviewSkillPath(path)) ||
-      isAbsolute(path) ||
-      path.split('/').includes('..') ||
-      path.split('/').some((part) => forbidden.has(part) || part.startsWith('.env'))
-    ) {
-      throw new Error('review evidence includes a forbidden path');
-    }
-    let current = canonicalRoot;
-    for (const component of path.split('/')) {
-      current = join(current, component);
-      if ((await lstat(current)).isSymbolicLink())
-        throw new Error('review evidence symlinks are forbidden');
-    }
-    const resolved = relative(canonicalRoot, await realpath(resolve(canonicalRoot, path)));
-    if (resolved.split('/').some((part) => forbidden.has(part) || part.startsWith('.env'))) {
-      throw new Error('resolved review evidence includes a forbidden path');
-    }
+    await validateReviewSourcePath(canonicalRoot, path);
   }
   const skills = captureCommittedReviewSkills(canonicalRoot, paths.filter(isReviewSkillPath));
   const ordinaryPaths = paths.filter((path) => !isReviewSkillPath(path));
@@ -102,7 +110,11 @@ export async function prepareReviewSnapshot(
       await writeFile(join(staged.root, identity.stagedPath), bytes, { mode: 0o600, flag: 'wx' });
       manifest.push({ ...identity, digest: createHash('sha256').update(bytes).digest('hex') });
     }
-    manifest.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+    manifest.sort((a, b) => {
+      if (a.path < b.path) return -1;
+      if (a.path > b.path) return 1;
+      return 0;
+    });
     let total = 0;
     for (const item of manifest) {
       const bytes = await readFile(join(staged.root, item.stagedPath ?? item.path));
