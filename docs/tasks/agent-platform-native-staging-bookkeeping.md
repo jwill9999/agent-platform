@@ -73,10 +73,19 @@ baseline. Only after full verified integration audit/recovery-protect delivered 
 retain main/staging/paused/unique/in-use/uncertain work. Next priority remains owner backlog review.
 
 Task completion requires BK01–BK05, verified protected staging delivery, complete mirror readbacks,
-source preservation and synced canonical Beads. Hosted outcomes for this new segment are pending.
+source preservation and synced canonical Beads. Feature delivery PR294 completed at
+`6929cd33f43f47d71c6f2966fe33f8f830639fbc` after all ten executed checks passed on `275c8b65`,
+approved review and zero unresolved threads; its tree matches reviewed source. Three full
+branch-specific Notion body/revision/hash/destination readbacks and normal commit/push hooks
+completed at that tested source revision. The hooks passed seven-package build/typecheck/tests
+and cycles. These gates are completed, not outstanding work to repeat; substantive later document
+changes need their own revision-bound mirror/readback and exact-head qualification.
+
 Actual local direct API Markdown lint passed all three substantive files; explicit authored formatting,
 JSON parse and diff checks passed. Original manifest/ignore bytes and both complete session/spec
 bodies are exact. All 220 original artifact modes/blobs/hashes/bytes and 139 JSON parses passed
 through retained Git objects, independently rechecked by the implementation critic. Independent
-plan and source reviews approved with no actionable findings. Full mirror publication/readback,
-normal hooks and fresh hosted qualification remain required; planned delivery above is not a result.
+plan and source reviews approved with no actionable findings. The remaining delivery is protected
+staging PR295, requiring actual latest-head ordinary full analysis, packaged VM, every live protected
+check and review clearance, then actual staging tree/source/preservation verification and Beads/Dolt
+closeout. An earlier head's passed results do not qualify changed source or complete this task.
