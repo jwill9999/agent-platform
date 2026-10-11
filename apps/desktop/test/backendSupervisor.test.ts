@@ -149,6 +149,8 @@ describe('desktop backend supervisor helpers', () => {
     const env = buildDesktopBackendEnvironment({
       env: {
         SCHEDULER_ENABLED: 'true',
+        DIAGNOSTICS_APP_VERSION: '0.1.0',
+        DIAGNOSTICS_LOCAL_CAPABILITY: 'a'.repeat(64),
         SQLITE_PATH: '/data/agent.sqlite',
         AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: '/app/macos-vm-runner',
         AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: 'E2E response',
@@ -161,6 +163,9 @@ describe('desktop backend supervisor helpers', () => {
 
     expect(env).toMatchObject({
       HOST: '127.0.0.1',
+      DIAGNOSTICS_APP_VERSION: '0.1.0',
+      DIAGNOSTICS_LOCAL_CAPABILITY: 'a'.repeat(64),
+      DIAGNOSTICS_HOST: '127.0.0.1:4500',
       NODE_ENV: 'production',
       PORT: '4500',
       SCHEDULER_ENABLED: 'true',

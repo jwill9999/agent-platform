@@ -1,3 +1,28 @@
+# Current diagnostics implementation — 11 October 2026
+
+Owner accepted P1 option A and authorized the diagnostics MVP. Checkout-free export verification
+is now release task `agent-platform-electron-release.diagnostics-export`; V1 retains real connected
+browser/standalone-Electron export and report investigation. V1's scoped old review-gate edge is
+removed; broader gate and all paused orchestration work remain unchanged. V1 is in progress.
+Active branch `task/diagnostic-event-foundation` follows planning tip `ebf3c279`, targeting
+`feature/agent-observability`. Follow the current authorization at the top of the plan/spec/tests;
+earlier planning-only and strict-artifact statements below are historical. No runtime test results
+or merge authority are inferred from this authorization.
+
+The SQLite adapter, request/model/tool observations, safe report/CLI and explicit browser/native
+export are implemented. Four connected journeys passed, including actual file export, API-stop
+partial export, full restart, approval/duplicate one-effect, denial/no-effect and SDK retry recovery.
+The report-only independent support exercise located the actual failed operation. Three repeated
+latency fixtures passed. Independent source review approved the repaired implementation; local
+quality checks and 2,734 aggregate tests passed (77 existing optional integration skips). The
+shared-module retry-test isolation failure is retained and its full 222-test API rerun passed.
+Hosted qualification and final publication remain pending.
+See [results](docs/reviews/agent-observability-mvp-results.md) and
+[usage](docs/development/diagnostics.md) for evidence and limits. Next: commit/push the segment-tip PR and full mirrors, then inspect current-head CI/security/comments.
+V1 stays in progress through actual authorized feature delivery; no merge is authorized by this step.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — diagnostics MVP planning, 11 October 2026
 
 The prior visibility documentation delivery below is complete: PR300/PR301 delivered it to staging

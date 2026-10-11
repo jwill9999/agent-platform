@@ -1,4 +1,6 @@
+import { localDiagnosticConnection } from '@/lib/local-diagnostics-server';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 
 /**
  * BFF: proxies to the API harness `POST /v1/chat` (NDJSON).
@@ -24,10 +26,15 @@ const HarnessChatBodySchema = z.object({
   modelConfigId: z.string().min(1).optional(),
 });
 
-function jsonError(status: number, code: string, message: string): Response {
+function jsonError(status: number, code: string, message: string, requestId: string): Response {
   return new Response(JSON.stringify({ error: { code, message } }), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-request-id': requestId,
+      'x-bff-request-id': requestId,
+      'Cache-Control': 'no-store',
+    },
   });
 }
 
@@ -45,20 +52,30 @@ function resolveUpstreamOpenAiKey(req: Request): string | undefined {
 }
 
 export async function POST(req: Request) {
+  const requestId = randomUUID();
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return jsonError(400, 'INVALID_JSON', 'Invalid JSON');
+    return jsonError(400, 'INVALID_JSON', 'Invalid JSON', requestId);
   }
 
   const parsed = HarnessChatBodySchema.safeParse(body);
   if (!parsed.success) {
-    return jsonError(400, 'INVALID_BODY', 'Expected { sessionId, message } for harness chat');
+    return jsonError(
+      400,
+      'INVALID_BODY',
+      'Expected { sessionId, message } for harness chat',
+      requestId,
+    );
   }
 
   const openAiKey = resolveUpstreamOpenAiKey(req);
+  const local = localDiagnosticConnection(req);
+  const target = local?.api.origin ?? TARGET;
   const headers: HeadersInit = {
+    ...(local ? { 'x-diagnostics-capability': local.capability } : {}),
+    'x-bff-request-id': requestId,
     'Content-Type': 'application/json',
     ...(openAiKey ? { 'x-openai-key': openAiKey } : {}),
     ...(parsed.data.modelConfigId ? { 'x-model-config-id': parsed.data.modelConfigId } : {}),
@@ -69,7 +86,7 @@ export async function POST(req: Request) {
   const headerAbort = new AbortController();
   const headerTimer = setTimeout(() => headerAbort.abort(), headerDeadlineMs);
   try {
-    res = await fetch(`${TARGET}/v1/chat`, {
+    res = await fetch(`${target}/v1/chat`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -79,19 +96,20 @@ export async function POST(req: Request) {
       signal: headerAbort.signal,
     });
   } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
     const aborted = err instanceof Error && err.name === 'AbortError';
     if (aborted) {
       return jsonError(
         504,
         'UPSTREAM_HEADER_TIMEOUT',
-        `API at ${TARGET} did not respond within ${headerDeadlineMs}ms (still starting MCP, waiting on a lock, or stuck). Check API logs. Increase CHAT_PROXY_HEADER_TIMEOUT_MS if needed.`,
+        'The local API did not respond in time. Retry or export a diagnostic report.',
+        requestId,
       );
     }
     return jsonError(
       502,
       'UPSTREAM_UNREACHABLE',
-      `Could not reach API at ${TARGET} (${detail}). Is the API running on port 3000?`,
+      'The local API could not be reached. Check that it is running or export a diagnostic report.',
+      requestId,
     );
   } finally {
     clearTimeout(headerTimer);
@@ -100,7 +118,11 @@ export async function POST(req: Request) {
   const outHeaders = new Headers();
   const ct = res.headers.get('content-type');
   if (ct) outHeaders.set('Content-Type', ct);
-  outHeaders.set('Cache-Control', 'no-cache');
+  const apiRequestId = z.string().uuid().safeParse(res.headers.get('x-request-id'));
+  outHeaders.set('x-request-id', apiRequestId.success ? apiRequestId.data : requestId);
+  outHeaders.set('x-bff-request-id', requestId);
+  if (apiRequestId.success) outHeaders.set('x-diagnostics-api-observed', '1');
+  outHeaders.set('Cache-Control', 'no-store');
   outHeaders.set('Connection', 'keep-alive');
 
   return new Response(res.body, {

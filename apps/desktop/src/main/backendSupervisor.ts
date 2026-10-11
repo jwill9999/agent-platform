@@ -51,6 +51,9 @@ interface StartDesktopBackendOptions {
 }
 
 export interface DesktopBackendEnvironment {
+  readonly DIAGNOSTICS_LOCAL_CAPABILITY?: string;
+  readonly DIAGNOSTICS_HOST?: string;
+  readonly DIAGNOSTICS_APP_VERSION?: string;
   readonly HOST: string;
   readonly NODE_ENV: string;
   readonly PORT: string;
@@ -159,6 +162,19 @@ export function buildDesktopBackendEnvironment({
     (existsSync(paths.macosVmPackagedHelperPath) ? paths.macosVmPackagedHelperPath : undefined);
   const commandRunner = resolvePackagedCommandRunner(env, paths);
   return {
+    ...(env.DIAGNOSTICS_LOCAL_CAPABILITY
+      ? {
+          DIAGNOSTICS_LOCAL_CAPABILITY: env.DIAGNOSTICS_LOCAL_CAPABILITY,
+          DIAGNOSTICS_HOST: `127.0.0.1:${port}`,
+        }
+      : {}),
+    ...(env.DIAGNOSTICS_APP_VERSION
+      ? { DIAGNOSTICS_APP_VERSION: env.DIAGNOSTICS_APP_VERSION }
+      : {}),
+    ...(env.DIAGNOSTICS_RETENTION_DAYS
+      ? { DIAGNOSTICS_RETENTION_DAYS: env.DIAGNOSTICS_RETENTION_DAYS }
+      : {}),
+    ...(env.DIAGNOSTICS_MAX_EVENTS ? { DIAGNOSTICS_MAX_EVENTS: env.DIAGNOSTICS_MAX_EVENTS } : {}),
     HOST: '127.0.0.1',
     NODE_ENV: 'production',
     PORT: port,

@@ -1,9 +1,27 @@
 # Agent diagnostics MVP — planning review
 
-Status: independent completion audit approved; coordinator planning work complete; owner decision P1 remains. This is not implementation or test evidence.
+Status: owner accepted P1 option A and authorized implementation; independent scope-amendment review approved. Historical planning reviews below are retained and are not runtime test evidence.
 Source baseline: staging `7814b59845b52ad5f850bfc99b7baee0e6742a25`.
 Task: `agent-platform-harness-v1`; [contract](../planning/agent-observability-mvp.md);
 [tests](../testing/agent-observability-mvp.md).
+
+## Accepted scope amendment — 11 October 2026
+
+The owner accepted P1 option A: implement the diagnostics MVP now and keep checkout-free
+artifact verification with release work. R1–R7 and connected browser/standalone-Electron
+T01–T12 remain mandatory. Only artifact-specific variants move to
+[the release follow-up](../tasks/agent-platform-electron-release.diagnostics-export.md).
+The historical pending/strict-default wording below records earlier decisions, not current blockers.
+
+Reviewer `visibility_delivery_review` independently inspected the amended contract, task,
+verification plan, release follow-up, session and actual Beads readback. OBS-AMEND-01 identified
+that the new task had its V1 prerequisite but lacked explicit release-epic parentage. The coordinator
+added `parent-child → agent-platform-electron-release`, preserved `blocks → agent-platform-harness-v1`,
+and read both back. The reviewer approved the corrected amendment with no actionable findings.
+Only V1's obsolete review-gate prerequisite was removed; broader paused work remains unchanged.
+
+This review approves the scope amendment. Implementation, connected tests, code review and hosted
+qualification remain separate and cannot inherit a pass from these planning reviews.
 
 ## Earlier independent critique and corrections
 

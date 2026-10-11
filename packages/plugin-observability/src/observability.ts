@@ -8,38 +8,33 @@ export type ObservabilityPluginOptions = Readonly<{
   /** Optional in-memory store used by runtime observability tools. */
   store?: ObservabilityStore;
   /**
-   * When false (default), tool arguments are **not** included in `tool_call` events
-   * (may contain paths, secrets, or user data).
+   * @deprecated Arguments are always omitted from diagnostic events.
    */
   includeToolArgs?: boolean;
 }>;
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return redactCredentials(error.message);
-  return redactCredentials(String(error));
-}
-
-function redactCredentials(content: string): string {
-  return content
-    .replace(/sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/g, '[REDACTED:OpenAI API Key]')
-    .replace(/(ghp|gho|ghu|ghs|ghr)_\w{36,}/g, '[REDACTED:GitHub Token]')
-    .replace(/Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/g, '[REDACTED:Bearer Token]');
-}
 
 function emitEvent(
   event: ObservabilityEvent,
   options: Pick<ObservabilityPluginOptions, 'log' | 'store'>,
 ): void {
-  options.store?.record(event);
-  options.log?.(event);
+  // Each sink is independent and observational. A broken logger cannot fail execution
+  // or prevent the in-memory record, and both receive the same safe event.
+  try {
+    options.store?.record(event);
+  } catch {
+    /* telemetry is best effort */
+  }
+  try {
+    options.log?.(event);
+  } catch {
+    /* telemetry is best effort */
+  }
 }
 
 /**
  * First-party plugin: skills/tools/path/errors as structured events without PII by default.
  */
 export function createObservabilityPlugin(options: ObservabilityPluginOptions): PluginHooks {
-  const { includeToolArgs = false } = options;
-
   return {
     onSessionStart(ctx) {
       emitEvent({ kind: 'session_start', sessionId: ctx.sessionId, agentId: ctx.agentId }, options);
@@ -70,28 +65,10 @@ export function createObservabilityPlugin(options: ObservabilityPluginOptions): 
       );
     },
     onToolCall(ctx) {
-      if (includeToolArgs) {
-        emitEvent(
-          {
-            kind: 'tool_call',
-            sessionId: ctx.sessionId,
-            runId: ctx.runId,
-            toolId: ctx.toolId,
-            args: ctx.args,
-          },
-          options,
-        );
-      } else {
-        emitEvent(
-          {
-            kind: 'tool_call',
-            sessionId: ctx.sessionId,
-            runId: ctx.runId,
-            toolId: ctx.toolId,
-          },
-          options,
-        );
-      }
+      emitEvent(
+        { kind: 'tool_call', sessionId: ctx.sessionId, runId: ctx.runId, toolId: ctx.toolId },
+        options,
+      );
     },
     onTaskEnd(ctx) {
       emitEvent(
@@ -101,7 +78,7 @@ export function createObservabilityPlugin(options: ObservabilityPluginOptions): 
           runId: ctx.runId,
           taskId: ctx.taskId,
           ok: ctx.ok,
-          ...(ctx.detail ? { detail: redactCredentials(ctx.detail) } : {}),
+          // Diagnostic metadata must never include arbitrary task details.
         },
         options,
       );
@@ -126,7 +103,7 @@ export function createObservabilityPlugin(options: ObservabilityPluginOptions): 
           sessionId: ctx.sessionId,
           runId: ctx.runId,
           phase: ctx.phase,
-          message: errorMessage(ctx.error),
+          message: 'Observed failure; free-form error details omitted.',
         },
         options,
       );

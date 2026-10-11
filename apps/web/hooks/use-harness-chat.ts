@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import type {
+  DiagnosticPartialFailure,
   ApprovalRequest,
   ApprovalRequestStatus,
   CapabilityRecovery,
   MessageRecord,
   WorkspaceEvent,
 } from '@agent-platform/contracts';
-import { WorkspaceEventSchema } from '@agent-platform/contracts';
+import { DiagnosticScopeSchema, WorkspaceEventSchema } from '@agent-platform/contracts';
 import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
 import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
 
@@ -483,6 +484,14 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [status, setStatus] = useState<'ready' | 'streaming'>('ready');
   const [error, setError] = useState<string | null>(null);
+  const [diagnosticRequestId, setDiagnosticRequestId] = useState<string | null>(null);
+  const [diagnosticFailure, setDiagnosticFailure] = useState<DiagnosticPartialFailure | null>(null);
+  const diagnosticSessionRef = useRef(sessionId);
+  diagnosticSessionRef.current = sessionId;
+  useEffect(() => {
+    setDiagnosticRequestId(null);
+    setDiagnosticFailure(null);
+  }, [sessionId]);
   const [criticEventsByMessage, setCriticEventsByMessage] = useState<Record<string, CriticEvent[]>>(
     {},
   );
@@ -686,6 +695,13 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       setStatus('streaming');
       setError(null);
 
+      const observedAtMs = Date.now();
+      const started = performance.now();
+      let requestId = crypto.randomUUID();
+      let apiObserved = false;
+      let responseStatus: number | undefined;
+      setDiagnosticRequestId(null);
+      setDiagnosticFailure(null);
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
@@ -697,6 +713,14 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           }),
         });
 
+        const identity = DiagnosticScopeSchema.safeParse({
+          requestId: res.headers.get('x-request-id'),
+        });
+        if (identity.success && 'requestId' in identity.data) requestId = identity.data.requestId;
+        apiObserved = res.headers.get('x-diagnostics-api-observed') === '1';
+        responseStatus = res.status;
+        if (apiObserved && !res.ok && diagnosticSessionRef.current === sessionId)
+          setDiagnosticRequestId(requestId);
         if (!res.ok) throw new Error(await parseErrorResponse(res));
         if (!res.body) throw new Error('No response body');
 
@@ -718,6 +742,25 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           return prev;
         });
       } catch (e) {
+        if (
+          diagnosticSessionRef.current === sessionId &&
+          (!apiObserved || responseStatus === undefined || responseStatus < 400)
+        ) {
+          setDiagnosticFailure({
+            requestId,
+            observedAtMs,
+            durationMs: Math.max(0, performance.now() - started),
+            phase: responseStatus === 400 ? 'ingress' : 'connection',
+            errorCode:
+              responseStatus === 400
+                ? 'invalid_request'
+                : responseStatus === 504
+                  ? 'timeout'
+                  : apiObserved
+                    ? 'connection_lost'
+                    : 'backend_unavailable',
+          });
+        }
         setError(friendlyChatErrorMessage(e instanceof Error ? e.message : String(e)));
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
         setCriticEventsByMessage((prev) => {
@@ -837,6 +880,8 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   );
 
   return {
+    diagnosticRequestId,
+    diagnosticFailure,
     messages,
     sendMessage,
     decideApproval,

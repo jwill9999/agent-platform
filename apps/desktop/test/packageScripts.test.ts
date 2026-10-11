@@ -51,6 +51,18 @@ describe('desktop package scripts', () => {
     expect(preloadBuilder).toContain(
       'openInIde: (request) => ipcRenderer.invoke(openProjectIdeIpcChannel, request)',
     );
+    expect(preloadBuilder).toMatch(
+      /readExportedStringConst\(\s*sourceFile,\s*'saveDiagnosticReportIpcChannel'/,
+    );
+    expect(preloadBuilder).toMatch(
+      /readExportedStringConst\(\s*sourceFile,\s*'savePartialDiagnosticReportIpcChannel'/,
+    );
+    expect(preloadBuilder).toContain(
+      'saveReport: (scope) => ipcRenderer.invoke(saveDiagnosticReportIpcChannel, scope)',
+    );
+    expect(preloadBuilder).toContain(
+      'savePartial: (failure) => ipcRenderer.invoke(savePartialDiagnosticReportIpcChannel, failure)',
+    );
     expect(preloadBuilder).toContain('saveWorkspaceResourceIpcChannel');
     expect(preloadBuilder).toContain(
       'saveResourceAs: (request) => ipcRenderer.invoke(saveWorkspaceResourceIpcChannel, request)',

@@ -4,6 +4,8 @@ import { useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { UIMessage } from 'ai';
 import { Sparkles } from 'lucide-react';
 import { Message, getMessageText } from './message';
+import { DiagnosticExportAction } from './diagnostic-export';
+import type { DiagnosticPartialFailure } from '@agent-platform/contracts';
 import { ChatInput } from './chat-input';
 import { SensorStatusPanel } from './sensor-status-panel';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
@@ -14,6 +16,9 @@ import type { WorkspaceEvent } from '@agent-platform/contracts';
 import { WorkspaceResourcePreviewProvider } from './workspace-resource-cards';
 
 export interface ChatProps {
+  diagnosticSessionId?: string | null;
+  diagnosticRequestId?: string | null;
+  diagnosticFailure?: DiagnosticPartialFailure | null;
   messages: UIMessage[];
   onSend: (text: string) => void;
   isLoading: boolean;
@@ -67,6 +72,9 @@ export interface ChatProps {
 }
 
 export function Chat({
+  diagnosticSessionId,
+  diagnosticRequestId,
+  diagnosticFailure,
   messages,
   onSend,
   isLoading,
@@ -128,7 +136,7 @@ export function Chat({
       projectId={workspaceWebViewProjectId ?? undefined}
     >
       <div className="grid h-full max-h-full min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto] overflow-hidden bg-gradient-to-b from-background to-secondary/20">
-        <div className="grid h-full max-h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden">
+        <div className="grid h-full max-h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto_auto_auto] overflow-hidden">
           {/* Messages */}
           <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto min-h-full max-w-3xl px-4 pb-8">
@@ -185,6 +193,13 @@ export function Chat({
               )}
             </div>
           </div>
+
+          <DiagnosticExportAction
+            key={diagnosticSessionId ?? 'none'}
+            sessionId={diagnosticSessionId ?? null}
+            requestId={diagnosticRequestId}
+            failure={diagnosticFailure}
+          />
 
           {/* Input */}
           <ChatInput

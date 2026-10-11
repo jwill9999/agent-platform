@@ -4,7 +4,18 @@
 
 **Parent:** `agent-platform-llm-observability-export`
 
-**Status:** planning-only proposal, final owner implementation decision pending.
+**Status:** implementation authorized and in progress; P1 option A accepted.
+
+## Current authorization and scope
+
+The owner accepted P1 option A and authorized implementation on 11 October. Checkout-free artifact
+variants of T10/T12 are transferred to `agent-platform-electron-release.diagnostics-export` under
+release work; connected standalone-Electron/browser export and the final support exercise remain
+mandatory here. The V1-only historical review-gate edge is removed; the broader gate stays open.
+V1 is in progress on `task/diagnostic-event-foundation` from planning tip `ebf3c279`, with segment PR
+target `feature/agent-observability`. Earlier planning-only/strict-artifact/default-B paragraphs below
+are retained decision history and superseded by this authorization. Runtime work follows R1–R7,
+the tests below with that explicit artifact transfer, and ordinary independent review/CI gates.
 
 ## Current task requirements
 
@@ -31,8 +42,7 @@ Source: staging `7814b59845b52ad5f850bfc99b7baee0e6742a25`, separate clean owned
 Planning: `feature/agent-observability` → `task/observability-mvp-plan` (intermediate).
 After owner agreement: `task/diagnostic-event-foundation` from the pushed planning tip is the
 single implementation segment tip, carrying this plan into a PR to `feature/agent-observability`.
-Staging is the eventual protected destination when authorized; never main. No implementation
-branch exists yet. Preserve all paused refs and dirty/unrelated checkouts.
+Staging is the eventual protected destination when authorized; never main. Implementation uses `task/diagnostic-event-foundation` from planning tip `ebf3c279`. Preserve all paused refs and dirty/unrelated checkouts.
 
 Milestones within this one task: identity/projection; adapter/lifecycle; report/CLI/export;
 connected verification and independent source review. The implementer owns final integrated
@@ -53,9 +63,8 @@ independent implementation review has no actionable findings, affected quality g
 Sonar/Problems findings clear, and the segment-tip PR has merged into its feature under actual
 owner authority. Record exact tested/merged revisions, safe artifacts and full documentation
 mirrors/readbacks. Then close/read back Beads and verify Dolt push. Parent closure requires its
-remaining broader scope; feature-to-staging delivery is separately gated. Planning publication
-leaves V1 open and the prior blocker intact. There is no new approval gate beyond the owner's
-explicit request to review the finished plan before implementation.
+remaining broader scope; feature-to-staging delivery is separately gated. V1 remains in progress until those delivery conditions hold. The owner has approved the completed
+plan and implementation; the V1-only historical review-gate edge has been removed.
 
 ## Final feasibility decision before allocation
 

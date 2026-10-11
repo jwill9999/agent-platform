@@ -1,9 +1,36 @@
 # Agent diagnostics MVP — verification plan
 
-Status: planned, not executed. Owner: implementer of `agent-platform-harness-v1`.
+Status: implementation verification underway; actual outcomes are in the linked result report. Owner: implementer of `agent-platform-harness-v1`.
 Source baseline: `7814b59845b52ad5f850bfc99b7baee0e6742a25`.
 [Feature contract](../planning/agent-observability-mvp.md) defines R1–R7 and scope limits.
 [Task](../tasks/agent-platform-harness-v1.md) owns all scenarios, including final integration.
+
+## Accepted execution boundary
+
+Owner accepted P1 option A on 11 October. Execute T01–T12 against real browser/standalone-Electron
+UI, main/preload, API and SQLite, including file export and final report investigation. The strict
+checkout-free application-artifact variants transfer to `agent-platform-electron-release.diagnostics-export`.
+They remain release acceptance obligations, not skipped MVP passes or V1 closure blockers. Earlier
+strict-default references below preserve the reviewed alternatives; this accepted boundary governs
+current execution. The result report distinguishes actual execution from remaining qualification.
+
+## Current implementation mapping
+
+Actual outcomes are recorded separately in [the result report](../reviews/agent-observability-mvp-results.md).
+The filenames below resolve the earlier proposed test allocation; requirement/scenario IDs and
+connected acceptance remain unchanged:
+
+- Contract/privacy: `packages/contracts/test/diagnostics.test.ts`.
+- Adapter/physical/deadline: `packages/db/test/diagnostics*.test.ts` and reusable conformance suite.
+- API/composed access and restart: `apps/api/test/diagnosticAccess.test.ts`,
+  `diagnostics.integration.test.ts`, `diagnosticsProcess.integration.test.ts` and
+  `diagnostics.performance.test.ts`.
+- Report command: `scripts/diagnostics.test.mjs` after contracts build.
+- UI/access/IPC: web diagnostic route/chat tests and desktop diagnostic export/preload tests.
+- Real browser and connected Electron share `apps/desktop/e2e/diagnostic-export.e2e.ts`, using
+  the actual standalone local BFF/API. Run through the existing desktop `test:e2e` command.
+  Its hosted `desktop-e2e` job runs all `*.e2e.ts` and installs Chromium explicitly; the
+  separate VM/release-artifact gate is not substituted for these browser/native export checks.
 
 ## Feasibility and isolation
 
@@ -11,7 +38,7 @@ Source review found working API/SQLite integration fixtures, browser Playwright,
 harness and a tested main-process Save As pattern. Node 24.14.0 exists locally. Docker Desktop
 29.8.0 engine was reachable during planning; Agent Platform containers were not started. Existing
 packaged macOS runner was qualified during staging consolidation; recheck its live availability
-before scheduling. No new scenario below has been run. No model-provider credentials or spend
+before scheduling. Use the result report for current execution status. No model-provider credentials or spend
 are required: use a loopback deterministic provider that emits known retry/error/wait sequences.
 This proves application integration, not a real external provider's reliability or latency.
 
@@ -47,8 +74,8 @@ the typed schema. With the API completely stopped, inspect the packaged saved pa
 its current-view/unverified/non-durable labels. With no observation, assert explicit unavailable.
 T04/T05 assert database <=64 MiB, transient rollback journal <=66 MiB, combined <=130 MiB;
 no WAL files are created. Hold a real external read transaction, exercise failed writes and crash
-recovery, verify bounded retry/loss and unchanged tool effects. These are future assertions, not
-measured guarantees from planning.
+recovery, verify bounded retry/loss and unchanged tool effects. These are acceptance assertions; actual measured results and environment limits are recorded
+separately in the implementation result report.
 
 ## Concrete file/test ownership
 

@@ -1,7 +1,29 @@
 # Agent diagnostics MVP — implementation proposal
 
-Status: revised planning proposal; final feasibility audit identified packaged-artifact decision P1. No runtime implementation authorized or started.
+Status: owner accepted P1 option A and authorized diagnostics MVP implementation; planning complete.
 Date: 11 October 2026. Source inspected: staging `7814b59845b52ad5f850bfc99b7baee0e6742a25`.
+
+## Current owner decision — implementation authorized
+
+On 11 October the owner accepted P1 option A: keep checkout-free export verification with release
+work, update Beads/plan, then implement this diagnostics MVP. R1–R7 and T01–T12 remain required
+for connected browser and standalone-Electron journeys, including real saved files and the final
+support exercise. Only the variants requiring a distributable app without checkout/development
+Node move to [release verification](../tasks/agent-platform-electron-release.diagnostics-export.md),
+real Beads task `agent-platform-electron-release.diagnostics-export`, under the existing release
+parent and blocked by V1. This release task is not a blocker for V1.
+
+The scoped V1→historical review-gate blocking edge is removed under this decision; the broad gate
+and unrelated work remain unchanged. V1 is in progress. Active implementation segment tip:
+`task/diagnostic-event-foundation`, branched from pushed planning tip `ebf3c279`, targeting
+`feature/agent-observability`. Implementation, routine fixes/tests/review/publication/CI are
+now authorized. No main promotion, merge grant or paused orchestration resumption is inferred.
+Earlier pending/P1 strict-default text below is retained as the reviewed decision history and is
+superseded by this accepted option A. Implementation estimate remains 4–6 engineering days.
+
+Implementation results: [actual checks and limits](../reviews/agent-observability-mvp-results.md).
+
+Implementation user guide: [local diagnostic reports](../development/diagnostics.md).
 
 ## Outcome and stopping point
 
@@ -129,16 +151,17 @@ it is not just a URL setting. Docker is a deployment option, not a storage adapt
 Interface: open/version check, append batch, query by explicit scope and opaque cursor, prune,
 health snapshot and close. SQLite is the only implementation. A reusable adapter conformance suite
 is required; no plugin discovery or second backend is built. Append assigns a persistent increasing
-sequence atomically. Same event ID and same canonical content is idempotent; different content is
-rejected and counted as a diagnostic conflict. Page snapshots capture a maximum sequence; cursors
+sequence atomically. Within retained history, the same event ID and same canonical content is idempotent; different
+content is rejected and counted as a diagnostic conflict. Pruning removes the identity record, so
+later reuse can receive a new sequence; this is not permanent deduplication. Page snapshots capture a maximum sequence; cursors
 bind scope and snapshot, and invalid/cross-scope cursors fail. Pruned cursors return an explicit
 expired-history response with the earliest available sequence, not silently incomplete success.
 
 Proposed defaults: seven days (configurable 1–90), 10,000 retained events (100–100,000), 4 KiB encoded
 per event, 256 pending events, batches of at most 32, 250 ms flush timer. Settings are documented
 startup configuration `DIAGNOSTICS_RETENTION_DAYS` and `DIAGNOSTICS_MAX_EVENTS`; desktop supports the
-same values in its local config file read at startup, requiring restart. No settings screen is
-needed in this increment. Validate values; malformed diagnostic configuration disables only this
+same values from its startup environment, requiring restart. A local config-file loader and
+settings screen are deferred; neither is needed in this increment. Validate values; malformed diagnostic configuration disables only this
 store with a safe visible reason and documented repair, not application boot.
 
 Writer I/O runs off the request execution path. Use the existing SQLite driver in a small worker

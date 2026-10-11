@@ -71,10 +71,12 @@ describe('createObservabilityPlugin', () => {
     expect(dod?.kind === 'dod_check' && dod.criteriaCount).toBe(1);
 
     const err = events.find((e) => e.kind === 'error');
-    expect(err?.kind === 'error' && err.message).toBe('boom');
+    expect(err?.kind === 'error' && err.message).toBe(
+      'Observed failure; free-form error details omitted.',
+    );
   });
 
-  it('includes tool args when includeToolArgs is true', async () => {
+  it('omits tool args even when the legacy opt-in is supplied', async () => {
     const events: ObservabilityEvent[] = [];
     const obs = createObservabilityPlugin({
       log: (e) => events.push(e),
@@ -90,7 +92,7 @@ describe('createObservabilityPlugin', () => {
     const tool = events[0];
     expect(tool?.kind).toBe('tool_call');
     if (tool?.kind === 'tool_call') {
-      expect(tool.args).toEqual({ x: 1 });
+      expect(tool.args).toBeUndefined();
     }
   });
 
@@ -110,7 +112,7 @@ describe('createObservabilityPlugin', () => {
     expect(store.getLogs({ sessionId: 's1', limit: 10 })).toHaveLength(2);
     expect(store.getErrors({ sessionId: 's1', limit: 10 })[0]?.event).toMatchObject({
       kind: 'error',
-      message: 'store boom',
+      message: 'Observed failure; free-form error details omitted.',
     });
   });
 
@@ -138,11 +140,10 @@ describe('createObservabilityPlugin', () => {
     expect(events).toEqual([
       expect.objectContaining({
         kind: 'task_end',
-        detail: 'Incorrect API key provided: [REDACTED:OpenAI API Key]',
       }),
       expect.objectContaining({
         kind: 'error',
-        message: 'Incorrect API key provided: [REDACTED:OpenAI API Key]',
+        message: 'Observed failure; free-form error details omitted.',
       }),
     ]);
   });
@@ -163,7 +164,7 @@ describe('createObservabilityPlugin', () => {
     expect(JSON.stringify(events)).not.toContain(masked);
     expect(events[0]).toMatchObject({
       kind: 'error',
-      message: 'Incorrect API key provided: [REDACTED:OpenAI API Key]',
+      message: 'Observed failure; free-form error details omitted.',
     });
   });
 });

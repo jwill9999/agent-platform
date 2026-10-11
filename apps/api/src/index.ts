@@ -1,4 +1,7 @@
 import { createServer } from 'node:http';
+import { dirname, join } from 'node:path';
+import { createDiagnosticStore } from '@agent-platform/db';
+import { consumeDiagnosticAccess } from './infrastructure/diagnostics/localAccess.js';
 
 import { closeDatabase, openDatabase, runSeed } from '@agent-platform/db';
 import type { HarnessStateType, ToolCallIntent } from '@agent-platform/harness';
@@ -20,7 +23,43 @@ if (sqlitePath) {
   log.info('db.ready', { sqlitePath });
 }
 
+const diagnosticsRequested = Boolean(process.env.DIAGNOSTICS_LOCAL_CAPABILITY);
+const diagnosticAccess = consumeDiagnosticAccess(process.env);
+const diagnosticStore =
+  sqlitePath && diagnosticAccess
+    ? createDiagnosticStore({
+        path: join(dirname(sqlitePath), 'diagnostics.sqlite'),
+        retentionDays:
+          process.env.DIAGNOSTICS_RETENTION_DAYS === undefined
+            ? undefined
+            : Number(process.env.DIAGNOSTICS_RETENTION_DAYS),
+        maxEvents:
+          process.env.DIAGNOSTICS_MAX_EVENTS === undefined
+            ? undefined
+            : Number(process.env.DIAGNOSTICS_MAX_EVENTS),
+      })
+    : undefined;
+// Worker startup is observational; failure must not prevent the application from listening.
+void diagnosticStore?.ready
+  .then(() => {
+    const health = diagnosticStore.health();
+    if (health.state === 'disabled') log.warn('diagnostics.disabled', { code: health.reason });
+  })
+  .catch(() => log.warn('diagnostics.disabled', { code: 'storage_unavailable' }));
+if (diagnosticsRequested && !diagnosticAccess) {
+  log.warn('diagnostics.disabled', { code: 'invalid_local_configuration' });
+}
+
 const app = createApp({
+  ...(diagnosticStore && diagnosticAccess
+    ? {
+        diagnostics: {
+          store: diagnosticStore,
+          access: diagnosticAccess,
+          appVersion: process.env.DIAGNOSTICS_APP_VERSION,
+        },
+      }
+    : {}),
   db: dbHandle?.db ?? null,
   ...e2eMockV1Options(),
 });
@@ -41,7 +80,8 @@ server.listen(port, host, () => {
 
 function shutdown() {
   scheduler?.stop();
-  server.close(() => {
+  server.close(async () => {
+    await diagnosticStore?.close().catch(() => undefined);
     if (dbHandle) {
       closeDatabase(dbHandle.sqlite);
       log.info('db.closed');

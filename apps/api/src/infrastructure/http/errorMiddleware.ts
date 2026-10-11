@@ -12,6 +12,15 @@ export const errorMiddleware: ErrorRequestHandler = (err, _req, res, next) => {
     next(err);
     return;
   }
+  if (
+    typeof err === 'object' &&
+    err !== null &&
+    'type' in err &&
+    err.type === 'entity.parse.failed'
+  ) {
+    res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid JSON request' } });
+    return;
+  }
   if (err instanceof ZodError) {
     res.status(400).json({
       error: {
@@ -64,8 +73,7 @@ export const errorMiddleware: ErrorRequestHandler = (err, _req, res, next) => {
   }
 
   log.error('Unhandled error', {
-    message: err instanceof Error ? err.message : String(err),
-    stack: err instanceof Error ? err.stack : undefined,
+    code: 'INTERNAL_ERROR',
   });
 
   res.status(500).json({

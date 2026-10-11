@@ -244,9 +244,10 @@ describe('observability tools (integration)', () => {
             record.level === 'error' &&
             record.kind === 'error' &&
             record.event?.phase === 'tool' &&
-            record.event?.message?.includes('sys_file_info'),
+            record.event?.message === 'Observed failure; free-form error details omitted.',
         ),
       ).toBe(true);
+      expect(JSON.stringify(recentErrors?.data?.records)).not.toContain(missingPath);
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);
