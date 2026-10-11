@@ -18,19 +18,28 @@ ordinary full scanning. No historical archive payload, runtime, dependency or wo
 are included. The archived JSON ignore rules preserve formatting only; no scanner exclusions.
 The selection manifest remains byte-for-byte from original evidence primer `2ad1a88a`.
 
-Next: independently review this source, validate metadata and history preservation, publish full
-branch-specific document mirrors and read them back, then deliver task to feature after all
-current-head executed gates and reviews pass. Protected feature-to-staging promotion separately
-requires genuine full analysis, actual packaged VM and every live protection/review gate.
-Current bookkeeping hosted checks have not run yet; PR293's results do not qualify this new segment.
+Feature delivery is complete: [PR294](https://github.com/jwill9999/agent-platform/pull/294)
+merged at `6929cd33f43f47d71c6f2966fe33f8f830639fbc` after all ten executed exact-head checks
+passed on `275c8b6589ce66cef4f625c8a2bf6b44f44d1de9`, approved review and zero unresolved threads.
+The feature tree `5abcb70d9d347ee9aeb12970fd43cec395e3d849` matches reviewed source and the
+conflict-free staging rehearsal. Continue with protected staging qualification in
+[PR295](https://github.com/jwill9999/agent-platform/pull/295); do not repeat PR294 delivery.
+Every executed and required check, genuine ordinary full analysis, actual packaged VM and all
+current protection/review findings must clear on its actual latest head before guarded squash.
+PR293 or an earlier PR295 head's results do not qualify later changed source.
 
 Local bookkeeping validation passed: direct API Markdown lint for all three substantive files,
 explicit authored formatting including the otherwise ignored JSON manifest, JSON parse and diff
 checks. Exact five-file scope, original manifest/ignore bytes and both complete session/spec bodies
 were verified. All 220 original artifact modes/blobs/hashes/bytes and 139 JSON parses passed directly
 from retained Git objects. Independent plan and implementation critics approved with no actionable
-findings. No runtime change required a new local VM run. Full source-bound Notion publication and
-new exact-head hosted results remain separate delivery gates.
+findings. No runtime change required a new local VM run. Three complete source-bound Notion
+body/revision/hash/destination readbacks and normal commit/push hooks completed at `275c8b65`;
+the hooks passed seven-package build/typecheck/tests and cycles. Those completed receipts remain
+retained; do not repeat stable publication or hooks merely to poll CI. Any substantively changed
+document must receive its own source-bound mirror/readback before final delivery. Live Beads and
+revision-bound publication receipts distinguish the original completed work from a later repair.
+The remaining integration gate is PR295's actual latest-head staging qualification and review.
 
 After that verified delivery, reconcile [PR288](https://github.com/jwill9999/agent-platform/pull/288)
 to exactly the complete 220 immutable archive additions. Preserve original refs with recovery
