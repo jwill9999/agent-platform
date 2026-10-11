@@ -54,7 +54,7 @@ async function destination(deps: DiagnosticExportDependencies) {
 }
 async function save(
   deps: DiagnosticExportDependencies,
-  content: () => Promise<unknown>,
+  content: () => unknown | Promise<unknown>,
 ): Promise<DesktopWorkspaceExportResult> {
   const selected = await destination(deps);
   if (selected.canceled || !selected.filePath) return { ok: true, status: 'cancelled' };
@@ -103,6 +103,7 @@ export async function saveDiagnosticReport(
     if (!reader) throw new Error('Diagnostic report was empty.');
     const chunks: Uint8Array[] = [];
     let bytes = 0;
+    // Sequential reads enforce backpressure and stop/cancel before retaining oversized data.
     while (true) {
       const chunk = await reader.read();
       if (chunk.done) break;
@@ -125,5 +126,5 @@ export async function savePartialDiagnosticReport(
 ): Promise<DesktopWorkspaceExportResult> {
   const validated = validateDiagnosticPartial(failure);
   if (!validated.ok || !validated.value) throw new Error('Partial diagnostic input is invalid.');
-  return save(deps, async () => buildPartialDiagnosticReport(validated.value!));
+  return save(deps, () => buildPartialDiagnosticReport(validated.value!));
 }

@@ -254,7 +254,8 @@ jobs:
           sudo apt-get install -y xvfb
 
       - name: Install browser for connected diagnostics export
-        run: pnpm exec playwright install --with-deps chromium
+        # Invoke the already lockfile-installed browser CLI; this is not a package install.
+        run: node node_modules/playwright/cli.js install --with-deps chromium
 
       - name: Electron E2E tests
         run: xvfb-run -a pnpm --filter @agent-platform/desktop test:e2e

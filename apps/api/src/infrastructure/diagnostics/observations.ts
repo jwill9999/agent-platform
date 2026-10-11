@@ -118,7 +118,7 @@ export function beginDiagnosticRun(sessionId: string, runId: string): () => void
   return () =>
     emit({
       phase: 'request',
-      outcome: current.waiting ? 'waiting' : current.halted ? 'failed' : 'succeeded',
+      outcome: completionOutcome(current.waiting, current.halted),
       ...(current.halted && !current.waiting ? { errorCode: 'internal_error' as const } : {}),
       durationMs: performance.now() - started,
     });
@@ -128,11 +128,7 @@ export function failDiagnosticRun(signal: AbortSignal): void {
   emit({
     phase: 'request',
     outcome: signal.aborted ? 'cancelled' : 'failed',
-    errorCode: signal.aborted
-      ? signal.reason === 'timeout'
-        ? 'timeout'
-        : 'cancelled'
-      : 'internal_error',
+    errorCode: runFailureCode(signal),
   });
 }
 
@@ -159,51 +155,11 @@ export function observeDiagnosticNode<A extends unknown[]>(
     const current: Context = { ...parent, operationId: randomUUID(), attempt: 1 };
     return context.run(current, async () => {
       const started = performance.now();
-      const provider = DiagnosticEventSchema.shape.provider.safeParse(state.modelConfig?.provider);
-      const metadata =
-        phase === 'model'
-          ? { provider: provider.success ? provider.data : ('other' as const) }
-          : { toolId: 'other' as const };
+      const metadata = nodeMetadata(phase, state);
       emit({ phase, outcome: 'started', parentOperationId: parent.operationId, ...metadata });
       try {
         const result = await node(state, ...args);
-        const traces = result.trace ?? [];
-        if (result.halted) parent.halted = true;
-        const waiting = traces.some((event) => event.type === 'tool_approval_required');
-        if (waiting) {
-          parent.waiting = true;
-        }
-        // Tool retries have no plugin retry hook; preserve only safe counters, never error text.
-        if (phase === 'tool')
-          for (const event of traces) {
-            if (event.type === 'tool_retry') diagnosticRetry(event.attempt, 'tool');
-          }
-        const failed = traces.some(
-          (event) =>
-            (event.type === 'tool_dispatch' && !event.ok) ||
-            event.type === 'tool_timeout' ||
-            event.type === 'limit_hit' ||
-            event.type === 'deadline_exceeded',
-        );
-        const usage = traces.find((event) => event.type === 'llm_call' && event.tokenUsage);
-        emit({
-          phase,
-          ...metadata,
-          outcome: waiting ? 'waiting' : failed ? 'failed' : 'succeeded',
-          durationMs: performance.now() - started,
-          ...(failed && !waiting
-            ? {
-                errorCode:
-                  phase === 'model' ? ('provider_error' as const) : ('tool_error' as const),
-              }
-            : {}),
-          ...(usage?.type === 'llm_call' && usage.tokenUsage
-            ? {
-                inputTokens: usage.tokenUsage.promptTokens,
-                outputTokens: usage.tokenUsage.completionTokens,
-              }
-            : {}),
-        });
+        observeNodeResult(parent, phase, result, metadata, started);
         return result;
       } catch (error) {
         emit({
@@ -226,21 +182,7 @@ export function observeDiagnosticTool(
 ): (status: string, durationMs: number) => void {
   const parent = context.getStore();
   if (!parent || !uuid.test(toolExecutionId)) return () => {};
-  const toolId: DiagnosticEvent['toolId'] = toolName.startsWith('mcp:')
-    ? 'mcp'
-    : toolName.startsWith('sys_file_') || toolName === 'sys_read_file'
-      ? 'read'
-      : toolName === 'sys_write_file' || toolName === 'sys_apply_patch'
-        ? 'write'
-        : toolName === 'sys_run_command' ||
-            toolName === 'sys_bash' ||
-            toolName === 'sys_run_quality_gate'
-          ? 'command'
-          : toolName.includes('search')
-            ? 'search'
-            : toolName === 'http_request'
-              ? 'http'
-              : 'other';
+  const toolId = toolFamily(toolName);
   const current: Context = { ...parent, operationId: randomUUID(), attempt: 1 };
   const started = performance.now();
   const metadata = {
@@ -285,4 +227,77 @@ export function observeDiagnosticApproval(
     outcome,
     ...(outcome === 'failed' ? { errorCode: 'permission_denied' as const } : {}),
   });
+}
+
+function completionOutcome(waiting: boolean, failed: boolean): DiagnosticEvent['outcome'] {
+  if (waiting) return 'waiting';
+  return failed ? 'failed' : 'succeeded';
+}
+
+function runFailureCode(signal: AbortSignal): DiagnosticEvent['errorCode'] {
+  if (!signal.aborted) return 'internal_error';
+  return signal.reason === 'timeout' ? 'timeout' : 'cancelled';
+}
+
+function nodeMetadata(phase: 'model' | 'tool', state: HarnessStateType): Partial<DiagnosticEvent> {
+  if (phase === 'tool') return { toolId: 'other' };
+  const provider = DiagnosticEventSchema.shape.provider.safeParse(state.modelConfig?.provider);
+  return { provider: provider.success ? provider.data : 'other' };
+}
+
+function observeNodeResult(
+  parent: Context,
+  phase: 'model' | 'tool',
+  result: NodeResult,
+  metadata: Partial<DiagnosticEvent>,
+  started: number,
+): void {
+  const traces = result.trace ?? [];
+  if (result.halted) parent.halted = true;
+  const waiting = traces.some((event) => event.type === 'tool_approval_required');
+  if (waiting) parent.waiting = true;
+  // Tool retries have no plugin retry hook; preserve counters, never error text.
+  if (phase === 'tool') observeToolRetries(traces);
+  const failed = traces.some(
+    (event) =>
+      (event.type === 'tool_dispatch' && !event.ok) ||
+      event.type === 'tool_timeout' ||
+      event.type === 'limit_hit' ||
+      event.type === 'deadline_exceeded',
+  );
+  emit({
+    phase,
+    ...metadata,
+    outcome: completionOutcome(waiting, failed),
+    durationMs: performance.now() - started,
+    ...(failed && !waiting
+      ? { errorCode: phase === 'model' ? ('provider_error' as const) : ('tool_error' as const) }
+      : {}),
+    ...observedTokenUsage(traces),
+  });
+}
+
+function observeToolRetries(traces: NonNullable<NodeResult['trace']>): void {
+  for (const event of traces) {
+    if (event.type === 'tool_retry') diagnosticRetry(event.attempt, 'tool');
+  }
+}
+
+function observedTokenUsage(traces: NonNullable<NodeResult['trace']>): Partial<DiagnosticEvent> {
+  const usage = traces.find((event) => event.type === 'llm_call' && event.tokenUsage);
+  if (usage?.type !== 'llm_call' || !usage.tokenUsage) return {};
+  return {
+    inputTokens: usage.tokenUsage.promptTokens,
+    outputTokens: usage.tokenUsage.completionTokens,
+  };
+}
+
+function toolFamily(toolName: string): DiagnosticEvent['toolId'] {
+  if (toolName.startsWith('mcp:')) return 'mcp';
+  if (toolName.startsWith('sys_file_') || toolName === 'sys_read_file') return 'read';
+  if (toolName === 'sys_write_file' || toolName === 'sys_apply_patch') return 'write';
+  if (['sys_run_command', 'sys_bash', 'sys_run_quality_gate'].includes(toolName)) return 'command';
+  if (toolName.includes('search')) return 'search';
+  if (toolName === 'http_request') return 'http';
+  return 'other';
 }

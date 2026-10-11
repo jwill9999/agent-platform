@@ -1,9 +1,8 @@
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
-import { createDiagnosticStore } from '@agent-platform/db';
+import { createDiagnosticStore, closeDatabase, openDatabase, runSeed } from '@agent-platform/db';
 import { consumeDiagnosticAccess } from './infrastructure/diagnostics/localAccess.js';
 
-import { closeDatabase, openDatabase, runSeed } from '@agent-platform/db';
 import type { HarnessStateType, ToolCallIntent } from '@agent-platform/harness';
 
 import { createApp } from './infrastructure/http/createApp.js';
@@ -39,13 +38,18 @@ const diagnosticStore =
             : Number(process.env.DIAGNOSTICS_MAX_EVENTS),
       })
     : undefined;
-// Worker startup is observational; failure must not prevent the application from listening.
-void diagnosticStore?.ready
-  .then(() => {
-    const health = diagnosticStore.health();
+// Intentionally detached: diagnostic readiness must not delay server.listen or prevent startup.
+if (diagnosticStore) void observeDiagnosticReadiness(diagnosticStore);
+
+async function observeDiagnosticReadiness(store: ReturnType<typeof createDiagnosticStore>) {
+  try {
+    await store.ready;
+    const health = store.health();
     if (health.state === 'disabled') log.warn('diagnostics.disabled', { code: health.reason });
-  })
-  .catch(() => log.warn('diagnostics.disabled', { code: 'storage_unavailable' }));
+  } catch {
+    log.warn('diagnostics.disabled', { code: 'storage_unavailable' });
+  }
+}
 if (diagnosticsRequested && !diagnosticAccess) {
   log.warn('diagnostics.disabled', { code: 'invalid_local_configuration' });
 }

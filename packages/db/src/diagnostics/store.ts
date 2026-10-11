@@ -11,16 +11,17 @@ import {
   type DiagnosticStoredEvent,
 } from '@agent-platform/contracts';
 
+function diagnosticErrorCode(reason: string): 'invalid_cursor' | 'expired_history' | 'unavailable' {
+  if (reason === 'invalid_cursor') return 'invalid_cursor';
+  if (reason.startsWith('expired_history:')) return 'expired_history';
+  return 'unavailable';
+}
+
 export class DiagnosticStoreError extends Error {
   readonly code: 'invalid_cursor' | 'expired_history' | 'unavailable';
   readonly earliestSequence?: number;
   constructor(reason: string) {
-    const code =
-      reason === 'invalid_cursor'
-        ? 'invalid_cursor'
-        : reason.startsWith('expired_history:')
-          ? 'expired_history'
-          : 'unavailable';
+    const code = diagnosticErrorCode(reason);
     super(code);
     this.name = 'DiagnosticStoreError';
     this.code = code;

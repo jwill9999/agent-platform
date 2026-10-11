@@ -6,10 +6,6 @@ import {
   validateDiagnosticScope,
   validateDiagnosticPartial,
 } from './diagnosticExport.js';
-import {
-  saveDiagnosticReportIpcChannel,
-  savePartialDiagnosticReportIpcChannel,
-} from '../preload/desktopBridge.js';
 import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, WebContentsView } from 'electron';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +49,8 @@ import {
   resolveDesktopRuntimePathsFromApp,
 } from './runtimePaths.js';
 import {
+  saveDiagnosticReportIpcChannel,
+  savePartialDiagnosticReportIpcChannel,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
   repairMacosVmRuntimeIpcChannel,

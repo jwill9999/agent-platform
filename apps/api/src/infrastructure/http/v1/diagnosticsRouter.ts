@@ -50,29 +50,12 @@ export function createDiagnosticsRouter(
           throw new HttpError(404, 'NOT_FOUND', 'Diagnostic scope not found');
         const report = buildDiagnosticReport(page, {
           appVersion: version.success ? version.data : undefined,
-          platform:
-            process.platform === 'darwin' ||
-            process.platform === 'linux' ||
-            process.platform === 'win32'
-              ? process.platform
-              : 'unknown',
+          platform: diagnosticPlatform(),
         });
         if (page.nextCursor) res.setHeader('x-diagnostics-next-cursor', page.nextCursor);
         res.json(report);
       } catch (error) {
-        if (error instanceof HttpError) throw error;
-        if (error instanceof DiagnosticStoreError && error.code === 'invalid_cursor')
-          throw new HttpError(400, 'INVALID_CURSOR', 'Invalid diagnostic cursor');
-        if (error instanceof DiagnosticStoreError && error.code === 'expired_history')
-          throw new HttpError(410, 'HISTORY_EXPIRED', 'Diagnostic history has expired', {
-            earliestSequence: error.earliestSequence,
-          });
-        // Storage error strings can contain paths or SQL, and are never returned or logged.
-        throw new HttpError(
-          503,
-          'DIAGNOSTICS_UNAVAILABLE',
-          'Diagnostic history is temporarily unavailable',
-        );
+        throw diagnosticReadError(error);
       }
     }),
   );
@@ -119,4 +102,26 @@ async function flushForRead(store: DiagnosticStore): Promise<void> {
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+function diagnosticPlatform(): 'darwin' | 'linux' | 'win32' | 'unknown' {
+  if (process.platform === 'darwin' || process.platform === 'linux' || process.platform === 'win32')
+    return process.platform;
+  return 'unknown';
+}
+
+function diagnosticReadError(error: unknown): HttpError {
+  if (error instanceof HttpError) return error;
+  if (error instanceof DiagnosticStoreError && error.code === 'invalid_cursor')
+    return new HttpError(400, 'INVALID_CURSOR', 'Invalid diagnostic cursor');
+  if (error instanceof DiagnosticStoreError && error.code === 'expired_history')
+    return new HttpError(410, 'HISTORY_EXPIRED', 'Diagnostic history has expired', {
+      earliestSequence: error.earliestSequence,
+    });
+  // Storage error strings can contain paths or SQL, and are never returned or logged.
+  return new HttpError(
+    503,
+    'DIAGNOSTICS_UNAVAILABLE',
+    'Diagnostic history is temporarily unavailable',
+  );
 }

@@ -148,6 +148,37 @@ lint exclusions were added. The six CLI boundary tests passed after the contract
 IDE Problems/Sonar MCP is unavailable locally; these terminal checks provide the local fallback.
 Detailed hosted Sonar/CodeQL and current-head review findings must still be inspected on the PR.
 
+## Hosted quality repair at first implementation revision
+
+PR302 at `77d0ce8e796b45f7388aa6e2a750a3d544a84966` triggered actual hosted Sonar analysis.
+Its gate failed with 37 findings, including six Critical complexity reports and a CI security
+rating failure on the browser-install command. Local lint had not reported these. The source
+repair separates projection/transport/worker helpers, removes nested formatting expressions and
+redundant imports/assignments, and preserves runtime decisions and test assertions. No scanner
+rule, severity, exclusion or finding dismissal was changed.
+
+The Chromium setup step now invokes the already lockfile-installed `playwright/cli.js` directly
+with the same arguments. The installed pnpm wrapper resolves that same file (version 1.59.1);
+this is browser/dependency setup rather than a package installation. It neither enables package
+lifecycle hooks nor adds an unsupported installer flag to disguise the warning.
+
+Two source-supported minor warnings retain intentional behavior: the exact IPv4-mapped loopback
+literal checks the actual socket peer, and sequential stream-reader awaits account for each chunk
+before reading another or cancelling oversize input. Parallel prefetch would weaken the byte bound.
+These are documented dispositions, not remote dismissals or scanner suppressions.
+
+Core repairs passed 34 affected tests and 120 baseline-versus-refactor report comparisons produced
+identical output. UI repairs passed 40 web tests, 21 desktop tests and all four fresh connected
+journeys in 33.5 seconds after rebuilding web/API/desktop. Independent review verified all eight
+UI source hashes and 23 evidence artifacts. Six CLI boundary tests also passed.
+
+The first affected API run passed 221 tests with one existing `/init` test exceeding its unchanged
+five-second timeout during concurrent builds. That exact case passed unchanged in 1.93 seconds;
+the original failure remains evidence. The uncontended full API rerun passed all 222 tests across
+30 files in 32.19 seconds, with no source, assertion or timeout changes.
+Fresh exact-head hosted analysis remains required. Sourcery skipped the initial hosted review;
+independent source review supplies the recorded critique, not a claim that Sourcery ran.
+
 ## Remaining qualification
 
 Connected T06/T07/T12 and local quality/regression checks passed. Complete normal commit/push,

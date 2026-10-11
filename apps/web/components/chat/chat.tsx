@@ -5,14 +5,16 @@ import type { UIMessage } from 'ai';
 import { Sparkles } from 'lucide-react';
 import { Message, getMessageText } from './message';
 import { DiagnosticExportAction } from './diagnostic-export';
-import type { DiagnosticPartialFailure } from '@agent-platform/contracts';
+import type {
+  DiagnosticPartialFailure,
+  SensorDashboardResponse,
+  WorkspaceEvent,
+} from '@agent-platform/contracts';
 import { ChatInput } from './chat-input';
 import { SensorStatusPanel } from './sensor-status-panel';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 import type { CriticEvent } from '@/lib/critic-events';
 import type { ApprovalCardState, ApprovalDecision, ToolTraceEvent } from '@/hooks/use-harness-chat';
-import type { SensorDashboardResponse } from '@agent-platform/contracts';
-import type { WorkspaceEvent } from '@agent-platform/contracts';
 import { WorkspaceResourcePreviewProvider } from './workspace-resource-cards';
 
 export interface ChatProps {

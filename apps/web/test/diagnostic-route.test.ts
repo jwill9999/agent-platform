@@ -98,4 +98,29 @@ describe('local diagnostic BFF', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('SECRET_CANARY')));
     expect(await (await POST(request())).text()).not.toContain('SECRET_CANARY');
   });
+  it('cancels an oversized streamed report before accepting a trailing chunk', async () => {
+    configure();
+    const cancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(5 * 1024 * 1024 + 1));
+      },
+      cancel,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream)));
+    const response = await POST(request());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: { code: 'REPORT_TOO_LARGE' } });
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+  it('preserves invalid request and missing upstream body error responses', async () => {
+    configure();
+    const fetcher = vi.fn().mockResolvedValue(new Response(null));
+    vi.stubGlobal('fetch', fetcher);
+    expect((await POST(request('{PRIVATE_PARSE_CANARY'))).status).toBe(400);
+    expect(fetcher).not.toHaveBeenCalled();
+    const response = await POST(request());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: { code: 'DIAGNOSTICS_UNAVAILABLE' } });
+  });
 });

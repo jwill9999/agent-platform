@@ -10,14 +10,29 @@ import type {
   MessageRecord,
   WorkspaceEvent,
 } from '@agent-platform/contracts';
-import { DiagnosticScopeSchema, WorkspaceEventSchema } from '@agent-platform/contracts';
+import { WorkspaceEventSchema } from '@agent-platform/contracts';
 import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
+import { observeChatResponse, partialChatFailure } from '@/lib/chat-diagnostics';
 import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
 
 export type { CriticEvent } from '@/lib/critic-events';
 
 const THINKING_PLACEHOLDER = 'The agent is thinking…';
 const THINKING_REVISE_PLACEHOLDER = 'The agent is revising…';
+function removeMessageEntry<T>(previous: Record<string, T>, messageId: string): Record<string, T> {
+  if (!(messageId in previous)) return previous;
+  const next = { ...previous };
+  delete next[messageId];
+  return next;
+}
+
+function clearThinkingPlaceholder(previous: Record<string, string>, messageId: string) {
+  const current = previous[messageId];
+  if (current === THINKING_PLACEHOLDER || current === THINKING_REVISE_PLACEHOLDER)
+    return removeMessageEntry(previous, messageId);
+  return previous;
+}
+
 const CREDENTIAL_PATTERNS: readonly RegExp[] = [
   /sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/g,
   /(ghp|gho|ghu|ghs|ghr)_\w{36,}/g,
@@ -713,12 +728,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           }),
         });
 
-        const identity = DiagnosticScopeSchema.safeParse({
-          requestId: res.headers.get('x-request-id'),
-        });
-        if (identity.success && 'requestId' in identity.data) requestId = identity.data.requestId;
-        apiObserved = res.headers.get('x-diagnostics-api-observed') === '1';
-        responseStatus = res.status;
+        ({ requestId, apiObserved, responseStatus } = observeChatResponse(res, requestId));
         if (apiObserved && !res.ok && diagnosticSessionRef.current === sessionId)
           setDiagnosticRequestId(requestId);
         if (!res.ok) throw new Error(await parseErrorResponse(res));
@@ -732,67 +742,24 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
 
         // Publish a single final answer for the turn after all revisions/streaming settle.
         updateAssistantMessage(assistantId, finalText);
-        setThinkingByMessage((prev) => {
-          const current = prev[assistantId];
-          if (current === THINKING_PLACEHOLDER || current === THINKING_REVISE_PLACEHOLDER) {
-            const next = { ...prev };
-            delete next[assistantId];
-            return next;
-          }
-          return prev;
-        });
+        setThinkingByMessage((prev) => clearThinkingPlaceholder(prev, assistantId));
       } catch (e) {
-        if (
-          diagnosticSessionRef.current === sessionId &&
-          (!apiObserved || responseStatus === undefined || responseStatus < 400)
-        ) {
-          setDiagnosticFailure({
-            requestId,
-            observedAtMs,
-            durationMs: Math.max(0, performance.now() - started),
-            phase: responseStatus === 400 ? 'ingress' : 'connection',
-            errorCode:
-              responseStatus === 400
-                ? 'invalid_request'
-                : responseStatus === 504
-                  ? 'timeout'
-                  : apiObserved
-                    ? 'connection_lost'
-                    : 'backend_unavailable',
-          });
-        }
+        const partialFailure = partialChatFailure({
+          requestId,
+          observedAtMs,
+          durationMs: performance.now() - started,
+          apiObserved,
+          responseStatus,
+        });
+        if (partialFailure && diagnosticSessionRef.current === sessionId)
+          setDiagnosticFailure(partialFailure);
         setError(friendlyChatErrorMessage(e instanceof Error ? e.message : String(e)));
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
-        setCriticEventsByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-        setThinkingByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-        setToolEventsByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-        setWorkspaceEventsByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-        setApprovalEventsByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
+        setCriticEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
+        setThinkingByMessage((prev) => removeMessageEntry(prev, assistantId));
+        setToolEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
+        setWorkspaceEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
+        setApprovalEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
       } finally {
         setStatus('ready');
       }

@@ -11,42 +11,47 @@ function error(status: number, code: string): Response {
   );
 }
 
+/** One reader owns each stream; sequential reads preserve backpressure and byte limits. */
+async function readBoundedBody(body: ReadableStream<Uint8Array> | null, limit: number) {
+  const reader = body?.getReader();
+  if (!reader) throw new Error('Missing body');
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    bytes += chunk.value.byteLength;
+    if (bytes > limit) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(chunk.value);
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+async function readScope(request: Request) {
+  const text = await readBoundedBody(request.body, 1024);
+  if (text === null) throw new Error('Invalid scope');
+  const body: unknown = JSON.parse(text);
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    Array.isArray(body) ||
+    Object.keys(body).join() !== 'scope'
+  )
+    throw new Error('Invalid scope');
+  return DiagnosticScopeSchema.parse((body as { scope: unknown }).scope);
+}
+
 /** Enabled only by an explicitly loopback-bound launcher. No renderer-held capability. */
 export async function POST(request: Request): Promise<Response> {
   const local = localDiagnosticConnection(request);
   if (!local) return error(403, 'DIAGNOSTICS_DENIED');
   const { api, capability } = local;
-  let text: string;
-  try {
-    const reader = request.body?.getReader();
-    if (!reader) return error(400, 'INVALID_SCOPE');
-    const chunks: Uint8Array[] = [];
-    let bytes = 0;
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      bytes += chunk.value.byteLength;
-      if (bytes > 1024) {
-        await reader.cancel();
-        return error(400, 'INVALID_SCOPE');
-      }
-      chunks.push(chunk.value);
-    }
-    text = Buffer.concat(chunks).toString('utf8');
-  } catch {
-    return error(400, 'INVALID_SCOPE');
-  }
   let scope;
   try {
-    const body: unknown = JSON.parse(text);
-    if (
-      !body ||
-      typeof body !== 'object' ||
-      Array.isArray(body) ||
-      Object.keys(body).join() !== 'scope'
-    )
-      return error(400, 'INVALID_SCOPE');
-    scope = DiagnosticScopeSchema.parse((body as { scope: unknown }).scope);
+    scope = await readScope(request);
   } catch {
     return error(400, 'INVALID_SCOPE');
   }
@@ -60,21 +65,9 @@ export async function POST(request: Request): Promise<Response> {
       cache: 'no-store',
     });
     if (!response.ok) return error(response.status === 403 ? 403 : 503, 'DIAGNOSTICS_UNAVAILABLE');
-    const reader = response.body?.getReader();
-    if (!reader) return error(503, 'DIAGNOSTICS_UNAVAILABLE');
-    const chunks: Uint8Array[] = [];
-    let bytes = 0;
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      bytes += chunk.value.byteLength;
-      if (bytes > MAX_REPORT_BYTES) {
-        await reader.cancel();
-        return error(503, 'REPORT_TOO_LARGE');
-      }
-      chunks.push(chunk.value);
-    }
-    const report = projectDiagnosticReport(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+    const text = await readBoundedBody(response.body, MAX_REPORT_BYTES);
+    if (text === null) return error(503, 'REPORT_TOO_LARGE');
+    const report = projectDiagnosticReport(JSON.parse(text));
     if (JSON.stringify(report.scope) !== JSON.stringify(scope)) return error(503, 'SCOPE_MISMATCH');
     return Response.json(report, {
       headers: {

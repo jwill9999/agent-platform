@@ -1222,7 +1222,6 @@ export async function handleSessionResume(
   const controller = new AbortController();
   const { signal } = controller;
   const runId = randomUUID();
-  let completeDiagnostics: () => void = () => {};
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   let heartbeatId: ReturnType<typeof setInterval> | undefined;
 
@@ -1233,7 +1232,7 @@ export async function handleSessionResume(
       mapResumeApprovalError(error);
     }
 
-    completeDiagnostics = beginDiagnosticRun(sessionId, runId);
+    const completeDiagnostics = beginDiagnosticRun(sessionId, runId);
     observeDiagnosticApproval(
       approvalRequestId,
       approval.status === 'rejected' ? 'failed' : 'started',

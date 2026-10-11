@@ -24,6 +24,18 @@ function validateScopeAndOrder(
   }
 }
 
+function durationSuffix(durationMs: number | undefined): string {
+  return durationMs === undefined ? '' : ` (${durationMs.toFixed(1)} ms)`;
+}
+
+function renderObservation(sequence: number, event: DiagnosticEvent): string {
+  const duration = durationSuffix(event.durationMs);
+  const error = event.errorCode ? ` [${event.errorCode}]` : '';
+  const operation = event.operationId ? `; operation ${event.operationId}` : '';
+  const attempt = event.attempt ? `; attempt ${event.attempt}` : '';
+  return `${sequence}. ${event.phase}: ${event.outcome}${duration}${error}; request ${event.requestId}${operation}${attempt}`;
+}
+
 function renderSummary(report: DiagnosticReport): string {
   const lines = [
     'Local diagnostic report — safe technical metadata only.',
@@ -56,9 +68,7 @@ function renderSummary(report: DiagnosticReport): string {
       'Prior-process unfinished work has unknown status after restart; no replay is implied.',
     );
   for (const { sequence, event } of report.events) {
-    lines.push(
-      `${sequence}. ${event.phase}: ${event.outcome}${event.durationMs === undefined ? '' : ` (${event.durationMs.toFixed(1)} ms)`}${event.errorCode ? ` [${event.errorCode}]` : ''}; request ${event.requestId}${event.operationId ? `; operation ${event.operationId}` : ''}${event.attempt ? `; attempt ${event.attempt}` : ''}`,
-    );
+    lines.push(renderObservation(sequence, event));
   }
   return lines.join('\n');
 }
@@ -115,7 +125,7 @@ export function buildPartialDiagnosticReport(input: DiagnosticPartialFailure): D
     source: 'current-view',
     scope: { requestId: failure.requestId },
     partialFailure: failure,
-    summary: `Current-view diagnostic observation (unverified, non-durable).\n${failure.phase}: ${failure.errorCode}${failure.durationMs === undefined ? '' : ` (${failure.durationMs.toFixed(1)} ms)`}.\nBackend history is unavailable. This observation is lost when the view closes.`,
+    summary: `Current-view diagnostic observation (unverified, non-durable).\n${failure.phase}: ${failure.errorCode}${durationSuffix(failure.durationMs)}.\nBackend history is unavailable. This observation is lost when the view closes.`,
     events: [],
     generatedAtMs: failure.observedAtMs,
     coverage: {

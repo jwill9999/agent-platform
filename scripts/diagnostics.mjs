@@ -130,10 +130,11 @@ export async function runDiagnostics(
         ? JSON.stringify(list, null, 2)
         : [
             `Recent local diagnostic events (${list.health.state}; ${list.health.dropped} dropped, ${list.health.pending} pending).`,
-            ...list.events.map(
-              ({ sequence, event }) =>
-                `${sequence}. ${event.phase}: ${event.outcome}; request ${event.requestId}${event.sessionId ? `; session ${event.sessionId}` : ''}${event.runId ? `; run ${event.runId}` : ''}`,
-            ),
+            ...list.events.map(({ sequence, event }) => {
+              const session = event.sessionId ? `; session ${event.sessionId}` : '';
+              const run = event.runId ? `; run ${event.runId}` : '';
+              return `${sequence}. ${event.phase}: ${event.outcome}; request ${event.requestId}${session}${run}`;
+            }),
           ].join('\n');
       output.write(`${text}\n`);
     } else {

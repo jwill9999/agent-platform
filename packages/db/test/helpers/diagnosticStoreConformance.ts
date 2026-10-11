@@ -2,19 +2,20 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { DiagnosticEvent, DiagnosticStore } from '@agent-platform/contracts';
 
+function observation(store: DiagnosticStore, requestId = randomUUID()): DiagnosticEvent {
+  return {
+    schemaVersion: 1,
+    eventId: randomUUID(),
+    processInstanceId: store.health().processInstanceId,
+    requestId,
+    phase: 'request',
+    outcome: 'started',
+    observedAtMs: Date.now(),
+  };
+}
+
 /** Reuse this suite for any future adapter; the factory owns cleanup after each test. */
 export function diagnosticStoreConformance(name: string, create: () => DiagnosticStore): void {
-  function observation(store: DiagnosticStore, requestId = randomUUID()): DiagnosticEvent {
-    return {
-      schemaVersion: 1,
-      eventId: randomUUID(),
-      processInstanceId: store.health().processInstanceId,
-      requestId,
-      phase: 'request',
-      outcome: 'started',
-      observedAtMs: Date.now(),
-    };
-  }
   describe(`${name}: diagnostic adapter contract`, () => {
     it('acknowledges only strict envelopes and never returns another request scope', async () => {
       const store = create();

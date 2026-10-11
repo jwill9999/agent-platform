@@ -237,51 +237,61 @@ try {
   }
   port.close();
 }
-port.on('message', (message: { id: number; type: string; input: unknown }) => {
-  try {
-    let result: unknown;
-    if (message.type === 'append') result = append(message.input as Parameters<typeof append>[0]);
-    else if (message.type === 'query') result = query(message.input as Parameters<typeof query>[0]);
-    else if (message.type === 'list') {
-      db.transaction(prune)();
-      const limit = Math.min(
-        100,
-        Math.max(1, Math.floor((message.input as { limit?: number }).limit ?? 20)),
-      );
-      const events = rows(
-        'SELECT sequence,content FROM diagnostic_events WHERE sequence IN (SELECT max(sequence) FROM diagnostic_events GROUP BY request_id) ORDER BY sequence DESC LIMIT ?',
-        [limit],
-      );
+type WorkerMessage = { id: number; type: string; input: unknown };
 
-      result = { events, stats: stats() };
-    } else if (message.type === 'prune') {
+function listRecent(input: { limit?: number }) {
+  db.transaction(prune)();
+  const limit = Math.min(100, Math.max(1, Math.floor(input.limit ?? 20)));
+  const events = rows(
+    'SELECT sequence,content FROM diagnostic_events WHERE sequence IN (SELECT max(sequence) FROM diagnostic_events GROUP BY request_id) ORDER BY sequence DESC LIMIT ?',
+    [limit],
+  );
+  return { events, stats: stats() };
+}
+
+function closeStore(input: { dropped: number }): null {
+  db.transaction(() => {
+    setMeta('dropped', Math.max(meta('dropped'), input.dropped));
+    setMeta('open', 0);
+  })();
+  db.close();
+  return null;
+}
+
+function executeCommand(message: WorkerMessage): unknown {
+  switch (message.type) {
+    case 'append':
+      return append(message.input as Parameters<typeof append>[0]);
+    case 'query':
+      return query(message.input as Parameters<typeof query>[0]);
+    case 'list':
+      return listRecent(message.input as Parameters<typeof listRecent>[0]);
+    case 'prune':
       db.transaction(prune)();
-      result = stats();
-    } else if (message.type === 'close') {
-      db.transaction(() => {
-        setMeta(
-          'dropped',
-          Math.max(meta('dropped'), (message.input as { dropped: number }).dropped),
-        );
-        setMeta('open', 0);
-      })();
-      db.close();
-      result = null;
-    } else throw new Error('invalid_command');
+      return stats();
+    case 'close':
+      return closeStore(message.input as Parameters<typeof closeStore>[0]);
+    default:
+      throw new Error('invalid_command');
+  }
+}
+
+function failureReason(error: unknown): string {
+  const messageText = error instanceof Error ? error.message : '';
+  if (messageText.startsWith('expired_history:')) return messageText;
+  if (messageText === 'invalid_cursor') return 'invalid_cursor';
+  const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : '';
+  if (code === 'SQLITE_BUSY') return 'busy';
+  if (code === 'SQLITE_FULL') return 'storage_limited';
+  return 'storage_unavailable';
+}
+
+port.on('message', (message: WorkerMessage) => {
+  try {
+    const result = executeCommand(message);
     port.postMessage({ id: message.id, result });
     if (message.type === 'close') port.close();
   } catch (error) {
-    const messageText = error instanceof Error ? error.message : '';
-    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : '';
-    const reason = messageText.startsWith('expired_history:')
-      ? messageText
-      : messageText === 'invalid_cursor'
-        ? 'invalid_cursor'
-        : code === 'SQLITE_BUSY'
-          ? 'busy'
-          : code === 'SQLITE_FULL'
-            ? 'storage_limited'
-            : 'storage_unavailable';
-    port.postMessage({ id: message.id, error: reason });
+    port.postMessage({ id: message.id, error: failureReason(error) });
   }
 });

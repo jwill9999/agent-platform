@@ -16,9 +16,16 @@ The report-only independent support exercise located the actual failed operation
 latency fixtures passed. Independent source review approved the repaired implementation; local
 quality checks and 2,734 aggregate tests passed (77 existing optional integration skips). The
 shared-module retry-test isolation failure is retained and its full 222-test API rerun passed.
-Hosted qualification and final publication remain pending.
+PR302 is open at `77d0ce8e`; all eight full Notion bodies/revisions/hashes read back at that revision.
+Hosted Sonar failed on complexity/style and the browser-install command. Independently reviewed
+bounded refactors passed 34 core tests, 120 report-equivalence comparisons, 40 web tests, 21 desktop
+tests, six CLI tests, four fresh connected journeys and a full 222-test API rerun. An earlier API
+timeout is retained alongside the unchanged focused and full rerun passes. Fresh hosted analysis
+is still required. No bypass, merge or closure. See results
+for the retained first failure and source-backed minor-warning dispositions.
 See [results](docs/reviews/agent-observability-mvp-results.md) and
-[usage](docs/development/diagnostics.md) for evidence and limits. Next: commit/push the segment-tip PR and full mirrors, then inspect current-head CI/security/comments.
+[usage](docs/development/diagnostics.md) for evidence and limits. Next: push the reviewed quality repair to PR302, refresh its changed full mirrors, and qualify
+the new current-head CI/security/comments.
 V1 stays in progress through actual authorized feature delivery; no merge is authorized by this step.
 
 <!-- markdownlint-disable MD025 -->
