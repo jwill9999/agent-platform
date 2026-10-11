@@ -4,3 +4,8 @@ dist
 .next
 .dolt
 .beads/dolt
+
+# Preserve archived machine evidence byte-for-byte; security scanning remains enabled.
+docs/reviews/evidence/**/*.json
+docs/reviews/role-enforcement-evidence/*.json
+docs/reviews/development-lifecycle-evidence/*.json
