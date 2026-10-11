@@ -1,6 +1,6 @@
 # Agent diagnostics MVP — planning review
 
-Status: approved by independent critic for final owner implementation decision. This is not implementation or test evidence.
+Status: independent completion audit approved; coordinator planning work complete; owner decision P1 remains. This is not implementation or test evidence.
 Source baseline: staging `7814b59845b52ad5f850bfc99b7baee0e6742a25`.
 Task: `agent-platform-harness-v1`; [contract](../planning/agent-observability-mvp.md);
 [tests](../testing/agent-observability-mvp.md).
@@ -55,3 +55,30 @@ revision and full Notion readback receipts are recorded in the canonical Beads n
 Final owner implementation agreement and scoped V1 dependency reconciliation are still pending;
 the broader gate and parent remain open. This status update records the critic's actual verdict,
 not another source or implementation approval.
+
+## Completion audit requested by owner
+
+A second source-aware completion audit found two omissions in revision `418de099`; the earlier
+approval did not establish checkout-free artifact feasibility. The coordinator corrected both
+without starting implementation or changing existing acceptance authority:
+
+| Finding    | Severity | Correction                                                                                                                                                                                                                             |
+| ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OBS-MVP-04 | Medium   | Plan decision P1 identifies the missing release-owned app artifact, preserves strict R6/T10/T12 by default and prepares concrete alternatives for final owner review; no silent scope waiver or packaging expansion                    |
+| OBS-MVP-05 | Medium   | Verification command/environment matrix identifies actual scripts, loopback fixture, capability provisioning, Node/SQLite ABI requirements and explicit hosted selectors; proposed tests and blocked artifact command labeled honestly |
+
+The owner will review once coordinator planning work and independent recheck are finished. The
+finished decision proposal may be ready for that review while implementation remains blocked on
+the owner's P1 scope/delivery choice and start decision. Do not describe it as an unblocked
+implementation contract. The default strict scope is unchanged; no release dependency mutation or
+new release activation has occurred. Final completion-audit recheck: **approved as a finished decision proposal for the owner’s final
+review**. No coordinator-resolvable planning findings remain. P1 is explicitly an owner decision;
+this does not establish implementation readiness or qualify any unexecuted test.
+
+Final reviewed contract SHA-256: `6d0421c648f2a97675b6d4085e9ce716d6016e01e1b0135b09cc76c5cb9117dd`.
+Final reviewed task SHA-256: `6bf1023d550164ec19c475a1d1e165d1bf829d03dec8cd0afda45a039c4a25cd`.
+Final reviewed verification SHA-256: `955f0eb1aca5fc413d903141ae2ffce979a1b592ad1b1bda849c91d11a52a88a`.
+Direct Markdown, formatting, relative artifact links and historical-body checks passed again;
+only documentation changed. Source publication and mirror/readback revision are recorded in Beads.
+V1 and the parent remain open because implementation has not occurred. No code or global changes,
+release-task activation or staged/main merge is part of this planning closeout.

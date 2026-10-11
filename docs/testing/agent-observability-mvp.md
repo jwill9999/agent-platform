@@ -19,7 +19,7 @@ Use unique temporary app-data/SQLite directories per test, isolated API/web port
 A/B, synthetic canaries and a fresh export directory. Do not use primary app data or production
 credentials. Shutdown API/worker, close DB handles and delete only fixture paths in finally hooks.
 Controlled time is allowed for age pruning; actual process restart and actual files are mandatory.
-The packaged app must load its real bundled UI/backend and native SQLite adapter. Native save dialog
+Strict T10/T12 require an actual application artifact loading its real bundled UI/backend and native SQLite adapter; that artifact has not been established. The existing repository-launched Electron fixture is a separate connected test layer. Native save dialog
 selection/cancellation may be supplied through a test hook; report generation, IPC validation,
 fetch and filesystem write may not be mocked in the connected tests.
 
@@ -124,3 +124,50 @@ scenario, actual command, revision, environment, pass/fail/skipped/blocked/not-r
 path/hash, mock boundary and defect disposition. Screenshots/traces must use synthetic data;
 inspect artifacts for canaries before sharing. No production session or secrets in test evidence.
 All required failed/unexecuted journeys block V1 completion. Broader V5/parent tests remain separate.
+
+## Executable verification mapping and artifact feasibility
+
+These are implementation-stage commands, not commands executed during planning. Run from the
+repository root under Node 24, with `WORKFLOW_GIT_BINARY=/usr/bin/git`, `VITEST_MAX_FORKS=4` and
+`VITEST_MIN_FORKS=1` where required by the existing local test setup. Build first with `pnpm build`.
+Use `exec vitest run` for explicit test selection rather than passing a literal extra `--` through
+a package script and accidentally running the entire suite.
+
+| Layer                         | Command / planned entry point                                                                                                                                      | Prerequisites and limits                                                                                                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T01–T08 plugin tests          | `pnpm --filter @agent-platform/plugin-observability exec vitest run`                                                                                               | Includes new projection/store/report tests; native adapter tests remain in its actual owning package                                                                                    |
+| T01–T08 API integration       | `pnpm --filter @agent-platform/api exec vitest run test/correlationMiddleware.test.ts test/observability.integration.test.ts test/sessionChat.integration.test.ts` | Add new diagnostic integration filenames to the selected command as implemented; real temporary SQLite, no live provider                                                                |
+| Storage regressions           | `pnpm --filter @agent-platform/db exec vitest run`                                                                                                                 | Temporary databases only; require adapter conformance and worker lifecycle cases in their eventual owner package                                                                        |
+| BFF/desktop unit boundary     | `pnpm --filter @agent-platform/web exec vitest run test/chat-route.test.ts` and `pnpm --filter @agent-platform/desktop exec vitest run`                            | Include new route/export/IPC denial tests explicitly; no claim these prove packaged delivery                                                                                            |
+| T06–T09 browser               | `pnpm exec playwright test -c e2e/playwright.config.ts e2e/diagnostics-export.spec.ts --workers=1`                                                                 | New spec/fixture must launch API and web on actual loopback free ports, set `BASE_URL`/`API_URL`, share private server capability, then clean them up                                   |
+| Connected standalone Electron | `pnpm --filter @agent-platform/desktop test:e2e e2e/diagnostics-export.e2e.ts`                                                                                     | New spec reuses actual standalone renderer/API/SQLite and main dialog hook; existing script builds before Playwright; still repository-launched                                         |
+| Existing protected VM gate    | Current `staging-packaged-macos-vm-e2e` job and its existing signing/resource preparation                                                                          | Keep actual VM qualification unchanged; its exact current selector only runs `packaged-vm-command.e2e.ts`                                                                               |
+| Strict artifact T10/T12       | Artifact executable path supplied by release task; Playwright `electron.launch({ executablePath })` from temporary cwd with development paths removed              | No runnable app artifact/build command exists yet; blocked input, not a passing/skipped test. Record artifact hash, bundled runtime/native module identities and no-checkout assertions |
+
+Implementation must add `diagnostics-export.e2e.ts` explicitly to an executed hosted Electron
+selector and, where needed, a macOS diagnostic journey step. The existing protected job's selector
+will not discover it automatically. Preserve the VM selector and every existing check; do not
+replace real VM coverage with diagnostics fixtures. Strict artifact verification also removes
+`AGENT_PLATFORM_DESKTOP_NODE_PATH`, source-path overrides and developer PATH conveniences, and
+checks that loaded runtime/module/renderer paths belong to the supplied bundle.
+
+The implementation owner supplies the isolated loopback browser fixture; it must actually start
+Next with `--hostname 127.0.0.1` and a free port, start the API with `HOST=127.0.0.1`, seed safe
+sessions and wait for readiness. Merely asserting a URL or setting a boolean is not evidence of
+binding. Missing capability or unsafe binding produces explicit denied/unavailable diagnostics.
+The current API child uses Node 24, so its better-sqlite3 binary must be built for that Node ABI
+(`pnpm rebuild:native` is the existing repair command when the native binding does not match).
+The new diagnostics worker runs in the API child's same runtime; do not load a Node-built binding
+inside Electron main or substitute an in-memory adapter to hide an ABI error. Record Node version,
+modules ABI and binding load result in test evidence. For an eventual shipped artifact, release work
+must provide its chosen bundled runtime and matching binding; this plan does not choose an Electron
+Node ABI migration on behalf of the release task.
+
+No new Docker profile is required for this local journey; the current Docker setup is available
+for existing regression gates, not proof of local-only diagnostic access.
+
+[Decision P1](../planning/agent-observability-mvp.md#completion-audit--packaged-artifact-decision-p1)
+explains the recommended bounded split and the unchanged strict default. Until the owner decides,
+T10/T12's checkout-free acceptance remains required and blocked on artifact provision. The 4–6 day
+estimate covers diagnostics, not application distribution work. Planning is ready for that concrete
+review; implementation readiness must not be reported until the selected dependency/DoD is recorded.

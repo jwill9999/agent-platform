@@ -17,13 +17,21 @@ logging; readable report plus structured data; small explicit export action from
 browser for manual sharing. External models remain supported; diagnostics stay local unless shared.
 Dashboards, accounts, uploads, other backends and execution-control changes are deferred.
 
-The final written plan has passed independent critique after three bounded corrections to local
+The owner requested completion of planning before their final review. Coordinator planning work
+is complete and the critic approved the final decision proposal with no remaining technical
+planning findings. The completion audit now
+identifies one material decision P1: repository-launched Electron tests do not supply the promised
+checkout-free application artifact. The release task owns that missing artifact. The finished
+proposal recommends deferring only artifact acceptance to release work; the existing strict
+requirement stays in force until the owner agrees. Implementation remains unallocated.
+
+The earlier written plan passed independent critique after three bounded corrections to local
 access, backend-unavailable export and SQLite journal bounds. It is being published for the owner
 implementation decision. No runtime implementation,
 installation or new application test execution has begun. V1 and its parent remain open; the old
 review-gate edge is retained pending the owner's requested final implementation decision, after
 which only the V1 edge should be reconciled. No broad gate closure or paused-work resumption.
-Next handoff is the completed reviewed plan to the owner, not an automatic implementation start.
+Next handoff is the completed reviewed decision proposal to the owner, not an automatic implementation start. P1 is the only remaining material choice; no interim owner review is needed.
 Estimated implementation effort is 4–6 focused engineering days with a two-day progress checkpoint.
 Canonical Beads root stays the primary repository; preserve its dirty files and the paused checkout.
 

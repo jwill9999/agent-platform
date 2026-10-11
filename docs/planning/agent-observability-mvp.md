@@ -1,6 +1,6 @@
 # Agent diagnostics MVP — implementation proposal
 
-Status: planning proposal for final owner review; no runtime implementation authorized or started.
+Status: revised planning proposal; final feasibility audit identified packaged-artifact decision P1. No runtime implementation authorized or started.
 Date: 11 October 2026. Source inspected: staging `7814b59845b52ad5f850bfc99b7baee0e6742a25`.
 
 ## Outcome and stopping point
@@ -256,3 +256,39 @@ storage backends, generalized logging across every route, advanced analytics, ex
 journals and new recovery/cancel semantics are deferred. Existing broader V2–V5/parent requirements
 remain recorded. Paused PR283 and its four retained branches and all dirty/unrelated worktrees stay
 separate. No code, release, staging merge or test execution is implied by publishing this plan.
+
+## Completion audit — packaged artifact decision P1
+
+This audit supersedes any earlier implication that the current Electron harness proves a
+checkout-free distributed application. `apps/desktop/e2e/packaged-vm-command.e2e.ts` launches
+Electron with `args: ['.']` from the desktop source directory and supplies `process.execPath` for
+the API child. It tests real VM assets and a standalone renderer but still depends on the checkout
+and development Node. `docs/desktop-runtime.md` explicitly leaves backend/runtime distribution to
+the [Electron release task](../tasks/agent-platform-electron-release.md).
+
+The live release record `agent-platform-electron-release` is open, blocked by
+`agent-platform-pre-production-automation` (also open); its experience/stabilisation prerequisites
+are closed. GitHub release discovery on 11 October found only the VM-assets prerelease, not an
+Agent Platform desktop application artifact. No usable checkout-free app artifact was established.
+This is a real acceptance dependency for strict T10/T12, not a runtime bug solved by this plan.
+
+The owner asked to review only once planning work is finished. The technical alternatives are
+prepared here for that final review; no intermediate question or implicit scope waiver is applied:
+
+| Option                                         | Delivery and acceptance                                                                                                                                                | Impact                                                                                                                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| A — recommended for the bounded MVP            | Deliver diagnostics and real connected standalone-Electron/browser export now; preserve the true checkout-free export exercise as a release-owned acceptance follow-up | Keeps diagnostics estimate at 4–6 days; requires owner agreement to move strict artifact acceptance out of V1 before changing its DoD        |
+| B — retain the original V1 completion boundary | Keep strict T10/T12 mandatory for V1 closure and wait for a usable application artifact from release work                                                              | Diagnostics code may progress after authorization, but V1 cannot close; packaging effort/dependency is separate and not included in 4–6 days |
+
+Current default remains **B** because the owner has not agreed to narrow the acceptance boundary.
+No artifact is invented, no standalone test is relabeled a distribution test, and no release epic
+is silently activated or made part of this implementation estimate. The next owner decision is P1
+at final plan review, alongside whether to start implementation at all. This is the only remaining
+material decision discovered in the completion audit; routine technical refinements are resolved.
+
+If A is accepted, record the exact transferred packaged acceptance in a scoped release follow-up
+with a real Beads ID and edge before removing it from V1's DoD; keep R6 functionality and connected
+export negative tests in V1. If B is retained, record an explicit artifact-provision dependency and
+its delivery owner before implementation allocation. Do not block V1 on every release feature by
+accident or close the broad review gate. Until that reconciliation, Beads remains planning-only and
+this document is a finished decision proposal, not an unblocked implementation execution contract.

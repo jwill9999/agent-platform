@@ -57,6 +57,16 @@ remaining broader scope; feature-to-staging delivery is separately gated. Planni
 leaves V1 open and the prior blocker intact. There is no new approval gate beyond the owner's
 explicit request to review the finished plan before implementation.
 
+## Final feasibility decision before allocation
+
+The completion audit found no checkout-free desktop app artifact or app packaging command.
+Existing Electron VM tests use the development Node and source checkout. Strict T10/T12 therefore
+remain required but blocked on release-owned artifact provision. [Decision P1](../planning/agent-observability-mvp.md#completion-audit--packaged-artifact-decision-p1)
+presents the bounded alternative: deliver connected standalone export in V1 and explicitly transfer
+checkout-free artifact acceptance to release work, only if the owner agrees at final plan review.
+Do not silently weaken acceptance, expand V1 into packaging, or claim implementation readiness.
+No new dependency edge or release task activation has been applied before that decision.
+
 ## Historical proposal — preserved, superseded for this V1 proposal
 
 The following earlier body is retained verbatim as history. Its broker, prototype implementation
