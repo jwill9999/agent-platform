@@ -25,14 +25,16 @@ history behind one adapter; configurable seven-day retention and bounded failure
 readable and structured reports; one packaged-app/browser export action; unchanged execution
 permissions and recovery. All technical bounds and privacy rules in that contract are normative.
 The earlier 1–2 day envelope estimate is replaced by 4–6 focused engineering days for this larger
-but bounded support workflow. No implementation or new runtime test has started.
+but bounded support workflow. Implementation and local verification are recorded in the
+[results](../reviews/agent-observability-mvp-results.md); current-head hosted qualification and
+authorized feature delivery remain separate completion gates.
 
 ## Dependency order
 
-Current upstream: `agent-platform-harness-review-gate` remains open and blocks V1 in Beads.
-Planning can proceed. At the requested final owner implementation checkpoint, reconcile only the
-V1 edge with the scoped decision; retain the broader gate and all unrelated records. This proposal
-does not require a prototype broker/contract, paused pilot, SDK modernization or dashboard.
+The owner-authorized V1 edge to `agent-platform-harness-review-gate` has been removed in Beads.
+The broader gate remains open for its other work; it does not block this implementation. The
+release export child depends on V1, not the reverse. This MVP does not require a prototype
+broker/contract, paused pilot, SDK modernization or dashboard.
 Existing downstream V2/V3/V4/R1/R4/K1 and local visibility/reliability records are retained. V1
 completion does not close them or waive their own acceptance requirements. Beads is authoritative.
 
@@ -40,7 +42,7 @@ completion does not close them or waive their own acceptance requirements. Beads
 
 Source: staging `7814b59845b52ad5f850bfc99b7baee0e6742a25`, separate clean owned worktree.
 Planning: `feature/agent-observability` → `task/observability-mvp-plan` (intermediate).
-After owner agreement: `task/diagnostic-event-foundation` from the pushed planning tip is the
+The authorized `task/diagnostic-event-foundation` from the pushed planning tip is the
 single implementation segment tip, carrying this plan into a PR to `feature/agent-observability`.
 Staging is the eventual protected destination when authorized; never main. Implementation uses `task/diagnostic-event-foundation` from planning tip `ebf3c279`. Preserve all paused refs and dirty/unrelated checkouts.
 
@@ -66,7 +68,7 @@ mirrors/readbacks. Then close/read back Beads and verify Dolt push. Parent closu
 remaining broader scope; feature-to-staging delivery is separately gated. V1 remains in progress until those delivery conditions hold. The owner has approved the completed
 plan and implementation; the V1-only historical review-gate edge has been removed.
 
-## Final feasibility decision before allocation
+## Recorded feasibility decision before allocation — superseded by accepted P1 option A
 
 The completion audit found no checkout-free desktop app artifact or app packaging command.
 Existing Electron VM tests use the development Node and source checkout. Strict T10/T12 therefore
@@ -74,14 +76,16 @@ remain required but blocked on release-owned artifact provision. [Decision P1](.
 presents the bounded alternative: deliver connected standalone export in V1 and explicitly transfer
 checkout-free artifact acceptance to release work, only if the owner agrees at final plan review.
 Do not silently weaken acceptance, expand V1 into packaging, or claim implementation readiness.
-No new dependency edge or release task activation has been applied before that decision.
+At that earlier planning checkpoint, no dependency edge or release task had been activated.
+The owner subsequently accepted option A: the release child now owns checkout-free artifact
+verification, and V1 proceeds with connected standalone-Electron/browser acceptance.
 
 ## Historical proposal — preserved, superseded for this V1 proposal
 
 The following earlier body is retained verbatim as history. Its broker, prototype implementation
 contract, mandatory intent-storage and broad review-gate instructions do not govern this native
 observational MVP. Its broader obligations remain in the existing backlog; none is silently claimed
-delivered. Current proposed V1 scope is above, pending the final owner decision.
+delivered. Current accepted V1 scope and delivery conditions are above.
 
 <!-- prettier-ignore-start -->
 ````text

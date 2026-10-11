@@ -16,17 +16,20 @@ The report-only independent support exercise located the actual failed operation
 latency fixtures passed. Independent source review approved the repaired implementation; local
 quality checks and 2,734 aggregate tests passed (77 existing optional integration skips). The
 shared-module retry-test isolation failure is retained and its full 222-test API rerun passed.
-PR302 is open at `77d0ce8e`; all eight full Notion bodies/revisions/hashes read back at that revision.
+PR302 remains open. The initial publication at `77d0ce8e` included all eight full Notion readbacks;
+subsequent changed result/session mirrors were read back at the pushed code repair revisions.
 Hosted Sonar failed on complexity/style and the browser-install command. Independently reviewed
 bounded refactors passed 34 core tests, 120 report-equivalence comparisons, 40 web tests, 21 desktop
 tests, six CLI tests, four fresh connected journeys and a full 222-test API rerun. An earlier API
 timeout is retained alongside the unchanged focused and full rerun passes. Fresh hosted analysis
-passed at `035ac26e` with no Critical findings; two final startup/type cleanups require their own
-hosted requalification. No bypass, merge or closure. See results
+passed again on final code revision `7e5ba9d6`, with no Blocker/Critical/Major findings and only
+two independently reviewed Minor dispositions. Normal push hooks passed all 222 API and 133
+desktop tests. Final documentation clarification aligns the V1 dependency section with accepted
+P1 and live Beads; its current-head CI remains required. No bypass, merge or closure. See results
 for the retained first failure and source-backed minor-warning dispositions.
 See [results](docs/reviews/agent-observability-mvp-results.md) and
-[usage](docs/development/diagnostics.md) for evidence and limits. Next: push the reviewed quality repair to PR302, refresh its changed full mirrors, and qualify
-the new current-head CI/security/comments.
+[usage](docs/development/diagnostics.md) for evidence and limits. Next: publish this documentation clarification to PR302, refresh its changed full mirrors, and
+qualify the current-head CI/security/comments.
 V1 stays in progress through actual authorized feature delivery; no merge is authorized by this step.
 
 <!-- markdownlint-disable MD025 -->

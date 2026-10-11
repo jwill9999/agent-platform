@@ -57,19 +57,17 @@ The owner requested the final written plan and independent critique before imple
 
 Repository: `jwill9999/agent-platform`. Clean planning worktree:
 `/Users/letuscode/.codex/worktrees/codex-developer-autonomy/agent-platform`.
-The planning branch is `task/observability-mvp-plan`, from `feature/agent-observability`, based on
-source staging above. Both are new, separate from the four paused orchestration refs.
-After owner acceptance, proposed implementation segment tip `task/diagnostic-event-foundation`
-branches from the pushed planning tip, carries this plan, and opens one PR to
-`feature/agent-observability`. It does not yet exist. Eventual feature promotion is to protected
-staging under actual owner merge authority and current gates; main is excluded.
+Planning was delivered on `task/observability-mvp-plan` from `feature/agent-observability`.
+The owner-authorized implementation segment `task/diagnostic-event-foundation` starts from
+planning tip `ebf3c279` and is published in PR302 to `feature/agent-observability`. It is separate
+from the four paused orchestration refs. Eventual feature promotion requires actual owner merge
+authority and current protected gates; main is excluded.
 
-Beads currently retains the blocking edge from `agent-platform-harness-review-gate` to V1.
-The final owner implementation decision should reconcile only this V1 edge and record that scoped
-decision, leaving the broad historical gate open for unrelated work. Until then V1 is open and
-planning-only, not schedulable implementation. No framework migration, F0/F3, paused pilot, V2/V3
-or full activity panel is a prerequisite for this current-stack slice. Existing downstream edges
-stay recorded; their closure/readiness is not implied by this proposal.
+The accepted P1 option A removed only V1's blocking edge to `agent-platform-harness-review-gate`.
+V1 is in progress; the broad historical gate remains open for unrelated work. Release child
+`agent-platform-electron-release.diagnostics-export` depends on V1 and owns checkout-free artifact
+acceptance. No framework migration, F0/F3, paused pilot, V2/V3 or full activity panel is a
+prerequisite for this slice. Existing downstream edges remain; V1 does not close those tasks.
 
 ## Requirements and acceptance
 

@@ -187,10 +187,18 @@ Startup still proceeds independently of diagnostics, and export validation is un
 intentional minor warnings above remain disclosed. This earlier hosted pass is not a substitute
 for the final repair revision's own analysis.
 
+The final code repair at `7e5ba9d62911414db78cbc4e9dc74de8ebe22941` also passed actual hosted
+Sonar analysis: gate OK, no Blocker/Critical/Major findings, and only the two reviewed Minor
+warnings remain. Independent review verified the exact source, live check and issue list. Five
+compiled-module startup scenarios and two actual API restart tests passed; the export type-only
+change passed eight focused tests. Normal push hooks passed all 222 API and 133 desktop tests.
+Later documentation clarification changes no executable source; its own hosted checks still apply.
+
 ## Remaining qualification
 
-Connected T06/T07/T12 and local quality/regression checks passed. Complete normal commit/push,
-full mirror readbacks and exact-head feature CI/reviews. Publish and read back all substantive changed
-documents, then update Beads with actual evidence. These remaining checks are acceptance gates,
-not assertions that planned tests have already passed. Merge and final owner acceptance retain
-their actual authorization boundaries.
+Connected T06/T07/T12 and local quality/regression checks passed. The implementation and quality
+repairs were committed and pushed with normal hooks, and all eight substantive document mirrors
+were read back in full at their recorded source revisions. Qualify the latest documentation
+clarification with its current-head feature CI/reviews and refreshed changed mirrors, then record
+actual completion evidence in Beads. Merge and final owner acceptance retain their actual
+authorization boundaries.
