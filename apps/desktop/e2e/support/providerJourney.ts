@@ -1,4 +1,4 @@
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 export const JOURNEY_MODEL = 'fixture-journey-model';
@@ -17,6 +17,36 @@ export type ProviderRequest = {
   tools?: Array<{ function: { name: string } }>;
 };
 
+async function readJourneyRequest(req: IncomingMessage): Promise<ProviderRequest> {
+  let raw = '';
+  for await (const chunk of req) {
+    raw += String(chunk);
+    if (raw.length > 250_000) throw new Error('Provider request exceeds fixture bound');
+  }
+  return JSON.parse(raw) as ProviderRequest;
+}
+
+function validateJourneyRequest(
+  body: ProviderRequest,
+  requestCount: number,
+  toolName: string,
+): boolean {
+  if (requestCount > 2 || body.model !== JOURNEY_MODEL || !body.stream) {
+    throw new Error('Unexpected provider request count, model or streaming mode');
+  }
+  const resumed = requestCount === 2;
+  if (
+    resumed &&
+    !body.messages.some((m) => m.role === 'tool' && m.tool_call_id === JOURNEY_CALL_ID)
+  ) {
+    throw new Error('Resume did not preserve the original tool-call identity');
+  }
+  if (!resumed && !body.tools?.some((tool) => tool.function.name === toolName)) {
+    throw new Error('Real reasoning did not expose the expected tool');
+  }
+  return resumed;
+}
+
 /** Only the external provider is scripted; no reasoning/graph/approval code is replaced. */
 export async function startJourneyProvider(
   command: string,
@@ -33,12 +63,7 @@ export async function startJourneyProvider(
         if (req.method !== 'POST' || req.url !== '/v1/chat/completions') {
           throw new Error(`Unexpected provider route: ${req.method} ${req.url}`);
         }
-        let raw = '';
-        for await (const chunk of req) {
-          raw += String(chunk);
-          if (raw.length > 250_000) throw new Error('Provider request exceeds fixture bound');
-        }
-        const body = JSON.parse(raw) as ProviderRequest;
+        const body = await readJourneyRequest(req);
         if (options.failFirst && attempts.length === 0) {
           attempts.push({ status: 503, model: body.model });
           res.writeHead(503, { 'content-type': 'application/json', 'retry-after': '0' });
@@ -47,19 +72,7 @@ export async function startJourneyProvider(
         }
         attempts.push({ status: 200, model: body.model });
         requests.push(body);
-        if (requests.length > 2 || body.model !== JOURNEY_MODEL || !body.stream) {
-          throw new Error('Unexpected provider request count, model or streaming mode');
-        }
-        const resumed = requests.length === 2;
-        if (
-          resumed &&
-          !body.messages.some((m) => m.role === 'tool' && m.tool_call_id === JOURNEY_CALL_ID)
-        ) {
-          throw new Error('Resume did not preserve the original tool-call identity');
-        }
-        if (!resumed && !body.tools?.some((tool) => tool.function.name === toolCall.name)) {
-          throw new Error('Real reasoning did not expose the expected tool');
-        }
+        const resumed = validateJourneyRequest(body, requests.length, toolCall.name);
         res.writeHead(200, { 'content-type': 'text/event-stream' });
         const emit = (delta: unknown, finishReason: string | null, usage?: unknown) => {
           res.write(

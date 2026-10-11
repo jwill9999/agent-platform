@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -27,6 +28,21 @@ it('binds review evidence to copied content independently of later source edits'
   expect(await readFile(join(first.root, 'plan.md'), 'utf8')).toBe('original');
   expect(await readFile(join(first.codexHome, 'config.toml'), 'utf8')).toContain(
     'sandbox_mode = "read-only"',
+  );
+});
+it('keeps UTF-16 manifest ordering and material identity independent of input order', async () => {
+  const root = await source();
+  const names = ['é.md', 'a.md', 'Z.md'];
+  for (const name of names) await writeFile(join(root, name), name);
+  const first = await prepareReviewSnapshot(root, names);
+  cleanup.push(dirname(first.root));
+  const second = await prepareReviewSnapshot(root, [...names].reverse());
+  cleanup.push(dirname(second.root));
+  expect(first.manifest.map((entry) => entry.path)).toEqual(['Z.md', 'a.md', 'é.md']);
+  expect(first.manifest).toEqual(second.manifest);
+  expect(first.materialDigest).toBe(second.materialDigest);
+  expect(first.materialDigest).toBe(
+    createHash('sha256').update(JSON.stringify(first.manifest)).digest('hex'),
   );
 });
 it('rejects credential/configuration directories even when nested in evidence', async () => {

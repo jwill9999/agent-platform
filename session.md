@@ -1,5 +1,50 @@
 # Native development consolidation handoff — 11 October 2026
 
+## Current PR299 detailed-analysis follow-up
+
+The first bounded quality repair was pushed at `58d3399a` in PR299. Normal hooks passed
+124 desktop and 1,141 workflow tests; both full specification/session mirrors were read back.
+Actual fresh Sonar reports a green quality gate but a Blocker `S2699` in the new network test:
+the child process's assertions are not visible to its parent test analyzer. A bounded follow-up
+keeps all child effect assertions and checks the child-reported three forwarded and three denied
+requests explicitly in the parent. All 11 HTTP/network cases passed again. Independent review,
+normal push, refreshed full mirrors and fresh detailed hosted clearance are still required.
+The ordered validation await has one disclosed Minor report and remains sequential intentionally.
+PR286 remains unmerged; prior full scan/VM success does not qualify a changed repair head.
+
+## Final quality repair continuation — 11 October 2026
+
+PR298 is merged into `feature/harness-backlog-review` at `4cf29b18a7a4150710df3cc36d9d135a7243d050`,
+with reviewed tree `dbbd092b84eff20ca566d321f0723d88613f04f9`; all nine executed feature checks passed.
+Both complete specification/session mirrors read back at `d74e63af`. PR295 and PR288 remain qualified
+and merged, their children closed. Actual PR286's new-head ordinary full Promptfoo run `38105914455`
+succeeded; old token-limit failures are retained historically, not reclassified. Actual new-head VM and
+all remaining gates still need terminal qualification.
+
+Detailed Sonar analysis at `4cf29b18` reports a green quality gate but two Critical complexity and two
+Major nested-ternary findings in promoted code. Repository completion is blocked by those Critical
+findings despite the green check. Independent source triage approves a bounded behavior-preserving
+[repair](docs/tasks/agent-platform-native-staging-sonar.md), `agent-platform-native-staging-sonar`,
+on `task/native-staging-sonar-repair` from the actual feature. It preserves snapshot validation/order/
+digests/cleanup, provider HTTP bounds/retry/SSE/resume identity and loopback-only fetch forwarding.
+The 37 Minor reports have explicit source-backed retained-behavior dispositions; no suppression,
+parallelization, scanner waiver or rule weakening is authorized. Repair source/tests, independent
+review, complete mirrors, task-to-feature delivery and fresh detailed finding clearance are required.
+Every changed protected head needs its own genuine full scan, actual VM and all checks/reviews.
+
+The bounded seven-file source and requirement/scenario contract are independently approved without
+findings. Local provider HTTP/network regressions passed 11 cases; the complete affected workflow
+suite passed 1,141 tests with 77 existing optional integration skips, including snapshot identities
+and committed skill boundaries. A supposed two-file command selected that whole suite because of a
+literal script `--`; its actual coverage is recorded. Affected typecheck/lint and the provider source's
+explicit desktop-package typecheck passed; the earlier root-only missing Node declarations are retained.
+Normal publication/feature gates and fresh detailed Critical/Major clearance remain required.
+
+Read live Beads and PR286 before resuming: if the repair/final promotion is already delivered, verify
+its actual source/evidence instead of repeating it. Parent stays in progress through final acceptance
+and verified branch cleanup. PR283, separate paused refs/dirty work, all archive bytes and protected
+controls remain separate and unchanged. Next priority remains owner-led backlog review after consolidation.
+
 The owner authorized completing PR295, PR288 and PR286, then recovery-protected cleanup of
 verified delivered branches. PR283 and the unfinished orchestration work remain paused and separate.
 This is native development; historical prototype discovery, broker, admission, gateway, budget and
