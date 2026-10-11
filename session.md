@@ -1,3 +1,36 @@
+# Current handoff — diagnostics MVP planning, 11 October 2026
+
+The prior visibility documentation delivery below is complete: PR300/PR301 delivered it to staging
+`7814b59845b52ad5f850bfc99b7baee0e6742a25`; temporary documentation branches were removed with
+recovery protection, and Beads closed/synced. Paused PR283 and the four orchestration refs remain
+separate. Historical pending delivery instructions below are not active work.
+
+The owner selected developer diagnostics as the next planning priority. Current work is the
+[bounded diagnostics MVP plan](docs/planning/agent-observability-mvp.md), canonical
+[V1 spec](docs/tasks/agent-platform-harness-v1.md), [verification plan](docs/testing/agent-observability-mvp.md)
+and [independent critique](docs/reviews/agent-observability-mvp-plan-review.md).
+Planning branch: `task/observability-mvp-plan`, from `feature/agent-observability` on actual staging.
+
+Agreed: foundation first; local single-user SQLite behind one small storage adapter; configurable
+seven-day retention; safe request/model/tool timings and failure metadata; essential backend
+logging; readable report plus structured data; small explicit export action from packaged app or
+browser for manual sharing. External models remain supported; diagnostics stay local unless shared.
+Dashboards, accounts, uploads, other backends and execution-control changes are deferred.
+
+The final written plan has passed independent critique after three bounded corrections to local
+access, backend-unavailable export and SQLite journal bounds. It is being published for the owner
+implementation decision. No runtime implementation,
+installation or new application test execution has begun. V1 and its parent remain open; the old
+review-gate edge is retained pending the owner's requested final implementation decision, after
+which only the V1 edge should be reconciled. No broad gate closure or paused-work resumption.
+Next handoff is the completed reviewed plan to the owner, not an automatic implementation start.
+Estimated implementation effort is 4–6 focused engineering days with a two-day progress checkpoint.
+Canonical Beads root stays the primary repository; preserve its dirty files and the paused checkout.
+
+<!-- markdownlint-disable MD025 -->
+
+## Earlier session history retained below
+
 # Native development consolidation handoff — 11 October 2026
 
 ## Current follow-up — paused work visibility

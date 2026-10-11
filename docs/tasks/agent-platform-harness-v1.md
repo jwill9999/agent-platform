@@ -1,3 +1,71 @@
+# Correlation and safe event contract — bounded diagnostics MVP
+
+**Beads issue:** `agent-platform-harness-v1`
+
+**Parent:** `agent-platform-llm-observability-export`
+
+**Status:** planning-only proposal, final owner implementation decision pending.
+
+## Current task requirements
+
+Implement R1–R7 in the [11 October feature contract](../planning/agent-observability-mvp.md):
+unique request/operation/attempt observations; safe focused backend logging; durable local SQLite
+history behind one adapter; configurable seven-day retention and bounded failure behavior;
+readable and structured reports; one packaged-app/browser export action; unchanged execution
+permissions and recovery. All technical bounds and privacy rules in that contract are normative.
+The earlier 1–2 day envelope estimate is replaced by 4–6 focused engineering days for this larger
+but bounded support workflow. No implementation or new runtime test has started.
+
+## Dependency order
+
+Current upstream: `agent-platform-harness-review-gate` remains open and blocks V1 in Beads.
+Planning can proceed. At the requested final owner implementation checkpoint, reconcile only the
+V1 edge with the scoped decision; retain the broader gate and all unrelated records. This proposal
+does not require a prototype broker/contract, paused pilot, SDK modernization or dashboard.
+Existing downstream V2/V3/V4/R1/R4/K1 and local visibility/reliability records are retained. V1
+completion does not close them or waive their own acceptance requirements. Beads is authoritative.
+
+## Implementation plan and branch mapping
+
+Source: staging `7814b59845b52ad5f850bfc99b7baee0e6742a25`, separate clean owned worktree.
+Planning: `feature/agent-observability` → `task/observability-mvp-plan` (intermediate).
+After owner agreement: `task/diagnostic-event-foundation` from the pushed planning tip is the
+single implementation segment tip, carrying this plan into a PR to `feature/agent-observability`.
+Staging is the eventual protected destination when authorized; never main. No implementation
+branch exists yet. Preserve all paused refs and dirty/unrelated checkouts.
+
+Milestones within this one task: identity/projection; adapter/lifecycle; report/CLI/export;
+connected verification and independent source review. The implementer owns final integrated
+T12 acceptance as well as individual tests; do not defer it to the broader V5 task.
+The two-day checkpoint and bounded retry/escalation rules are in the feature contract.
+
+## Tests and definition of done
+
+The [verification plan](../testing/agent-observability-mvp.md) maps every requirement to T01–T12,
+source files, real backend/file assertions, environments, limits and evidence. All are required
+before implementation completion. Model-provider doubles are disclosed; no paid live call required.
+For planning completion, validate these documents and obtain independent critique; do not claim
+application tests have passed. [Planning review](../reviews/agent-observability-mvp-plan-review.md)
+records findings and their dispositions.
+
+V1 closes only after R1–R7 and T01–T12 pass on the accepted source, dependencies are reconciled,
+independent implementation review has no actionable findings, affected quality gates and detailed
+Sonar/Problems findings clear, and the segment-tip PR has merged into its feature under actual
+owner authority. Record exact tested/merged revisions, safe artifacts and full documentation
+mirrors/readbacks. Then close/read back Beads and verify Dolt push. Parent closure requires its
+remaining broader scope; feature-to-staging delivery is separately gated. Planning publication
+leaves V1 open and the prior blocker intact. There is no new approval gate beyond the owner's
+explicit request to review the finished plan before implementation.
+
+## Historical proposal — preserved, superseded for this V1 proposal
+
+The following earlier body is retained verbatim as history. Its broker, prototype implementation
+contract, mandatory intent-storage and broad review-gate instructions do not govern this native
+observational MVP. Its broader obligations remain in the existing backlog; none is silently claimed
+delivered. Current proposed V1 scope is above, pending the final owner decision.
+
+<!-- prettier-ignore-start -->
+````text
 # Correlation and safe event contract
 
 Beads issue: `agent-platform-harness-v1`. Status and scheduling authority: Beads.
@@ -65,3 +133,5 @@ Feature: Truthful local run state
   Scenario: Mandatory intent storage fails
     Then a side-effecting action is not dispatched
 ```
+````
+<!-- prettier-ignore-end -->
