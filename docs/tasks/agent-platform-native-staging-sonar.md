@@ -71,6 +71,15 @@ gate publication and delivery; these local results do not clear the old hosted C
 
 ### Remaining delivery
 
+The first reviewed repair was published in PR299 at `58d3399a`; normal hooks passed 124 desktop
+and 1,141 workflow tests, and both complete specification/session mirrors were read back. Its fresh
+Sonar quality check is green, but detailed analysis reports a Blocker `S2699`: assertions embedded
+in the network-guard child program are not visible to the parent test analyzer. The follow-up retains
+those child assertions and returns the actual forwarded/denied counts for an explicit parent assertion.
+All 11 HTTP/network cases passed again. The relocated sequential path-validation await is one
+disclosed Minor report; ordering remains intentional. The follow-up needs independent source review,
+normal publication/mirror refresh and fresh hosted clearance; old-head success cannot qualify it.
+
 1. **Completed:** independent source-backed triage and requirement/scenario critique approved.
 2. **Completed:** bounded extraction/comparison repairs, HTTP/snapshot/network regressions,
    affected package typecheck/lint and complete workflow tests passed; implementation review approved.

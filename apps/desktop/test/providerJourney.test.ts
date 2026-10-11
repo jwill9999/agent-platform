@@ -172,10 +172,17 @@ it('keeps loopback-only fetch enforcement and forwards each original input/init 
       assert.equal(calls.at(-1).input, input);
       assert.equal(calls.at(-1).init, init);
     }
+    let denied = 0;
     for (const input of ['https://remote.invalid/v1', new URL('http://127.0.0.1.attacker.invalid/'), new Request('http://localhost.attacker.invalid/')]) {
       assert.throws(() => globalThis.fetch(input), /forbids non-loopback/);
+      denied += 1;
     }
     assert.equal(calls.length, 3);
+    process.stdout.write(JSON.stringify({ forwarded: calls.length, denied }));
   `;
-  execFileSync(process.execPath, ['-e', program, guard], { stdio: 'pipe' });
+  const result = execFileSync(process.execPath, ['-e', program, guard], {
+    stdio: 'pipe',
+    encoding: 'utf8',
+  });
+  expect(JSON.parse(result)).toEqual({ forwarded: 3, denied: 3 });
 });

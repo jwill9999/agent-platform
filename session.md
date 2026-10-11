@@ -1,5 +1,17 @@
 # Native development consolidation handoff — 11 October 2026
 
+## Current PR299 detailed-analysis follow-up
+
+The first bounded quality repair was pushed at `58d3399a` in PR299. Normal hooks passed
+124 desktop and 1,141 workflow tests; both full specification/session mirrors were read back.
+Actual fresh Sonar reports a green quality gate but a Blocker `S2699` in the new network test:
+the child process's assertions are not visible to its parent test analyzer. A bounded follow-up
+keeps all child effect assertions and checks the child-reported three forwarded and three denied
+requests explicitly in the parent. All 11 HTTP/network cases passed again. Independent review,
+normal push, refreshed full mirrors and fresh detailed hosted clearance are still required.
+The ordered validation await has one disclosed Minor report and remains sequential intentionally.
+PR286 remains unmerged; prior full scan/VM success does not qualify a changed repair head.
+
 ## Final quality repair continuation — 11 October 2026
 
 PR298 is merged into `feature/harness-backlog-review` at `4cf29b18a7a4150710df3cc36d9d135a7243d050`,
