@@ -1,5 +1,39 @@
 # Native development consolidation handoff — 11 October 2026
 
+## Current follow-up — paused work visibility
+
+Last updated: 11 October 2026. Paused orchestration labelling is complete; the owner has now
+authorized integrating its documentation into staging and removing the two temporary branches.
+
+The consolidation below is complete: PR295, PR288 and PR286 merged; staging is
+`3a22ac8f45d2257fe1a9200e936e4bd2923c9eae`. All 14 final executed checks, actual full scan,
+packaged macOS VM and review gates passed. The integration task is closed and synced;
+17 delivered remote/local branches were removed with 20 recovery tags. Its monitor is paused.
+
+Next: `agent-platform-paused-work-visibility` is in progress at P1 with the completed integration as
+its upstream dependency. Its [specification](docs/tasks/agent-platform-paused-work-visibility.md)
+records a paused title/label and four-branch inventory for PR283, plus relevant Beads notes.
+The title, label, complete description, all ten deferred Beads records and preserved branch/dirty
+work identities have been read back; metadata closure and Dolt sync completed. The task is reopened
+only for the subsequent owner-authorized documentation delivery. Specification work uses
+`task/paused-work-visibility` from `feature/paused-work-visibility`, based on qualified staging.
+These new follow-up branches are active documentation work, separate from the four paused refs.
+
+Preserve PR283's base/head/draft state, all paused branch tips and dirty/unrelated checkouts.
+Independently review and publish the two-file source; merge task to feature after current checks
+and reviews pass, then require fresh protected staging full scan, actual packaged macOS VM and
+all checks/reviews before guarded squash. Verify the staging tree, recovery-protect and remove
+only the two delivered visibility branches, refresh mirrors/Beads and close after Dolt sync.
+The owner may review the live backlog in parallel; the next product priority remains undecided.
+The immediately following PR299 and final-quality-repair sections are preserved pre-completion
+snapshots. Their pending review, publication and hosted-clearance steps were subsequently completed:
+PR299 merged into its feature at `583da680ae84e79cb8723b808792c8321d9b4c7e`, then PR286
+merged into staging at `3a22ac8f45d2257fe1a9200e936e4bd2923c9eae`. Statements below that
+PR286 is unmerged or that those repair gates remain pending are superseded by those verified
+deliveries. They do not describe active work. The visibility documentation delivery above is still
+active; paused orchestration remains deferred. Consult live Beads and current PR state before
+acting on any other dated historical section.
+
 ## Current PR299 detailed-analysis follow-up
 
 The first bounded quality repair was pushed at `58d3399a` in PR299. Normal hooks passed
