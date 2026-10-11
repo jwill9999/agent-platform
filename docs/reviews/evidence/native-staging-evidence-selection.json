@@ -1,0 +1,1332 @@
+{
+  "status": "Historical inert evidence copied from reviewed feature; not fresh execution or pilot approval",
+  "source_repository": "jwill9999/agent-platform",
+  "source_revision": "6ca3cd1baf7ff13add1da57dc0ecc330d2ab2cec",
+  "initial_staging_revision": "a5a1641c3d2a5ef317c05fa45c6190e7189c1915",
+  "task": "agent-platform-native-staging-evidence",
+  "created_at": "2026-10-10T15:20:01.684164+00:00",
+  "artifact_count": 220,
+  "total_bytes": 3958506,
+  "artifacts": [
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/broker-image-binding.json",
+      "source_blob": "165d46752374e3a3b31a7290de98589aeb109c92",
+      "bytes": 1274,
+      "sha256": "693c224d665803066223bffaeab2aa6d3e977e39dae38ccd1801f4d05f001647"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/current-image-generation-driver.txt",
+      "source_blob": "4f0c7b32ae215ade6bc94a5e2c5d6b27c65501e0",
+      "bytes": 5851,
+      "sha256": "8e9651a1a3be11e9c89feada5b2fc08e3036428dc2d6c9942aeab33caaf38a90"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/current-image-generation.json",
+      "source_blob": "3f52ce20f27eaed798f56e09d51d1dcd1e6dfdaa",
+      "bytes": 2575,
+      "sha256": "1d474cbbd5d14811735efffff089319c8cbc384cb4a48e28cc43d5fd32e8e17c"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-1.json",
+      "source_blob": "103353f129070a7a54dc65b6737b4b5c3b10bac7",
+      "bytes": 11341,
+      "sha256": "8491b47820f8ecaf3f818193e82d10e6f07efa517aa2f6b97ad97df1cea3c450"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-10.json",
+      "source_blob": "566571a29a16bcfaf4118f7ad9ae8eace9a2d3ad",
+      "bytes": 8965,
+      "sha256": "bb90a21c49c76811f992951b99f2bf91af7b99390cb7c09eeb7af76347767e70"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-11.json",
+      "source_blob": "ff071209c2dfbac18c32a574ce01d52bc026ecb0",
+      "bytes": 8276,
+      "sha256": "f8618fd13bf4f703d9379aa67cc9c2d45e02edfaea852efec248bb4c298e7ec7"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-12.json",
+      "source_blob": "7d5c51cb36c3d116a67653053fe81dca852ab924",
+      "bytes": 8939,
+      "sha256": "9b18132b7ebb8f641b334e86523b0ff6ef7a3694194be3d52f822e87c0369335"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-13.json",
+      "source_blob": "e832b440896b1cf9d01171bd62c4ba375dea5b73",
+      "bytes": 9281,
+      "sha256": "e1b3a1534f4a426b0227ad5e5c25d8c47ceac4c8c5bf691a41e94f4d6be583bb"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-14.json",
+      "source_blob": "c613a4d881185a400d96066529c755218b68cd96",
+      "bytes": 9912,
+      "sha256": "57bd8a03c2e022555d2e55298f1274f6c6f9a1c4fc7ce2097b5803105b7b1341"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-15.json",
+      "source_blob": "70b6fc7572f73743d5132f99e0476bfe27e309d4",
+      "bytes": 8682,
+      "sha256": "a449864c9cf24a2f1e27e34f8f116339ced71cea41da96d383e825e3ab045c9e"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-16.json",
+      "source_blob": "c014a1b477908bf7d348da9cfdad67569b36ad89",
+      "bytes": 9138,
+      "sha256": "d96e45063c831de007f96d8715b223ea6d3e98dfeff89e9049adcbf7f7c449a0"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-17.json",
+      "source_blob": "6901ab64ee08b2994af611bc4c3653e5303b19df",
+      "bytes": 9540,
+      "sha256": "d03289bfd3e5284c04080d3a2209204cf62aaf1b8c892f8a1214d00c1e7af900"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-18.json",
+      "source_blob": "0f8a297e1deaa3055d1d4698eb87c84c0a0ed9b0",
+      "bytes": 9705,
+      "sha256": "81bcf23676d90067e3d92fd9ffbe4ffbb80abebb30bcb2190673997f8bb0e881"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-19.json",
+      "source_blob": "e1d87a521c318f9c1822cab021a8d9ad2dcc8dd5",
+      "bytes": 9725,
+      "sha256": "15f91b4bd729c453de53d4737edcae4c79381c578f89e0cf0fe1bbe39b45052a"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-2.json",
+      "source_blob": "18c31b8fdfdfc70b759d5a54d2cd6d1e4d90b0ab",
+      "bytes": 9389,
+      "sha256": "e5b2f7ebef9f5c638fb0ac51c8c45fb5f7758211d8a4c9a11f4e7b1ccaf41f36"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-3.json",
+      "source_blob": "b3b92d144ee7565136e749c38a750e0d89b20755",
+      "bytes": 9355,
+      "sha256": "199a3d2c2fd2d9880a85078b6cdce944ea5cc3ffbddb1ade4c8a54e76b8d6589"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-4.json",
+      "source_blob": "b8dff374deda9c4ab3d5359add24190807678893",
+      "bytes": 8320,
+      "sha256": "c9e8b59d2511952f23030701b55b7195ad769bcc955ff5ee54419928cf175684"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-5.json",
+      "source_blob": "140bb0f91a7c9b151a871f1f44f111316cd2ac05",
+      "bytes": 8875,
+      "sha256": "ce65676f1921b9be572a891c81fd1b76a569bcdb32b0ab9f71708a25c8811184"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-6.json",
+      "source_blob": "11822e37b68d8f6838d80f7100cc6e72da149498",
+      "bytes": 8368,
+      "sha256": "47999f5da085385f6abd9e5bde8a51035890d657b67fd4f05413483aacc8997f"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-7.json",
+      "source_blob": "de72c7da53d2fae7463db095fbc63d9a93cb62a9",
+      "bytes": 7646,
+      "sha256": "4a53ee25143e9a3b697e4f5cc1ec491c371013f2f69943029363d057a7eec0d6"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-8.json",
+      "source_blob": "67e4691d7f70ff1b36679639fcc8d540a099ae4f",
+      "bytes": 8572,
+      "sha256": "8cadcd8fb67d48ef1ac1d4d364a92ed71f6a29e774e29942e476a427e699f4f9"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/implementation-review-9.json",
+      "source_blob": "4575df87eaac6fa7f9ec840865502e7b89811a01",
+      "bytes": 8534,
+      "sha256": "56cdcf6a29ace749ad9f6c56ead12b225d0df5920c861acaa6870080c1173207"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/local-verification.json",
+      "source_blob": "bb00849af65510c4d16dc1a1fe91aea41ff6f185",
+      "bytes": 124340,
+      "sha256": "cb90cc0b57cfe3dc65d9b76f88f4ba528a46c065c5f2e64878aed93be85c2b86"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/plan-review-1.json",
+      "source_blob": "fb41b0c1c9146c289fb51e89274c157c87b9fab8",
+      "bytes": 9241,
+      "sha256": "ec16b87b074f56d96553c07ba3ab8fd6bfd530f1faea049f2d0c76dfd8edbdac"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/plan-review-2.json",
+      "source_blob": "8c414e092625b8474af585fb29211caab172ba5e",
+      "bytes": 6564,
+      "sha256": "5743c1ee794c4c1e8abd3679b3b0398506debbbdf47467bc918099be99fb6d47"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/plan-review-3.json",
+      "source_blob": "e9eba259e73ff7340b375943c9b732adf90f1b5a",
+      "bytes": 5426,
+      "sha256": "b6fb6d5a06241f68358631a0799fdedfa7ddebafdfa8d57e07e5ac6e64a20e64"
+    },
+    {
+      "path": "docs/reviews/development-lifecycle-evidence/plan-review-4.json",
+      "source_blob": "57a184334f94baabd3329453aeec41e570f02ae0",
+      "bytes": 2830,
+      "sha256": "f68837e98c5f82d50148474503a40e30a4a62655d4dae334ecde0f665b0e4bc2"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-checkpoint.json",
+      "source_blob": "c54b5f793f6593f1f06e1554155a7353f00efa0c",
+      "bytes": 18587,
+      "sha256": "5c143d9d5d3462bf78aa39e5000548a5e09d9db7d352140e766e3a38adf89756"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-code-review-round1.json",
+      "source_blob": "1d0a99fdd4c9dd496773eaaa76c8391424879021",
+      "bytes": 11395,
+      "sha256": "7c3437a62d9898f4b2ab2ced5db1ac7e8685b334275d3ca6c7396a4751ef39fe"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-code-review-round10.json",
+      "source_blob": "5f30b1c8dc7d861fd50b002eeb566936a2f937b2",
+      "bytes": 2158,
+      "sha256": "ac1b7d81126c1924668c48eb3ea4a4baad3b9b55ebd4679ecb7a38a238d4ca42"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-code-review-round2.json",
+      "source_blob": "36c1182c356d694da177ef8b0566597437827357",
+      "bytes": 10385,
+      "sha256": "0452f9a61f97ef0fa52c728ab549e6639b29f8994c44be79636cb24f6cad507b"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-code-review-round3.json",
+      "source_blob": "820223fb91dd70d7939730607f71da1529b2b80c",
+      "bytes": 10911,
+      "sha256": "0851395797137bfec531a65e2c6ecd7d9a9f07ad42b19e2ddc8c5aecaa384ecb"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-code-review-round4.json",
+      "source_blob": "b11f80ff4480948955370b779ab9d511e8839658",
+      "bytes": 13218,
+      "sha256": "8420bbbe971cacd13329f4ceac478b8c0b256cfd4ee1b72cdbec76c302d70dc6"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-code-review-round6.json",
+      "source_blob": "5c10ba69a265a503585499fdc00be1b402b8c753",
+      "bytes": 13336,
+      "sha256": "692f448ecf979fae8e927930fd824e5f1bf1cc8e3616438524cb371730f08ef5"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-code-review-round7.json",
+      "source_blob": "8f4a9c108fcce3ffc0abe0294a68f232743543c9",
+      "bytes": 10306,
+      "sha256": "a2781de2532230a33510df7bbc770dff4909d34a31bd545e55d7a9170217df3f"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-code-review-round8.json",
+      "source_blob": "33428fddb8758223dcd5832fcebc01550cc4ba61",
+      "bytes": 9559,
+      "sha256": "176621ee0331c20ec1ff25b78ac057daed5d3be15a03899571d28f0da1724c75"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-code-review-round9.json",
+      "source_blob": "a0a18f22309cf5cfb3b40974d042a111e494d148",
+      "bytes": 8203,
+      "sha256": "83a93bc152d6c1e0c755e03a644c0500ea637166c94649c4e035699b5ec093f1"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-composed.log",
+      "source_blob": "c06aee0ae32f28697a3b8afeea815c0e05ea1d9d",
+      "bytes": 1009,
+      "sha256": "d35082387e851e0da14834f7c9eeb1dc34f0784d13b089702066f758af9a7314"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-connected.log",
+      "source_blob": "76dbba7a1c0881437297784bb52cebc5f5823cc6",
+      "bytes": 2628,
+      "sha256": "a7834bdd91eca726f9e00bdbc4dbf0798a6e32ce008edc08834174dfea3cc6d1"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-dispatch-races.log",
+      "source_blob": "93c496c8b7eabb5f8d0e380a11cc76091c6ac4c5",
+      "bytes": 5191,
+      "sha256": "7f0c9fcc152cc34f8d4aeb7b0535252bd84eccece4cde7e998c1bef249512fac"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-lint.log",
+      "source_blob": "1de99044a995a3d2c5779f80d975a1c9f80ea6e3",
+      "bytes": 163,
+      "sha256": "8896c1d45d24ed7b354798eda292a9c98931562d133674ad19f109bc648b42a1"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-linux.log",
+      "source_blob": "6bdcf94a7ae208860d9372f0754f76acb545ded6",
+      "bytes": 18034,
+      "sha256": "f93288b1687435f998131147b27d7284af3a64fce9e184df15250790ac99480d"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-native-paths.log",
+      "source_blob": "cdd97862731b168f3d79a6ff8c100d5b70ce1dc6",
+      "bytes": 9364,
+      "sha256": "972ac9a529d71525ca666c796f24b3e906ded9d61fcd7867afd6af3b2e951a3b"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-quality-followup.diff",
+      "source_blob": "38caa8a9ef41929d645884827d7c7e77a8f454f0",
+      "bytes": 3305,
+      "sha256": "41576e95e68f43e33589035715339f25b4d4ce4aabd022fdff95455c44bc1016"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-quality-followup.log",
+      "source_blob": "0eb59627bbb2b7413c1d015bdf856f10d8d693ab",
+      "bytes": 3579,
+      "sha256": "35ee6530544e548f75cf48842addaabb4183c20fc206592b5d0c4b11eaabeaf4"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-races.log",
+      "source_blob": "7afbf360acb67bc343eda1c5c65fd7f442bd9fc9",
+      "bytes": 7968,
+      "sha256": "184e2797d1cafe3f5864bd34f8588297c32f09e35115eedbb7a6f9bd9974ec0c"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-repair-verification.json",
+      "source_blob": "4e57d4f4d6974834fc42c81e962b0f922bee95e7",
+      "bytes": 41039,
+      "sha256": "918b988ad4d36bd90039766785bb4fe13b6864cda3b903277c0606ff6b9bd0c5"
+    },
+    {
+      "path": "docs/reviews/evidence/approved-document-binding-test-types.log",
+      "source_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/cancellation-contention-reproduction.txt",
+      "source_blob": "be61e4b54c4e9f78fd620ac0c2a4c30eda27f88f",
+      "bytes": 6680,
+      "sha256": "83b16904414bf54ae3288e7e51f639563e6fe815176d9ccd94d7c5af1b71617e"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/cancellation-repair-tests.txt",
+      "source_blob": "bb2a7ea64bd6ad46c4717d0671f3930ffb11a4f1",
+      "bytes": 3033,
+      "sha256": "20af43c84bd955cf1f5bc3ec0e782c4e826a02f53b8576a8a33bf2907ac60d30"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/cancellation-writer-regression.txt",
+      "source_blob": "b400bf7d83841b9fe64810091aed255ad8c817f9",
+      "bytes": 593,
+      "sha256": "fa924256d3cf0a55732449b9cf7480364845eefc58406098a676dd8698ccda79"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/child-budget-test.txt",
+      "source_blob": "36393b6472cb08bbb444db144dfe9999da01e65f",
+      "bytes": 419,
+      "sha256": "b8321acbc15bf07f55c766862c7863ea09836565df34e9ff2e675be055c5ecdd"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/configuration-qualification-manifest.json",
+      "source_blob": "e1d986be105bb443672daa972dce5737afbf7567",
+      "bytes": 42034,
+      "sha256": "af5d79182ed5064304f71b71eac812f56edd28e0e4ce369051f3dbd7a81f1a5d"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/configuration-run-cancellation-failure.txt",
+      "source_blob": "3c991423364464812ddf6a322c6beb47cdcd6c84",
+      "bytes": 39777,
+      "sha256": "1de2a1eff0f9894a8cb09d017b77de72af64d9fe782674ca0db7be08021e0d7f"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/connected-five-journeys.txt",
+      "source_blob": "171aa88643d6b617900b7424466f9bc9e1e39fd3",
+      "bytes": 930,
+      "sha256": "988321dd939d88c6bfa8127f82e4d1cc25c5592a30f3e63bf91bc5e0ac19cae8"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/connected-import-phase-tests.txt",
+      "source_blob": "4d66182bc665e4678ed8950101183b66ea2201a1",
+      "bytes": 7917,
+      "sha256": "212ad5592a975d1bdb7d92e554244a07470427f7bfa4dcbe4da17a8fdafa2cba"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/connected-lost-close-ack.txt",
+      "source_blob": "27967b2d2e75ce4605263aaec3650c052e389f40",
+      "bytes": 496,
+      "sha256": "2e9f03e9c637e5591f7fad88591b92f74b10591c342d3a31d1d757f660adb6ad"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/connected-negative-fixture-failure.txt",
+      "source_blob": "51bd431a68d118736e22947c603e283a88b14b9c",
+      "bytes": 3176,
+      "sha256": "3af192effe6db47388f5cb7038b26413b365e1c5eec3746d98f66eea0c9e744f"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/connected-negative-passed.txt",
+      "source_blob": "ba78668b722da65e78d59db7b14ab63202031bd8",
+      "bytes": 847,
+      "sha256": "ab23f99ecb976fb2982ac60b4db0bf7afcc86aef77ddecd0f1586e55fab86926"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/coordinator-recovery-tests.txt",
+      "source_blob": "33d4cbd64b7c5ce634a6d391aa6ed34e0d25dfd9",
+      "bytes": 3622,
+      "sha256": "3fc6801d97f980dd764342d36585072fc7ac6551133e1100945708e3e8cf0958"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/coordinator-repeat-repair-tests.txt",
+      "source_blob": "098c6ce7c3b34a391162dc6d6c4c42605921b2f2",
+      "bytes": 2696,
+      "sha256": "dd89cd44ed8bf619d869d4de8e06c08d54fdf5c58f3a5532000a7ab538a48022"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/coordinator-transport-tests.txt",
+      "source_blob": "a6d2594da96f33660b75affc9ed2a36103642fd9",
+      "bytes": 337,
+      "sha256": "0c569edfb5325298043c587c106c17ae2d6e2272840cfd39ae0bfbb1a5aebfe6"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/dependency-cycles.txt",
+      "source_blob": "0fba3694834163e810e12a1ead4395697ee36f76",
+      "bytes": 2641,
+      "sha256": "a9c65075e494254734298a9f22ecad564cae2a816b347721f32a1e795f7f7896"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/feature-repair-connected.txt",
+      "source_blob": "4c9b944d06b6bf90c44c4cda5534937702f8d8b2",
+      "bytes": 450,
+      "sha256": "3fd2fdff89b7094760c541e548f3cc8286cdd16d5b1b0dff22ce29548eb20b53"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/final-connected-import.txt",
+      "source_blob": "0bb2833a15e367b544e4a4383a37b4cf65b2345e",
+      "bytes": 481,
+      "sha256": "4eeff73d3c2f00caff04c2eb29a5d11e740a7ea5029fc20bfa442eb5097b67a0"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/final-cycles.txt",
+      "source_blob": "235d0ad8bc0f58aa220aff8632f2bd63b3a4668d",
+      "bytes": 2642,
+      "sha256": "94f67781da3be6bdc6236083a6c473efe2f49686737cd24b6df6367cbb76490f"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/final-lint.txt",
+      "source_blob": "1de99044a995a3d2c5779f80d975a1c9f80ea6e3",
+      "bytes": 163,
+      "sha256": "8896c1d45d24ed7b354798eda292a9c98931562d133674ad19f109bc648b42a1"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/final-regression.txt",
+      "source_blob": "a02fb9a9562e5e9a0d283e6473939e8eb23c85e6",
+      "bytes": 57037,
+      "sha256": "dc657f39fb0cb195e6bec8d0f7c6c27b69a09b00fd3db80716fcb4465567fa85"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/final-source-hosted-checks.json",
+      "source_blob": "1e157d31022750b65b7d3734b32b81810333d78d",
+      "bytes": 42521,
+      "sha256": "e3bbda4d631244c2a2a96fb9df341a75d1cc4c25ed997ad290637fde89d8f5fe"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/final-source-hosted-ci.json",
+      "source_blob": "ba48f2f1dc3127b8412e143bb742060e68df8209",
+      "bytes": 11902,
+      "sha256": "d908016e5d4f42795808e3da2e66d4a73ee24b5dd052eaa63d6a5b111061eda7"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/final-typecheck.txt",
+      "source_blob": "b4c580f9950782e523e48a10f43721b341bc0f7a",
+      "bytes": 3746,
+      "sha256": "e26cffb3d62236109ccb30a04d73aee6712fc83f0374631903776812e07908a7"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/full-suite-git-config-failure.txt",
+      "source_blob": "2805a66dfb941574a1f5fcb9c0a3ada6bb529504",
+      "bytes": 52378,
+      "sha256": "04d39b4eb314f814a3f3f1cda08369a1698d399cb3136d80123139a5c44e0161"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/full-workflow-suite.txt",
+      "source_blob": "2d7b9026666f8eb574c9b21783c603654b0af1bd",
+      "bytes": 57653,
+      "sha256": "a268dc724570fd698935f45a29daab8c47987bb393a973a05ab27a9a5806a591"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/import-cleanup-completion-fences.txt",
+      "source_blob": "3e11bb724d3e39eb31a2f32b49f5a0feccc4e168",
+      "bytes": 12370,
+      "sha256": "154d964fa6b4e8b4b6ccdc0b32b38c3c73f38fc56580208d151b92471c8d9605"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/import-owner-wait.txt",
+      "source_blob": "d023bf146d864de3835bfe41ddbe2ade06fa61b2",
+      "bytes": 487,
+      "sha256": "b37f8c868a4f68f9b6727891c2b07b51153dee868e89c9e927ede694ed776bf1"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/isolated-review-13.json",
+      "source_blob": "e0cad750c051e3fa3ce3b20669c5e70e443ba1cd",
+      "bytes": 11124,
+      "sha256": "b336ad1d109592494f3d0b7937b5c9717bbb3548f886598c857329e84f2148b4"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/nine-connected-checkpoint.txt",
+      "source_blob": "e2a299eabd68e3015cce4c5c66cd4f27b762f8c9",
+      "bytes": 1349,
+      "sha256": "43bd7faae5a74dfbbdbe4999a49acf0caa6d86f40d0c5d55f8e6d0037364bd1d"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/nine-connected-final.txt",
+      "source_blob": "19a9e2c952a0554c09810489a8b997665af693d3",
+      "bytes": 1399,
+      "sha256": "31dfe1c097bebe0a8266dd54f96355b51fc5459cc1bfb5c603f7295c10b2ee65"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/node24-adapter-check.txt",
+      "source_blob": "f87015afd5d49909f2a5390781eaffab7f10a8af",
+      "bytes": 4304,
+      "sha256": "da3b42f6aa6caf65653de4221573d53fe67e5175de493a17a57f650d6e365cef"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/node24-e7-regression.txt",
+      "source_blob": "53c89689b734cdbf683bce8047f79afdabbd62ac",
+      "bytes": 58160,
+      "sha256": "d86880fb5907c397973a421c3cf10a4f3264975c7ee4a72d88c52171f8f0da61"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/owned-bootstrap-regression.txt",
+      "source_blob": "49be20f1fbd99e48bf1de97e5844cbef7b70de96",
+      "bytes": 7197,
+      "sha256": "2e4d294c0aaacec093aaae4ebca42538845ffb5311c59acf23a16fe01e5b4f7e"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/owned-connected-final.txt",
+      "source_blob": "d08a4a4b3587d1f35569b363c2ed7bae856dbdf9",
+      "bytes": 579,
+      "sha256": "2cf32583e3f304d39fb62055a7675c1140e30a4f5f5c1d1f44238ea374e5420d"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/owned-connected-three-phase.txt",
+      "source_blob": "1e744a9995f7a30661b7fbad61e5b0e015b2a5d8",
+      "bytes": 579,
+      "sha256": "d6e36dc1fc7ec3e0146633a2e41eb0d18654ba17751494b4ad6181c1ee02cb31"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/owned-focused-initial.txt",
+      "source_blob": "5773d12c4951e1f9d6936bf7e338135a5acbf4c3",
+      "bytes": 15664,
+      "sha256": "16e958b24c936ba793fb661b1240dc42fd8c4b69a6a2c384954f7c42b14413a7"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/owned-full-initial.txt",
+      "source_blob": "026ad5994f4dfc0ef5063a77c1b0d5166622ab52",
+      "bytes": 72509,
+      "sha256": "98e83214cfcd2a017b9c58c7c289bfd5042845ac66e5a1043bf547384ae25422"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/owned-import-lease-renewal.txt",
+      "source_blob": "d2ed4fd0a2c768bfdb126d85ceebf2d5aaac58a2",
+      "bytes": 576,
+      "sha256": "58bc6e66601e656a6e8da264d2189fceafec4303c7014e7fd82664f18cc665b6"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/pinned-git-check.txt",
+      "source_blob": "bd2a8299e2abc6d4903e116c57c9cb6a54319f76",
+      "bytes": 445,
+      "sha256": "e446dc1271c2f49b18580521e6849225c74a0a4b199fcb3bc46a44aa6ed8b52f"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/planner-exhaustion-test.txt",
+      "source_blob": "5b1bd3a0b7aa501d4bce1588ca230504b2536031",
+      "bytes": 409,
+      "sha256": "e94f636ca2856345ef7260902dc414b1a580593d69ef689ee7f66e94497eee49"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/planner-owner-wait.txt",
+      "source_blob": "ec6c7ebc593fb9d6b2ebbc0235b263e06ef13e04",
+      "bytes": 422,
+      "sha256": "fff79388a9c1976968ba9bf801a733d9b6da688db9494102fbf2dbdd673b91fe"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/post-refactor-focused-tests.txt",
+      "source_blob": "a4f56a87aebecff47eb335d23a8898188087954c",
+      "bytes": 15574,
+      "sha256": "b53517ca70817268bb7873ad6c078da469cb376db5454ecad5ea9726d85925fa"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/post-refactor-storage-container-tests.txt",
+      "source_blob": "8652b1728949f5488e040ac9d07d04c92a9ea99e",
+      "bytes": 2263,
+      "sha256": "32000117768155ed9ac9a8f684b56c8cbc22d7f7b945b238fdbb6e27ba6711df"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/private-document-tests.txt",
+      "source_blob": "03deddec439416c2178df2ef4e519401336c1d44",
+      "bytes": 497,
+      "sha256": "7e08be1dfeb9c5d7fb7dcc20386d261c686da7247006cb4bb9ac6a92ce538653"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/qualification-manifest.json",
+      "source_blob": "9135c5d5f52a133abf17ae9235d5d9ceccbabdba",
+      "bytes": 41320,
+      "sha256": "bb1772c2735e443f5219f302ac680a4c3f8d038eeefa50f8f0cbead1eb58985f"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/ref-boundary-tests.txt",
+      "source_blob": "07969b6b462d342dac4ace0f886a461e27d60205",
+      "bytes": 671,
+      "sha256": "14946d0f035db4e702dd417b7b41d086f77203fee8bf74eba6bdb59db5224b04"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/ref-deadline-import-tests.txt",
+      "source_blob": "ab90bf66a58717d6c2c93d09837c8f622f12ca3a",
+      "bytes": 2580,
+      "sha256": "d428563a544cc8b7298a2ff2d460b7fe69381d3a6942747d2d5b01a16280e3dd"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/regression-recheck.txt",
+      "source_blob": "c2fb8d31004be43fd1887396cd4e9baad4d5b1e2",
+      "bytes": 12367,
+      "sha256": "4e1b153dd22dfc9e6db09bd11b15b0de364677f5a25db6b76bef17d4141278aa"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/repair-planning-design-review.json",
+      "source_blob": "9232c7c653a34955598369cdcdfa1e91f8d69f8a",
+      "bytes": 9583,
+      "sha256": "5e0bae863c4debbaa14c6b217fdf38075ecb54ce2c7db95bedc09074ca633510"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/repository-typecheck.txt",
+      "source_blob": "7dd1b7df780ecc4ac1e1a59e1254e1ef332f67a1",
+      "bytes": 3746,
+      "sha256": "0a733b5891f20cad7e6bc8b73d1e8bd01d6e700c819cfd289eddc7044f66106b"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-10.json",
+      "source_blob": "6545cb02cd0cf66d5cded23c3d4a29056a2e812e",
+      "bytes": 10754,
+      "sha256": "3ea605baada545e5ceb5a20076915cf90e74100119ee114b110dd19c41400a64"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-11.json",
+      "source_blob": "ab677939f63fb8eae81c58f531e513915d7e59bc",
+      "bytes": 9787,
+      "sha256": "cf2b58a3b0763e701e10fe0539c83dcd13845856af9fce8e59b6e598be760e06"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-15.json",
+      "source_blob": "6a7ba6552e5c789a4d00eae0c0b7114f64648232",
+      "bytes": 6475,
+      "sha256": "ed1289e589b597bdc69ae367f25e01abbc846a180669a26e234a33c032e9e6a1"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-16.json",
+      "source_blob": "ce53ca2381d14771840ad78afaf590385598eb98",
+      "bytes": 4984,
+      "sha256": "904dfbaad96d208a012f3f4e227741992ecf3822b7473cbb7736e47014a21fe9"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-17.json",
+      "source_blob": "fe44013787fd17e11bb0ad4ce3a7d0c754ee8705",
+      "bytes": 4338,
+      "sha256": "515b72ed715c3407a07b9f8cb00af55bc2bfe780bddd584668a5e802596dbdf3"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-18.json",
+      "source_blob": "f0fe3870153359f70814dc4b4b8f9c849a00ecb7",
+      "bytes": 5268,
+      "sha256": "fabc6e207a3c95db69e469c6830f3bee17c71c0ff80c2e15a23c11c77585dec5"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-19.json",
+      "source_blob": "ee00c6ec1031d74baac6422c9e4f5ef4d9943382",
+      "bytes": 4659,
+      "sha256": "8618415b6c6327bd99cf21722ee259ecfa6bf0b5e6697170d6c018b8b5e19ae9"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-2.json",
+      "source_blob": "b33276d80b79819b9a14e196d065e121bba69d59",
+      "bytes": 8892,
+      "sha256": "ab68afaecbf6d5a6ca3c43a05cecdcc99523d8851c9dba29d156a2ac6ffde560"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-20.json",
+      "source_blob": "4bf5762c8cafbf7f23c62de14d9377cd1cc0cc5a",
+      "bytes": 5872,
+      "sha256": "f9eac358924eac0b2250cf1f8bea0e05fd6a1ccddbd7f02b02b882a3e71d79a6"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-21.json",
+      "source_blob": "70e39cd9d5383491fccce47856f49f7a35a697e3",
+      "bytes": 5515,
+      "sha256": "80d0d1aed5f4062687776c4b5cebbb2056986286ed8d4ce25ce5659d54956cd0"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-22.json",
+      "source_blob": "d31ce43ae17df0f8f8e5d0dd3c1da064625ca98d",
+      "bytes": 8393,
+      "sha256": "4d2bc6297eb042200ea2bfe1cb9e89fa6afb0545d02045d16f1b6eaded0f4400"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-23.json",
+      "source_blob": "ee3079f4dc5e3b54928584baf491bf0316ba6797",
+      "bytes": 7953,
+      "sha256": "2c7dc623b0e553dbadaef9be22733f0850e40ec72137e012ff8a32bc077192ae"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-24.json",
+      "source_blob": "92f26ccd38fe25bffc3026a6557486db2650cc23",
+      "bytes": 4685,
+      "sha256": "76f5cb66e21db68413ca97c8150da91b0653a075f0502fac6b257dcc390c1448"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-25.json",
+      "source_blob": "d7de38cce62b093fce877d21d72ace9a941d592b",
+      "bytes": 5490,
+      "sha256": "11445d9457f0db945265f4e22ccfa86f86ae902c7228e7b232a73fa95921463f"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-26.json",
+      "source_blob": "fa6a19532a5b0e786757362d5af476164a411e46",
+      "bytes": 5788,
+      "sha256": "18838acd512ab3f77441028c541782ba3265c74f1928dab7808fc272097f743a"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-27.json",
+      "source_blob": "94198660df045a91aa3c13b117708e153e4a5009",
+      "bytes": 5778,
+      "sha256": "adb3b1041abe11a6e029b156492bd0f73aeab3cd9a93ef4bdc54090100e97a16"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-4.json",
+      "source_blob": "e4dad1e06b0556a75a78ad3f8ba37f278e83d8dd",
+      "bytes": 5991,
+      "sha256": "01c28f94f4c73d265bc5e9d8c26f8a1faa21045685f072dedade70b6dcede9c1"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-5.json",
+      "source_blob": "4d6fd8eaf9362e5ebe35fd4042866dc1e691fefa",
+      "bytes": 5008,
+      "sha256": "8ed4859d7869edc1b1df8344f7bbff558393948a95989b1dc1e3d22ecc9b7c8e"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-6.json",
+      "source_blob": "db2c48f1af6f739acc30a41f338076f6cf75efcc",
+      "bytes": 5332,
+      "sha256": "0d438e8c4ed8a48e020d4b933aa99762f632850d2a2873a529e9cb286136bea0"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-7.json",
+      "source_blob": "65022841700fde89078a823e6167383dca3afa2a",
+      "bytes": 4724,
+      "sha256": "090f02825fe135eef0c5dea481bbaeab4988dde96272db58f77d4d901f0e1965"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-8.json",
+      "source_blob": "104ba27ec14965838a0c171fd9566cb8c71d081f",
+      "bytes": 6687,
+      "sha256": "5f799f45bcf2cd729d76487cf66f99339f353c6e4fefac464a5afbab83e07b58"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/review-9.json",
+      "source_blob": "48f0ffca03c9b477201588f42f95f065ad51ebef",
+      "bytes": 5318,
+      "sha256": "e507c49de45bdbac9a2a9e460b9fee44d0622a6e9af7e79c2843e9295a4ac5c4"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/role-enforcement-final.json",
+      "source_blob": "6b138ecb377157aadf189216b2395a3534c4fc2c",
+      "bytes": 7754,
+      "sha256": "f1e9758b56196b137497b4ce26d6120ace2b36555a7c3ba0cadf80138dad8476"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/role-final.txt",
+      "source_blob": "76a0e71462550e74d4098312578882b6614485b8",
+      "bytes": 1245,
+      "sha256": "55ef71d9a819f854e9fdd1845cfb9e7e2c62e83fc7de0ebeb2d1b5276d230834"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/role-tools-final.json",
+      "source_blob": "2f65b86b4647ea540d1b0b860e89a8a5894c2165",
+      "bytes": 1516989,
+      "sha256": "d77af5f6bad9e9f59aca2d2deb01289c58ad72034c9729a563b53f09656ea9af"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/sonar-initial-gate.json",
+      "source_blob": "24aab1bc38e4c7294bf8c680f0fad73b2b21f3e3",
+      "bytes": 746,
+      "sha256": "6932b3f17b80a4b536859534804c028f7c762ef73c248636b17ccff8f865b669"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/sonar-initial-issues.json",
+      "source_blob": "1e2d96c2363916ff6d7930320692564502236eae",
+      "bytes": 7151,
+      "sha256": "d34f057576d99c93d5a5b2d27ca1c6b36760da2331c984898828bbbcd1b317fd"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/sonar-refactor-gate.json",
+      "source_blob": "cdc7e8745f1158655fb27fcb4eb282438c819783",
+      "bytes": 1177,
+      "sha256": "c77e57ecc50434948d069ea34cc4fcfe4e3bd0a7647ecd2cf154a1d04c217794"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/source-hosted-checks.json",
+      "source_blob": "68e825fb1ede82edf7db76aaced8f14a48f58d19",
+      "bytes": 42521,
+      "sha256": "d0a985a06a8f3059fff19e4c39cfbc2d81414355d8500663520b4956948e0cb5"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/source-hosted-ci.json",
+      "source_blob": "5a01c39cb9dc275e9c1d9181ab62638484b8e28c",
+      "bytes": 11902,
+      "sha256": "4183154d177c268b8df0ed9750d15155a4a134b5b7c363e42ad313075fcd227e"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/source-hosted-status.json",
+      "source_blob": "72577045536d520fc2bd3432205d6f8279618208",
+      "bytes": 4784,
+      "sha256": "4c1f16f2c772301475067aa1e7504e4123839dff57559d7edcc4b75cd43b0902"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/thirteen-connected-with-config.txt",
+      "source_blob": "a713726a535cd659dfd5cb1dc23b1d365d1d96b8",
+      "bytes": 38946,
+      "sha256": "39459b3fa7f02458a2d7936afcce273956dd9ccc05ca366f38995f1262da0889"
+    },
+    {
+      "path": "docs/reviews/evidence/artifact-import-coordinator/thirteen-connected.txt",
+      "source_blob": "b2fef77dda8ce1080cacf4feb1a9e8bd9fa33ba3",
+      "bytes": 12756,
+      "sha256": "ff04bf286ec71ec1eb1ff73ef7ab4c8664336fa1dad16648a442c4d0b8813548"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/beads-log-append-proof.json",
+      "source_blob": "6b3e706101dc1a3f7edd1b558ae021e529bb4597",
+      "bytes": 371,
+      "sha256": "7e52623ba0ad6fd5b54b3cfc36d4d4604a3793a9226724dec81a92b828276644"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/detailed-plan-review-r1.json",
+      "source_blob": "0bf1f3e7f0bb748966775d7b2d3e71d1cabb177a",
+      "bytes": 1185,
+      "sha256": "5a91f37a138d25df8dabc80c694464a6bf451582e4a293fc3cbac3a1953897e2"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/detailed-plan-review-r2.json",
+      "source_blob": "825db566928b218f25633bcf0a6a7e7059d70aa3",
+      "bytes": 517,
+      "sha256": "c3b853ba2bc87877461eda7dc60acaf7386dc64a35a71b53c72679517adc5afe"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/detailed-plan-review-r3.json",
+      "source_blob": "729da632ff6a2a5384d6141da53203fa37608799",
+      "bytes": 500,
+      "sha256": "7335d598352f1f40e85c52c4f7e10998fe7357f32206a2cbd60542d059970357"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/final-source-review.json",
+      "source_blob": "263e47a9096e8b3705f91f34d689cdd858186b54",
+      "bytes": 748,
+      "sha256": "ea76b424def973c73c716a2e44389c3bdc5599602e5d2e0eb38677e362f350ed"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/guidance-publication.json",
+      "source_blob": "3992da4af2fe39d972ef16052ec74db205003666",
+      "bytes": 16194,
+      "sha256": "295d610cae38037dee21734217c6024c76a6fe5c15f128a137afb5f0179e6394"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/guidance-review-r1.json",
+      "source_blob": "ebe8b175ae02b0e575b6ade14af3b91918bb63e4",
+      "bytes": 846,
+      "sha256": "3f780f9b1ff76114f22d02c4f4e99da5791af97eddede92f5379bb66ae541cf0"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/guidance-review-r3.json",
+      "source_blob": "5d173fa83aeb763eee439383ca71606bab97228d",
+      "bytes": 450,
+      "sha256": "9a06f541a50b7bdb9b7d18b6951bc61687a07a20fbf9df989c2d42f70100faf6"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/initial-write.json",
+      "source_blob": "f3008b43bb0c9b55fbc0605281a509e0cc0516c5",
+      "bytes": 295,
+      "sha256": "84e751f93819bdf6d58a896fd6b3d2c2ed1ac043a56dc9d2c09caad92c193319"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/local-quality.json",
+      "source_blob": "85ef797b25ed2c6e5a531781b912facb17bff4b7",
+      "bytes": 1305,
+      "sha256": "2631748eac5c9408a1adedde89e15ba7817598473d7575c452622e017691675d"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/native-adoption-report.json",
+      "source_blob": "2713c88e8114e559f3f70b51992050590256f08e",
+      "bytes": 8421,
+      "sha256": "f80615664f3bdb9897fa8130312ea74c4864f2482c1a8b0db0d7d8b38342fff6"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/planning-publication.json",
+      "source_blob": "09c2c57444c6efe280fc026fde1af23d7c15ddd8",
+      "bytes": 4152,
+      "sha256": "8c41345a36270aadf4836da260a38947d6fb16851ad58c16facb9777cd943329"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/policy-publication.json",
+      "source_blob": "deaf156e4908676996039da7503bc994b7e96d61",
+      "bytes": 2091,
+      "sha256": "11b0fd1ad622974870896cfe6640e9330836e3a162f81ddf7189f7ae15f2258e"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/policy-review.json",
+      "source_blob": "c68e4b4c6474e8ab5ca9a6cefd84acdb857f4fd1",
+      "bytes": 395,
+      "sha256": "d4243fa36f1e1beae2df40cecb66c8e2ee0a270de0b263d41ca4f14186d5181e"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/preservation-after.json",
+      "source_blob": "f567ad44606987a544bc2f6230c556bfe087a48f",
+      "bytes": 435,
+      "sha256": "8f7712261682225f30fae5abe9a51a16aaffc75ac78322e392d1365f7d31ddb8"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/repair.json",
+      "source_blob": "d2217c53450d8f74438347e00848d6b1e6ee979d",
+      "bytes": 246,
+      "sha256": "6913964aecdefc6412ed246369a984c0ac3fcb3df0a976f79427d98e46fb6a11"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/scoped-doc-validation.json",
+      "source_blob": "4d0d39ab67d0ea7ebd3afbb7f46fee78c8091382",
+      "bytes": 135,
+      "sha256": "3c1975bf8e858f0dc4c21c9f4213edaa4ecde58ade15aa50c44e32cd5ad989be"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/source-and-profile-check.json",
+      "source_blob": "8fc48af3b4f5cf302e7841106e2c0be7feb90689",
+      "bytes": 2349,
+      "sha256": "001a1ac1bb3f0d648b0e6f70dbfd404aba3f29bbe86971ae9349ff93c0b1e829"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/supporting-manifest.json",
+      "source_blob": "641f10089aa40d940ce518c2a982e670a64a2148",
+      "bytes": 1406,
+      "sha256": "4f3f8bdc2b951119b71a4ff502843cf10c03b7d431a78ecdd3afaeff5a125b9f"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/validation-failure.json",
+      "source_blob": "fab6a2256fcf501ce05e3daade24b6e95486fdce",
+      "bytes": 149,
+      "sha256": "7ebbeb241e23870bd0d56a92e09d66b917c1b3684bdb7ed8f5c08fc715dcf812"
+    },
+    {
+      "path": "docs/reviews/evidence/codex-autonomy/validation-pass.json",
+      "source_blob": "436822d280c23c056bf1b3e081cb99c6efe19b27",
+      "bytes": 224,
+      "sha256": "68a6d7b792c75ffd66ce2d85c5358e3fda11e71a40bd6336ce5ee7e4bda2f45d"
+    },
+    {
+      "path": "docs/reviews/evidence/document-binding-critique-round1.json",
+      "source_blob": "6efe9f9c016a5a3598d198732ebfebb8cd65ee5e",
+      "bytes": 6059,
+      "sha256": "18f37d6c384a29cf6753d03263af5ecfb682a0fa234b001701503bb4d2359ba5"
+    },
+    {
+      "path": "docs/reviews/evidence/document-binding-critique-round2.json",
+      "source_blob": "b3ccb56dd98dba88df1fcce9206a778fcabccab5",
+      "bytes": 4858,
+      "sha256": "00f997a8ae8c0966d1f62acdb203de3c32f90908ccece879f7d6a63de3f6940c"
+    },
+    {
+      "path": "docs/reviews/evidence/document-binding-source-excerpts.json",
+      "source_blob": "85d200eee2080dc3710de80a3523ef266c13eb5f",
+      "bytes": 37109,
+      "sha256": "8ae4a8bb84a84f4ec0ee3d4d35af623f5d80ac50bb0fee5d79236743006bf15a"
+    },
+    {
+      "path": "docs/reviews/evidence/pr271-capability-hardening.json",
+      "source_blob": "f94b74ee0ab59ab95b7827f8855fed3b535b7abd",
+      "bytes": 14028,
+      "sha256": "d47c41fa6c494ef87ae7f25d4e53d54b5cd7f3ec5c7c5e87fe732d408c1b9112"
+    },
+    {
+      "path": "docs/reviews/evidence/pr271-repair-critique.json",
+      "source_blob": "886658bda02dae402100ed751f28be3e2731471c",
+      "bytes": 2821,
+      "sha256": "63e408b09761ccfbdcc4c611e6e29526e4126b2380eacf0ca5317e4e06359299"
+    },
+    {
+      "path": "docs/reviews/evidence/readiness-pilot-dependencies-2026-09-26.json",
+      "source_blob": "13010956bab4b9ece24ae4cf1199190b9d99dbdc",
+      "bytes": 20061,
+      "sha256": "b78b20c0df32398bea4e73f7280528bf79456e9329615f03d434eea1f1b73eed"
+    },
+    {
+      "path": "docs/reviews/evidence/readiness-refresh-tests-2026-09-26.log",
+      "source_blob": "9cbd7af63bc6346667a7a9a5347139f89422d53b",
+      "bytes": 10209,
+      "sha256": "e7f516f8d5c2142f04728f09351bfe064faac6707c07b4b48391667314d6f5f9"
+    },
+    {
+      "path": "docs/reviews/evidence/readiness-skill-review-2026-09-26.json",
+      "source_blob": "94c3f5269b30770a28f4f971d24e2066abe3ecd7",
+      "bytes": 10120,
+      "sha256": "26c30263274612326fec895a2baeff9c21780193d74a1e328adc949ad5741a9d"
+    },
+    {
+      "path": "docs/reviews/evidence/readiness-skill-review-final-2026-09-26.json",
+      "source_blob": "b5a2cc5940c6e5684a7807c5a4c4eaae374ba489",
+      "bytes": 5069,
+      "sha256": "9452b76e84d209468429c673673ff0cf52df20ff68019fc232ca845feb6005b3"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/capability-probe.json",
+      "source_blob": "9368436b16f84d68cb633754f303191480a1a120",
+      "bytes": 14426,
+      "sha256": "a5ffa08e3239715453176fbf48872e10fdc8b9ddcdb227c3ee9275410ef15139"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/checks.json",
+      "source_blob": "228c1bd5295e3d89e193939ec90dc06625a42ae7",
+      "bytes": 1520,
+      "sha256": "96a7dd5bdc8aab11d818c3416333b11dde14a31b1b058f68935cbaeac5f3a859"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/code-review-final.json",
+      "source_blob": "f5e8ae2576c590ee1e6442e40bc7083f00e7697a",
+      "bytes": 5032,
+      "sha256": "ea85e225b27b63faf11eaaca72576deacd7a120aad649d10078ce307d7ffa420"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/code-review-recheck.json",
+      "source_blob": "f6b66faf1852658f0bc7082084b000d8c0f14607",
+      "bytes": 2524,
+      "sha256": "f1c02430052720949e13ef898c846a675ba88fd3b015b1108fc24ab6db03d60b"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/code-review.json",
+      "source_blob": "454bb15b480dec537e196bec4509755930a10b46",
+      "bytes": 3015,
+      "sha256": "78cfe7af2cdb1ff8618ab6c47d46b3efcc52f2bf3c36282d3e603c6a27f78211"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/container-tests.txt",
+      "source_blob": "9993f84b4f810c8d4fa44b69a27de117f36d61ee",
+      "bytes": 871,
+      "sha256": "f228f6c264ac38920d569ea3d9989b80103421bdfdca4e8ca126cfe3ce0d3cf5"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/full-parallel-tests.txt",
+      "source_blob": "e1504454188d55c2c5371565974af63b68ff390b",
+      "bytes": 107213,
+      "sha256": "45d7826ace725d14b1a594722105f9d7bef10066e26cd6dd1ab3308ba99d42fd"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/full-serial-tests.txt",
+      "source_blob": "5da73b775dd08576ed80af05887b7ba85a45f321",
+      "bytes": 60767,
+      "sha256": "b5444bda757ba32697895b13f08be73796ecbf51f6a5c97dd7f69a4db7317f19"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/lint.txt",
+      "source_blob": "1de99044a995a3d2c5779f80d975a1c9f80ea6e3",
+      "bytes": 163,
+      "sha256": "8896c1d45d24ed7b354798eda292a9c98931562d133674ad19f109bc648b42a1"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/markdown.txt",
+      "source_blob": "30ec14b2c91c49e50a3b4b6212448a76ea32f27d",
+      "bytes": 82,
+      "sha256": "9e4c0c9cd8812954780586b72e7cebf02f07ad9f772cd2fa101ff7afe942fe5c"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/pilot-draft-recheck.json",
+      "source_blob": "104bf2b41501cca8590ca1e752861945c72c765e",
+      "bytes": 3762,
+      "sha256": "0b7a74028528ce988c4ff0fe3044840de0e06d6eba8719ecffaafd902d6725f9"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/pilot-draft-review.json",
+      "source_blob": "500a8e5f91a5e35f792ba9ecbc8fd49c36a8bb4b",
+      "bytes": 7944,
+      "sha256": "c0cebae9d8f40376f26471ad9fccf52353251d793937b5565157f382990ea1b4"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/pilot-draft-validation.txt",
+      "source_blob": "738b960682f89d086a20e72bfb2afb0e6b0b0e78",
+      "bytes": 383,
+      "sha256": "f49e57f472c26977ca35a25b8040ed3add02a689556c314d001370808bacae1d"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/plan-review-revised.json",
+      "source_blob": "aebc897899fa07d3a1dcaf1c41bccb7a0f632b5b",
+      "bytes": 2530,
+      "sha256": "9b928ca76692e3332cab8c8933201045fc9e481700c27558122ffa2f3bdfad3a"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/plan-review.json",
+      "source_blob": "f9214ad7404b85e10144afcaa26574946743cb18",
+      "bytes": 5687,
+      "sha256": "5960f6bd0c94d40d507a524573f60789dd7d3d95301f476c375b3c481bcad899"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/scenario-input-verification.json",
+      "source_blob": "cb7804ad2ef82a305e6bb4c8f318087c90637fbc",
+      "bytes": 5974,
+      "sha256": "155569989d3f1675811cfc42ebdc3b2734b804a5005d6a23b5e4e84a37093408"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/skill-scenarios-supplement.json",
+      "source_blob": "9d5e5623baec688dd947d77445240628df8c9154",
+      "bytes": 6329,
+      "sha256": "ebb305bda339e81696b6cab3c30164b5a9109b8ca9956908c94be8e27b885510"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/skill-scenarios.json",
+      "source_blob": "aecf415a908fc0adc904d506cdd74ccd0c92851c",
+      "bytes": 13123,
+      "sha256": "48a1fa6f94487e6642c3620d21454afff0d03f7309f91e1cc7b1b4311ee97e81"
+    },
+    {
+      "path": "docs/reviews/evidence/reviewer-skill-evidence/typecheck.txt",
+      "source_blob": "7e5301a6978a4985a57e4be3a0714902c06e9397",
+      "bytes": 172,
+      "sha256": "5fd6067d0d69b0264562eaad9f86b52f9cc12d2024f21a91489317fc68fa582d"
+    },
+    {
+      "path": "docs/reviews/evidence/standalone-host-prerequisites.json",
+      "source_blob": "c3ec7d0d1b48b9f81bc7da2879b378d1a620ef66",
+      "bytes": 1287,
+      "sha256": "b7b001f288cc75276e4b0cd26b83bbb4d90139ad080641bc1566630bd990dd65"
+    },
+    {
+      "path": "docs/reviews/evidence/standalone-plan-pilot-deps.json",
+      "source_blob": "bf31eb7e542d2842a7ccf35cb37034e799215773",
+      "bytes": 20530,
+      "sha256": "87d61161f4443567a5e1fed20f30a5c8f58ff50d0d9dbb2fe2c380c0033eba53"
+    },
+    {
+      "path": "docs/reviews/evidence/standalone-plan-review-final.json",
+      "source_blob": "366f026e8cece64680e4039a4163ab46d296a01c",
+      "bytes": 3191,
+      "sha256": "2683699df8bcd4b84b848a0e1d1cf6076d7cebe763e217e811a46e4691ac2b9d"
+    },
+    {
+      "path": "docs/reviews/evidence/standalone-plan-review-round1.json",
+      "source_blob": "89336a2f8131f6386e4b21ea819bb46bdb181f53",
+      "bytes": 5651,
+      "sha256": "faf5e536d37337b28d9fbc1c0ab0088833c83b4ee2728ef018434d3c29fd39f0"
+    },
+    {
+      "path": "docs/reviews/evidence/standalone-plan-review-round2.json",
+      "source_blob": "1b0890b36008b8a729005718cd74893c8d63f51b",
+      "bytes": 4373,
+      "sha256": "114356057c2490e8a53f1df5754d7ac125adfdd024bfbd1c328495d952a9388a"
+    },
+    {
+      "path": "docs/reviews/evidence/standalone-plan-validation.txt",
+      "source_blob": "b320d3ad01617a78358015915dd78f2d9535f41b",
+      "bytes": 91,
+      "sha256": "8e264c99883e026a76c16d9b9703631305338179df4fd0d9e5e89736b22651b4"
+    },
+    {
+      "path": "docs/reviews/evidence/standalone-readiness/local-host.json",
+      "source_blob": "2effaf0f32d64cd6485441cb3c2ceba41cae6cfa",
+      "bytes": 5577,
+      "sha256": "6704f19cccd6a215ec0c5bfb28c5dce1eb9291e9e11ae143951da826ce2bf0c4"
+    },
+    {
+      "path": "docs/reviews/evidence/standalone-readiness/scenarios.txt",
+      "source_blob": "a0efac1116a510680975391b8e3fbe737102f761",
+      "bytes": 2546,
+      "sha256": "e03ac16c72d109c5c710fea05bb03470e7bede6438ea568416cc3cc1d5f61254"
+    },
+    {
+      "path": "docs/reviews/evidence/standalone-readiness/skill-scenarios.json",
+      "source_blob": "b05d8c4b16d9678cd2f1067b01c41c95980fcaba",
+      "bytes": 225,
+      "sha256": "c47136d34f0c1f22436adc9c7dbd1f59948b3f3a3815aac100ead4c380fecad3"
+    },
+    {
+      "path": "docs/reviews/evidence/supervised-review-capabilities.json",
+      "source_blob": "befa107db44dc9ca082ad7c0f0bc29f38383a762",
+      "bytes": 14028,
+      "sha256": "cf61a195f8ab5bd02230da83343378b714e0fd66148cf5a3e16a9eb19cf7e5e4"
+    },
+    {
+      "path": "docs/reviews/evidence/supervised-review-first.json",
+      "source_blob": "1bc703ef68b65ab0f20eb6c80a4735c58f8851fb",
+      "bytes": 8395,
+      "sha256": "0b516abaa037496486c0f0d3ef15047dac895fc0328b64b790430a5326472343"
+    },
+    {
+      "path": "docs/reviews/evidence/supervised-review-fourth.json",
+      "source_blob": "d9aeb19cf443c7c26ccb7d5d44fc4c9980cc0c68",
+      "bytes": 7160,
+      "sha256": "92ef3bc357db6ab7e81a916c3688658104784d8472d58154c8b7a9d1381223aa"
+    },
+    {
+      "path": "docs/reviews/evidence/supervised-review-gateway.json",
+      "source_blob": "3a61b63a4a27fc20649f2d017aa77fba0608ba3b",
+      "bytes": 3154,
+      "sha256": "14ecbde6bcbcf0edd09515b481b4a515fda3833fa2bb7c4e12dc07915a7c36d7"
+    },
+    {
+      "path": "docs/reviews/evidence/supervised-review-second.json",
+      "source_blob": "a0252836e4c230d4ae018a8075e6da1e397022e0",
+      "bytes": 8835,
+      "sha256": "a2c95de9ec0117c4f87d0befd077f95d573d2b0025e2e0860ab770793ce95c77"
+    },
+    {
+      "path": "docs/reviews/evidence/supervised-review-third.json",
+      "source_blob": "4408f9cc53f642d2bccec8b95ca1317fb0487c81",
+      "bytes": 7401,
+      "sha256": "a2af5e12978057f8e45e0cf089c576273c2fd0d751ab1f17da8158c4800fdf16"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/broker-followup.log",
+      "source_blob": "117fb92f75614a913219599e997549a7c8005fba",
+      "bytes": 433,
+      "sha256": "0655b33064fd673290f8de1711c7ee02adc7b06268264410695de7920d89afcc"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/build.log",
+      "source_blob": "7be5ea41871db897701132bb05e76deb2546acf4",
+      "bytes": 110,
+      "sha256": "38a2e2ac7e99cc10049da768b50fbdec9e661e5d88631a5f295af2acb5e5758e"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/client-tests.log",
+      "source_blob": "b490816bba12e14902fd541fa65ff551b25cd4b6",
+      "bytes": 1132,
+      "sha256": "61b3080b2bc631a4a85b21d4df7ae78054c63e372853380eef1e8fbea1619570"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/command-equivalence.json",
+      "source_blob": "0cbae421db6591de5bf353b317408ec6f3e27ee7",
+      "bytes": 165,
+      "sha256": "52101f3767e90541b8f92ae43a72a497e4b8c0b359ccdd17226183db2458d6e5"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/existing-container-tests.log",
+      "source_blob": "104c9136bbd1dca811931fbe9392c6af8e568481",
+      "bytes": 1302,
+      "sha256": "cbbd717cdb9b6ea0c7d5a144d609708177b7329e88b2777d85b64497cc848e04"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/filesystem-controls.json",
+      "source_blob": "bc6c01bd0574f380b84160f0fc02265e37dca4fe",
+      "bytes": 7500,
+      "sha256": "9f64c8e2ffc1cdc4fe1d5acc36035a7076b10861376cceea78dc16dd530b2094"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/filesystem-tests.log",
+      "source_blob": "d9d0d203bf3e838373548c7fbc9b44bccfab49ee",
+      "bytes": 536,
+      "sha256": "34075a0941ff61675056b7e5477cbe21a9c94e62bcccb6b2ec91b3093f45062c"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/final-client-controls.json",
+      "source_blob": "1bb6f864ed1e9a1395f248f9f70a8f21471dac27",
+      "bytes": 222998,
+      "sha256": "7a35f19fce03084897db09ac10c324e0c38996b7a1b5da5ad23bbd7bee7d8d6a"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/final-filesystem-controls.json",
+      "source_blob": "6b138ecb377157aadf189216b2395a3534c4fc2c",
+      "bytes": 7754,
+      "sha256": "f1e9758b56196b137497b4ce26d6120ace2b36555a7c3ba0cadf80138dad8476"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/format-followup-client.json",
+      "source_blob": "83ebd650a7dce9b32a742dbde4183da0c16e5e56",
+      "bytes": 20487,
+      "sha256": "9f08c74cffc1d01f43b30d2100eef18143ee763159109fa1ceffc80cea2a5c40"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/format-followup-client.log",
+      "source_blob": "b1e0705b0977575cf7a60c9add4b90c39f3de9a2",
+      "bytes": 398,
+      "sha256": "6c79ee96dcf64a51ecd8a0f702187efabf2946375249c3b11e9044b53e23e204"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/formatting.log",
+      "source_blob": "4aa0d16e7a0ff5c16269bf45771cebe89cc2e81d",
+      "bytes": 66,
+      "sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/lint.log",
+      "source_blob": "2c3877d804f3542cb2d5674e765b0d792ddba358",
+      "bytes": 114,
+      "sha256": "c67b079a87493927fb281bb66e266aec94889423bc323c9d430a86a9df3a5dd8"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/monorepo-typecheck.log",
+      "source_blob": "416e119b06f1b955ed718226d68fe4204d6d0290",
+      "bytes": 3158,
+      "sha256": "ba6b3e70a744cc00961be626500a2567520f4576da85a3fb15ee20ada00a512a"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/plan-review.json",
+      "source_blob": "cb801d58338a4071bfc0792f8a5df59eb9c4d3fc",
+      "bytes": 2810,
+      "sha256": "3f66383094c134375b5c9ee9537293976eed460f0da2183798ad7f78e3dd5238"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/prior-client-controls.json",
+      "source_blob": "676029ca1352271b8f1fcdb8a0ba2cb8079ea110",
+      "bytes": 205288,
+      "sha256": "e9a625a0858fb18bb53820c44a372d950b99ced0c09f19f065ae733e3c1c577c"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/quality-followup.patch",
+      "source_blob": "508d4703c20dcbe24f52b28173260289775525c0",
+      "bytes": 5376,
+      "sha256": "1e9a37562f4b68460863c5fd0acf72c8eaadd4eea6ed209df214c1d56f23a5e2"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/regression-quality-followup.log",
+      "source_blob": "4b12d205e2959bcd256ce78a4f2a398f944ca1a3",
+      "bytes": 14765,
+      "sha256": "80ec8421387a321f64b205403ab1806b5155b3d59a6fa9569476f855b54ba970"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/regression.log",
+      "source_blob": "027418369e80ca6391c905cdf2267742685dce0e",
+      "bytes": 14292,
+      "sha256": "3d630d7591dc49c8832e5b98a38d8f5dd9b2cd7c8b3eadc890640f5255d98119"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/review1.json",
+      "source_blob": "7fac438fe161f378d99a674f202c4ccba290cff4",
+      "bytes": 5797,
+      "sha256": "e9937f3df5aa5c562d023c7706fc9d79bfbfa480ab5de9888f6ca749d4c6007e"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/review2.json",
+      "source_blob": "c6ebe19e2a1937af425a52c1adb76a92e40f0ec2",
+      "bytes": 6992,
+      "sha256": "546f9c479fdafe2924c622972fbff1f642b786b7f288eed4ee70889fc52027ec"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/review3.json",
+      "source_blob": "b4b9ff51393e77c84b5a9f39c87ec731d8f0b4ef",
+      "bytes": 5598,
+      "sha256": "af4d4234ce3a38304ac129884129495c948e90719a567e8c0081c833b547afc4"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/review4.json",
+      "source_blob": "d9acda7d157e117056255c360bcff5821e791af2",
+      "bytes": 5924,
+      "sha256": "42e737e424ad4e8475b9e6e6312531d0a4c1d2a1d9bc2fe58db0fb4343dd0ac5"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/review5.json",
+      "source_blob": "3b26c9b70c48c90e8562b3640ec608cfa6c84834",
+      "bytes": 3670,
+      "sha256": "79fd324c8138d426b07d9f94ad1b22414cb6c1cacfd0776703078524a828c34c"
+    },
+    {
+      "path": "docs/reviews/role-enforcement-evidence/typecheck-followup.log",
+      "source_blob": "c8564bc3af9f392bf827ddbb832b1f59677387ca",
+      "bytes": 123,
+      "sha256": "7754a935dd0d0d697a63f7144e7098a5d7becd7714d3c2e9f610f6e861d9e32e"
+    }
+  ]
+}
