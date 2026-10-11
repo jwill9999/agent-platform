@@ -15,15 +15,11 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { resolveMacosVmHelper, SWIFT_BINARY, swiftBuildArgs } from './resolve-macos-vm-helper.mjs';
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
-const defaultHelper = join(
-  desktopDir,
-  'native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner',
-);
 const defaultOutDir = join(desktopDir, 'resources/macos-vm');
-const SWIFT_BINARY = '/usr/bin/swift';
 
 function usage(exitCode = 1) {
   console.error(
@@ -47,7 +43,6 @@ function usage(exitCode = 1) {
 function parseArgs(argv) {
   const options = {
     outDir: defaultOutDir,
-    helper: defaultHelper,
     skipBuild: false,
   };
 
@@ -90,7 +85,7 @@ function setPathOption(options, arg, value) {
 }
 
 function runSwiftBuild() {
-  const result = spawnSync(SWIFT_BINARY, ['build', '--package-path', 'native/macos-vm-runner'], {
+  const result = spawnSync(SWIFT_BINARY, swiftBuildArgs, {
     cwd: desktopDir,
     stdio: 'inherit',
   });
@@ -183,8 +178,7 @@ function copyAssetSet(assetsDir, outImagesDir, manifest) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (!options.skipBuild) runSwiftBuild();
-
-  assertFile(options.helper, 'macOS VM helper binary');
+  options.helper = resolveMacosVmHelper({ helper: options.helper });
   const manifest = await loadAndVerifyAssets(options.assetsDir);
   const helperSha256 = await sha256File(options.helper);
 
