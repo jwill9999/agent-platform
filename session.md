@@ -2,24 +2,30 @@
 
 ## Current follow-up — paused work visibility
 
-Last updated: 11 October 2026. The owner requested a Beads task to make retained paused
-orchestration visibly distinct before any new product development.
+Last updated: 11 October 2026. Paused orchestration labelling is complete; the owner has now
+authorized integrating its documentation into staging and removing the two temporary branches.
 
 The consolidation below is complete: PR295, PR288 and PR286 merged; staging is
 `3a22ac8f45d2257fe1a9200e936e4bd2923c9eae`. All 14 final executed checks, actual full scan,
 packaged macOS VM and review gates passed. The integration task is closed and synced;
 17 delivered remote/local branches were removed with 20 recovery tags. Its monitor is paused.
 
-Next: `agent-platform-paused-work-visibility` is open at P1 with the completed integration as
+Next: `agent-platform-paused-work-visibility` is in progress at P1 with the completed integration as
 its upstream dependency. Its [specification](docs/tasks/agent-platform-paused-work-visibility.md)
 records a paused title/label and four-branch inventory for PR283, plus relevant Beads notes.
-This turn records the task; GitHub metadata changes remain pending. Specification work uses
+The title, label, complete description, all ten deferred Beads records and preserved branch/dirty
+work identities have been read back; metadata closure and Dolt sync completed. The task is reopened
+only for the subsequent owner-authorized documentation delivery. Specification work uses
 `task/paused-work-visibility` from `feature/paused-work-visibility`, based on qualified staging.
 These new follow-up branches are active documentation work, separate from the four paused refs.
 
 Preserve PR283's base/head/draft state, all paused branch tips and dirty/unrelated checkouts.
-The next product priority remains undecided. Complete this visibility housekeeping before an
-owner-led backlog review selects new development. Earlier continuation sections below are
+Independently review and publish the two-file source; merge task to feature after current checks
+and reviews pass, then require fresh protected staging full scan, actual packaged macOS VM and
+all checks/reviews before guarded squash. Verify the staging tree, recovery-protect and remove
+only the two delivered visibility branches, refresh mirrors/Beads and close after Dolt sync.
+The owner may review the live backlog in parallel; the next product priority remains undecided.
+Earlier continuation sections below are
 retained historical snapshots; do not repeat their completed merges or resume orchestration.
 
 ## Current PR299 detailed-analysis follow-up

@@ -1,7 +1,8 @@
 # Task: Make paused orchestration work clearly visible
 
 **Beads issue:** `agent-platform-paused-work-visibility`  
-**Status:** Open; task capture complete, implementation pending.  
+**Status:** Metadata complete; owner-authorized documentation integration in progress.
+
 **Priority:** P1, owner-requested next housekeeping task.  
 **Parent epic:** None; standalone follow-up to completed native staging consolidation.
 
@@ -9,7 +10,9 @@
 
 The owner requested a task to make retained paused orchestration visibly distinct from current
 features, epics and development, before moving forward with further work. Beads is authoritative
-for task status. Creating this specification does not claim the GitHub metadata has been changed.
+for task status. The GitHub metadata and ten related Beads notes are now verified complete.
+The owner subsequently authorized merging these two documentation branches into staging after
+checks and review, then removing those delivered temporary branches.
 
 ## Requirements
 
@@ -29,6 +32,9 @@ for task status. Creating this specification does not claim the GitHub metadata 
   checkpoints, local unfinished work and deferred operational evidence. Do not reopen closed work.
 - R5: Preserve branch names and tips, pull request base/head and draft state, existing history,
   dirty worktrees and human notes. No prototype resumption, pilot, source deletion or main promotion.
+- R6: Integrate this specification and the session handoff through the existing task/feature
+  branches into protected staging after all actual current-head checks and review findings clear.
+  Recovery-protect and remove only the two delivered visibility branches after verifying staging.
 
 ## Dependency order
 
@@ -45,15 +51,20 @@ product task has been selected, so no invented downstream issue or bulk dependen
 3. Reconcile only relevant Beads notes/status descriptions with retained delivery evidence.
 4. Read back actual GitHub and Beads changes and compare ref tips, pull request relationships,
    draft state and worktree preservation against the before snapshot.
-5. Record results, publish the complete changed documentation mirror, sync Dolt and close the
-   Beads task only after every acceptance criterion is verified.
+5. Record results and publish the complete changed documentation mirrors with source-bound readback.
+6. Independently review the two-file source, deliver task to feature through a guarded merge,
+   then qualify the protected staging request with fresh full security analysis, actual packaged
+   macOS VM, every required/executed check and resolved review findings before guarded squash.
+7. Verify the actual staging tree, preserve recovery tags, delete only the two delivered visibility
+   branches with SHA guards, verify retained work, sync Dolt and close the task.
 
 ## Git and documentation delivery
 
 Specification branch: `task/paused-work-visibility`, from `feature/paused-work-visibility`, itself
 from the qualified staging baseline. Push the specification through normal hooks; no direct staging
 or main commits. Repository documentation uses the normal task-to-feature and feature-to-staging
-pull request workflow when integrated. Creating this task does not grant a new merge authorization.
+pull request workflow. The owner's subsequent voice instruction explicitly authorizes this
+documentation integration and two-branch cleanup after passing checks and resolved reviews.
 
 The full specification is mirrored in the Agent Platform Notion hub with source revision and hash.
 No runtime code, dependency, security policy or Git branch rename is required by this task.
@@ -68,6 +79,9 @@ No runtime code, dependency, security policy or Git branch rename is required by
   worktree status without modifying dirty files. All preserved values must match.
 - V4: Validate Markdown, formatting and source links; read the complete Notion mirror back and
   verify source metadata and content. Verify canonical Beads Dolt push completes.
+- V5 / R6: Verify independent source review, latest task/feature and staging checks, no unresolved
+  review findings, actual completed full security scan and actual packaged macOS VM. Compare the
+  protected merge tree to reviewed source. Verify recovery tags and SHA-guarded cleanup readbacks.
 - Application build, unit, integration and Playwright tests are not applicable to metadata-only
   changes; normal repository hooks remain enabled. Any expanded code scope needs its own checks.
 
@@ -78,8 +92,27 @@ No runtime code, dependency, security policy or Git branch rename is required by
 - Delivered code is not represented as unwritten; remaining acceptance work stays explicit.
 - Existing source, branch identities, pull request relationships and dirty work are preserved.
 - Required documentation delivery, full mirror readback and canonical Dolt sync are verified.
-- Actual verification evidence is recorded before closure; this planning snapshot claims no
-  implementation, independent review, metadata change or application test completion.
+- Both visibility documentation branches are integrated into staging, their delivered tips are
+  recovery-protected, and only those two temporary branches are removed.
+- Actual verification evidence is recorded before closure. Metadata completion and documentation
+  integration are separate milestones; earlier checks do not qualify a changed source revision.
 
-**Sign-off:** Pending implementation and verification. Owner requested task creation by voice on
-11 October 2026. Next development priority remains undecided until this housekeeping is complete.
+## Verified metadata outcome
+
+The runner-controls pull request now has the title
+`Paused: test: qualify runner controls and expose local-network blocker`, label
+`paused orchestration`, and an opening four-branch inventory. Full readback preserves the original
+description, OPEN/DRAFT state, base/head names and head SHA. All ten relevant Beads records retain
+their deferred status and full previous notes, with an explicit current exclusion from native
+development. Closed delivered records were not reopened. Original primary and paused worktrees
+were verified byte-exact, including dirty diffs and untracked hashes. No runtime code changed.
+
+The initial specification/handoff at `dc42a3c1` passed formatting, direct Markdown and normal
+commit/push gates; two full source-bound Notion mirrors and subsequent metadata acceptance notes
+were read back. One MCP read rejected an existing `supersedes` dependency type; official CLI
+readback succeeded without changing that dependency. Metadata task closure and Dolt sync completed.
+The task is now reopened solely for the newly authorized documentation integration and cleanup.
+
+**Sign-off:** Metadata verified; documentation integration pending fresh source review, publication,
+hosted gates, protected merge and recovery-protected cleanup. The owner authorized this delivery
+by voice on 11 October 2026. Next product priority remains for owner-led backlog review.
