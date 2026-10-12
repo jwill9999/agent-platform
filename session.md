@@ -1,3 +1,33 @@
+# Diagnostics staging blocker — 13 October 2026
+
+The owner authorized completion of diagnostics delivery and cleanup. PR302 is merged at
+`f0f4edd32b88693d39d803dea175c2750f738db5`; protected staging PR303 remains open. All executed
+checks except the actual packaged macOS VM suite passed. That suite passed eighteen scenarios
+but its network-block policy case failed backend readiness before model setup, including retry.
+The healthy real-VM subcase and completed full security scan do not waive that failure.
+
+Current bounded repair: `task/diagnostics-vm-startup-evidence`, based on the delivered feature.
+The safe startup recorder and attachment-cleanup fix passed independent review, nine focused
+tests and the actual failure/cleanup control. One focused packaged network-block case passed in
+32.4 seconds without retries. The earlier failure was not reproduced; its cause remains unknown.
+Independent source inspection found the fixture discards the error details needed to identify
+startup failure. The fixture now preserves safe, bounded startup observations before cleanup;
+the focused reproduction above retained the 20-second timeout and existing assertions. The previous
+failure's cause remains unproven. Deliver reviewed repairs through the feature, then qualify fresh
+PR303 full security, actual packaged VM and all other current-head gates/review comments before
+protected squash. Preserve the original failure evidence and all earlier handoff history.
+
+V1 remains in progress. Checkout-free release export verification and the wider epic remain open.
+Recovery-protect and remove only delivered diagnostics branches after verified staging delivery;
+keep main, paused orchestration/PR283 and dirty or unrelated work unchanged. See
+[implementation results](docs/reviews/agent-observability-mvp-results.md) for actual run evidence.
+
+## Historical pre-merge handoff
+
+The following complete handoff is historical; its pending PR302 instructions are superseded above.
+
+<!-- markdownlint-disable MD025 -->
+
 # Diagnostics delivery handoff — 13 October 2026
 
 The owner authorized merging PR302 into `feature/agent-observability`, then promoting that feature
