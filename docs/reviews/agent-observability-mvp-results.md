@@ -305,3 +305,8 @@ policy evaluation verifies the blocked policy and persisted backend effects. Thi
 the original startup failure; its cause remains unknown. The fixture change repairs the evidence
 blind spot, not a demonstrated application defect. New task-to-feature and full staging checks
 remain required; none of the old-head passes qualifies the revised head.
+
+PR304's first hosted Sonar gate was OK but its issue list identified one Major S3358 nested
+conditional in the startup helper. The follow-up extracts equivalent branching without suppression
+or runtime changes. All nine affected tests, lint and formatting passed. Independent equivalence
+review and new hosted qualification remain separate from the earlier successful packaged case.

@@ -110,12 +110,13 @@ export function createStartupEvidence(backendPort: number, rendererPort: number)
       } catch (error) {
         const failure = record(error);
         const code = record(failure?.cause)?.code ?? failure?.code;
-        last.transportCode =
-          failure?.name === 'TimeoutError' || failure?.name === 'AbortError'
-            ? 'ETIMEDOUT'
-            : typeof code === 'string' && transportCodes.has(code)
-              ? code
-              : 'UNKNOWN';
+        if (failure?.name === 'TimeoutError' || failure?.name === 'AbortError') {
+          last.transportCode = 'ETIMEDOUT';
+        } else if (typeof code === 'string' && transportCodes.has(code)) {
+          last.transportCode = code;
+        } else {
+          last.transportCode = 'UNKNOWN';
+        }
         return false;
       }
     },
