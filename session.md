@@ -1,3 +1,37 @@
+# Diagnostics delivery handoff — 13 October 2026
+
+The owner authorized merging PR302 into `feature/agent-observability`, then promoting that feature
+to protected `staging` once all current-head checks pass and actionable review comments are resolved.
+After verified delivery, recovery-protect and remove only the delivered diagnostics feature/task
+branches. Preserve main, all paused orchestration refs/PR283, dirty primary/paused checkouts and
+unrelated work. Checkout-free export qualification remains with the open release child
+`agent-platform-electron-release.diagnostics-export`; no release or main promotion is authorized.
+
+As of this handoff, the implemented revision `f9450bd2fd15d0a8f135450a2ac57fc6b08f1e78` passed all
+nine executed feature checks. CI `38184603689` passed 2,745 package tests, 22 browser journeys and
+29 Electron journeys; 77 existing optional prototype tests were skipped. All nine measured benchmark
+modes passed the original bounds: maximum request p95 overhead 15.176855 ms against 20 ms, and
+enqueue p95 0.0128 ms against 2 ms. Independent review verified source, numeric samples and the
+hosted artifact identity. The earlier failed latency observation remains recorded with cause unknown.
+Sonar passed with two independently reviewed Minor dispositions; no open CodeQL alerts or unresolved
+PR302 threads were present at the refreshed snapshot. Sourcery skipped its diff-size limit; independent
+source review supplies the review evidence. The feature VM skip does not qualify staging.
+
+This handoff changes documentation only. Its new revision still needs current-head feature checks;
+then merge PR302 with its exact head guard, verify the feature tree and open the staging PR. Staging
+requires fresh ordinary full security analysis, actual packaged macOS VM success, all live protections
+and resolved review findings. Keep V1 in progress until actual delivery/readbacks/sync are verified.
+The broader observability epic and release child remain open. Current task state and eventual merge
+SHAs are recorded in canonical Beads; this is a dated pre-merge snapshot, not a claim that promotion
+has already occurred. See [results](docs/reviews/agent-observability-mvp-results.md).
+
+## Historical implementation and planning snapshots
+
+The following handoffs are preserved verbatim as historical evidence. Their pending instructions
+and earlier authorization limits are superseded by the current owner-authorized delivery above.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current diagnostics implementation — 11 October 2026
 
 Owner accepted P1 option A and authorized the diagnostics MVP. Checkout-free export verification
