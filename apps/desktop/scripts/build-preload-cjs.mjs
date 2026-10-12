@@ -39,6 +39,8 @@ writeFileSync(
 const { contextBridge, ipcRenderer } = require("electron");
 
 const desktopBridgeApiName = ${JSON.stringify(desktopBridge.desktopBridgeApiName)};
+const saveDiagnosticReportIpcChannel = ${JSON.stringify(desktopBridge.saveDiagnosticReportIpcChannel)};
+const savePartialDiagnosticReportIpcChannel = ${JSON.stringify(desktopBridge.savePartialDiagnosticReportIpcChannel)};
 const resetLocalDataIpcChannel = ${JSON.stringify(desktopBridge.resetLocalDataIpcChannel)};
 const resetLocalDataConfirmationIpcChannel = ${JSON.stringify(
     desktopBridge.resetLocalDataConfirmationIpcChannel,
@@ -91,6 +93,10 @@ const workspaceWebViewUpdatedIpcChannel = ${JSON.stringify(
   )};
 
 const desktopApi = {
+  diagnostics: {
+    saveReport: (scope) => ipcRenderer.invoke(saveDiagnosticReportIpcChannel, scope),
+    savePartial: (failure) => ipcRenderer.invoke(savePartialDiagnosticReportIpcChannel, failure),
+  },
   maintenance: {
     getResetLocalDataConfirmation: () => ipcRenderer.invoke(resetLocalDataConfirmationIpcChannel),
     repairMacosVmRuntime: () => ipcRenderer.invoke(repairMacosVmRuntimeIpcChannel),
@@ -157,6 +163,14 @@ function loadDesktopBridgeContract() {
 
   return {
     desktopBridgeApiName: readExportedStringConst(sourceFile, 'desktopBridgeApiName'),
+    saveDiagnosticReportIpcChannel: readExportedStringConst(
+      sourceFile,
+      'saveDiagnosticReportIpcChannel',
+    ),
+    savePartialDiagnosticReportIpcChannel: readExportedStringConst(
+      sourceFile,
+      'savePartialDiagnosticReportIpcChannel',
+    ),
     resetLocalDataIpcChannel: readExportedStringConst(sourceFile, 'resetLocalDataIpcChannel'),
     resetLocalDataConfirmationIpcChannel: readExportedStringConst(
       sourceFile,

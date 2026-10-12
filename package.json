@@ -23,7 +23,8 @@
     "deps:check-cycles": "madge --circular --extensions ts,tsx,js --ts-config apps/web/tsconfig.json --warning packages apps",
     "deps:visualize": "madge --image deps-graph.svg --ts-config apps/web/tsconfig.json packages apps",
     "prepare": "husky",
-    "postinstall": "node scripts/fix-node-pty-helpers.mjs"
+    "postinstall": "node scripts/fix-node-pty-helpers.mjs",
+    "diagnostics": "node scripts/diagnostics.mjs"
   },
   "lint-staged": {
     "*.{ts,json,md,js}": "prettier --write",

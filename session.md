@@ -1,3 +1,119 @@
+# Diagnostics delivery handoff — 13 October 2026
+
+The owner authorized merging PR302 into `feature/agent-observability`, then promoting that feature
+to protected `staging` once all current-head checks pass and actionable review comments are resolved.
+After verified delivery, recovery-protect and remove only the delivered diagnostics feature/task
+branches. Preserve main, all paused orchestration refs/PR283, dirty primary/paused checkouts and
+unrelated work. Checkout-free export qualification remains with the open release child
+`agent-platform-electron-release.diagnostics-export`; no release or main promotion is authorized.
+
+As of this handoff, the implemented revision `f9450bd2fd15d0a8f135450a2ac57fc6b08f1e78` passed all
+nine executed feature checks. CI `38184603689` passed 2,745 package tests, 22 browser journeys and
+29 Electron journeys; 77 existing optional prototype tests were skipped. All nine measured benchmark
+modes passed the original bounds: maximum request p95 overhead 15.176855 ms against 20 ms, and
+enqueue p95 0.0128 ms against 2 ms. Independent review verified source, numeric samples and the
+hosted artifact identity. The earlier failed latency observation remains recorded with cause unknown.
+Sonar passed with two independently reviewed Minor dispositions; no open CodeQL alerts or unresolved
+PR302 threads were present at the refreshed snapshot. Sourcery skipped its diff-size limit; independent
+source review supplies the review evidence. The feature VM skip does not qualify staging.
+
+This handoff changes documentation only. Its new revision still needs current-head feature checks;
+then merge PR302 with its exact head guard, verify the feature tree and open the staging PR. Staging
+requires fresh ordinary full security analysis, actual packaged macOS VM success, all live protections
+and resolved review findings. Keep V1 in progress until actual delivery/readbacks/sync are verified.
+The broader observability epic and release child remain open. Current task state and eventual merge
+SHAs are recorded in canonical Beads; this is a dated pre-merge snapshot, not a claim that promotion
+has already occurred. See [results](docs/reviews/agent-observability-mvp-results.md).
+
+## Historical implementation and planning snapshots
+
+The following handoffs are preserved verbatim as historical evidence. Their pending instructions
+and earlier authorization limits are superseded by the current owner-authorized delivery above.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current diagnostics implementation — 11 October 2026
+
+Owner accepted P1 option A and authorized the diagnostics MVP. Checkout-free export verification
+is now release task `agent-platform-electron-release.diagnostics-export`; V1 retains real connected
+browser/standalone-Electron export and report investigation. V1's scoped old review-gate edge is
+removed; broader gate and all paused orchestration work remain unchanged. V1 is in progress.
+Active branch `task/diagnostic-event-foundation` follows planning tip `ebf3c279`, targeting
+`feature/agent-observability`. Follow the current authorization at the top of the plan/spec/tests;
+earlier planning-only and strict-artifact statements below are historical. No runtime test results
+or merge authority are inferred from this authorization.
+
+The SQLite adapter, request/model/tool observations, safe report/CLI and explicit browser/native
+export are implemented. Four connected journeys passed, including actual file export, API-stop
+partial export, full restart, approval/duplicate one-effect, denial/no-effect and SDK retry recovery.
+The report-only independent support exercise located the actual failed operation. Three repeated
+latency fixtures passed. Independent source review approved the repaired implementation; local
+quality checks and 2,734 aggregate tests passed (77 existing optional integration skips). The
+shared-module retry-test isolation failure is retained and its full 222-test API rerun passed.
+PR302 remains open. The initial publication at `77d0ce8e` included all eight full Notion readbacks;
+subsequent changed result/session mirrors were read back at the pushed code repair revisions.
+Hosted Sonar failed on complexity/style and the browser-install command. Independently reviewed
+bounded refactors passed 34 core tests, 120 report-equivalence comparisons, 40 web tests, 21 desktop
+tests, six CLI tests, four fresh connected journeys and a full 222-test API rerun. An earlier API
+timeout is retained alongside the unchanged focused and full rerun passes. Fresh hosted analysis
+passed again on final code revision `7e5ba9d6`, with no Blocker/Critical/Major findings and only
+two independently reviewed Minor dispositions. Normal push hooks passed all 222 API and 133
+desktop tests. Final documentation clarification aligns the V1 dependency section with accepted
+P1 and live Beads. That handoff revision passed hosted browser/Electron but failed one latency
+comparison (25.464694 ms versus the unchanged 20 ms bound). A bounded measurement-fixture repair
+removes retained spy-call overhead and preserves numeric failure evidence; no cause is inferred
+from one sample and no limit is raised. New current-head qualification remains required. No
+bypass, merge or closure. See results
+for the retained first failure and source-backed minor-warning dispositions.
+See [results](docs/reviews/agent-observability-mvp-results.md) and
+[usage](docs/development/diagnostics.md) for evidence and limits. Next: publish the independently reviewed measurement repair to PR302, refresh its changed full
+mirrors, and qualify current-head CI/security/comments with the retained numerical benchmark
+artifact. The focused repaired benchmark and two explicit failure/cleanup controls passed locally.
+V1 stays in progress through actual authorized feature delivery; no merge is authorized by this step.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — diagnostics MVP planning, 11 October 2026
+
+The prior visibility documentation delivery below is complete: PR300/PR301 delivered it to staging
+`7814b59845b52ad5f850bfc99b7baee0e6742a25`; temporary documentation branches were removed with
+recovery protection, and Beads closed/synced. Paused PR283 and the four orchestration refs remain
+separate. Historical pending delivery instructions below are not active work.
+
+The owner selected developer diagnostics as the next planning priority. Current work is the
+[bounded diagnostics MVP plan](docs/planning/agent-observability-mvp.md), canonical
+[V1 spec](docs/tasks/agent-platform-harness-v1.md), [verification plan](docs/testing/agent-observability-mvp.md)
+and [independent critique](docs/reviews/agent-observability-mvp-plan-review.md).
+Planning branch: `task/observability-mvp-plan`, from `feature/agent-observability` on actual staging.
+
+Agreed: foundation first; local single-user SQLite behind one small storage adapter; configurable
+seven-day retention; safe request/model/tool timings and failure metadata; essential backend
+logging; readable report plus structured data; small explicit export action from packaged app or
+browser for manual sharing. External models remain supported; diagnostics stay local unless shared.
+Dashboards, accounts, uploads, other backends and execution-control changes are deferred.
+
+The owner requested completion of planning before their final review. Coordinator planning work
+is complete and the critic approved the final decision proposal with no remaining technical
+planning findings. The completion audit now
+identifies one material decision P1: repository-launched Electron tests do not supply the promised
+checkout-free application artifact. The release task owns that missing artifact. The finished
+proposal recommends deferring only artifact acceptance to release work; the existing strict
+requirement stays in force until the owner agrees. Implementation remains unallocated.
+
+The earlier written plan passed independent critique after three bounded corrections to local
+access, backend-unavailable export and SQLite journal bounds. It is being published for the owner
+implementation decision. No runtime implementation,
+installation or new application test execution has begun. V1 and its parent remain open; the old
+review-gate edge is retained pending the owner's requested final implementation decision, after
+which only the V1 edge should be reconciled. No broad gate closure or paused-work resumption.
+Next handoff is the completed reviewed decision proposal to the owner, not an automatic implementation start. P1 is the only remaining material choice; no interim owner review is needed.
+Estimated implementation effort is 4–6 focused engineering days with a two-day progress checkpoint.
+Canonical Beads root stays the primary repository; preserve its dirty files and the paused checkout.
+
+<!-- markdownlint-disable MD025 -->
+
+## Earlier session history retained below
+
 # Native development consolidation handoff — 11 October 2026
 
 ## Current follow-up — paused work visibility

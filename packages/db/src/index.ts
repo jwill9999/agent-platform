@@ -22,3 +22,8 @@ export * from './repositories/memoryRetrieval.js';
 export * from './repositories/selfLearning.js';
 export * from './repositories/workingMemory.js';
 export * from './slug.js';
+export {
+  createDiagnosticStore,
+  DiagnosticStoreError,
+  type DiagnosticStoreOptions,
+} from './diagnostics/store.js';

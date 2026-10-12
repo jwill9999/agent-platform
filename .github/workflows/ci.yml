@@ -59,6 +59,9 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Test local diagnostic command boundaries
+        run: node --test scripts/diagnostics.test.mjs
+
       - name: Prepare private interpreter for pinned execution tests
         shell: bash
         run: |
@@ -69,7 +72,17 @@ jobs:
           echo "$workflow_test_bin" >> "$GITHUB_PATH"
 
       - name: Test
+        env:
+          DIAGNOSTICS_BENCHMARK_RESULT: ${{ runner.temp }}/diagnostics-benchmark.json
         run: pnpm run test
+
+      - name: Upload diagnostic benchmark measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: diagnostics-benchmark
+          path: ${{ runner.temp }}/diagnostics-benchmark.json*
+          retention-days: 7
 
       - name: Seed (idempotent)
         run: |
@@ -249,6 +262,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
+
+      - name: Install browser for connected diagnostics export
+        # Invoke the already lockfile-installed browser CLI; this is not a package install.
+        run: node node_modules/playwright/cli.js install --with-deps chromium
 
       - name: Electron E2E tests
         run: xvfb-run -a pnpm --filter @agent-platform/desktop test:e2e

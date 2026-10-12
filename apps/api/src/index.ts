@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
+import { dirname, join } from 'node:path';
+import { createDiagnosticStore, closeDatabase, openDatabase, runSeed } from '@agent-platform/db';
+import { consumeDiagnosticAccess } from './infrastructure/diagnostics/localAccess.js';
 
-import { closeDatabase, openDatabase, runSeed } from '@agent-platform/db';
 import type { HarnessStateType, ToolCallIntent } from '@agent-platform/harness';
 
 import { createApp } from './infrastructure/http/createApp.js';
@@ -20,7 +22,47 @@ if (sqlitePath) {
   log.info('db.ready', { sqlitePath });
 }
 
+const diagnosticsRequested = Boolean(process.env.DIAGNOSTICS_LOCAL_CAPABILITY);
+const diagnosticAccess = consumeDiagnosticAccess(process.env);
+const diagnosticStore =
+  sqlitePath && diagnosticAccess
+    ? createDiagnosticStore({
+        path: join(dirname(sqlitePath), 'diagnostics.sqlite'),
+        retentionDays:
+          process.env.DIAGNOSTICS_RETENTION_DAYS === undefined
+            ? undefined
+            : Number(process.env.DIAGNOSTICS_RETENTION_DAYS),
+        maxEvents:
+          process.env.DIAGNOSTICS_MAX_EVENTS === undefined
+            ? undefined
+            : Number(process.env.DIAGNOSTICS_MAX_EVENTS),
+      })
+    : undefined;
+// Register observers synchronously; diagnostic readiness must not delay server.listen.
+if (diagnosticStore) observeDiagnosticReadiness(diagnosticStore);
+
+function observeDiagnosticReadiness(store: ReturnType<typeof createDiagnosticStore>): void {
+  void store.ready
+    .then(() => {
+      const health = store.health();
+      if (health.state === 'disabled') log.warn('diagnostics.disabled', { code: health.reason });
+    })
+    .catch(() => log.warn('diagnostics.disabled', { code: 'storage_unavailable' }));
+}
+if (diagnosticsRequested && !diagnosticAccess) {
+  log.warn('diagnostics.disabled', { code: 'invalid_local_configuration' });
+}
+
 const app = createApp({
+  ...(diagnosticStore && diagnosticAccess
+    ? {
+        diagnostics: {
+          store: diagnosticStore,
+          access: diagnosticAccess,
+          appVersion: process.env.DIAGNOSTICS_APP_VERSION,
+        },
+      }
+    : {}),
   db: dbHandle?.db ?? null,
   ...e2eMockV1Options(),
 });
@@ -41,7 +83,8 @@ server.listen(port, host, () => {
 
 function shutdown() {
   scheduler?.stop();
-  server.close(() => {
+  server.close(async () => {
+    await diagnosticStore?.close().catch(() => undefined);
     if (dbHandle) {
       closeDatabase(dbHandle.sqlite);
       log.info('db.closed');

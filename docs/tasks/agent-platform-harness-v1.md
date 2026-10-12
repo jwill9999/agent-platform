@@ -1,3 +1,94 @@
+# Correlation and safe event contract — bounded diagnostics MVP
+
+**Beads issue:** `agent-platform-harness-v1`
+
+**Parent:** `agent-platform-llm-observability-export`
+
+**Status:** implementation authorized and in progress; P1 option A accepted.
+
+## Current authorization and scope
+
+The owner accepted P1 option A and authorized implementation on 11 October. Checkout-free artifact
+variants of T10/T12 are transferred to `agent-platform-electron-release.diagnostics-export` under
+release work; connected standalone-Electron/browser export and the final support exercise remain
+mandatory here. The V1-only historical review-gate edge is removed; the broader gate stays open.
+V1 is in progress on `task/diagnostic-event-foundation` from planning tip `ebf3c279`, with segment PR
+target `feature/agent-observability`. Earlier planning-only/strict-artifact/default-B paragraphs below
+are retained decision history and superseded by this authorization. Runtime work follows R1–R7,
+the tests below with that explicit artifact transfer, and ordinary independent review/CI gates.
+
+## Current task requirements
+
+Implement R1–R7 in the [11 October feature contract](../planning/agent-observability-mvp.md):
+unique request/operation/attempt observations; safe focused backend logging; durable local SQLite
+history behind one adapter; configurable seven-day retention and bounded failure behavior;
+readable and structured reports; one packaged-app/browser export action; unchanged execution
+permissions and recovery. All technical bounds and privacy rules in that contract are normative.
+The earlier 1–2 day envelope estimate is replaced by 4–6 focused engineering days for this larger
+but bounded support workflow. Implementation and local verification are recorded in the
+[results](../reviews/agent-observability-mvp-results.md); current-head hosted qualification and
+authorized feature delivery remain separate completion gates.
+
+## Dependency order
+
+The owner-authorized V1 edge to `agent-platform-harness-review-gate` has been removed in Beads.
+The broader gate remains open for its other work; it does not block this implementation. The
+release export child depends on V1, not the reverse. This MVP does not require a prototype
+broker/contract, paused pilot, SDK modernization or dashboard.
+Existing downstream V2/V3/V4/R1/R4/K1 and local visibility/reliability records are retained. V1
+completion does not close them or waive their own acceptance requirements. Beads is authoritative.
+
+## Implementation plan and branch mapping
+
+Source: staging `7814b59845b52ad5f850bfc99b7baee0e6742a25`, separate clean owned worktree.
+Planning: `feature/agent-observability` → `task/observability-mvp-plan` (intermediate).
+The authorized `task/diagnostic-event-foundation` from the pushed planning tip is the
+single implementation segment tip, carrying this plan into a PR to `feature/agent-observability`.
+Staging is the eventual protected destination when authorized; never main. Implementation uses `task/diagnostic-event-foundation` from planning tip `ebf3c279`. Preserve all paused refs and dirty/unrelated checkouts.
+
+Milestones within this one task: identity/projection; adapter/lifecycle; report/CLI/export;
+connected verification and independent source review. The implementer owns final integrated
+T12 acceptance as well as individual tests; do not defer it to the broader V5 task.
+The two-day checkpoint and bounded retry/escalation rules are in the feature contract.
+
+## Tests and definition of done
+
+The [verification plan](../testing/agent-observability-mvp.md) maps every requirement to T01–T12,
+source files, real backend/file assertions, environments, limits and evidence. All are required
+before implementation completion. Model-provider doubles are disclosed; no paid live call required.
+For planning completion, validate these documents and obtain independent critique; do not claim
+application tests have passed. [Planning review](../reviews/agent-observability-mvp-plan-review.md)
+records findings and their dispositions.
+
+V1 closes only after R1–R7 and T01–T12 pass on the accepted source, dependencies are reconciled,
+independent implementation review has no actionable findings, affected quality gates and detailed
+Sonar/Problems findings clear, and the segment-tip PR has merged into its feature under actual
+owner authority. Record exact tested/merged revisions, safe artifacts and full documentation
+mirrors/readbacks. Then close/read back Beads and verify Dolt push. Parent closure requires its
+remaining broader scope; feature-to-staging delivery is separately gated. V1 remains in progress until those delivery conditions hold. The owner has approved the completed
+plan and implementation; the V1-only historical review-gate edge has been removed.
+
+## Recorded feasibility decision before allocation — superseded by accepted P1 option A
+
+The completion audit found no checkout-free desktop app artifact or app packaging command.
+Existing Electron VM tests use the development Node and source checkout. Strict T10/T12 therefore
+remain required but blocked on release-owned artifact provision. [Decision P1](../planning/agent-observability-mvp.md#completion-audit--packaged-artifact-decision-p1)
+presents the bounded alternative: deliver connected standalone export in V1 and explicitly transfer
+checkout-free artifact acceptance to release work, only if the owner agrees at final plan review.
+Do not silently weaken acceptance, expand V1 into packaging, or claim implementation readiness.
+At that earlier planning checkpoint, no dependency edge or release task had been activated.
+The owner subsequently accepted option A: the release child now owns checkout-free artifact
+verification, and V1 proceeds with connected standalone-Electron/browser acceptance.
+
+## Historical proposal — preserved, superseded for this V1 proposal
+
+The following earlier body is retained verbatim as history. Its broker, prototype implementation
+contract, mandatory intent-storage and broad review-gate instructions do not govern this native
+observational MVP. Its broader obligations remain in the existing backlog; none is silently claimed
+delivered. Current accepted V1 scope and delivery conditions are above.
+
+<!-- prettier-ignore-start -->
+````text
 # Correlation and safe event contract
 
 Beads issue: `agent-platform-harness-v1`. Status and scheduling authority: Beads.
@@ -65,3 +156,5 @@ Feature: Truthful local run state
   Scenario: Mandatory intent storage fails
     Then a side-effecting action is not dispatched
 ```
+````
+<!-- prettier-ignore-end -->

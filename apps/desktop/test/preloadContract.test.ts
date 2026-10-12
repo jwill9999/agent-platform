@@ -39,6 +39,7 @@ describe('desktop preload bridge contract', () => {
 
   it('limits the root bridge keys to the explicit contract', () => {
     expect(desktopBridgeApiKeys).toEqual([
+      'diagnostics',
       'maintenance',
       'projects',
       'terminal',

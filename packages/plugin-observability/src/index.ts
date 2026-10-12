@@ -17,3 +17,8 @@ export {
   type SensorFeedbackCandidate,
 } from './store.js';
 export type { SensorMcpCapabilityAvailability } from './events.js';
+export {
+  projectDiagnosticEvent,
+  buildDiagnosticReport,
+  buildPartialDiagnosticReport,
+} from './diagnostics.js';

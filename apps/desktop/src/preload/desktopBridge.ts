@@ -1,4 +1,6 @@
 import type {
+  DiagnosticScope,
+  DiagnosticPartialFailure,
   DesktopCreateProjectFolderRequest,
   DesktopOpenProjectIdeRequest,
   DesktopOpenProjectIdeResult,
@@ -173,7 +175,17 @@ export interface DesktopWorkspaceApi {
   ) => DesktopWorkspaceWebViewUnsubscribe;
 }
 
+export interface DesktopDiagnosticsApi {
+  readonly saveReport: (scope: DiagnosticScope) => Promise<DesktopWorkspaceExportResult>;
+  readonly savePartial: (
+    failure: DiagnosticPartialFailure,
+  ) => Promise<DesktopWorkspaceExportResult>;
+}
+export const saveDiagnosticReportIpcChannel = 'agent-platform:diagnostics:save-report';
+export const savePartialDiagnosticReportIpcChannel = 'agent-platform:diagnostics:save-partial';
+
 export interface AgentPlatformDesktopApi {
+  readonly diagnostics: DesktopDiagnosticsApi;
   readonly maintenance: DesktopMaintenanceApi;
   readonly projects: DesktopProjectsApi;
   readonly terminal: DesktopTerminalApi;
@@ -210,6 +222,7 @@ export const reloadWorkspaceWebViewIpcChannel = 'agent-platform:workspace:webvie
 export const workspaceWebViewUpdatedIpcChannel = 'agent-platform:workspace:webview-updated';
 
 export const desktopBridgeApiKeys = [
+  'diagnostics',
   'maintenance',
   'projects',
   'terminal',
