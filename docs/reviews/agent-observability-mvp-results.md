@@ -1,6 +1,6 @@
 # Diagnostics MVP — implementation results
 
-Status: implemented and locally verified; hosted qualification, feature delivery and final owner acceptance remain pending.
+Status: PR302 delivered to the feature under owner authorization; staging PR303 is blocked by the packaged VM startup failure described below. Earlier pending statements are dated historical snapshots.
 Task: [agent-platform-harness-v1](../tasks/agent-platform-harness-v1.md).
 Contract: [approved MVP](../planning/agent-observability-mvp.md).
 Verification: [T01–T12](../testing/agent-observability-mvp.md).
@@ -255,3 +255,58 @@ were read back in full at their recorded source revisions. Qualify the measureme
 with its current-head feature CI/reviews, retained numeric benchmark artifact and refreshed changed mirrors, then record
 actual completion evidence in Beads. Merge and final owner acceptance retain their actual
 authorization boundaries.
+
+## Protected staging attempt and startup evidence repair — 13 October 2026
+
+PR302 merged into `feature/agent-observability` at
+`f0f4edd32b88693d39d803dea175c2750f738db5` after all nine executed checks passed on
+`e79f9c3179f9c806dd9f7879d9b0b0ccc0395a28`, with no unresolved review findings. Its tree
+`80e092cead216ca4e851190200a7991ef830e22f` matched the independently reviewed source and staging
+rehearsal. The owner explicitly authorized this merge and conditional staging delivery.
+
+Protected PR303's first CI run `38320874174` passed build, browser, desktop and Docker jobs.
+The ordinary full Promptfoo run `38320874093` completed real analysis (three batches, no reported
+LLM vulnerabilities), verified against its source-bound proof and downloaded SARIF. CodeQL and
+Sonar also passed. The staging benchmark passed all nine modes within the original limits,
+with maximum request-p95 overhead 1.952530 ms and enqueue p95 0.020160 ms.
+
+The mandatory packaged macOS VM job `115048391318` failed one of nineteen scenarios: the
+network-block policy journey failed its backend readiness poll before model configuration,
+both initially and on its configured retry. Eighteen scenarios passed. Healthy VM evidence
+confirms signed packaging, a ready VM and no host-path/secret exposure for that subcase; it does
+not qualify a failed suite. No staging merge or delivered-branch deletion followed this failure.
+
+The old polling code discards HTTP status and transport errors, while cleanup removes startup
+logs before they are preserved. No provider request, approval or tool effect occurred in the
+failed scenario. Source inspection confirms a nonready command runner alone produces degraded
+HTTP 200, not the failed readiness predicate. The historical failure's root cause is unproven.
+Independent critique approved a bounded, fixture-only startup evidence repair and a focused
+reproduction, retaining the existing 20-second poll and all policy assertions. Raw health errors,
+log messages, environment values and paths must not be exported. Runtime behavior and security
+policy remain unchanged; new exact-head qualification is required before delivery.
+
+The process observation refers to Electron, not its API child. Stderr inspection begins after
+`electron.launch` resolves and records only a fixed allowlist of error codes from a bounded prefix;
+earlier output or a launch failure can remain unavailable. A successful reproduction would not
+retroactively establish the original failure's cause. Review also identified that attachment failure
+must not skip provider/VM/temporary-directory cleanup; that failure path is part of the repair checks.
+
+The repaired fixture passed nine focused tests covering actual refused/503 responses, an exited
+child, bounded/nonterminating response bodies, secret canaries, stderr bounds and cleanup on
+attachment failure. An additional external Playwright control copied the actual hook/close helper
+and intentionally failed both the test and attachment: all five cleanup markers were reached, the original
+failure remained first, and the attachment failure surfaced after cleanup. Independent re-review
+closed OBS-VM-01. Desktop typecheck and backend/renderer/desktop builds passed; scoped lint,
+formatting and Markdown checks passed. These are fixture/quality results, not staging qualification.
+
+One focused packaged network-block reproduction then passed in 32.4 seconds, with retries disabled,
+using the existing signed packaged VM resources and deterministic HTTP model provider. Its saved
+policy evaluation verifies the blocked policy and persisted backend effects. This did not reproduce
+the original startup failure; its cause remains unknown. The fixture change repairs the evidence
+blind spot, not a demonstrated application defect. New task-to-feature and full staging checks
+remain required; none of the old-head passes qualifies the revised head.
+
+PR304's first hosted Sonar gate was OK but its issue list identified one Major S3358 nested
+conditional in the startup helper. The follow-up extracts equivalent branching without suppression
+or runtime changes. All nine affected tests, lint and formatting passed. Independent equivalence
+review and new hosted qualification remain separate from the earlier successful packaged case.

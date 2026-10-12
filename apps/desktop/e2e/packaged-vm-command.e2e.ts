@@ -13,11 +13,22 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type TestInfo } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 
 import { JOURNEY_CALL_ID, JOURNEY_MODEL, startJourneyProvider } from './support/providerJourney.js';
 import { getOpenPort } from './support/runtime.js';
+import {
+  attemptStartupEvidenceAttachment,
+  createStartupEvidence,
+} from './support/startupEvidence.js';
+
+const failedStartupAttachments = new WeakSet<TestInfo>();
+test.afterEach(() => {
+  const testInfo = test.info();
+  // Test-body finally blocks have already released the provider, VM and temporary files.
+  expect(failedStartupAttachments.has(testInfo), 'Startup evidence attachment failed').toBe(false);
+});
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
@@ -35,6 +46,7 @@ type VmFixtureHealth = 'ready' | 'failed';
 
 type VmFixture = {
   backendPort: number;
+  startup: ReturnType<typeof createStartupEvidence>;
   evidenceDir?: string;
   heartbeatTimer?: NodeJS.Timeout;
   projectDir: string;
@@ -76,7 +88,7 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await expect(page.getByText(HOST_ONLY_CANARY_VALUE)).toHaveCount(0);
       writeVmEvidence(fixture, 'success', realVmStatus);
     } finally {
-      await app?.close();
+      await closeVmFixtureApp(fixture, app);
       stopRealVmRunner(fixture);
       if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
       rmSync(fixture.tempRoot, { recursive: true, force: true });
@@ -108,7 +120,7 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await expect(page.getByText(`HOST_CWD:${fixture.projectDir}`)).toHaveCount(0);
       await expect(page.getByText(HOST_ONLY_CANARY_VALUE)).toHaveCount(0);
     } finally {
-      await app?.close();
+      await closeVmFixtureApp(fixture, app);
       if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
       rmSync(fixture.tempRoot, { recursive: true, force: true });
     }
@@ -438,7 +450,7 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
           .info()
           .attach('journey-browser-trace', { path: tracePath, contentType: 'application/zip' });
       }
-      await app?.close();
+      await closeVmFixtureApp(fixture, app);
       await provider?.close();
       stopRealVmRunner(fixture);
       if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
@@ -705,7 +717,7 @@ for (const { policy, unavailableFiles, action } of [
             .attach('policy-browser-trace', { path: trace, contentType: 'application/zip' });
         }
       } finally {
-        await app?.close();
+        await closeVmFixtureApp(fixture, app);
         await provider.close();
         stopRealVmRunner(fixture);
         if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
@@ -757,18 +769,22 @@ type ApprovalEvidence = {
 };
 type AuditEvidence = { id: string; sessionId: string; toolName: string; status: string };
 
+async function closeVmFixtureApp(fixture: VmFixture, app?: ElectronApplication): Promise<void> {
+  const info = test.info();
+  const attached = await attemptStartupEvidenceAttachment(() =>
+    info.attach('startup-evidence', {
+      body: Buffer.from(JSON.stringify(fixture.startup.snapshot(), null, 2)),
+      contentType: 'application/json',
+    }),
+  );
+  if (!attached) failedStartupAttachments.add(info);
+  await app?.close();
+}
+
 async function configureJourneyModel(fixture: VmFixture): Promise<void> {
+  const deadline = performance.now() + 20_000;
   await expect
-    .poll(
-      async () => {
-        try {
-          return (await fetch(`http://127.0.0.1:${fixture.backendPort}/health/ready`)).ok;
-        } catch {
-          return false;
-        }
-      },
-      { timeout: 20_000 },
-    )
+    .poll(() => fixture.startup.probe(deadline - performance.now()), { timeout: 20_000 })
     .toBe(true);
   const configs = await readEvidence<{ id: string }>(fixture, 'model-configs');
   expect(configs).toHaveLength(1);
@@ -883,6 +899,7 @@ async function createVmFixture(options: { health: VmFixtureHealth }): Promise<Vm
 
   return {
     backendPort,
+    startup: createStartupEvidence(backendPort, rendererPort),
     evidenceDir,
     heartbeatTimer,
     projectDir,
@@ -903,7 +920,7 @@ async function launchVmFixture(
     workspaceRoot?: string;
   } = {},
 ): Promise<ElectronApplication> {
-  return electron.launch({
+  const app = await electron.launch({
     cwd: desktopDir,
     args: ['.'],
     env: {
@@ -950,6 +967,8 @@ async function launchVmFixture(
       ...(process.env.CI ? { CI: process.env.CI } : {}),
     },
   });
+  fixture.startup.observeProcess(app.process());
+  return app;
 }
 
 async function openProject(page: Page): Promise<void> {
