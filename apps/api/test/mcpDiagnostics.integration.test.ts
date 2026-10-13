@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import type { Server } from 'node:http';
+import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
+
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,6 +25,7 @@ it('persists real MCP namespace attribution while excluding server names and arg
   const toolExecutionId = randomUUID();
   const privateToolName = 'private_customer_search';
   const argumentCanary = 'sk-fixture-secret-not-for-diagnostics';
+  let server: Server | undefined;
   try {
     await store.ready;
     const app = express();
@@ -43,7 +47,8 @@ it('persists real MCP namespace attribution while excluding server names and arg
       finishRun();
       res.json({ ok: true });
     });
-    await request(app)
+    server = await listenLoopback(app);
+    await request(server)
       .post('/v1/chat')
       .send({ arguments: { text: argumentCanary } })
       .expect(200);
@@ -60,7 +65,11 @@ it('persists real MCP namespace attribution while excluding server names and arg
     for (const privateValue of [serverId, privateToolName, argumentCanary])
       expect(serialized).not.toContain(privateValue);
   } finally {
-    await store.close();
-    rmSync(directory, { recursive: true, force: true });
+    try {
+      if (server) await closeLoopback(server);
+    } finally {
+      await store.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
   }
 });

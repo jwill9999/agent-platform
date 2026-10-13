@@ -1,3 +1,4 @@
+import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -66,7 +67,7 @@ async function makeFixture() {
         },
       },
     });
-  let app = makeApp();
+  let app = await listenLoopback(makeApp());
   return {
     get app() {
       return app;
@@ -84,10 +85,14 @@ async function makeFixture() {
     setResult(value: string) {
       result = value;
     },
-    restart() {
-      closeDatabase(connection.sqlite);
+    async restart() {
+      try {
+        await closeLoopback(app);
+      } finally {
+        closeDatabase(connection.sqlite);
+      }
       connection = openDatabase(file);
-      app = makeApp();
+      app = await listenLoopback(makeApp());
     },
     budget(maxInputTokens: number, maxOutputTokens = 73) {
       connection.sqlite
@@ -104,9 +109,13 @@ async function makeFixture() {
         .expect(201);
       return res.body.data.id as string;
     },
-    dispose() {
-      closeDatabase(connection.sqlite);
-      rmSync(dir, { recursive: true, force: true });
+    async dispose() {
+      try {
+        await closeLoopback(app);
+      } finally {
+        closeDatabase(connection.sqlite);
+        rmSync(dir, { recursive: true, force: true });
+      }
     },
   };
 }
@@ -157,8 +166,8 @@ describe('context admission through API and SQLite', () => {
     f = await makeFixture();
     f.budget(12000);
   });
-  afterEach(() => {
-    f.dispose();
+  afterEach(async () => {
+    await f.dispose();
     restoreChatEnv(env);
     vi.unstubAllEnvs();
   });
@@ -233,7 +242,7 @@ describe('context admission through API and SQLite', () => {
       });
       updateSettings(f.db, { executionPolicy: { unknownCommandPolicy: policy } });
       // Persistence/reload must not turn a past memory claim into live authority.
-      f.restart();
+      await f.restart();
       stream.mockReturnValueOnce(response('', [reviewedCall], 'tool-calls'));
       stream.mockReturnValueOnce(response('Cannot execute without live permission'));
       const res = await request(f.app)
@@ -352,7 +361,7 @@ describe('context admission through API and SQLite', () => {
       importantFiles: ['RESTART_FILE'],
     });
     f.setResult('HUGE_EFFECT_RESULT'.repeat(10000));
-    f.restart();
+    await f.restart();
     const res = await resume(f, sessionId, approvalRequestId);
     expect(res.text).toContain('CONTEXT_BUDGET_EXCEEDED');
     expect(f.effects).toBe(1);
@@ -389,7 +398,7 @@ describe('context admission through API and SQLite', () => {
         .expect(200);
       if (decision === 'block')
         updateSettings(f.db, { executionPolicy: { unknownCommandPolicy: 'block' } });
-      f.restart();
+      await f.restart();
       stream.mockReturnValueOnce(response('Reviewed outcome'));
       await resume(f, sessionId, approvalRequestId);
       expect(stream).toHaveBeenCalledTimes(2);
@@ -498,7 +507,7 @@ describe('context admission through API and SQLite', () => {
       .post(`/v1/approval-requests/${approvalRequestId}/approve`)
       .send({})
       .expect(200);
-    f.restart();
+    await f.restart();
     stream.mockReturnValueOnce(response('Approved result explained'));
     await resume(f, sessionId, approvalRequestId);
     expect(stream).toHaveBeenCalledTimes(3);
@@ -605,7 +614,7 @@ describe('context admission through API and SQLite', () => {
     expect(
       f.sqlite.prepare('SELECT context_window_json FROM agents WHERE id = ?').get(DEFAULT_AGENT_ID),
     ).toEqual(storedBefore);
-    f.restart();
+    await f.restart();
     expect(
       (await request(f.app).get(`/v1/agents/${DEFAULT_AGENT_ID}`).expect(200)).body.data
         .contextWindow,
@@ -664,7 +673,7 @@ describe('context admission through API and SQLite', () => {
       .post('/v1/agents')
       .send({ ...updated.body.data, name: 'Copied explicit context' })
       .expect(201);
-    f.restart();
+    await f.restart();
     for (const [id, expected] of [
       [absent.body.data.id, absent.body.data.contextWindow],
       [partial.body.data.id, partial.body.data.contextWindow],
@@ -697,7 +706,7 @@ describe('context admission through API and SQLite', () => {
       .send({ ...updated.body.data, name: 'Context settings copy' })
       .expect(201);
     expect(copied.body.data.id).not.toBe(created.body.data.id);
-    f.restart();
+    await f.restart();
     for (const id of [created.body.data.id, copied.body.data.id]) {
       const read = await request(f.app).get(`/v1/agents/${id}`).expect(200);
       expect(read.body.data.contextWindow).toEqual(updatedPolicy);

@@ -1,17 +1,26 @@
 import request from 'supertest';
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import type { Server } from 'node:http';
+import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
 
 import { createApp } from '../src/infrastructure/http/createApp.js';
 
 describe('correlation middleware', () => {
   const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  let app: Server;
+  beforeEach(async () => {
+    app = await listenLoopback(createApp({ db: null }));
+  });
 
-  afterEach(() => {
-    consoleSpy.mockClear();
+  afterEach(async () => {
+    try {
+      await closeLoopback(app);
+    } finally {
+      consoleSpy.mockClear();
+    }
   });
 
   it('generates x-correlation-id when none is sent', async () => {
-    const app = createApp({ db: null });
     const res = await request(app).get('/health');
 
     const header = res.headers['x-correlation-id'] as string;
@@ -20,14 +29,12 @@ describe('correlation middleware', () => {
   });
 
   it('echoes back a client-provided x-correlation-id', async () => {
-    const app = createApp({ db: null });
     const res = await request(app).get('/health').set('x-correlation-id', 'client-abc-123');
 
     expect(res.headers['x-correlation-id']).toBe('client-abc-123');
   });
 
   it('keeps repeated caller IDs separate and rejects unsafe caller metadata', async () => {
-    const app = createApp({ db: null });
     const responses = await Promise.all([
       request(app).get('/health').set('x-correlation-id', 'same'),
       request(app).get('/health').set('x-correlation-id', 'same'),
@@ -41,7 +48,6 @@ describe('correlation middleware', () => {
   });
 
   it('propagates correlationId into structured log output', async () => {
-    const app = createApp({ db: null });
     await request(app).get('/health').set('x-correlation-id', 'trace-xyz');
 
     // Find any log line that includes our correlation ID

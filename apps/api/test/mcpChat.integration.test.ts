@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync } from 'no
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import type { Server } from 'node:http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import {
@@ -24,6 +25,7 @@ import {
   type SessionLock,
 } from '../src/infrastructure/http/sessionLock.js';
 import type { HarnessStateType, ToolCallIntent } from '@agent-platform/harness';
+import { listenLoopback, closeLoopback, closeLoopbacks } from './support/loopbackServer.js';
 
 const providerStream = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => never>(() => {
@@ -37,18 +39,25 @@ vi.mock('../../../packages/harness/node_modules/ai', async (importOriginal) => (
 }));
 
 const roots: string[] = [];
+const servers = new Set<Server>();
 const diagnosticStores: DiagnosticStore[] = [];
 const restore = { key: process.env.SECRETS_MASTER_KEY, provider: process.env.AGENT_OPENAI_API_KEY };
 afterEach(async () => {
   providerStream.mockClear();
-  for (const store of diagnosticStores.splice(0)) await store.close();
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
-  for (const [name, value] of [
-    ['SECRETS_MASTER_KEY', restore.key],
-    ['AGENT_OPENAI_API_KEY', restore.provider],
-  ] as const) {
-    if (value === undefined) delete process.env[name];
-    else process.env[name] = value;
+  const ownedServers = [...servers];
+  servers.clear();
+  try {
+    await closeLoopbacks(ownedServers);
+  } finally {
+    for (const store of diagnosticStores.splice(0)) await store.close();
+    for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+    for (const [name, value] of [
+      ['SECRETS_MASTER_KEY', restore.key],
+      ['AGENT_OPENAI_API_KEY', restore.provider],
+    ] as const) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   }
 });
 
@@ -81,7 +90,7 @@ async function setup(
   const replies: Array<ToolCallIntent[] | string> = [];
   const definitions: string[][] = [];
   const discoveredDefinitions: string[][] = [];
-  const app = createApp({
+  const rawApp = createApp({
     db,
     diagnostics: diagnosticStore
       ? { store: diagnosticStore, access: { host: '127.0.0.1:3456', capability: 'a'.repeat(64) } }
@@ -124,6 +133,8 @@ async function setup(
       },
     },
   });
+  const app = await listenLoopback(rawApp);
+  servers.add(app);
   const body = {
     name: 'MCP chat fixture',
     transport: 'stdio',
@@ -203,6 +214,14 @@ async function setup(
     app,
     db,
     sqlite,
+    close: async () => {
+      try {
+        await closeLoopback(app);
+      } finally {
+        servers.delete(app);
+        closeDatabase(sqlite);
+      }
+    },
     body,
     server,
     agentBody,
@@ -292,7 +311,7 @@ describe('real MCP chat and durable approval boundary', () => {
       expect(JSON.stringify(report)).not.toContain('Check the bounded MCP catalog.');
       await f.settledChildren();
     } finally {
-      closeDatabase(f.sqlite);
+      await f.close();
     }
   });
 
@@ -337,7 +356,7 @@ describe('real MCP chat and durable approval boundary', () => {
       expect(JSON.stringify(report)).not.toContain('changed-before-dispatch');
       await f.settledChildren();
     } finally {
-      closeDatabase(f.sqlite);
+      await f.close();
     }
   });
 
@@ -357,7 +376,7 @@ describe('real MCP chat and durable approval boundary', () => {
       expect(f.effect()).toHaveLength(0);
       await f.settledChildren();
     } finally {
-      closeDatabase(f.sqlite);
+      await f.close();
     }
   });
 
@@ -391,7 +410,7 @@ describe('real MCP chat and durable approval boundary', () => {
       expect(f.modelCalls()).toBe(count);
       await f.settledChildren();
     } finally {
-      closeDatabase(f.sqlite);
+      await f.close();
     }
   });
 
@@ -443,7 +462,7 @@ describe('real MCP chat and durable approval boundary', () => {
         if (change !== 'schema') expect(f.read()).toHaveLength(starts);
         await f.settledChildren();
       } finally {
-        closeDatabase(f.sqlite);
+        await f.close();
       }
     });
   }
@@ -479,7 +498,7 @@ describe('real MCP chat and durable approval boundary', () => {
       ).toBe(false);
       await f.settledChildren();
     } finally {
-      closeDatabase(f.sqlite);
+      await f.close();
     }
   });
 
@@ -501,7 +520,7 @@ describe('real MCP chat and durable approval boundary', () => {
       expect(f.effect()).toHaveLength(0);
       await f.settledChildren();
     } finally {
-      closeDatabase(f.sqlite);
+      await f.close();
     }
   });
 
@@ -530,7 +549,7 @@ describe('real MCP chat and durable approval boundary', () => {
       expect(f.effect()).toHaveLength(0);
       await f.settledChildren();
     } finally {
-      closeDatabase(f.sqlite);
+      await f.close();
     }
   });
 
@@ -560,7 +579,7 @@ describe('real MCP chat and durable approval boundary', () => {
       expect(f.effect()).toHaveLength(0);
       await f.settledChildren();
     } finally {
-      closeDatabase(f.sqlite);
+      await f.close();
     }
   });
 
@@ -586,7 +605,7 @@ describe('real MCP chat and durable approval boundary', () => {
       await f.settledChildren();
     } finally {
       release();
-      closeDatabase(f.sqlite);
+      await f.close();
     }
   });
 
@@ -602,7 +621,7 @@ describe('real MCP chat and durable approval boundary', () => {
       expect(f.effect()).toHaveLength(0);
       await f.settledChildren();
     } finally {
-      closeDatabase(f.sqlite);
+      await f.close();
     }
   });
 });

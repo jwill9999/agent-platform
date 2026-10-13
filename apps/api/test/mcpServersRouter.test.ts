@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { createServer, type Server } from 'node:http';
+import { listenLoopback, closeLoopbacks } from './support/loopbackServer.js';
+
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,23 +21,27 @@ const fixture = fileURLToPath(
 describe('MCP API real DB and transport', () => {
   let dir: string;
   let opened: ReturnType<typeof openDatabase>;
-  let app: express.Express;
+  let app: Server;
   const servers: ReturnType<typeof createServer>[] = [];
-  beforeEach(() => {
+  beforeEach(async () => {
     dir = mkdtempSync(path.join(os.tmpdir(), 'mcp-api-'));
     opened = openDatabase(path.join(dir, 'db.sqlite'));
     vi.stubEnv('SECRETS_MASTER_KEY', randomBytes(32).toString('base64'));
-    app = express();
-    app.use(express.json());
-    app.use('/mcp', createMcpServersRouter(opened.db));
-    app.use(errorMiddleware);
+    const rawApp = express();
+    rawApp.use(express.json());
+    rawApp.use('/mcp', createMcpServersRouter(opened.db));
+    rawApp.use(errorMiddleware);
+    app = await listenLoopback(rawApp);
+    servers.push(app);
   });
   afterEach(async () => {
-    for (const server of servers.splice(0))
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    opened.sqlite.close();
-    rmSync(dir, { recursive: true, force: true });
-    vi.unstubAllEnvs();
+    try {
+      await closeLoopbacks(servers.splice(0));
+    } finally {
+      opened.sqlite.close();
+      rmSync(dir, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+    }
   });
   it('save does not execute; Test performs real stdio discovery, no call, and closes child', async () => {
     const journal = path.join(dir, 'effects.jsonl');
