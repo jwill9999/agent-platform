@@ -42,6 +42,24 @@ browser `pnpm exec playwright test -c e2e/playwright.config.ts e2e/chat-reply-re
 against owned configured services. Desktop:
 `pnpm exec playwright test -c apps/desktop/e2e/playwright.electron.config.ts chat-reply-reliability.e2e.ts`.
 The connected files now exist; the actual result map records runs and any bounded fixture repairs.
+The normal Docker configuration sequences Chromium, the reply regression and MCP onboarding because
+these suites share a disposable loopback provider port. Preserve all discovered tests exactly once;
+qualify the dependency-enabled matrix without `--no-deps`. Both the conventional `/workspace` mount
+and the context fixture's `/context-projects` mount must be available in the isolated test topology.
+
+CR-T06 also covers cold Project reopening when agents arrive before or after the session lookup:
+only the current selection may bind, exactly once, after confirming there is no saved session.
+Navigation to Home or another Project must invalidate that pending binding; a failed binding must
+surface its error without automatic retry. Retain the controlled pre-fix mounted failure and require
+both fixed mounted coverage and the existing connected MCP initial-binding journey.
+
+Repeated navigation to an already selected Personal chat must preserve its completed, resumed or
+pending conversation. Explicit New conversation must still create a new session. Keep controlled
+pre-fix failures and mounted regression assertions for both paths. Project-access fixtures must use
+owned directories outside the source checkout: verify their own Git root or genuine no-Git state so
+background checks cannot silently inherit the developer's remote. This does not qualify real GitHub
+responsiveness; that existing backend issue remains separately tracked as `agent-platform-d185`.
+
 Use Node24.14, canonical `WORKFLOW_GIT_BINARY=/usr/bin/git`, Vitest min/max forks1, tracing disabled
 and normal hooks. A pre-existing unrelated hook-baseline bug is recorded separately; diagnose any
 actual failure, do not silently skip or weaken gates.

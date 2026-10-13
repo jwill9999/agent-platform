@@ -47,7 +47,28 @@ vi.mock('../components/chat/chat', () => ({
     createElement('output', { 'data-testid': 'conversation' }, props.diagnosticSessionId ?? ''),
 }));
 vi.mock('../components/chat/agent-model-context', () => ({
-  AgentModelProvider: ({ children }: { children: ReactNode }) => children,
+  AgentModelProvider: ({
+    children,
+    value,
+  }: {
+    children: ReactNode;
+    value: { onSelectAgent: (agentId: string) => void };
+  }) =>
+    createElement(
+      'div',
+      null,
+      children,
+      createElement(
+        'button',
+        { onClick: () => value.onSelectAgent('personal') },
+        'Choose Personal agent',
+      ),
+      createElement(
+        'button',
+        { onClick: () => value.onSelectAgent('coding') },
+        'Choose Coding agent',
+      ),
+    ),
 }));
 vi.mock('../components/chat/session-dropdown', () => ({
   SessionDropdown: (props: ComponentProps<typeof SessionDropdown>) =>
@@ -216,7 +237,163 @@ async function openProject(id = 'alpha') {
   expect(current()).toBe(`bound-${id}`);
 }
 
+async function coldProjectReopen() {
+  await act(async () => root.unmount());
+  vi.clearAllMocks();
+  const agentList = deferred<Agent[]>();
+  const sessionList = deferred<SessionRecord[]>();
+  mocks.get.mockImplementation(async (path: string) => {
+    if (path === '/api/v1/agents') return agentList.promise;
+    if (path === '/api/v1/model-configs') return [];
+    if (path === '/api/v1/sessions') return sessionList.promise;
+    if (path.endsWith('/sensors')) return null;
+    throw new Error(`Unexpected cold fixture GET ${path}`);
+  });
+  mocks.recent.mockResolvedValue([project('alpha')]);
+  window.history.replaceState(null, '', '/?projectId=alpha');
+  root = createRoot(container);
+  await act(async () => root.render(createElement(HomePage)));
+  return { agentList, sessionList };
+}
+
 describe('HomePage asynchronous selection ownership', () => {
+  it('keeps a usable personal conversation when the current personal navigation is requested again', async () => {
+    await openPersonal();
+    await navigate(workspacePersonalChatRequestedEvent);
+    expect(current()).toBe('personal-current');
+    expect(mocks.post).toHaveBeenCalledOnce();
+    mocks.post.mockResolvedValueOnce(session('explicit-new'));
+    await click('New conversation');
+    expect(current()).toBe('explicit-new');
+    expect(mocks.post).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves a resumed conversation when personal workspace navigation is repeated', async () => {
+    await openPersonal();
+    await click('Select B');
+    expect(current()).toBe('B');
+    await navigate(workspacePersonalChatRequestedEvent);
+    expect(current()).toBe('B');
+    expect(mocks.post).toHaveBeenCalledOnce();
+  });
+
+  it('preserves an in-flight personal session creation when personal navigation is repeated', async () => {
+    const pending = deferred<SessionRecord>();
+    mocks.post.mockReturnValueOnce(pending.promise);
+    await navigate(workspacePersonalChatRequestedEvent);
+    expect(current()).toBe('');
+    await navigate(workspacePersonalChatRequestedEvent);
+    await settle(pending, session('pending-personal'));
+    expect(current()).toBe('pending-personal');
+    expect(mocks.post).toHaveBeenCalledOnce();
+  });
+
+  it('creates personal chat after Project agent switches even while all old bindings are pending', async () => {
+    const first = deferred<{ session: SessionRecord; created: boolean }>();
+    const second = deferred<{ session: SessionRecord; created: boolean }>();
+    const third = deferred<{ session: SessionRecord; created: boolean }>();
+    mocks.bind
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+      .mockReturnValueOnce(third.promise);
+    mocks.createProject.mockResolvedValueOnce({ project: project('alpha'), created: true });
+    await click('New project');
+    const start = [...container.querySelectorAll('button')].find((item) =>
+      item.textContent?.includes('Start from scratch'),
+    )!;
+    await act(async () => start.click());
+    const input = container.querySelector<HTMLInputElement>('#new-project-name')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        input,
+        'alpha',
+      );
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () =>
+      container
+        .querySelector('form')!
+        .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+    );
+    await click('Choose Personal agent');
+    await click('Choose Coding agent');
+    expect(mocks.bind).toHaveBeenCalledTimes(3);
+    await navigate(workspaceHomeRequestedEvent);
+    const chat = [...container.querySelectorAll('button')].find((button) =>
+      button.textContent?.startsWith('Chat'),
+    )!;
+    await act(async () => chat.click());
+    expect(current()).toBe('personal-current');
+    expect(mocks.post).toHaveBeenCalledWith('/api/v1/sessions', {
+      agentId: 'personal',
+      mode: 'chat',
+    });
+    for (const pending of [first, second, third]) {
+      await settle(pending, { session: session('old-project', 'coding', 'alpha'), created: false });
+    }
+    expect(current()).toBe('personal-current');
+  });
+
+  it('binds once after agents arrive during a cold Project session lookup', async () => {
+    const pending = await coldProjectReopen();
+    expect(mocks.get).toHaveBeenCalledWith('/api/v1/sessions');
+    expect(current()).toBe('');
+    await settle(pending.agentList, agents);
+    expect(mocks.bind).not.toHaveBeenCalled();
+    await settle(pending.sessionList, []);
+    expect(current()).toBe('bound-alpha');
+    expect(mocks.bind).toHaveBeenCalledOnce();
+    expect(mocks.bind).toHaveBeenCalledWith({ agentId: 'coding', projectId: 'alpha' });
+  });
+
+  it('binds once when agents arrive after the cold Project lookup is complete', async () => {
+    const pending = await coldProjectReopen();
+    await settle(pending.sessionList, []);
+    expect(mocks.bind).not.toHaveBeenCalled();
+    await settle(pending.agentList, agents);
+    expect(current()).toBe('bound-alpha');
+    expect(mocks.bind).toHaveBeenCalledOnce();
+    expect(mocks.bind).toHaveBeenCalledWith({ agentId: 'coding', projectId: 'alpha' });
+  });
+
+  it('surfaces a failed deferred binding without automatically retrying it', async () => {
+    const pending = await coldProjectReopen();
+    mocks.bind.mockRejectedValue(new Error('controlled binding failure'));
+    await settle(pending.agentList, agents);
+    await settle(pending.sessionList, []);
+    expect(current()).toBe('');
+    expect(container.textContent).toContain('Failed to open Project chat');
+    expect(mocks.bind).toHaveBeenCalledOnce();
+  });
+
+  it('restores an existing saved Project session without deferred binding or agent substitution', async () => {
+    const pending = await coldProjectReopen();
+    await settle(pending.agentList, agents);
+    await settle(pending.sessionList, [session('saved-project', 'saved-custom-agent', 'alpha')]);
+    expect(current()).toBe('saved-project');
+    expect(mocks.bind).not.toHaveBeenCalled();
+  });
+
+  it('invalidates an already queued cold Project binding when navigation selects personal chat', async () => {
+    const pending = await coldProjectReopen();
+    await settle(pending.sessionList, []);
+    await navigate(workspacePersonalChatRequestedEvent);
+    await settle(pending.agentList, agents);
+    expect(current()).toBe('personal-current');
+    expect(mocks.bind).not.toHaveBeenCalled();
+  });
+
+  it('does not bind an abandoned cold Project after late agents and session lookup finish', async () => {
+    const pending = await coldProjectReopen();
+    expect(mocks.get).toHaveBeenCalledWith('/api/v1/sessions');
+    await navigate(workspaceHomeRequestedEvent);
+    await settle(pending.agentList, agents);
+    await settle(pending.sessionList, []);
+    expect(current()).toBeUndefined();
+    expect(container.textContent).toContain('Choose a workspace');
+    expect(mocks.bind).not.toHaveBeenCalled();
+  });
+
   it('stays on Home without creating or binding a session when its current picker is canceled', async () => {
     const pending = deferred<null>();
     mocks.picker.mockReturnValueOnce(pending.promise);

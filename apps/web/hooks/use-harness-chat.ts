@@ -570,6 +570,14 @@ function emptyChatView(selection: symbol, epoch: number, status: ChatRestoration
   };
 }
 
+function initialRestorationStatus(
+  sessionId: string | null,
+  resume: boolean,
+): ChatRestorationStatus {
+  if (!sessionId) return 'unbound';
+  return resume ? 'restoring' : 'ready';
+}
+
 function createChatGeneration(sessionId: string | null, resume: boolean): ChatGeneration {
   const selection = Symbol('chat-selection');
   return {
@@ -578,7 +586,7 @@ function createChatGeneration(sessionId: string | null, resume: boolean): ChatGe
     epoch: 0,
     active: false,
     operation: null,
-    state: emptyChatView(selection, 0, sessionId ? (resume ? 'restoring' : 'ready') : 'unbound'),
+    state: emptyChatView(selection, 0, initialRestorationStatus(sessionId, resume)),
   };
 }
 
@@ -866,7 +874,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     generation.epoch += 1;
     generation.operation = null;
     const { publish } = makePublisher(generation, generation.epoch);
-    const status: ChatRestorationStatus = sessionId ? (resume ? 'restoring' : 'ready') : 'unbound';
+    const status = initialRestorationStatus(sessionId, resume);
     publish(() => emptyChatView(generation.selection, generation.epoch, status));
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;

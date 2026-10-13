@@ -25,12 +25,36 @@ See the [approved plan](docs/planning/chat-reply-reliability.md),
 policy or acceptance assertions. Source-tree Electron and deterministic providers are not protected
 staging packaged-VM or release qualification.
 
-All eight unchanged adjacent context/MCP connected regressions also passed. Implementation is pushed
-at `699f39c8`; normal affected-package hooks passed build/typecheck/cycles and412 tests (web259,
-desktop153), with no failures/skips. Next: finish final evidence/documentation review, publish all five
-complete source-bound Notion mirrors, and qualify the
-cumulative task-to-feature PR's actual hosted checks and review findings. Beads remains in progress
-through its integration gate; no PR, merge, task closure or staging-readiness claim at this checkpoint.
+All eight initial unchanged adjacent context/MCP connected regressions also passed. Implementation
+was pushed at `699f39c8`, with initial results and all five complete Notion mirrors verified at
+`5f09ac45`. Normal affected-package hooks passed build/typecheck/cycles and412 tests. PR314 is open
+into the feature; its first hosted run found four cold Project binding failures and a contextual
+textbox-name regression. Detailed Sonar inspection also found seven issues despite its green badge.
+
+The independently reviewed repairs preserve ownership and accessible names, simplify flagged code,
+and sequence shared Docker provider fixtures without removing tests. A deterministic pre-fix mounted
+failure confirms the cold Project startup race. That source passed42 mounted tests, a fresh31-case
+Docker suite and18-case Chromium/Electron matrix with ten verified V1 exports. Expanded adjacent
+verification then exposed delayed Personal session creation; the session did exist, but its response
+arrived too late for the poll. The fixture inherited the checkout's GitHub remote; existing open
+`agent-platform-d185` retains this evidence. Reviewed external temporary directories now isolate the
+fixture without changing product Git behavior or weakening assertions/timeouts.
+
+A separate controlled failure confirmed that selecting Personal again could clear an existing or
+pending conversation. Idempotent navigation now preserves it; explicit New conversation remains
+available. The critic approved this bounded fix, and46 mounted tests pass. On this final source,
+fresh Docker31/31, adjacent Electron10/10 and the18-case Chromium/Electron reply matrix all pass.
+All ten final V1 exports again pass linkage, coverage and privacy checks, with independent UI,
+SQLite and effect evidence. Final source-bound receipts use the `final-isolated-` prefix; earlier
+passes and failed attempts remain retained. New exact-head hosted qualification remains required. The incomplete
+diagnostic-file read observed in one
+existing test is recorded separately as `agent-platform-diagnostic-export-file-read`; its original
+failed attempt and successful normal retry remain evidence, not a new repair in this scope.
+
+Next: complete independent final evidence review, push and read back the changed documentation
+mirrors, then qualify PR314's new exact-head hosted checks and actual review/Sonar findings. Beads
+remains in progress through its integration gate. No merge, task closure or staging readiness is
+claimed; owner acceptance and merge authority remain separate.
 Primary and paused snapshots match the planning-final preservation record, including its one prior
 authorized Beads status append; retain all separate refs and unrelated services. Earlier handoffs
 below are historical, including the superseded planning-only authorization.

@@ -80,7 +80,7 @@ Distinct critic `runner_plan_critic` approved the runtime freeze after CR-I01–
 The source freeze approval is recorded in `runtime-freeze-review.json`; it is not final connected,
 hosted or merge qualification. Read-only assignments are procedural, not technical tool isolation.
 
-## Actual verification
+## Initial source verification
 
 - Baseline: two successful reproduction assertions (Chromium and Electron) confirmed the defect
   against unchanged runtime21191673, before any runtime repair.
@@ -121,9 +121,9 @@ Playwright assertions and SQLite comparisons, not by diagnostic success alone.
 The failure reports explain the deliberately injected provider error and context refusal. Restoration
 GET failures/timeouts happen before chat admission: wire/provider/SQLite checks prove no run/effect;
 absence of a run report is not used as proof. Late operations may still complete in their original
-session; navigation is not advertised as server cancellation. No new in-scope product finding remains
-from these diagnostic checkpoints. The final checkpoint reuses this frozen-source evidence unless
-later source changes invalidate it. These controlled samples do not establish a latency benchmark.
+session; navigation is not advertised as server cancellation. No additional product finding arose from those initial diagnostic exports. Subsequent combined and
+hosted checks exposed the cold Project binding race described below; later source changes require
+fresh connected qualification rather than inheriting the initial freeze. These controlled samples do not establish a latency benchmark.
 
 Distinct critic `runner_plan_critic` independently verified all136 connected artifact hashes,
 readable traces/SQLite, current test-source hashes and all10 exports, approving the connected evidence
@@ -155,6 +155,102 @@ No user conversations, paid model calls, Docker pruning or unrelated service cha
 Deterministic provider fixtures and source-tree Electron do not qualify live providers, a distributed
 release artifact or the protected staging packaged-VM job. Those delivery gates remain separate.
 
+## Hosted review and cumulative-regression repairs
+
+PR314 targets `feature/chat-reply-reliability`. Its initial head `5f09ac45` passed build/unit,
+Docker-build, documentation, cycle and secret checks. Sonar's badge and overall gate were green,
+but the detailed issue API reported seven open findings, including two critical complexity issues.
+The source repair extracts focused journey cleanup/capture helpers and requested-session lookup,
+uses an async creation function rather than nested promises, simplifies restoration-status selection,
+and uses the native status output element. No scanner rule or assertion was suppressed.
+Independent source review approved these bounded changes; current-head hosted analysis remains required.
+
+The normal Docker test review also found shared fixture provider port11434 between context, reply
+and MCP suites. The reviewed configuration sequences Chromium → chat-reply → MCP while retaining
+all31 discovered cases exactly once. A dependency-enabled run initially exposed an isolated mount
+mistake: older workspace tests need their conventional worktree directory at `/workspace`, while
+context uses a separate `/context-projects` mount. With both mounts corrected, Chromium23 and the
+reply case passed, but MCP's initial Project binding stalled before any model call. No fixture or
+production rate limit was weakened.
+
+A deterministic mounted reproduction then proved the caller race: agents can become available while
+a Project's saved-session lookup is still pending; clearing only a ref at the end does not trigger
+the skipped fallback binding. A deferred, Project-and-generation-owned binding handles this ordering
+only after lookup confirms no saved session. Competing navigation invalidates it, and binding failure
+does not enqueue an automatic retry. This is within CR-T06's existing Project entry-point scope.
+
+The initial hosted run independently showed four MCP initial-binding failures, plus one desktop
+Project-access failure because the new generic composer label replaced the existing contextual
+accessible name. The composer now preserves that name. At that checkpoint the Project-access test
+was unchanged; the later fixture isolation is described below. One existing provider HTTP transient-retry case first hit JSON EOF and passed its normal
+retry; its cause is not established. The existence-before-parse fixture gap is tracked separately in
+[diagnostic export file readiness](../tasks/agent-platform-diagnostic-export-file-read.md), with
+`discovered-from` provenance rather than a new scope or blocking edge. Initial hosted desktop totals were53 passed, one flaky and one
+failed; browser totals were26 passed, four failed and one pre-existing context skip. These are retained
+failures, not a passing final gate. Fresh source-bound connected and hosted qualification follows.
+
+## Repaired-source qualification
+
+The first cumulative runtime/source repair passed42 mounted tests (Home15, hook18, IDE5, composer4),
+web typecheck, scoped ESLint and formatting. This includes agents-before/after-lookup, saved custom
+agent restoration, navigation invalidation, exactly one binding and no automatic retry after failure.
+The critic approved the exact runtime/test hashes in `final-repair-source-review.json`.
+
+A fresh Docker image then passed the complete31-case suite with zero failures, skips or flaky cases
+in68.827seconds: Chromium23 with context enabled, reply1, and all seven MCP cases including five chat
+permission/effect modes. The dependency-enabled run preserves both workspace mounts and executes
+all original assertions; the four previously failing cold Project paths now complete. Receipt
+`docker-browser/final-full-verification.json` binds43 retained artifacts and actual project intervals;
+owned Compose services were removed with verified cleanup.
+
+The repaired runtime then passed a fresh18-case matrix, nine Chromium and nine Electron, zero
+failures/skips in3.9minutes. All ten actual V1 exports again passed request/session linkage, durable
+coverage and privacy checks, with independent visible-reply/SQLite/effect assertions. New420-artifact
+build receipt `final-repair-build-source.json` and frozen `final-repair-connected-receipt.json`
+(SHA-256 `55f1cbe0011ecdf41132e8338117e384e5ce0e7465f94579d129b1e411a88658`)
+qualify this repaired source rather than reusing the initial runtime freeze. The unchanged adjacent
+Project/context/MCP suite and exact-head hosted analysis remain pending at this checkpoint.
+
+The subsequent expanded adjacent suite passed nine of ten cases. Its first Project-access case
+failed the existing five-second Personal-session poll. A bounded instrumented run retained the
+original assertions and captured a real creation POST returning201 after4.44seconds, followed by
+the correct SQLite session. There were no page errors. The fixture lived inside the source checkout
+and inherited its Git root and remote; synchronous GitHub checks are an existing issue,
+`agent-platform-d185`, updated with this evidence. The observed delay supports interference, but
+does not establish a sole cause. The failed run and instrumentation remain in
+`final-repair-adjacent-failed-receipt.json` and `project-access-instrumented-receipt.json`.
+
+Separate mounted controls proved that selecting Personal chat again cleared a completed or pending
+conversation without replacement. Current-Personal navigation is now idempotent, while explicit
+New conversation remains separate. Completed, pending and resumed repeat controls plus explicit-new
+creation pass:46 mounted tests in total, with typecheck/lint/format passing. The critic approved page
+hash `75e44aa8` and its exact test source. This defect is not claimed as the adjacent timeout's cause.
+The reviewed fixture correction uses external owned temporary directories, preserving explicit Git
+and no-Git behavior. Additive probes verify the first Project's own Git root and empty remotes, and
+the other two Projects' genuine no-Git state. An AST comparison confirms all342 original assertions
+remain in order. A local type alias matches Playwright's existing file-input shape; redundant CI
+properties are removed because the preceding environment spread already preserves the same value
+or absence. Strict TypeScript, lint, formatting and independent source review pass. No product
+endpoint, existing assertion or timeout changed.
+
+On final page source `75e44aa8`, the fresh Docker matrix passed31/31 with zero failures, skips or
+flaky cases in44.339seconds. The critic verified all43 artifact hashes and nonoverlapping project
+intervals in `docker-browser/personal-nav-full-verification.json` (SHA-256
+`7d56233239cba3cfb1ded57afe3e08ed14419a0d1bde314e6747dd1a68944476`). Owned services were cleaned up.
+The same final source then passed all ten adjacent Electron regressions in1.3minutes, zero failures
+or skips: Project access2, context5 and MCP3. The formerly failing Project journey completed all its
+original assertions and the new isolation probes. Receipt `final-isolated-adjacent-receipt.json`
+(SHA-256 `c4b5c08bda616f5d8670c745f14caf898db479ae4b242b4a87d0f39a91c5fca3`) binds45 artifacts
+and the same420-artifact build. This qualifies the isolated fixture, not a fix for `agent-platform-d185`.
+The final managed reply matrix also passed18/18, zero failures or skips in3.0minutes: nine Chromium
+and nine Electron cases. All ten fresh V1 exports again match their actual request/session IDs,
+durable verified coverage and privacy assertions; visible replies, SQLite contents, provider calls
+and tool effects are checked independently. `final-isolated-connected-receipt.json` (SHA-256
+`15186c28a83297b1bd9647d28ccd544dfb469d818e41135a8825cc768fe14471`) and
+`final-isolated-build-source.json` bind the final source and420 build artifacts. These final receipts
+supersede earlier source checkpoints for current local qualification; they do not erase failed
+attempts or qualify a future different source. New exact-head hosted analysis remains required.
+
 ## Publication and completion boundary
 
 Planning publication is complete at `34d6397b`: five full mirrors/readbacks, normal hooks and Dolt
@@ -162,6 +258,7 @@ sync are retained in `/Users/letuscode/.codex/chat-reply-plan-20261013/publicati
 publication follows the pushed implementation `699f39c8` and binds the final documentation revision
 and all five changed full bodies; historical pages
 and human notes remain intact. Beads stays in progress through its owner-authorized integration gate.
-No implementation PR, merge or task closure is claimed at this source checkpoint. Final hosted
-results and publication receipts are recorded in Beads against the actual revision; this document's
-pending checkpoints are superseded only by that evidence, not automatically by opening a PR.
+All five initial implementation mirrors were read back at `5f09ac45` (receipt `publication.json`).
+PR314 is open; no merge or task closure is claimed. Later substantive changes require updated full
+mirrors and source-bound readbacks. Final hosted results and publication receipts are recorded in
+Beads against the actual revision; opening a PR does not establish qualification.

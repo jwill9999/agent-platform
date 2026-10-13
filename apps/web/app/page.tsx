@@ -86,6 +86,12 @@ import {
   Terminal as TerminalIcon,
 } from 'lucide-react';
 
+async function loadRequestedProjectSession(projectId: string, sessionId: string | null) {
+  if (!sessionId) return null;
+  const session = await apiGet<SessionRecord>(apiPath('sessions', sessionId));
+  return session?.mode === 'project' && session.projectId === projectId ? session : null;
+}
+
 type WorkspaceMode = 'chat' | 'project-chat';
 type HomeEntryScreenProps = Readonly<{
   isCreatingProject: boolean;
@@ -647,9 +653,14 @@ export default function HomePage() {
   const personalChatRepairRef = useRef<string | null>(null);
   const selectionGenerationRef = useRef(0);
   const selectionPendingRef = useRef(false);
+  const [deferredProjectBinding, setDeferredProjectBinding] = useState<{
+    projectId: string;
+    isCurrent: () => boolean;
+  } | null>(null);
   const beginSelection = useCallback((clearSession = true) => {
     const generation = ++selectionGenerationRef.current;
     selectionPendingRef.current = false;
+    setDeferredProjectBinding(null);
     if (clearSession) {
       setSessionId(null);
       setSensorDashboard(null);
@@ -905,6 +916,8 @@ export default function HomePage() {
 
   const handleOpenChat = useCallback(
     (options?: { readonly updateUrl?: boolean }) => {
+      // Workspace navigation preserves the current chat; New conversation owns replacement.
+      if (selectedMode === 'chat') return;
       beginSelection();
       if (options?.updateUrl !== false && globalThis.window !== undefined) {
         globalThis.window.history.pushState(null, '', buildPersonalChatHref());
@@ -927,7 +940,7 @@ export default function HomePage() {
         setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
       }
     },
-    [agents, beginSelection, clearAttachments, modelConfigs],
+    [agents, beginSelection, clearAttachments, modelConfigs, selectedMode],
   );
 
   const handleReturnHome = useCallback(() => {
@@ -1112,19 +1125,17 @@ export default function HomePage() {
           return;
         }
         const agentId = openProjectChat(project, { updateUrl: false, isCurrent });
-        if (requestedSessionId) {
-          const session = await apiGet<SessionRecord>(apiPath('sessions', requestedSessionId));
-          if (!isCurrent()) return;
-          if (session?.mode === 'project' && session.projectId === project.id) {
-            setIsResuming(true);
-            setSelectedAgentId(session.agentId);
-            setSelectedModelConfigId(
-              resolveChatModelConfigId(session.agentId, agents, modelConfigs),
-            );
-            setSessionId(session.id);
-            await refreshSensors(session.id, false, isCurrent);
-            return;
-          }
+        const requestedSession = await loadRequestedProjectSession(project.id, requestedSessionId);
+        if (!isCurrent()) return;
+        if (requestedSession) {
+          setIsResuming(true);
+          setSelectedAgentId(requestedSession.agentId);
+          setSelectedModelConfigId(
+            resolveChatModelConfigId(requestedSession.agentId, agents, modelConfigs),
+          );
+          setSessionId(requestedSession.id);
+          await refreshSensors(requestedSession.id, false, isCurrent);
+          return;
         }
         const projectSessions = (await apiGet<SessionRecord[]>(apiPath('sessions'))) ?? [];
         if (!isCurrent()) return;
@@ -1141,6 +1152,8 @@ export default function HomePage() {
         }
         if (agentId) {
           await bindActiveProjectSession(agentId, project.id, isCurrent);
+        } else {
+          setDeferredProjectBinding({ projectId: project.id, isCurrent });
         }
       } catch (error) {
         if (!isCurrent()) return;
@@ -1468,12 +1481,13 @@ export default function HomePage() {
       if (selectedMode === 'project-chat' && activeProject?.id) {
         selectionPendingRef.current = true;
         setSessionError(null);
-        apiPost<SessionRecord>(apiPath('sessions'), {
-          agentId: chatAgentId,
-          mode: 'project',
-          projectId: activeProject.id,
-        })
-          .then((session) => {
+        const createProjectSession = async () => {
+          try {
+            const session = await apiPost<SessionRecord>(apiPath('sessions'), {
+              agentId: chatAgentId,
+              mode: 'project',
+              projectId: activeProject.id,
+            });
             if (!isCurrent()) return;
             if (!session?.id) {
               setSessionError('Failed to create Project chat session');
@@ -1482,16 +1496,16 @@ export default function HomePage() {
             setSessionId(session.id);
             refreshSessions(isCurrent).catch(() => {});
             refreshSensors(session.id, false, isCurrent).catch(() => {});
-          })
-          .catch((error) => {
+          } catch (error) {
             if (!isCurrent()) return;
             setSessionError(
               error instanceof ApiRequestError ? error.message : 'Failed to create Project chat',
             );
-          })
-          .finally(() => {
+          } finally {
             if (isCurrent()) selectionPendingRef.current = false;
-          });
+          }
+        };
+        void createProjectSession();
         return;
       }
       createSessionForAgent(chatAgentId).catch(() => {});
@@ -1537,10 +1551,46 @@ export default function HomePage() {
   });
 
   useEffect(() => {
-    if (selectedMode !== 'project-chat' || sessionId || selectionPendingRef.current) return;
+    if (!deferredProjectBinding) return;
+    const { projectId, isCurrent } = deferredProjectBinding;
+    if (!isCurrent() || selectedMode !== 'project-chat' || activeProject?.id !== projectId) {
+      setDeferredProjectBinding(null);
+      return;
+    }
+    const agent = pickDefaultAgentForMode(agents, 'project');
+    if (!agent) return;
+    setDeferredProjectBinding(null);
+    agentSelectionSourceRef.current = 'system';
+    setSelectedAgentId(agent.id);
+    setSelectedModelConfigId(resolveChatModelConfigId(agent.id, agents, modelConfigs));
+    bindActiveProjectSession(agent.id, projectId, isCurrent).catch(() => {});
+  }, [
+    activeProject?.id,
+    agents,
+    bindActiveProjectSession,
+    deferredProjectBinding,
+    modelConfigs,
+    selectedMode,
+  ]);
+
+  useEffect(() => {
+    if (
+      selectedMode !== 'project-chat' ||
+      sessionId ||
+      selectionPendingRef.current ||
+      deferredProjectBinding
+    )
+      return;
     if (!selectedAgentId || !activeProject?.id) return;
     bindActiveProjectSession(selectedAgentId, activeProject.id).catch(() => {});
-  }, [activeProject?.id, bindActiveProjectSession, selectedAgentId, selectedMode, sessionId]);
+  }, [
+    activeProject?.id,
+    bindActiveProjectSession,
+    deferredProjectBinding,
+    selectedAgentId,
+    selectedMode,
+    sessionId,
+  ]);
 
   const handleSend = useCallback(
     (text: string) => {

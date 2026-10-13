@@ -42,6 +42,27 @@ async function submit() {
 }
 
 describe('composer admission', () => {
+  it('retains the contextual Project textbox name and the default message name', async () => {
+    const onSend = vi.fn().mockReturnValue(true);
+    await act(async () =>
+      root.render(
+        createElement(ChatInput, {
+          onSend,
+          isLoading: false,
+          placeholder: 'Ask about this Project...',
+        }),
+      ),
+    );
+    expect(container.querySelector('textarea')!.getAttribute('aria-label')).toBe(
+      'Ask about this Project...',
+    );
+    expect(container.querySelector('button[type="submit"]')!.getAttribute('aria-label')).toBe(
+      'Send message',
+    );
+    await act(async () => root.render(createElement(ChatInput, { onSend, isLoading: false })));
+    expect(container.querySelector('textarea')!.getAttribute('aria-label')).toBe('Message');
+  });
+
   it('keeps the draft when the synchronous caller refuses and clears only on acceptance', async () => {
     const onSend = vi.fn().mockReturnValue(false);
     await act(async () => root.render(createElement(ChatInput, { onSend, isLoading: false })));
@@ -87,7 +108,7 @@ describe('composer admission', () => {
     expect(onRetryHistory).toHaveBeenCalledOnce();
     expect(onSend).not.toHaveBeenCalled();
     expect(textarea.value).toBe('retained during retry');
-    expect(container.querySelector('[role="status"]')!.textContent).toContain('Unable to restore');
+    expect(container.querySelector('output')!.textContent).toContain('Unable to restore');
   });
 
   it('does not submit Enter while composing an IME character', async () => {

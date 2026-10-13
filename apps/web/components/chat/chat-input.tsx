@@ -259,7 +259,7 @@ export function ChatInput({
                 (onAddFiles ? 'Send a message... (drop files to attach)' : 'Send a message...')
               }
               className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none text-sm leading-relaxed max-h-[200px]"
-              aria-label="Message"
+              aria-label={placeholder ?? 'Message'}
               rows={1}
               disabled={isLoading}
             />
@@ -310,12 +310,12 @@ export function ChatInput({
             </div>
           </div>
         </section>
-        <p role="status" className="text-xs text-muted-foreground text-center mt-2">
+        <output className="block text-xs text-muted-foreground text-center mt-2">
           {statusText ??
             (canSend
               ? 'Press Enter to send, Shift+Enter for new line'
               : 'Waiting for chat session…')}
-        </p>
+        </output>
         {onRetryHistory && (
           <div className="text-center mt-2">
             <button type="button" onClick={onRetryHistory} className="text-sm underline">
