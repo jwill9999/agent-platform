@@ -1624,7 +1624,7 @@ describe('POST /v1/chat (session-aware)', () => {
       const followUpState = getLastChatPromptState();
       expect(followUpState.messages?.[0]?.content).toContain('Short-term working memory');
       expect(followUpState.messages?.[0]?.content).toContain(
-        'Goal: Implement agent-platform-memory.2 for agent-platform',
+        'Implement agent-platform-memory.2 for agent-platform',
       );
     } finally {
       restoreChatEnv(envSnap);
@@ -1766,7 +1766,7 @@ describe('POST /v1/chat (session-aware)', () => {
     }
   });
 
-  it('does not replay unresolved pending approval tool calls into later chat turns', async () => {
+  it('preserves unresolved pending approval history for shared admission instead of silently dropping it', async () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
@@ -1782,7 +1782,7 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(200);
 
       const followUpState = getLastChatPromptState();
-      expect(followUpState.messages?.some((message) => message.toolCalls?.length)).toBe(false);
+      expect(followUpState.messages?.some((message) => message.toolCalls?.length)).toBe(true);
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);

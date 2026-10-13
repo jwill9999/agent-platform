@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import {
+  ContextDecisionMetadataSchema,
   DiagnosticEventSchema,
   type DiagnosticEvent,
   type DiagnosticStore,
@@ -21,6 +22,10 @@ type Context = {
   attempt?: number;
   waiting: boolean;
   halted: boolean;
+  haltError?: DiagnosticEvent['errorCode'];
+  parentOperationId?: string;
+  modelMetadata?: Partial<DiagnosticEvent>;
+  modelStartedAt?: number;
 };
 const context = new AsyncLocalStorage<Context>();
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -119,7 +124,9 @@ export function beginDiagnosticRun(sessionId: string, runId: string): () => void
     emit({
       phase: 'request',
       outcome: completionOutcome(current.waiting, current.halted),
-      ...(current.halted && !current.waiting ? { errorCode: 'internal_error' as const } : {}),
+      ...(current.halted && !current.waiting
+        ? { errorCode: current.haltError ?? ('internal_error' as const) }
+        : {}),
       durationMs: performance.now() - started,
     });
 }
@@ -148,6 +155,7 @@ type ObservedNode<A extends unknown[]> = (
 export function observeDiagnosticNode<A extends unknown[]>(
   phase: 'model' | 'tool',
   node: ObservedNode<A>,
+  options: { deferModelStart?: boolean } = {},
 ): ObservedNode<A> {
   return async (state, ...args) => {
     const parent = context.getStore();
@@ -156,22 +164,64 @@ export function observeDiagnosticNode<A extends unknown[]>(
     return context.run(current, async () => {
       const started = performance.now();
       const metadata = nodeMetadata(phase, state);
-      emit({ phase, outcome: 'started', parentOperationId: parent.operationId, ...metadata });
+      current.parentOperationId = parent.operationId;
+      current.modelMetadata = metadata;
+      if (phase === 'model') {
+        if (!options.deferModelStart) observeDiagnosticModelAttempt();
+      } else {
+        emit({ phase, outcome: 'started', parentOperationId: parent.operationId, ...metadata });
+      }
       try {
         const result = await node(state, ...args);
-        observeNodeResult(parent, phase, result, metadata, started);
+        observeNodeResult(parent, phase, result, metadata, current.modelStartedAt ?? started);
         return result;
       } catch (error) {
-        emit({
-          phase,
-          outcome: 'failed',
-          durationMs: performance.now() - started,
-          errorCode: phase === 'model' ? 'provider_error' : 'tool_error',
-        });
+        if (phase !== 'model' || current.modelStartedAt !== undefined) {
+          emit({
+            phase,
+            outcome: 'failed',
+            durationMs: performance.now() - (current.modelStartedAt ?? started),
+            errorCode: phase === 'model' ? 'provider_error' : 'tool_error',
+          });
+        }
         throw error;
       }
     });
   };
+}
+
+/** Local admission is distinct from a provider invocation, including on rejected context. */
+export function observeDiagnosticContextDecision(input: unknown): void {
+  const parsed = ContextDecisionMetadataSchema.safeParse(input);
+  if (!parsed.success) return;
+  const decision = parsed.data;
+  const rejected = decision.reason === 'required_overflow' || decision.reason === 'invalid_history';
+  emit({
+    phase: 'context',
+    outcome: rejected ? 'failed' : 'succeeded',
+    attempt: undefined,
+    contextDecision: decision,
+    errorCode: contextDecisionError(decision.reason),
+  });
+}
+
+function contextDecisionError(reason: string): DiagnosticEvent['errorCode'] {
+  if (reason === 'required_overflow') return 'context_budget_exceeded';
+  if (reason === 'invalid_history') return 'context_invalid_history';
+  return undefined;
+}
+
+/** Real harness calls this immediately before each SDK invocation, after admission succeeds. */
+export function observeDiagnosticModelAttempt(): void {
+  const current = context.getStore();
+  if (!current) return;
+  current.modelStartedAt ??= performance.now();
+  emit({
+    phase: 'model',
+    outcome: 'started',
+    parentOperationId: current.parentOperationId,
+    ...current.modelMetadata,
+  });
 }
 
 /** Safe projection of committed audit metadata; raw args/results never cross this boundary. */
@@ -254,6 +304,8 @@ function observeNodeResult(
 ): void {
   const traces = result.trace ?? [];
   if (result.halted) parent.halted = true;
+  const haltError = observedContextHalt(result);
+  if (haltError) parent.haltError = haltError;
   const waiting = traces.some((event) => event.type === 'tool_approval_required');
   if (waiting) parent.waiting = true;
   // Tool retries have no plugin retry hook; preserve counters, never error text.
@@ -265,16 +317,31 @@ function observeNodeResult(
       event.type === 'limit_hit' ||
       event.type === 'deadline_exceeded',
   );
+  if (phase === 'model' && context.getStore()?.modelStartedAt === undefined) return;
   emit({
     phase,
     ...metadata,
-    outcome: completionOutcome(waiting, failed),
+    outcome: completionOutcome(waiting, failed || Boolean(haltError)),
     durationMs: performance.now() - started,
-    ...(failed && !waiting
-      ? { errorCode: phase === 'model' ? ('provider_error' as const) : ('tool_error' as const) }
+    ...((failed || haltError) && !waiting
+      ? {
+          errorCode:
+            haltError ??
+            (phase === 'model' ? ('provider_error' as const) : ('tool_error' as const)),
+        }
       : {}),
     ...observedTokenUsage(traces),
   });
+}
+
+function observedContextHalt(result: NodeResult): DiagnosticEvent['errorCode'] {
+  if (!('contextHalt' in result) || !result.contextHalt || typeof result.contextHalt !== 'object')
+    return undefined;
+  const code = (result.contextHalt as { code?: unknown }).code;
+  if (code === 'CONTEXT_BUDGET_EXCEEDED') return 'context_budget_exceeded';
+  if (code === 'CONTEXT_INVALID_HISTORY') return 'context_invalid_history';
+  if (code === 'MODEL_OUTPUT_INCOMPLETE') return 'model_output_incomplete';
+  return undefined;
 }
 
 function observeToolRetries(traces: NonNullable<NodeResult['trace']>): void {

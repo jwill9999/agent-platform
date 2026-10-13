@@ -8,6 +8,7 @@ import {
   DiagnosticScopeSchema,
   DiagnosticStoredEventSchema,
   projectDiagnosticReport,
+  renderDiagnosticObservation,
 } from '../packages/contracts/dist/index.js';
 
 function projectList(input) {
@@ -133,7 +134,7 @@ export async function runDiagnostics(
             ...list.events.map(({ sequence, event }) => {
               const session = event.sessionId ? `; session ${event.sessionId}` : '';
               const run = event.runId ? `; run ${event.runId}` : '';
-              return `${sequence}. ${event.phase}: ${event.outcome}; request ${event.requestId}${session}${run}`;
+              return `${renderDiagnosticObservation(sequence, event)}${session}${run}`;
             }),
           ].join('\n');
       output.write(`${text}\n`);

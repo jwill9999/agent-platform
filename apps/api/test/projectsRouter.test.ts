@@ -10,6 +10,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer, type Server } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -49,9 +50,9 @@ function buildTestApp(db: ReturnType<typeof openDatabase>['db']) {
 describe('projectsRouter', () => {
   let opened: ReturnType<typeof openDatabase>;
   let tmpDir: string;
-  let app: ReturnType<typeof buildTestApp>;
+  let app: Server;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-projects-api-'));
     opened = openDatabase(path.join(tmpDir, 'test.sqlite'));
     replaceAgent(opened.db, {
@@ -66,13 +67,39 @@ describe('projectsRouter', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
-    app = buildTestApp(opened.db);
+    app = createServer(buildTestApp(opened.db));
+    // Supertest connects to IPv4. Bind that same family explicitly rather than
+    // allowing an IPv6 wildcard listener to overlap an existing IPv4 service.
+    await new Promise<void>((resolve, reject) => {
+      app.once('error', reject);
+      app.listen(0, '127.0.0.1', () => {
+        app.off('error', reject);
+        resolve();
+      });
+    });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     delete process.env['AGENT_PLATFORM_GH_BINARY'];
-    closeDatabase(opened.sqlite);
-    rmSync(tmpDir, { recursive: true, force: true });
+    try {
+      if (app?.listening) {
+        await new Promise<void>((resolve, reject) => {
+          app.close((error) => (error ? reject(error) : resolve()));
+        });
+      }
+    } finally {
+      try {
+        closeDatabase(opened.sqlite);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it('binds the test listener to the same IPv4 loopback family used by Supertest', async () => {
+    expect(app.address()).toMatchObject({ address: '127.0.0.1', family: 'IPv4' });
+    await request(app).get('/v1/projects').expect(200).expect({ data: [] });
+    expect(app.listening).toBe(true);
   });
 
   it('creates, lists, updates, and archives projects', async () => {
