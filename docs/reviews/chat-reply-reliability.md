@@ -314,6 +314,33 @@ needs a controlled reproduction. It is recorded in
 [the investigation task](../tasks/agent-platform-initial-session-draft.md); no product change or
 confirmed defect is claimed for it here.
 
+## Controlled restoration fixture navigation boundary
+
+Revision `61828f33` passed actual Sonar with zero issues, hosted verification and browser checks.
+The repaired diagnostic-export journey passed. Electron's remaining failure was CR-T01 Chromium:
+Send became enabled and a POST was observed while the test believed restoration reads were held.
+The run reports 54 passed/one failed, including the ordinary retry, and remains a failed gate.
+
+The downloaded manual traces establish the fixture ordering on both attempts. Its initial Chromium
+navigation had not finished restoration before the scenario installed one-shot GET barriers and
+navigated again. Requests from the outgoing page consumed the holds and ended with
+`net::ERR_ABORTED`. The active document's later history/approval pair was forwarded and returned 200,
+so the application legitimately became ready. The first attempt's POST preceded the obsolete
+approval hold's release. This is recorded in `pr314-6182-held-read-trace-diagnosis.json` (SHA-256
+`185dd30aa32e216db5b73843f18447f5aa3047fa8b6e879e3ff961084c626c37`), not inferred from a green badge.
+
+The bounded helper correction awaits initial Chromium session readiness before scenario-specific
+barriers are installed. Their one-shot behavior and all assertions/timeouts remain intact, including
+stale-generation tests. Product code and build artifacts are unchanged. Strict TypeScript, lint,
+formatting and diff checks pass. The corrected full connected matrix passes all 18 cases in 5.8 minutes
+with zero failures or skips. Its 10 schema-valid V1 diagnostic reports are durable and verified, with
+zero dropped, pending or truncated events. Both Chromium and Electron traces show exactly two active
+successful restoration reads, with both held responses fulfilled before the first POST. The receipt
+`held-read-repair-connected-receipt.json` (SHA-256
+`ae483b651f2dd9d5f644f5fced5a9ea47141e16f6237873c07ba5bdd61259507`) binds 137 evidence artifacts and
+420 unchanged build artifacts. These deterministic-provider journeys qualify the local fixture
+correction; new exact-head hosted checks and review still precede the authorized feature merge.
+
 ## Publication and completion boundary
 
 Planning publication is complete at `34d6397b`: five full mirrors/readbacks, normal hooks and Dolt

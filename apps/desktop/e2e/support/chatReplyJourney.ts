@@ -67,6 +67,12 @@ export async function replyJourney(
       await page.goto(
         `http://127.0.0.1:${fixture.rendererPort}/?projectId=${session.projectId}&sessionId=${session.id}`,
       );
+      // Finish this initial restoration before a scenario installs one-shot read barriers.
+      await expect(
+        page
+          .getByRole('status')
+          .filter({ hasText: 'Press Enter to send, Shift+Enter for new line' }),
+      ).toBeVisible();
     } else page = native;
     await page.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
     traced = true;

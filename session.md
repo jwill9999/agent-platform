@@ -81,6 +81,18 @@ passes1/1 in30.9seconds; fresh hosted qualification is required. A separate unpr
 draft-remount concern is recorded in `agent-platform-initial-session-draft` for controlled investigation,
 not silently included in this same-session fix.
 
+The fixture repair and three complete mirrors are pushed and verified at `61828f33`. Its hosted
+export test passed, but CR-T01 Chromium exposed a separate fixture ordering error: outgoing initial
+page requests consumed the one-shot barriers, while the active page's fresh reads returned 200.
+Downloaded traces prove this on both attempts. The helper now awaits initial Chromium restoration
+before installing scenario barriers, retaining all timeouts and assertions. Application code is
+unchanged. The corrected connected matrix passes 18/18 with no failures or skips; all 10 V1 reports
+are durable and verified with zero loss, pending or truncated events. Both first-case traces prove
+held reads complete before the first POST. The source/build/evidence receipt is
+`held-read-repair-connected-receipt.json` (SHA-256
+`ae483b651f2dd9d5f644f5fced5a9ea47141e16f6237873c07ba5bdd61259507`). New exact-head hosted
+qualification remains required; the failed `61828f33` run is retained.
+
 Next: finish source-bound publication and qualify all new exact-head PR314 pipelines and review
 findings, then perform the owner-authorized feature merge. Beads remains in progress through that
 integration gate. No merge, task closure or staging readiness is claimed at this checkpoint.
