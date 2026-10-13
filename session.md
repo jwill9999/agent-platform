@@ -27,15 +27,31 @@ so a timeout can identify the outstanding stage even when tracing has not starte
 assertions, deadlines, test inventory and security controls remain unchanged. The observed timeout's
 cause is still unknown; this evidence correction does not claim to fix a product defect.
 
-The final helper passed the original Chromium journey1/1 in10.6seconds with37 safe stage records,
-verified real success/failure diagnostic reports and completed owned cleanup. Two bound/write-failure
-controls and scoped TypeScript/lint/format checks passed; production build bytes are unchanged.
-The independent critic approved the bounded source; final evidence review and publication follow.
+The progress helper passed the original Chromium journey 1/1 with real success/failure diagnostic
+reports and bounded writer controls. Independent review, normal hooks and both complete Notion
+mirror readbacks were completed at `73230965`, published in PR317. Its nine executed check badges
+were green, including Sonar with zero open issues, but desktop job `115469956272` reported 51 passes
+and four flaky cases. The retained results ZIP's SHA-256 is
+`2c009e960a77b1a5214a7ccabf0b51cb9b843b6f7fe1ece48da80b8caebde803`; digest and every member CRC
+were verified. All four failures waited for the initial project-session binding response. Three
+reply progress records stop before scenario execution, and their option interactions failed while
+the persisted session still belonged to the default agent. No pre-binding trace exists.
 
-Next: independently qualify and publish this bounded correction with both full source-bound
-Notion mirrors, merge its task PR only after exact-head checks/reviews clear, then qualify PR315's
-new source with actual full scan, packaged VM and clean desktop execution. Only after the protected
-staging merge may verified delivered chat-reply branches be recovery-protected and removed.
+Source review identifies a readiness gap: an enabled textarea does not establish completed initial
+binding, whose session-key change can remount the agent selector. Independent critique approved
+waiting for actual readiness before initial selection and after alternate binding, and observing
+selection/response failures together. Real UI transitions, exact response and persisted-agent checks,
+all deadlines and product behavior remain unchanged. The controlled regression reproduced the old
+helper race and passed with the correction; the alternate binding control also passed. All nine
+original affected journeys passed without retries, failures or skips. Independent source/control
+review approved the fix; detailed evidence is recorded in the verification document. This does not
+prove the exact hosted cause.
+
+Next: finish and independently review this bounded fixture correction in PR317, update both full
+source-bound mirrors, and qualify its exact-head feature checks with clean desktop execution.
+After its guarded feature merge, PR315 needs fresh full scan, actual packaged VM, clean desktop and
+all protected checks/reviews. Only after verified protected staging delivery may the five delivered
+chat-reply branches be recovery-protected and removed. No staging completion is claimed here.
 Paused PR283/orchestration branches, dirty primary/paused checkouts and main remain untouched.
 All preceding handoffs below are historical; current actual receipts and delivery state are in Beads
 and `/Users/letuscode/.codex/chat-reply-implementation-20261013`.

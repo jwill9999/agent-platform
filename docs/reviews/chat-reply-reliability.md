@@ -466,3 +466,59 @@ for the128-entry bound/omission reporting and write-failure handling without cle
 Strict TypeScript, lint, formatting and diff checks pass. Receipt `ci-evidence-helper-receipt.json`
 SHA-256 `38a95fdf26a43b624a9b011dbab2b42f4b6543bd3cb6d52f6b2a7250b57e439f` binds source,
 artifacts and420 unchanged production build files. No original hosted cause is claimed.
+
+## Retained first-attempt evidence and initial binding correction
+
+PR317 at `73230965` completed all nine executed checks, including actual Sonar clearance with zero
+open issues. Verify passed 3005 tests with 77 existing optional skips, and the benchmark completed
+all nine samples within the original bounds. Desktop job `115469956272` nevertheless reported
+51 passed and four flaky cases: CR-T06 Chromium, CR-T04 Electron, CR-T06 Electron and MCP native
+stdio onboarding. All first attempts timed out at the shared project-binding response waiter.
+The newly retained artifact `11839792238` is 473,890,220 bytes, with verified ZIP SHA-256
+`2c009e960a77b1a5214a7ccabf0b51cb9b843b6f7fe1ece48da80b8caebde803` and valid CRC for every member.
+
+The three reply progress records stop at initial project binding before browser/scenario startup;
+provider calls are zero, the option locator is missing or detached, and the saved database contains
+only the default-agent Project session. Manual traces begin later, so none proves the original
+menu-closure cause. An enabled textarea allows the fixture to open the selector before the initial
+binding changes the Chat key. This source-backed race is the repair target; slow networking and a
+product defect are not established by these observations.
+
+Critic findings CR-Q04 and CR-Q05 require actual readiness before initial selection and after the
+alternate binding, plus jointly observed response/action failures. The approved correction retains
+real UI agent selection, exact POST-response matching and independent persisted-agent checks;
+no timeout, retry policy, application handler or assertion is relaxed. The controlled regression
+must distinguish scheduling evidence from proof of the original hosted failure. Final source and
+test results follow below; a green badge containing flaky retries does not qualify promotion.
+
+The independent critic approved the final helper (SHA-256
+`ed422bf4f53049bd14f2fec676b09254e4d8216f74cb1ff7453e29eb05a96f5a`) and the archived complete
+control source (`pr317-binding-control-final.ts`, SHA-256
+`990f75f19904eddcae46d74ee9ab2f2fbf61ce41259b7030f73c30dbc903077c`). The control holds the actual
+default binding response unchanged and delays only the fixture's option click across the resulting
+Chat remount. The original helper attempts selection before default readiness and times out at its
+original 30-second deadline. Its expected-failure control passing is not a product-success result.
+The corrected helper waits for actual readiness, selects the requested agent and verifies the
+persisted binding; the real-app control passed 1/1 in 5.2 seconds. An additional alternate-path
+control verified successful Coding → Personal → Coding responses, persisted target binding and zero
+provider calls, passing 1/1 in 4.9 seconds. Its first setup attempt lacked the fixture model and
+failed during later model selection; that setup failure is retained separately. Temporary control
+code is archived outside the repository and removed from the delivered source. This demonstrates
+a fixture race under controlled scheduling, without claiming the definitive hosted cause.
+
+The final uninstrumented helper then passed all nine original affected journeys in 1.3 minutes,
+with no retries, failures or skips: the four formerly flaky cases and all five context/token cases.
+The matrix includes fresh default-agent and Coding sessions, real multi-tool history, context-limit
+refusal and approval/restart/replay denial. The first failed control setup is retained; it does not
+count toward this clean nine-case result. Source-aware review and the existing quality checks remain
+separate from fresh hosted qualification. Detailed command, source hashes and diagnostic report
+readbacks are recorded in the external binding receipt and Beads.
+
+The diagnostic checkpoint read back 11 unique actual V1 exports: schema-valid, durable and verified,
+with zero dropped or pending events, no truncation and matching session correlation. Original
+privacy, request and effect assertions passed; an additional fixture-canary scan was clear. All 420
+production build files and the four checked runtime-source hashes remain unchanged. Strict
+TypeScript, lint, formatting and diff checks passed. Receipt `pr317-binding-repair-receipt.json`
+SHA-256 `f070036d0a1669f4fdd32039dcf5fc2fd35bf2dba2587303e844143e339c06ea` binds the frozen helper,
+71 artifact hashes and control results. This qualifies the bounded local fixture correction;
+PR317 and then PR315 still require new exact-head hosted checks and review before merging.
