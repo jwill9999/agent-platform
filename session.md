@@ -1,3 +1,74 @@
+# Current handoff — reply fix delivered; next local MVP priority, 13 October 2026
+
+## Completed development baseline
+
+[PR315](https://github.com/jwill9999/agent-platform/pull/315) merged into protected `staging`
+at `1e4bd7af30b092cc9a2d795e9c022ebfd5212176`. Its tree
+`229d777b5056ff56f753e9fe9cfdfea82b4b2664` matches reviewed feature head `a9bcb302`.
+All 15 executed checks passed, with no unresolved review threads or blocking reviews.
+Electron passed 55 tests without flaky retries; the actual packaged macOS VM suite passed 19.
+Browser passed 30 with one existing environment-dependent skip; the 15-package verification
+passed 3,005 tests with 77 existing optional skips. Both full security scans completed actual
+analysis; Sonar reported zero open issues and scoped CodeQL had no open alerts.
+The nine-sample diagnostics benchmark passed unchanged 20ms/2ms bounds.
+Independent source and evidence review approved delivery. Sourcery's optional size/budget skip
+and ordinary scanner coverage limitations remain disclosed in the verification record.
+
+`agent-platform-sizx` and `agent-platform-diagnostic-export-file-read` are closed and Dolt-synced.
+Six delivered chat-reply local/remote branches were removed after seven recovery tags were pushed
+and read back. Main and the four paused orchestration remote branches remain unchanged; PR283
+remains open as a draft. Primary and paused dirty checkouts were preserved, including the explicitly
+recorded Beads status-journal appends. Staging is the local development baseline, not a distribution
+release; checkout-free export, signing/notarization and wider distribution architecture remain phase two.
+
+Final receipts: `/Users/letuscode/.codex/chat-reply-implementation-20261013/pr315-completion.json`,
+`pr315-staging-merge.json`, `pr315-delivered-branch-cleanup.json`, and
+`pr315-final-closure-preservation.json` in the same directory. Durable implementation evidence:
+[reply verification](docs/reviews/chat-reply-reliability.md).
+
+## Recommended next discussion
+
+The owner requested a backlog review and recommendation, not another implementation launch.
+Beads remains authoritative; the following is a dated recommendation, not a second task tracker.
+
+1. **Recommend first: `agent-platform-d185` — keep the API responsive during GitHub checks.**
+   Current staging still uses synchronous GitHub CLI calls in the Project checks/PR read paths.
+   Existing evidence records GitHub checks taking 1.47–5.35 seconds and a separate Personal-session
+   creation completing after 4.44 seconds amid Project requests. A fixture with its own local Git
+   root avoided unintended live-remote coupling. These observations support the responsiveness
+   investigation, but do not prove the sole cause of every historical timeout.
+   A bounded next plan should cover asynchronous, time/output-bounded read-side GitHub operations,
+   preserve repository/ref identity and credential/process validation, and prove chat, health and
+   diagnostic export remain responsive during slow/unavailable checks. Inventory adjacent PR reads
+   before agreeing scope; do not expand this into a rewrite of all Git operations or UI.
+2. **Then `agent-platform-est0` — make keyless Ollama selection work consistently.**
+   The API accepts default Ollama configurations without keys, but an explicit chat model selection
+   still rejects every configuration without `hasApiKey`. This is a small local-model usability win;
+   keyed providers must retain credential validation. No provider installation or product fix ran here.
+3. **Next larger feature: `agent-platform-ii1` — complete the everyday Git workflow.**
+   Reconcile delivered code with older tickets, then select one useful commit → push → PR slice.
+   `agent-platform-0ra` already records an implementation commit and a stale dependency hold;
+   `agent-platform-4hm` remains open. Do not assume either needs rewriting from its status alone.
+
+The direct-file policy ticket also retains an old pre-merge note despite PR271 being merged and its
+merge commit being an ancestor of current staging. Reconcile acceptance/delivery separately before
+changing its status; this review does not establish a new permission defect or close that task.
+Existing observability/export and initial-session-draft follow-ups remain open. No broad backlog
+reprioritization, release activation, paid calls or paused prototype resumption occurred.
+
+## This documentation delivery
+
+Tracking: [agent-platform-local-mvp-handoff](docs/tasks/agent-platform-local-mvp-handoff.md).
+The update is on `task/local-mvp-handoff`, based on `feature/local-mvp-handoff` at the verified staging
+commit above. It needs its own reviewed documentation integration; the previous reply-feature merge
+does not contain this later handoff. Publication/check outcomes and current delivery state are recorded
+in Beads and `/Users/letuscode/.codex/local-mvp-handoff-20261013`.
+
+Everything below is retained historical context. Its pending work and earlier authorization wording
+are superseded by the current handoff and live Beads; do not repeat completed reply deliveries.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — complete diagnostic reads before staging, 13 October 2026
 
 PR317 has merged into `feature/chat-reply-reliability` at `f5fdb464`, tree `efc52d6b`,
