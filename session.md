@@ -1,3 +1,47 @@
+# Current handoff — disappearing reply staging qualification, 13 October 2026
+
+PR314 merged into `feature/chat-reply-reliability` at `60b6e36c` after all nine executed
+checks passed on `1cf4da2c`, with no unresolved findings. The owner subsequently authorized
+protected staging promotion and delivered-branch cleanup; paused PR283/orchestration and main
+remain separate. PR315 targets staging `21191673`. Beads `agent-platform-sizx` is reopened solely
+for this additional delivery phase. Earlier handoffs below are historical checkpoints.
+
+PR315's first ordinary security scan completed actual analysis with no reported vulnerabilities;
+Sonar reports zero open issues and CodeQL is clear. All 19 packaged macOS VM tests passed, with
+verified signature, ready VM and tested host-path/secret non-exposure evidence. Its verify job
+failed the diagnostic benchmark's third healthy sample: p95 overhead56.843ms exceeded20ms.
+The cause remains unproven. The one independently approved unchanged failed-job retry then failed
+the separate physical database ceiling test at60seconds, before API benchmark execution. That same
+test passed in33seconds on the first attempt. No workload, threshold or timeout has been weakened;
+there will be no further unchanged retry. Independent review approved serial workspace/file test
+scheduling in the existing CI Test step, retaining all fifteen Vitest scripts and every acceptance
+threshold. The exact complete local command passed3005 tests with77 existing optional skips in
+557.53seconds. The unchanged capacity test passed in19.733seconds; allnine benchmark samples
+completed successfully with the original20ms/2ms limits. This qualifies the local correction, not
+the future hosted result or the original failures' cause.
+
+The desktop job's green badge concealed two first-attempt failures:53 passed and two passed only
+on retry. One shared helper pressed Enter without waiting for session readiness. The other lacked
+the expected finished diagnostic export file; its cause is not established by that symptom. The
+independent critic required a bounded fixture correction and observed export qualification.
+The task branch `task/chat-reply-staging-fixture` starts from the actual feature merge.
+The helper now waits for readiness before drafting and enabled Send before Enter. Product runtime
+and every existing assertion/timeout remain unchanged. Instrumented approve/reject journeys both
+passed with four nativeHTTP200 exports, durable verified coverage and no dropped/pending/truncated
+events. The final uninstrumented two-case run also passed without retries, and independent source
+and evidence review approved the six-line fixture correction. The original hosted export cause remains unknown and is retained in the observability epic.
+Retained evidence lives in
+`/Users/letuscode/.codex/chat-reply-implementation-20261013`.
+
+Next: publish the reviewed correction and both changed full documentation mirrors, then qualify
+its task-to-feature PR. PR315 then needs new current-head
+full scan, actual packaged VM, all protected checks and resolved findings before the authorized
+squash merge. Recovery-protect and remove only verified delivered chat-reply branches after that
+merge; preserve all paused, dirty, unrelated and in-use work. No staging completion or cleanup is
+claimed at this checkpoint. Subsequent actual delivery receipts and task state are recorded in Beads.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — disappearing reply implementation, 13 October 2026
 
 Owner approved the bounded plan at `34d6397b` and authorized implementation of
