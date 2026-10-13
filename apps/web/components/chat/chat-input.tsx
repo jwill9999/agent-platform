@@ -28,13 +28,14 @@ import { ChatAgentSelector } from './chat-agent-selector';
 import { ChatModelSelector } from './chat-model-selector';
 
 interface ChatInputProps {
-  onSend: (text: string) => void;
+  onSend: (text: string) => boolean;
   isLoading: boolean;
   placeholder?: string;
   /** When false, sending is blocked (e.g. session not ready yet). */
   canSend?: boolean;
   /** Optional status text shown below the composer. */
   statusText?: string;
+  onRetryHistory?: () => void;
   /** Attached files/snippets (optional — pass to enable attachment UI). */
   attachments?: AttachmentEntry[];
   /** Callback when user picks or drops files. */
@@ -56,6 +57,7 @@ export function ChatInput({
   placeholder,
   canSend = true,
   statusText,
+  onRetryHistory,
   attachments,
   onAddFiles,
   onRemoveAttachment,
@@ -83,7 +85,7 @@ export function ChatInput({
   const doSend = useCallback(() => {
     const trimmed = input.trim();
     if (!trimmed || isLoading || !canSend) return;
-    onSend(trimmed);
+    if (!onSend(trimmed)) return;
     setInput('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -100,7 +102,7 @@ export function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
         e.preventDefault();
         doSend();
       }
@@ -257,11 +259,13 @@ export function ChatInput({
                 (onAddFiles ? 'Send a message... (drop files to attach)' : 'Send a message...')
               }
               className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none text-sm leading-relaxed max-h-[200px]"
+              aria-label={placeholder ?? 'Message'}
               rows={1}
-              disabled={isLoading || !canSend}
+              disabled={isLoading}
             />
             <button
               type="submit"
+              aria-label="Send message"
               disabled={!input.trim() || isLoading || !canSend}
               className={cn(
                 'flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all',
@@ -306,12 +310,19 @@ export function ChatInput({
             </div>
           </div>
         </section>
-        <p className="text-xs text-muted-foreground text-center mt-2">
+        <output className="block text-xs text-muted-foreground text-center mt-2">
           {statusText ??
             (canSend
               ? 'Press Enter to send, Shift+Enter for new line'
               : 'Waiting for chat session…')}
-        </p>
+        </output>
+        {onRetryHistory && (
+          <div className="text-center mt-2">
+            <button type="button" onClick={onRetryHistory} className="text-sm underline">
+              Retry history
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

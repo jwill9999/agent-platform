@@ -1,3 +1,137 @@
+# Current handoff — disappearing reply implementation, 13 October 2026
+
+Owner approved the bounded plan at `34d6397b` and authorized implementation of
+`agent-platform-sizx`, with Beads, critic review and browser/Electron/diagnostic checks.
+Current branch `task/chat-reply-reliability` chains from the pushed planning tip, targeting
+`feature/chat-reply-reliability` at staging `21191673`. This authorization covers implementation
+and hosted merge readiness. After reviewing the changes, the owner additionally accepted them and
+authorized PR314 to merge into its existing feature destination once current checks and findings
+clear, including routine repairs. Staging/main promotion remains reserved. MCP onboarding is
+already delivered and paused PR283/orchestration remain separate and unchanged.
+
+The fix gates sending until history and approvals both load, provides safe15-second failure/manual
+retry, and scopes asynchronous updates to the active selection and admitted operation. Refused sends
+retain drafts/attachments; saved-session links and delayed Project selection are guarded. The critic
+approved the runtime after three caller-ownership findings were repaired. Baseline Chromium/Electron
+reproduced the missing visible reply while SQLite held the final assistant. The fixed18-case matrix
+passed (nine per mode), and the normal Docker browser case passed with retained trace/screenshot/DB.
+Ten actual V1 reports join to request/session IDs, with durable verified coverage, no truncation or
+lost/pending events and tested private-data canaries absent. The critic independently approved this
+evidence. Mounted caller/hook/composer35pass; full repository typecheck/lint/format/cycles pass.
+
+See the [approved plan](docs/planning/chat-reply-reliability.md),
+[task specification](docs/tasks/agent-platform-sizx.md),
+[verification map](docs/testing/chat-reply-reliability.md) and
+[actual results](docs/reviews/chat-reply-reliability.md). Evidence and retained earlier failures are in
+`/Users/letuscode/.codex/chat-reply-implementation-20261013`. Fixture repairs did not weaken runtime
+policy or acceptance assertions. Source-tree Electron and deterministic providers are not protected
+staging packaged-VM or release qualification.
+
+All eight initial unchanged adjacent context/MCP connected regressions also passed. Implementation
+was pushed at `699f39c8`, with initial results and all five complete Notion mirrors verified at
+`5f09ac45`. Normal affected-package hooks passed build/typecheck/cycles and412 tests. PR314 is open
+into the feature; its first hosted run found four cold Project binding failures and a contextual
+textbox-name regression. Detailed Sonar inspection also found seven issues despite its green badge.
+
+The independently reviewed repairs preserve ownership and accessible names, simplify flagged code,
+and sequence shared Docker provider fixtures without removing tests. A deterministic pre-fix mounted
+failure confirms the cold Project startup race. That source passed42 mounted tests, a fresh31-case
+Docker suite and18-case Chromium/Electron matrix with ten verified V1 exports. Expanded adjacent
+verification then exposed delayed Personal session creation; the session did exist, but its response
+arrived too late for the poll. The fixture inherited the checkout's GitHub remote; existing open
+`agent-platform-d185` retains this evidence. Reviewed external temporary directories now isolate the
+fixture without changing product Git behavior or weakening assertions/timeouts.
+
+A separate controlled failure confirmed that selecting Personal again could clear an existing or
+pending conversation. Idempotent navigation now preserves it; explicit New conversation remains
+available. The critic approved this bounded fix, and46 mounted tests pass. On this final source,
+fresh Docker31/31, adjacent Electron10/10 and the18-case Chromium/Electron reply matrix all pass.
+All ten final V1 exports again pass linkage, coverage and privacy checks, with independent UI,
+SQLite and effect evidence. Final source-bound receipts use the `final-isolated-` prefix; earlier
+passes and failed attempts remain retained. New exact-head hosted qualification remains required. The incomplete
+diagnostic-file read observed in one
+existing test is recorded separately as `agent-platform-diagnostic-export-file-read`; its original
+failed attempt and successful normal retry remain evidence, not a new repair in this scope.
+
+Final local evidence review is approved. The repairs are pushed at `ed63db14`; normal hooks passed
+build/typecheck/cycles and423 package tests (web270, desktop153). Four changed full Notion mirrors
+were read back at that revision, with earlier unchanged plan/spec mirrors retained. Hosted Sonar
+cleared the seven original findings but identified one critical cleanup-helper issue involving
+optional undefined inputs to Promise.allSettled. The narrow correction passes three actual-source
+settlement controls and strict typecheck/lint/format. Its first representative Electron run hit a
+generic diagnostic preparation error before cleanup; one bounded follow-up with additive metadata
+capture passed the original assertions and both complete exports. The original failure remains
+unexplained and retained for diagnostics follow-up; no timeout or assertion changed. Temporary
+instrumentation is removed. The earlier green badge alone did not clear the findings gate.
+
+The helper correction and three complete changed mirrors were verified at `1ef391d3`. Exact-head
+Sonar now reports zero open issues and all quality conditions pass; review threads and CodeQL are
+clear. Hosted verification and browser jobs passed (browser30passed, one existing environment-only
+context skip), but Electron54passed/one diagnostic-export fixture failed twice. Its textarea-enabled
+check submitted during restoration, when drafting is allowed but Send is correctly refused. A
+focused instrumented reproduction found one empty session, zero messages/events and a native404
+response in21ms. This explains the local reproduction and is consistent with the hosted empty
+conversation; it does not establish the hosted transport response or explain the earlier two-event
+preparation sample.
+
+The fixture now waits for session readiness before drafting, enabled Send before submission and the
+actual deterministic reply before exporting. All original export/privacy/failure assertions and
+timeouts remain; application code is unchanged. The focused Electron/browser/export/restart journey
+passes1/1 in30.9seconds; fresh hosted qualification is required. A separate unproven initial-session
+draft-remount concern is recorded in `agent-platform-initial-session-draft` for controlled investigation,
+not silently included in this same-session fix.
+
+The fixture repair and three complete mirrors are pushed and verified at `61828f33`. Its hosted
+export test passed, but CR-T01 Chromium exposed a separate fixture ordering error: outgoing initial
+page requests consumed the one-shot barriers, while the active page's fresh reads returned 200.
+Downloaded traces prove this on both attempts. The helper now awaits initial Chromium restoration
+before installing scenario barriers, retaining all timeouts and assertions. Application code is
+unchanged. The corrected connected matrix passes 18/18 with no failures or skips; all 10 V1 reports
+are durable and verified with zero loss, pending or truncated events. Both first-case traces prove
+held reads complete before the first POST. The source/build/evidence receipt is
+`held-read-repair-connected-receipt.json` (SHA-256
+`ae483b651f2dd9d5f644f5fced5a9ea47141e16f6237873c07ba5bdd61259507`). New exact-head hosted
+qualification remains required; the failed `61828f33` run is retained.
+
+Next: finish source-bound publication and qualify all new exact-head PR314 pipelines and review
+findings, then perform the owner-authorized feature merge. Beads remains in progress through that
+integration gate. No merge, task closure or staging readiness is claimed at this checkpoint.
+Primary and paused snapshots match the planning-final preservation record, including its one prior
+authorized Beads status append; retain all separate refs and unrelated services. Earlier handoffs
+below are historical, including the superseded planning-only authorization.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — disappearing reply planning, 13 October 2026
+
+MCP onboarding is delivered: PR313 merged into staging at
+`211916739642f5b095ba35100b3b452779969feb` after all14 executed checks passed, including the actual
+full scan and19 packaged VM tests, with no unresolved review threads. Delivered MCP branches were
+recovery-protected and cleaned; Beads is closed and synced. Prior handoffs below describe historical
+checkpoints and do not reopen completed MCP work. Paused PR283/orchestration remain separate.
+
+The owner selected `agent-platform-sizx` for **planning only**, with an independent critic before
+implementation. See the [bounded plan](docs/planning/chat-reply-reliability.md),
+[specification](docs/tasks/agent-platform-sizx.md), [verification map](docs/testing/chat-reply-reliability.md)
+and [critique/results](docs/reviews/chat-reply-reliability.md). Current actual planning branch is
+`task/chat-reply-reliability-plan` from `feature/chat-reply-reliability`, based on staging21191673.
+Proposed implementation branch is `task/chat-reply-reliability` from the pushed planning tip.
+
+The proposed small repair gates Send until history and approvals finish loading, scopes all late
+results to the owning session/operation, preserves refused drafts/attachments, and gives a manual
+retry for restoration failures. Reuse existing V1 diagnostics with controlled browser/Electron race
+traces and independent SQLite checks; diagnostics do not themselves prove UI visibility. No new
+logging service or dashboard. No product implementation or tests have run in this planning phase.
+The independent critic approved the corrected plan with no actionable findings; CR-C01 added saved
+Project link/reopen coverage. Documentation validation and Beads spec/acceptance readback pass.
+Full mirror/push/sync receipts will be recorded against the resulting pushed revision when
+publication completes, in canonical Beads and
+`/Users/letuscode/.codex/chat-reply-plan-20261013/publication.json`. Beads remains in progress;
+next action after publication is owner discussion, not automatic implementation. Preserve dirty primary,
+paused checkout, all separate orchestration refs and unrelated services. Full earlier handoff follows.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — MCP onboarding implementation, 13 October 2026
 
 The owner approved the bounded MCP onboarding plan at `f75fba7d` and instructed completion

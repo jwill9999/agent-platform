@@ -20,13 +20,22 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: /mcp-(onboarding|chat)\.spec\.ts/,
+      testIgnore: /(?:mcp-(?:onboarding|chat)|chat-reply-reliability)\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },
+    },
+    {
+      // These fixtures share the disposable API container's loopback provider port.
+      name: 'chat-reply',
+      testMatch: /chat-reply-reliability\.spec\.ts/,
+      dependencies: ['chromium'],
+      fullyParallel: false,
+      workers: 1,
       use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },
     },
     {
       name: 'mcp-onboarding',
       testMatch: /mcp-(onboarding|chat)\.spec\.ts/,
-      dependencies: ['chromium'],
+      dependencies: ['chat-reply'],
       fullyParallel: false,
       workers: 1,
       use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },

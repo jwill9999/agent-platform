@@ -2,17 +2,26 @@ import { expect, test } from '@playwright/test';
 import {
   _electron as electron,
   type ElectronApplication,
-  type FilePayload,
   type Locator,
   type Page,
 } from 'playwright';
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getOpenPort, seedDesktopDatabase } from './support/runtime.js';
+
+type FilePayload = { name: string; mimeType: string; buffer: Buffer };
 
 interface ApiEnvelope<T> {
   data: T;
@@ -37,7 +46,6 @@ interface RecentDesktopProjects {
 }
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const repoRoot = resolve(desktopDir, '../..');
 const GIT_BINARY = '/usr/bin/git';
 const DEFAULT_AGENT_ID = '00000000-0000-4000-8000-000000000001';
 const E2E_MODEL_RESPONSE = 'E2E model response received';
@@ -55,7 +63,7 @@ const VISUAL_REGRESSION_OPTIONS = {
 test.describe('Electron Project access', () => {
   test('opens a local Project and binds chat/slash commands to the same Project session', async () => {
     test.info().snapshotSuffix = '';
-    const tempRoot = join(repoRoot, '.agent-platform', 'electron-e2e', String(Date.now()));
+    const tempRoot = mkdtempSync(join(tmpdir(), 'agent-platform-electron-project-access-e2e-'));
     const runtimeDir = join(tempRoot, 'runtime');
     const newProjectParentDir = join(tempRoot, 'new-projects');
     const newProjectName = 'fresh-e2e-project';
@@ -125,7 +133,6 @@ test.describe('Electron Project access', () => {
           AGENT_PLATFORM_DESKTOP_TEST_OPEN_IDE: '1',
           AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: E2E_MODEL_RESPONSE,
           SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
-          CI: process.env.CI,
         },
       });
 
@@ -144,6 +151,36 @@ test.describe('Electron Project access', () => {
       expect(existsSync(join(newProjectParentDir, newProjectName))).toBe(true);
       const createdProject = await findRecentProject(backendPort, newProjectName);
       expect(createdProject.metadata.source).toBe('desktop');
+      // Keep the real Git fixture separate from the two intentionally non-Git Projects.
+      const gitProbeEnv = {
+        PATH: '/usr/bin:/bin',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+      };
+      const ownGitRoot = execFileSync(GIT_BINARY, ['rev-parse', '--show-toplevel'], {
+        cwd: firstProjectDir,
+        env: gitProbeEnv,
+        encoding: 'utf8',
+      }).trim();
+      expect(realpathSync(ownGitRoot)).toBe(realpathSync(firstProjectDir));
+      expect(
+        execFileSync(GIT_BINARY, ['remote'], {
+          cwd: firstProjectDir,
+          env: gitProbeEnv,
+          encoding: 'utf8',
+        }).trim(),
+      ).toBe('');
+      for (const directory of [join(newProjectParentDir, newProjectName), secondProjectDir]) {
+        const probe = spawnSync(GIT_BINARY, ['rev-parse', '--show-toplevel'], {
+          cwd: directory,
+          env: gitProbeEnv,
+          encoding: 'utf8',
+        });
+        expect(probe.error).toBeUndefined();
+        expect(probe.status).toBe(128);
+        expect(probe.stdout).toBe('');
+      }
+
       await selectActiveAgent(page, 'Personal assistant');
       await selectActiveAgent(page, 'Coding');
       await page.getByRole('button', { name: 'Workspaces' }).click();
@@ -503,7 +540,6 @@ test.describe('Electron Project access', () => {
           AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
           AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
           SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
-          CI: process.env.CI,
         },
       });
 
