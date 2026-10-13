@@ -1,7 +1,7 @@
 # Context/token MVP — implementation and verification results
 
 **Task:** `agent-platform-context-optimisation`.
-**Status:** Configured and fresh-default connected MVP journeys passed; local default regression passed; hosted qualification remains pending.
+**Status:** Connected MVP journeys and the approved default passed local and hosted verification at `38244723`; final test-only coverage additions pass locally and await their own exact-head hosted qualification.
 **Source:** Runtime checkpoint `b4559f7c037558b89f5833890006b5a4a866963a`, based on approved plan
 `294a52c8d877038164f636e06208625871888214` and staging `d199ad01`.
 
@@ -71,6 +71,32 @@ controls reject missing, unmatched or duplicate results and oversized input. The
 9,038, 9,165, 9,281, 9,540 and 9,074 against an effective 12,600 limit, with output cap2,048.
 `browser-context-vq01-source-receipt.json` binds the reviewed source and fresh run. These remain
 approximate input estimates, not provider-reported token usage.
+
+## Final acceptance coverage and hosted checkpoint
+
+The approved default checkpoint `38244723e9cbd9d401b52f2277f22a39bfeaf7a0` passed all nine
+executed hosted checks. CI run38346783169 includes34 desktop end-to-end tests in5.6minutes,
+plus build/verification, Docker and browser end-to-end success. Documentation, cycles, secret
+scanning and Sonar succeeded; direct Sonar inspection returned zero open issues. There were no
+unresolved review threads or blocking reviews. Sourcery skipped this cumulative diff because it
+exceeded150,000characters; independent source and evidence reviews supply the recorded review.
+The feature-targeted packaged staging VM job was skipped and supplies no staging qualification.
+No open CodeQL records were returned for this PR ref; that does not claim a feature CodeQL run.
+
+The final acceptance-map audit added two test-only controls:
+
+- CT-T04 composes the actual graph, critic and reasoning nodes. Oversized revision feedback stays
+  in history but fails the second admission before another provider attempt or tool effect.
+- CT-T08 persists and reloads a stale working-memory permission claim, verifies it reaches model
+  context, then proves the actual Ask/Block policy still controls execution. Both cases have zero
+  effects and persisted pending/denied audit records.
+
+The focused suites passed14 harness and24 API tests, with scoped lint/format checks.
+`ct-coverage-cq01-cq02-receipt.json` binds frozen sources and passing logs; earlier fixture failures
+remain retained. Deterministic evaluator/SDK boundaries are disclosed. These tests add acceptance
+coverage without production changes, and require a fresh hosted run after publication. Current-head
+check and publication receipts are tracked in Beads and PR309 rather than treating the earlier green
+checkpoint as qualification for later commits.
 
 ## Executed checks
 
@@ -171,9 +197,10 @@ hosted issue clearance are separate from the earlier green Sonar gate.
 
 ## Remaining delivery boundary
 
-Runtime b4559f7c and verification checkpoints through808dc301 are pushed. Normal pre-push affected
-build, typecheck, cycles and tests passed, including API247 and workflow-control1141 with77 optional
-skips. Configured-budget connected MVP tests and independent diagnostic evidence review now pass.
-Final documentation publication/readbacks,
-exact-head hosted checks and owner acceptance remain outstanding. Beads remains `in_progress`.
-No feature merge, staging promotion, distribution or paused-orchestration integration has occurred.
+The implementation and approved16,000 default are pushed through `38244723`; all nine executed
+hosted checks on that checkpoint passed. Configured-budget and fresh-default connected journeys,
+actual diagnostic exports and independent source/evidence reviews pass. Final test-only acceptance
+coverage passes locally; its publication/readbacks and exact-head hosted checks must finish before
+owner acceptance. PR309 is open for review and unmerged; Beads remains `in_progress` through the
+specified authorized feature integration. No feature/staging merge, distribution or paused
+orchestration integration is authorized or claimed for this delivery.

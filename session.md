@@ -1,52 +1,56 @@
 # Context and token optimisation implementation — 13 October 2026
 
-Implementation checkpoint: runtime `b4559f7c` and verification through `808dc301` are pushed; work continues on
-`task/context-token-verification`. [Actual results](docs/reviews/context-token-optimisation-results.md)
-record browser success, API247 passing tests, all three configured-budget native journeys and five
-verified exports. The approved default adjustment and final hosted qualification are being verified. No implementation merge or staging promotion is authorized or claimed.
+The bounded local MVP is implemented on `task/context-token-verification`, with PR309 open for
+review into `feature/context-token-optimisation`. The approved default checkpoint `38244723`
+passed all nine executed hosted checks, including34 desktop end-to-end tests and zero open Sonar
+issues. Final test-only acceptance coverage passed locally; its final publication and exact-head CI
+are the remaining verification steps before owner acceptance. No merge is authorized for this feature.
 
-The owner approved the bounded plan at `294a52c8` and authorised implementation with Beads,
-the implementation skill, critic review and the agreed tests. The task is
-`agent-platform-context-optimisation`, in progress. Main/staging merges are not authorised for this
-feature yet. Keep PR308, paused PR283 and all retained orchestration work separate.
+The owner approved plan `294a52c8` and implementation using Beads, the implementation skill,
+independent critique and agreed tests. Canonical task `agent-platform-context-optimisation` remains
+`in_progress` through its specified authorized feature integration. Preserve unrelated PR308,
+paused draft PR283, primary/paused dirty checkouts and all retained orchestration branches.
+Staging baseline is `d199ad01`; no staging/main promotion, paid model call or dependency upgrade.
 
-Current chain: `feature/context-token-optimisation` → `task/context-token-plan` →
-`task/context-token-boundary`; verification is the final planned slice. Runtime baseline is
-staging `d199ad01`. No dependency or provider upgrade, paid call or distribution work is included.
+Provider admission now includes mapped messages and all tool schemas before conversational model
+calls, tool iterations and approval continuation. Required current-turn groups and scoped memory
+are preserved in the provider view; original history stays in storage. Output caps are independent,
+and partial length-limited tool calls cannot execute. V1 diagnostics explain admission and actual
+model attempts without exposing content or secrets. CP01/CP02 approval-provenance findings are fixed.
 
-The shared provider projection, output cap, full-history API assembly and strict V1 decision metadata
-are implemented and source-reviewed. CP01/CP02 approval-provenance findings are fixed. Normal pre-push
-build/typecheck/cycles and affected tests pass, including harness707, API247 and workflow-control1141
-with77 existing optional skips. Original failed attempts remain recorded. The browser journey passed
-with independent per-request estimates, atomic tool groups, real file effects, denial, overflow and
-recovery assertions. All three native journeys now pass, including export, restart and no repeated
-approved effects. Independent review verifies five actual V1 reports and retained per-run source
-hashes; restart honestly reports unfinishedPriorProcess. These configured-budget results do not
-prove default usability or full hosted qualification.
+The owner approved16,000 estimated input tokens for absent/new settings, retaining every explicit
+saved limit, including8000. Output2048 and10%framing margin remain unchanged. Shared/OpenAPI
+normalization agrees, with no migration or tool removal. Thirty-three focused tests passed across
+contracts, raw SQLite persistence and real API create/update/copy/reopen; explicit8000 still rejects
+before provider/effects when required context does not fit. Fresh Personal/Coding desktop journeys
+both pass without budget overrides, retaining all56 tools and durable verified V1 exports.
+The unchanged19-case desktop permission/effect suite also passes.
 
-The owner has now approved16,000 input tokens for absent/new settings, preserving explicitly saved
-limits including8000. Output2048 and10%margin remain unchanged; no migration or silent tool removal.
-Shared/OpenAPI defaults now agree. Thirty-three focused tests pass, including saved8,000 rejection
-before provider/effects and persistence across update/copy/reopen. Both fresh Personal/Coding native
-journeys pass without budget overrides, retaining56tools and verified local V1 reports. Earlier
-configured-budget journeys remain separate retained evidence. The unchanged19-case desktop permission/effect regression also passes; fresh full hosted CI
-still qualifies the final source.
+Configured-budget browser and all three native adversarial journeys passed with independent wire
+estimates, real effects, denial, overflow/recovery, approval/restart/replay and five native exports.
+Reports are durable, untruncated and have zero loss counters; the restart report honestly records
+unfinished prior work. Diagnostic review findings outside scope are tracked separately as
+agent-platform-est0, agent-platform-sizx, agent-platform-lnbn and agent-platform-d185.
+Fixture boundaries and retained failures are documented in the results; no live-provider performance,
+exact token count or release/distribution claim follows from these tests.
 
-Hosted run38338322697 at3cdf failed15 existing desktop tests because their saved8,000 budget rejected
-requests before any provider/effect, plus two new fixture readiness failures repaired locally.
-A subsequent hosted DB physical-cap test timed out; the unchanged focused suite passed2/2 in20.94s
-under its original60s timeout. Keep both outcomes. Separate GitHub check responsiveness finding
-agent-platform-d185 is tracked alongside the three earlier findings. Draft PR309 remains unmerged.
-Next qualify CT-T13/default regression, independent review, full publication/readbacks and fresh
-exact-head hosted quality gates before owner acceptance.
+The final acceptance audit added CT-T04 actual critic-feedback readmission and CT-T08 persisted stale
+memory versus actual Ask/Block policy. Both focused suites pass:14 harness and24 API tests, no
+production changes. Their source/log hashes are retained in ct-coverage-cq01-cq02-receipt.json.
+Earlier failed fixture attempts remain evidence. Hosted checkpoint38244723 is green; these later
+coverage additions still require their own final-head CI and full changed-document mirror readbacks.
+Sourcery skipped the cumulative diff above150,000characters; independent review is recorded.
+Feature-targeted staging VM skip is not staging qualification. Local IDE Problems is unavailable;
+terminal quality checks and hosted Sonar findings provide the documented fallback.
+
 [Plan](docs/planning/context-token-optimisation-mvp.md),
 [task](docs/tasks/agent-platform-context-optimisation.md),
 [verification](docs/testing/context-token-optimisation-mvp.md) and
-[plan critique](docs/reviews/context-token-optimisation-plan-review.md) remain canonical.
-
-Phase one is a working local single-user MVP; distribution architecture and checkout-free export
-verification remain phase two. Preserve primary/paused dirty worktrees and the retained legacy local
-context branch. Beads owns task status; no task closure on intermediate test results.
+[actual results](docs/reviews/context-token-optimisation-results.md) are canonical.
+Current final revision/check/publication evidence belongs in Beads and PR309. Present the verified
+implementation for owner acceptance; do not merge or clean delivered branches without that authority.
+Phase two retains distribution architecture and checkout-free export verification. The local MVP
+introduces no dashboard, summarizer, external account or automatic diagnostic sharing.
 
 ## Historical handoffs
 
