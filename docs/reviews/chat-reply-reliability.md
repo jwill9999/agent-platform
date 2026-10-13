@@ -92,14 +92,16 @@ hosted or merge qualification. Read-only assignments are procedural, not technic
   provider. It is separate from the native managed-runtime diagnostic-export topology.
 - Mounted Home/IDE/hook/composer: **35 passed** across four files (Home9, IDE5, hook18, composer3).
   Actual HomePage and hook run with deferred boundary calls; IDE uses its actual caller/input and a
-  mocked hook admission boundary. Connected IDE sending is not claimed. Earlier full web regression
-  passed245 tests before the14 new caller assertions; cumulative affected-package hooks follow.
+  mocked hook admission boundary. Connected IDE sending is not claimed. The normal affected-package push gates
+  passed412 assertions: web259 across44 files and desktop153 across22 files, zero failed/skipped.
+  Earlier web245 results remain retained before the14 new caller tests.
 - Full repository typecheck, lint, formatting and cycle check passed. Cycle analysis reported81
   resolution warnings and no cycles. Direct strict TypeScript checks cover the five new desktop E2E
   files that are outside the normal desktop source tsconfig. Scoped test lint/format also passed.
 - Eight unchanged adjacent connected regressions passed (context/token5; MCP stdio/HTTP/unknown3),
   zero failed/skipped, in1.0 minute from the required desktop working directory. Normal cumulative
-  push hooks and hosted checks remain pending at this source checkpoint.
+  build/typecheck/test/cycle push hooks passed on implementation commit `699f39c8`; hosted checks
+  remain a separate pending gate at this source checkpoint.
 
 Evidence: `connected-final-receipt.json`, `fixed-fourth-full.log`, `fixed-fourth-full/`,
 `fixed-build-source.json`, `caller-mounted-final-receipt.json`, `local-quality-checkpoint.json` and
@@ -128,7 +130,7 @@ readable traces/SQLite, current test-source hashes and all10 exports, approving 
 with no findings. CR-Q01 added explicit final-reply visibility alongside uniqueness; CR-Q02 made
 fixture teardown independent so one failure cannot skip other cleanup. Final Docker evidence is also independently approved: all four retained artifact hashes/sizes,
 trace integrity and actual SQLite rows match; POST/provider counts are one with no fixture error.
-Adjacent regressions have a separate receipt; source review does not imply hosted qualification.
+Adjacent regressions have `adjacent-native-receipt.json`; source review does not imply hosted qualification.
 
 Earlier failures remain available with dispositions:
 
@@ -157,7 +159,8 @@ release artifact or the protected staging packaged-VM job. Those delivery gates 
 
 Planning publication is complete at `34d6397b`: five full mirrors/readbacks, normal hooks and Dolt
 sync are retained in `/Users/letuscode/.codex/chat-reply-plan-20261013/publication.json`. Implementation
-publication will bind its actual pushed revision and all five changed full bodies; historical pages
+publication follows the pushed implementation `699f39c8` and binds the final documentation revision
+and all five changed full bodies; historical pages
 and human notes remain intact. Beads stays in progress through its owner-authorized integration gate.
 No implementation PR, merge or task closure is claimed at this source checkpoint. Final hosted
 results and publication receipts are recorded in Beads against the actual revision; this document's

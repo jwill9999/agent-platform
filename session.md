@@ -25,8 +25,10 @@ See the [approved plan](docs/planning/chat-reply-reliability.md),
 policy or acceptance assertions. Source-tree Electron and deterministic providers are not protected
 staging packaged-VM or release qualification.
 
-All eight unchanged adjacent context/MCP connected regressions also passed. Next: complete cumulative
-normal push hooks and final independent review, publish all five complete source-bound Notion mirrors, and qualify the
+All eight unchanged adjacent context/MCP connected regressions also passed. Implementation is pushed
+at `699f39c8`; normal affected-package hooks passed build/typecheck/cycles and412 tests (web259,
+desktop153), with no failures/skips. Next: finish final evidence/documentation review, publish all five
+complete source-bound Notion mirrors, and qualify the
 cumulative task-to-feature PR's actual hosted checks and review findings. Beads remains in progress
 through its integration gate; no PR, merge, task closure or staging-readiness claim at this checkpoint.
 Primary and paused snapshots match the planning-final preservation record, including its one prior
