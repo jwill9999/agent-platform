@@ -1,3 +1,39 @@
+# Current handoff — MCP onboarding planning, 13 October 2026
+
+The owner selected reliable MCP onboarding as the next local-MVP investigation. This is
+**planning only**: present the reviewed scope and briefing for agreement before implementation.
+Canonical Beads task `agent-platform-mcp-onboarding` is P1/in progress under
+`agent-platform-capability-registry`; the broader epic remains open.
+
+## Current baseline and next discussion
+
+PR308 and its staging promotion [PR311](https://github.com/jwill9999/agent-platform/pull/311)
+are complete. Staging is `26e90126a1987b1dc6e689438b471fe5ed932235`, tree
+`a7a737cdc3d76fd5aa5a69038ab90914c6ebd661`. All 14 executed promotion checks and 19 packaged
+VM tests passed, with no unresolved comments. Sourcery's size skip was disclosed alongside
+independent review. The two delivered handoff branches were removed with recovery tags retained;
+`agent-platform-o0rt` is closed and synced. Earlier pending PR308 instructions below are historical.
+
+The current planning branch is `task/mcp-onboarding-plan`, from `feature/mcp-onboarding` at
+that staging baseline. See the [briefing and manifest](docs/planning/mcp-onboarding-mvp.md),
+[task spec](docs/tasks/agent-platform-mcp-onboarding.md),
+[verification map](docs/testing/mcp-onboarding-mvp.md) and
+[critique/results](docs/reviews/mcp-onboarding-planning.md).
+
+Recommended scope: trusted preinstalled stdio servers and Streamable HTTP, safe credential
+storage, consistent import/test/chat behavior and real permitted/denied tool journeys.
+No universal installer, OAuth, marketplace, new dashboard or arbitrary-server VM isolation.
+Source investigation found the URL import transport mismatch and ignored env/header settings.
+Product tests are planned, not passed. The independent critic approved the corrected plan with no remaining findings. Publication
+receipts establish planning delivery only; owner agreement is still needed before implementation.
+
+Preserve main, paused PR283 and all four retained orchestration branches, dirty primary and
+paused checkouts. Beads journal updates are authorized task bookkeeping, not an unchanged
+whole-primary-diff claim. No distribution, paid calls or orchestration resumption is authorized.
+The complete previous handoff is retained below for provenance, not as current instructions.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — context MVP delivered, 13 October 2026
 
 **Verified development baseline:** `staging` at `66ae2cce73332a35da103c26f7ab9f97a6372fa9`.
