@@ -21,6 +21,18 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path?: string[
     headers,
   };
 
+  // Cancellation is intentionally scoped to these read-only operations. In
+  // particular, aborting a browser request must not imply a Git write rolled back.
+  if (
+    req.method === 'GET' &&
+    path.length === 4 &&
+    path[0] === 'projects' &&
+    ((path[2] === 'git' && path[3] === 'checks') ||
+      (path[2] === 'github' && path[3] === 'pull-requests'))
+  ) {
+    init.signal = req.signal;
+  }
+
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     const buf = await req.arrayBuffer();
     init.body = buf.byteLength ? buf : undefined;
