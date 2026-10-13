@@ -3,16 +3,29 @@
 The owner approved the bounded MCP onboarding plan at `f75fba7d` and instructed completion
 of the epic's concrete tasks. Canonical Beads `agent-platform-mcp-onboarding` remains in progress;
 its broader capability-registry parent remains open. Current branch is
-`task/mcp-onboarding-connection`, chained from the pushed planning tip under
-`feature/mcp-onboarding` at staging `26e90126`. Implementation is authorized;
-final owner acceptance and feature/staging merge authority remain separate.
+`task/mcp-onboarding-verification`, from pushed connection tip `4769f41c`, which contains runtime
+implementation `ab98c705` and planning `f75fba7d` under `feature/mcp-onboarding` at staging `26e90126`.
+The owner authorized finishing documentation mirrors, the cumulative PR and hosted checks/reviews
+to merge readiness. Merging is not authorized by this instruction; final acceptance remains separate.
 
 Shared configuration/encrypted credentials, Test/chat parity, safe connection lifecycle,
 configuration-bound approval and the onboarding UI are implemented. Independent review repaired
 malformed legacy state, pre-stream cleanup, repeated ownership and truthful terminal failure
 diagnostics. The corrected approval card now reports uncertain actions truthfully. Final browser
 7/7, source-tree desktop 3/3 and upstream reference 2/2 journeys passed. The critic-requested
-context-budget refusal case passes; cumulative regression/publication gates remain. Do not claim completion.
+context-budget refusal case passes. Full local regression: 2,958 passed/77 existing optional skips/zero
+failures at one fork; earlier four-fork lease/timeouts are retained. Typecheck/lint/format pass.
+A later push hook exposed an API fixture failure. An owned-server probe proved the IPv4/wildcard
+collision hazard; the original 400 responder remains unknown. The test-only repair now binds
+23 fixtures explicitly and API verification passed 276 tests, zero failures or skips, before
+a final critic-requested session-chat teardown-order repair. That repair passed 39 focused
+tests with tracing disabled and independent review.
+Original assertions, runtime behavior and timeouts are unchanged. The 2,958-test full run was not
+repeated at this fixture-only delta. Runtime source is committed at `ab98c705`; the reviewed fixture
+repair is committed and pushed at `4769f41c`. Its normal build, typecheck, cycle and seven-package
+test gates passed: 1,715 tests, including 276 API tests after the final teardown repair.
+`implementation-push-qualified.json` binds the exact tip and terminal log. Final fixture critique
+is approved. Publication and hosted checks remain pending; no final acceptance or merge is claimed.
 
 See the [approved plan](docs/planning/mcp-onboarding-mvp.md),
 [task specification](docs/tasks/agent-platform-mcp-onboarding.md),
@@ -20,8 +33,9 @@ See the [approved plan](docs/planning/mcp-onboarding-mvp.md),
 [actual execution results](docs/reviews/mcp-onboarding-planning.md).
 Evidence and source hashes are under `/Users/letuscode/.codex/mcp-onboarding-plan-20261013`.
 Current evidence binds source/artifacts and actual durable V1 waiting/success/failure reports,
-with no reported loss. Complete cumulative regression checks, final review,
-full Notion readbacks, pushed chain and exact-head hosted gates. Model fixtures are deterministic;
+with no reported loss. Implementation and final fixture source review are approved; the connection
+tip passed normal push qualification. Complete full Notion readbacks, push the verification
+documentation chain and finish exact-head hosted gates/reviews before reporting merge readiness. Model fixtures are deterministic;
 source-tree desktop success does not establish checkout-free release qualification.
 
 Preserve the dirty primary checkout, paused thirteen-path checkout, PR283 and all retained

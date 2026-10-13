@@ -1,6 +1,6 @@
 # Reliable MCP onboarding — bounded local MVP
 
-**Status:** owner-approved bounded plan; implementation and verification in progress.
+**Status:** owner-approved bounded plan; local implementation gates passed, documentation and hosted qualification in progress.
 **Date:** 13 October 2026. **Source:** staging `26e90126a1987b1dc6e689438b471fe5ed932235`.  
 **Owner intent:** make existing open-source MCP servers straightforward to connect and use. Keep the local MVP small; investigate and obtain independent critique before agreeing implementation.
 
@@ -54,18 +54,18 @@ Closed Beads records `agent-platform-browser-tools.6` and `.7` describe gateway 
 
 Repository `jwill9999/agent-platform`; owned worktree `/Users/letuscode/.codex/worktrees/codex-developer-autonomy/agent-platform`. Canonical Beads workspace `/Users/letuscode/projects/agent-platform`.
 
-| Item                          | Exact mapping                                                                                                                                                         |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Parent                        | `agent-platform-capability-registry` — Capability registry and policy profiles; parent relation, not a blocking dependency                                            |
-| Owning task                   | `agent-platform-mcp-onboarding` — Make existing MCP server onboarding reliable, P1, in progress                                                                       |
-| Integration                   | `feature/mcp-onboarding`, created from staging `26e90126`; eventual destination protected staging, never main                                                         |
-| Planning branch               | `task/mcp-onboarding-plan`, created from that feature; documentation only                                                                                             |
-| Proposed implementation chain | `task/mcp-onboarding-connection` from pushed planning tip, then `task/mcp-onboarding-verification` from pushed connection tip; these two branches are not yet created |
-| Segment ownership             | One Beads task owns all three internal slices and final integrated gate; one eventual tip PR into feature; no fictional child IDs or cross-task blockers              |
-| Task spec                     | [Requirements, dependencies and sign-off](../tasks/agent-platform-mcp-onboarding.md)                                                                                  |
-| Verification                  | [Scenario map and evidence contract](../testing/mcp-onboarding-mvp.md)                                                                                                |
-| Critique/results              | [Independent findings and planning results](../reviews/mcp-onboarding-planning.md)                                                                                    |
-| Handoff                       | [Current session](../../session.md)                                                                                                                                   |
+| Item                        | Exact mapping                                                                                                                                                                                                           |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parent                      | `agent-platform-capability-registry` — Capability registry and policy profiles; parent relation, not a blocking dependency                                                                                              |
+| Owning task                 | `agent-platform-mcp-onboarding` — Make existing MCP server onboarding reliable, P1, in progress                                                                                                                         |
+| Integration                 | `feature/mcp-onboarding`, created from staging `26e90126`; eventual destination protected staging, never main                                                                                                           |
+| Planning branch             | `task/mcp-onboarding-plan`, created from that feature; documentation only                                                                                                                                               |
+| Actual implementation chain | Reviewed planning `f75fba7d` → runtime `ab98c705` → reviewed fixture repair and qualified pushed connection tip `4769f41c` → current `task/mcp-onboarding-verification`; cumulative PR targets `feature/mcp-onboarding` |
+| Segment ownership           | One Beads task owns all three internal slices and final integrated gate; one eventual tip PR into feature; no fictional child IDs or cross-task blockers                                                                |
+| Task spec                   | [Requirements, dependencies and sign-off](../tasks/agent-platform-mcp-onboarding.md)                                                                                                                                    |
+| Verification                | [Scenario map and evidence contract](../testing/mcp-onboarding-mvp.md)                                                                                                                                                  |
+| Critique/results            | [Independent findings and planning results](../reviews/mcp-onboarding-planning.md)                                                                                                                                      |
+| Handoff                     | [Current session](../../session.md)                                                                                                                                                                                     |
 
 Slice A (about 2–3 days): contracts, DB secret ownership/migration, shared API/harness connection resolver and adapter. Slice B (about 1 day): existing MCP editor/import/test/agent-assignment controls and errors. Slice A also owns pending-approval identity and unknown-outcome halting at the existing chat/dispatch boundary; those are essential protection, not optional polish. Slice C (about 2–3 days): connected browser and Electron journeys, upstream interoperability, V1 diagnostic review, repairs and final independent review. Same implementing agent owns integration; critic reviews independently. Routine refinements inside accepted behavior do not need new permission.
 
@@ -81,4 +81,4 @@ The agent handles authorized fixture setup, code, tests and documentation. The o
 
 Defer marketplace/catalog browsing, general install/update/uninstall, OAuth, legacy HTTP+SSE protocol, remote SSH, gateway-scale selection, resources/prompts/sampling/elicitation, background health monitoring, VM sandboxing of arbitrary MCP processes, distributed accounts and released-app distribution. Keep PR283 and all paused orchestration refs/worktrees untouched. Do not complete the broader capability-registry epic.
 
-Planning approval is still required from the owner. After acceptance, follow implementation skill, normal hooks and affected quality tests; repair at most two identical transient retries before diagnosis. Do not loosen timeouts, permission rules or tests to get green. Material scope/security/host behavior changes, real credentials, paid use or infeasible required tests come back with concrete options. Merge/promotion requires applicable future authorization; no merge authority is inferred from this planning request.
+The owner approved planning revision `f75fba7d` and authorized implementation. The current instruction also authorizes completing documentation mirrors, opening the cumulative PR and resolving hosted checks/reviews to merge readiness, but not merging. Follow the implementation skill, normal hooks and affected quality tests; repair at most two identical transient retries before diagnosis. Do not loosen timeouts, permission rules or tests to get green. Material scope/security/host behavior changes, real credentials, paid use or infeasible required tests come back with concrete options. Merge/promotion requires applicable future authorization; no merge authority is inferred from this planning request.

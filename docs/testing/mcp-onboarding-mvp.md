@@ -1,6 +1,8 @@
 # MCP onboarding verification plan
 
-**Status:** approved verification contract; execution in progress, final gates outstanding. **Owner:** `agent-platform-mcp-onboarding`.
+**Status:** approved verification contract; local implementation and normal push gates passed, documentation and hosted gates outstanding. **Owner:** `agent-platform-mcp-onboarding`.
+
+At pushed connection tip `4769f41c`, normal build, typecheck, cycle and affected-package test gates passed: 1,715 tests across seven packages, including 276 API tests after the final fixture cleanup repair. The earlier full-suite result (2,958 passed and 77 existing optional skips) belongs to runtime checkpoint `ab98c705`; it was not rerun at the test-only fixture delta. See the [execution record](../reviews/mcp-onboarding-planning.md) for failures, focused repairs and connected evidence. Current verification documentation branches from `4769f41c`; publication and exact-head hosted qualification are still required.
 **Contract:** [MCP-01 through MCP-08](../planning/mcp-onboarding-mvp.md).  
 **Results:** [Planning critique and later execution evidence](../reviews/mcp-onboarding-planning.md).
 

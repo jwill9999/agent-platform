@@ -42,8 +42,11 @@ and instructed delivery of the epic's concrete tasks. The sole live child remain
 The planning-only statements above describe that earlier phase, not current authority.
 
 Implementation is on `task/mcp-onboarding-connection` from the reviewed planning tip.
-Source changes are currently uncommitted; external evidence binds individual file hashes.
-No final implementation revision, hosted qualification, owner acceptance or merge is claimed.
+Runtime implementation is committed at `ab98c705eda72025aeadc8aebebb75f6bd5a1c06`;
+the reviewed test-only fixture repair is pushed at `4769f41c9a67e6e362b42b80a7ec1cf37881f513`.
+Current `task/mcp-onboarding-verification` branches from that qualified connection tip to record delivery results.
+The owner authorized documentation publication, the cumulative PR and hosted checks/reviews to merge readiness, without merging.
+No hosted qualification, owner acceptance or merge is claimed before its actual gates.
 The scoped evidence root is `/Users/letuscode/.codex/mcp-onboarding-plan-20261013`.
 
 ### Implemented behavior
@@ -110,12 +113,39 @@ production change was needed for that case. The critic verified the exact test a
   at unchanged timeouts. The 100 ms lease fixture also uses real monotonic elapsed time; concurrent
   load is plausible but not proven as the sole cause. No paused runtime/test policy was changed.
   `workflow-failure-diagnosis.json` and `workflow-failures-isolated.log` retain the diagnosis.
-  The later four-fork full run again failed:1,137passed,4failed,77existing optional skips in
-  workflow-control, stopping later tiers. Two lease failures and two five-second timeouts are
+  The later four-fork full run again failed: 1,137 passed, 4 failed, 77 existing optional skips in
+  workflow-control, stopping later tiers. Two lease failures and two five-second timeouts
   all pass individually at one fork with identical assertions/timeouts. The complete one-fork
-  run is underway; no full pass is claimed before its terminal result.
+  run then passed: **2,958 passed, 77 existing optional skips, zero failures** across 15 packages.
+  Workflow-control itself passed 1,141 with 77 optional skips. `final-broad-verification.json` and
+  `final-regression-diagnosis.json` bind exact source/logs, both scheduling settings and failures.
+  Full typecheck, lint, root formatting, explicit TSX/MJS formatting and direct Markdown pass.
+  Sonar/IDE Problems tools were unavailable locally; the documented local fallback passed.
+  Hosted Sonar/CodeQL remain separate mandatory PR evidence.
 
-Cumulative regressions, final source-bound independent review, full
-documentation mirrors, pushed branch chain and exact-head hosted checks remain outstanding.
-These pending gates prevent product completion. No setup or decision is currently required
-from the owner.
+A later normal push hook failed an existing error-middleware fixture (HTTP400 instead of404).
+An owned-server probe reproduced a host test hazard: IPv4 and IPv6 wildcard listeners can own
+separate servers on the same port while Supertest sends to127.0.0.1. The identity of the original
+400 responder is unknown. Subsequent full API verification exposed other bare-listener fixtures.
+The completed test-only repair binds 23 affected fixtures to owned IPv4 listeners, awaits their
+cleanup and adds route-ownership proof. The complete API run at that checkpoint passed **276 tests across
+35 files, zero failures or skips**, in 39.28 seconds; `ipv4-all-fixtures-verification.json` binds
+source hashes and the terminal log. Original assertions, runtime behavior and timeouts remain
+unchanged. Final critique then identified session-chat SQLite disposal occurring before its
+owned listener closed. That test-only teardown-order repair passed all 39 session-chat tests
+with tracing disabled and independent source review; the 276-pass log predates it. The first
+focused run omitted tracing-off exports and logged denied tracing requests; its evidence is
+retained separately from the corrected run. The earlier 2,958-test full pass
+remains evidence for its run; it was not repeated at
+this later fixture-only delta and does not qualify the failed push hook.
+
+Runtime source remains committed at `ab98c705`; the reviewed test-only fixture repair is
+committed and pushed at `4769f41c9a67e6e362b42b80a7ec1cf37881f513`. Final fixture critique is approved.
+The subsequent normal, unmodified push gate passed build, typecheck, cycles and **1,715 tests across
+seven affected packages**, including **276 API tests after the final cleanup repair**.
+`implementation-push-qualified.json` binds the exact local/remote tip and successful terminal log;
+the earlier failed push remains retained. This affected-package gate is distinct from the historical
+2,958-test full-suite run. Full source-bound documentation readbacks
+and exact-head hosted checks also remain delivery gates. Final owner acceptance and authorized feature
+merge remain separate. No setup or product decision is currently required from the owner.
+No task closure or staging readiness is claimed.
