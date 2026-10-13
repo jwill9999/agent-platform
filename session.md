@@ -1,3 +1,36 @@
+# Diagnostics VM teardown repair — 13 October 2026
+
+PR302 and the startup-evidence repair PR304 are merged into `feature/agent-observability`.
+Current feature tip is `0081843130674d207a74ae025efe0af99a0c2585`; staging remains
+`7814b59845b52ad5f850bfc99b7baee0e6742a25`. PR303 is blocked by its actual packaged VM
+suite: eighteen scenarios passed, but the network-block case failed with confirmed `ENOSPC`
+and a retry readiness failure. All other executed current-head checks passed, including genuine
+full security analysis. The cause of the earlier feature-tip failure remains unproven.
+
+Active bounded repair: `task/diagnostics-vm-teardown`. Independent critique approved correcting
+the fixture stop timeout collision and verifying daemon/image-handle release before temporary
+file removal. Retain evidence and fail visibly if teardown cannot be verified; preserve all
+policy/readiness assertions and release independent resources. Twenty focused controls, desktop typecheck, scoped lint/format and three sequential real-VM
+network-block journeys passed without retries. Every teardown reported daemon exit and exact
+image release, with no leftover fixture process/handle or accumulating 4 GiB images. Source review
+resolved OBS-VM-02/03; final evidence/documentation review precedes publication. Actual source and
+verification results belong in [the result report](docs/reviews/agent-observability-mvp-results.md).
+
+Reuse the owner's merge authority after independent source review, complete document mirrors,
+and all new exact-head feature gates; then qualify fresh protected PR303 full scan, actual VM,
+quality checks and review findings before guarded squash. No staging delivery or branch cleanup
+has occurred. V1 remains in progress; checkout-free released-artifact verification remains in
+the open release child. Recovery-protect and remove only delivered diagnostics branches after
+verified staging delivery. Preserve main, PR283, paused orchestration and dirty/unrelated work.
+Beads remains the live task authority; this is a dated pre-delivery snapshot.
+
+## Historical startup-evidence handoff
+
+The full earlier handoff below is retained as historical evidence and superseded by the current
+teardown repair where its next steps differ.
+
+<!-- markdownlint-disable MD025 -->
+
 # Diagnostics staging blocker — 13 October 2026
 
 The owner authorized completion of diagnostics delivery and cleanup. PR302 is merged at

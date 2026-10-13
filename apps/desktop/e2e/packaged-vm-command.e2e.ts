@@ -18,16 +18,27 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 
 import { JOURNEY_CALL_ID, JOURNEY_MODEL, startJourneyProvider } from './support/providerJourney.js';
 import { getOpenPort } from './support/runtime.js';
+import { attemptFixtureCleanup, releaseOwnedVmFixture } from './support/vmFixtureTeardown.js';
 import {
   attemptStartupEvidenceAttachment,
   createStartupEvidence,
 } from './support/startupEvidence.js';
 
 const failedStartupAttachments = new WeakSet<TestInfo>();
+const failedVmTeardowns = new WeakSet<TestInfo>();
+const failedFixtureCleanup = new WeakMap<TestInfo, string[]>();
 test.afterEach(() => {
   const testInfo = test.info();
-  // Test-body finally blocks have already released the provider, VM and temporary files.
-  expect(failedStartupAttachments.has(testInfo), 'Startup evidence attachment failed').toBe(false);
+  // Report secondary failures after cleanup attempts; unverified fixture roots are retained.
+  expect
+    .soft(failedStartupAttachments.has(testInfo), 'Startup evidence attachment failed')
+    .toBe(false);
+  expect
+    .soft(failedVmTeardowns.has(testInfo), 'VM teardown unverified; fixture retained')
+    .toBe(false);
+  expect(failedFixtureCleanup.get(testInfo) ?? [], 'Fixture cleanup failed; root retained').toEqual(
+    [],
+  );
 });
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -51,6 +62,9 @@ type VmFixture = {
   heartbeatTimer?: NodeJS.Timeout;
   projectDir: string;
   realVmRuntimeDir?: string;
+  vmStartAttempted?: boolean;
+  vmDaemonPid?: number;
+  vmTeardownFailed?: boolean;
   rendererPort: number;
   resourcesDir: string;
   runtimeDir: string;
@@ -88,10 +102,8 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await expect(page.getByText(HOST_ONLY_CANARY_VALUE)).toHaveCount(0);
       writeVmEvidence(fixture, 'success', realVmStatus);
     } finally {
-      await closeVmFixtureApp(fixture, app);
-      stopRealVmRunner(fixture);
-      if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
-      rmSync(fixture.tempRoot, { recursive: true, force: true });
+      await cleanupFixtureResources(fixture, app);
+      if (!fixture.vmTeardownFailed) rmSync(fixture.tempRoot, { recursive: true, force: true });
     }
   });
 
@@ -120,9 +132,8 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await expect(page.getByText(`HOST_CWD:${fixture.projectDir}`)).toHaveCount(0);
       await expect(page.getByText(HOST_ONLY_CANARY_VALUE)).toHaveCount(0);
     } finally {
-      await closeVmFixtureApp(fixture, app);
-      if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
-      rmSync(fixture.tempRoot, { recursive: true, force: true });
+      await cleanupFixtureResources(fixture, app);
+      if (!fixture.vmTeardownFailed) rmSync(fixture.tempRoot, { recursive: true, force: true });
     }
   });
 });
@@ -443,17 +454,22 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
       audits = (
         await readEvidence<AuditEvidence>(fixture, 'tool-executions').catch(() => audits)
       ).filter((row) => row.toolName === 'sys_bash');
-      if (app && tracing) {
-        const tracePath = test.info().outputPath('journey-trace.zip');
-        await app.context().tracing.stop({ path: tracePath });
-        await test
-          .info()
-          .attach('journey-browser-trace', { path: tracePath, contentType: 'application/zip' });
-      }
-      await closeVmFixtureApp(fixture, app);
-      await provider?.close();
-      stopRealVmRunner(fixture);
-      if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
+      await recordCleanupFailures(fixture, [
+        {
+          name: 'trace',
+          run: async () => {
+            if (app && tracing) {
+              const tracePath = test.info().outputPath('journey-trace.zip');
+              await app.context().tracing.stop({ path: tracePath });
+              await test.info().attach('journey-browser-trace', {
+                path: tracePath,
+                contentType: 'application/zip',
+              });
+            }
+          },
+        },
+      ]);
+      await cleanupFixtureResources(fixture, app, () => provider?.close());
       try {
         const backendEvents = readBackendEvents(fixture);
         const evaluation = {
@@ -513,7 +529,7 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
           contentType: 'text/markdown',
         });
       } finally {
-        rmSync(fixture.tempRoot, { recursive: true, force: true });
+        if (!fixture.vmTeardownFailed) rmSync(fixture.tempRoot, { recursive: true, force: true });
       }
     }
   });
@@ -709,18 +725,22 @@ for (const { policy, unavailableFiles, action } of [
       ).filter((row) => row.toolName === toolName);
       savedPolicy = await readPolicy().catch(() => savedPolicy);
       try {
-        if (app && tracing) {
-          const trace = test.info().outputPath('policy-trace.zip');
-          await app.context().tracing.stop({ path: trace });
-          await test
-            .info()
-            .attach('policy-browser-trace', { path: trace, contentType: 'application/zip' });
-        }
+        await recordCleanupFailures(fixture, [
+          {
+            name: 'trace',
+            run: async () => {
+              if (app && tracing) {
+                const trace = test.info().outputPath('policy-trace.zip');
+                await app.context().tracing.stop({ path: trace });
+                await test
+                  .info()
+                  .attach('policy-browser-trace', { path: trace, contentType: 'application/zip' });
+              }
+            },
+          },
+        ]);
       } finally {
-        await closeVmFixtureApp(fixture, app);
-        await provider.close();
-        stopRealVmRunner(fixture);
-        if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
+        await cleanupFixtureResources(fixture, app, () => provider.close());
         try {
           const evidence = {
             policy,
@@ -752,7 +772,7 @@ for (const { policy, unavailableFiles, action } of [
           );
           await test.info().attach('policy-evaluation', { path, contentType: 'application/json' });
         } finally {
-          rmSync(fixture.tempRoot, { recursive: true, force: true });
+          if (!fixture.vmTeardownFailed) rmSync(fixture.tempRoot, { recursive: true, force: true });
         }
       }
     }
@@ -768,6 +788,38 @@ type ApprovalEvidence = {
   resumedAtMs?: number | null;
 };
 type AuditEvidence = { id: string; sessionId: string; toolName: string; status: string };
+
+async function recordCleanupFailures(
+  fixture: VmFixture,
+  steps: Parameters<typeof attemptFixtureCleanup>[0],
+): Promise<void> {
+  const failed = await attemptFixtureCleanup(steps);
+  if (failed.length) {
+    const info = test.info();
+    failedFixtureCleanup.set(info, [...(failedFixtureCleanup.get(info) ?? []), ...failed]);
+    fixture.vmTeardownFailed = true;
+  }
+}
+
+async function cleanupFixtureResources(
+  fixture: VmFixture,
+  app?: ElectronApplication,
+  closeProvider: () => void | Promise<void> = () => {},
+): Promise<void> {
+  const priorFailure = fixture.vmTeardownFailed;
+  await recordCleanupFailures(fixture, [
+    { name: 'electron', run: () => closeVmFixtureApp(fixture, app) },
+    { name: 'provider', run: closeProvider },
+    { name: 'vm', run: () => stopRealVmRunner(fixture) },
+    {
+      name: 'heartbeat',
+      run: () => {
+        if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
+      },
+    },
+  ]);
+  fixture.vmTeardownFailed ||= priorFailure;
+}
 
 async function closeVmFixtureApp(fixture: VmFixture, app?: ElectronApplication): Promise<void> {
   const info = test.info();
@@ -1088,11 +1140,26 @@ function assertPackagedResources(resourcesDir: string): void {
 function startRealVmRunner(fixture: VmFixture): unknown {
   if (!fixture.realVmRuntimeDir) return undefined;
   const helperPath = join(fixture.resourcesDir, 'macos-vm', 'macos-vm-runner');
-  const status = execFileSync(
-    helperPath,
-    ['start', '--runtime-dir', fixture.realVmRuntimeDir, '--workspace', fixture.projectDir],
-    { encoding: 'utf8', timeout: 90_000 },
-  );
+  fixture.vmStartAttempted = true;
+  let status: string;
+  try {
+    status = execFileSync(
+      helperPath,
+      ['start', '--runtime-dir', fixture.realVmRuntimeDir, '--workspace', fixture.projectDir],
+      { encoding: 'utf8', timeout: 90_000 },
+    );
+  } finally {
+    try {
+      const text = readFileSync(
+        join(fixture.realVmRuntimeDir, 'state', 'daemon.pid'),
+        'utf8',
+      ).trim();
+      if (/^[1-9]\d*$/.test(text) && Number.isSafeInteger(Number(text)))
+        fixture.vmDaemonPid = Number(text);
+    } catch {
+      /* Missing identity must fail teardown rather than signal an unknown process. */
+    }
+  }
   const parsed = JSON.parse(status) as { ok?: boolean; message?: string; state?: string };
   if (!parsed.ok || parsed.state !== 'ready') {
     throw new Error(`macOS VM runner did not start: ${status}`);
@@ -1100,17 +1167,24 @@ function startRealVmRunner(fixture: VmFixture): unknown {
   return parsed;
 }
 
-function stopRealVmRunner(fixture: VmFixture): void {
+async function stopRealVmRunner(fixture: VmFixture): Promise<void> {
   if (!fixture.realVmRuntimeDir) return;
-  const helperPath = join(fixture.resourcesDir, 'macos-vm', 'macos-vm-runner');
-  try {
-    execFileSync(helperPath, ['stop', '--runtime-dir', fixture.realVmRuntimeDir], {
-      encoding: 'utf8',
-      timeout: 20_000,
-    });
-  } catch {
-    // Best-effort cleanup; the test has already captured the relevant failure.
-  }
+  const outcome = await releaseOwnedVmFixture({
+    runtimeDir: fixture.realVmRuntimeDir,
+    helperPath: join(fixture.resourcesDir, 'macos-vm', 'macos-vm-runner'),
+    projectDir: fixture.projectDir,
+    started: fixture.vmStartAttempted ?? false,
+    daemonPid: fixture.vmDaemonPid,
+  });
+  fixture.vmTeardownFailed = !outcome.ok;
+  if (!outcome.ok) failedVmTeardowns.add(test.info());
+  const attached = await attemptStartupEvidenceAttachment(() =>
+    test.info().attach('vm-teardown', {
+      body: Buffer.from(JSON.stringify(outcome)),
+      contentType: 'application/json',
+    }),
+  );
+  if (!attached) failedStartupAttachments.add(test.info());
 }
 
 function writeVmEvidence(fixture: VmFixture, scenario: string, runnerStatus: unknown): void {

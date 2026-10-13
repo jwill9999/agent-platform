@@ -1,6 +1,6 @@
 # Diagnostics MVP — implementation results
 
-Status: PR302 delivered to the feature under owner authorization; staging PR303 is blocked by the packaged VM startup failure described below. Earlier pending statements are dated historical snapshots.
+Status: PR302 and PR304 delivered to the feature under owner authorization; staging PR303 is blocked by the confirmed runner disk exhaustion and fixture teardown defect below. Earlier pending statements are dated historical snapshots.
 Task: [agent-platform-harness-v1](../tasks/agent-platform-harness-v1.md).
 Contract: [approved MVP](../planning/agent-observability-mvp.md).
 Verification: [T01–T12](../testing/agent-observability-mvp.md).
@@ -310,3 +310,80 @@ PR304's first hosted Sonar gate was OK but its issue list identified one Major S
 conditional in the startup helper. The follow-up extracts equivalent branching without suppression
 or runtime changes. All nine affected tests, lint and formatting passed. Independent equivalence
 review and new hosted qualification remain separate from the earlier successful packaged case.
+
+## Second staging attempt: disk exhaustion and VM teardown — 13 October
+
+Feature repair PR304 merged at `0081843130674d207a74ae025efe0af99a0c2585` after ten
+executed checks passed on `40388cfd4abe12bf0a7d78294db3a02c17007c4e`, approved review and
+zero unresolved threads. Its tree exactly equals the reviewed source. Fresh PR303 CI
+`38324590084` passed every executed gate except the packaged macOS suite, which again passed
+eighteen scenarios and failed the network-block case. The first attempt now directly reports
+`ENOSPC` while creating its result directory and failure to attach startup evidence; the retry
+failed backend readiness before model setup. The runner had 621 MiB available during upload
+and about 37 GiB after job cleanup. This proves disk exhaustion for this attempt; it does not
+retroactively establish the cause of the earlier `f0f4edd3` failure.
+
+Source review found **OBS-VM-02**: fixture shutdown allows 20 seconds for a native helper that
+itself waits 20 seconds before escalating to forced termination. The fixture can interrupt that
+escalation, ignores the stop failure, and unlinks its runtime image while a VM still holds it.
+The hosted log records eight orphaned `macos-vm-runner` processes terminated at job end.
+Read-only local inspection also found a retained focused-test VM holding an unlinked 4 GiB image.
+The source defect and retained handles support the teardown repair; exact historical per-process
+allocation during the failed run was not measured.
+
+The independently approved bounded repair is fixture-only: allow native stop escalation to
+finish, verify the captured daemon has exited and no process holds the exact image before
+removing temporary files, retain the root and fail visibly when verification is inconclusive,
+and release provider/timer resources independently. Readiness, policy assertions and overall test
+timeouts stay unchanged. Negative cleanup controls and three sequential real VM lifecycles passed as recorded below.
+
+Fresh ordinary Promptfoo analysis `38324590109`, attempt 1, completed three batches with no
+reported vulnerabilities on `00818431`. The independent reviewer verified the live run/job,
+ZIP digest, both artifact members, receipt/SARIF bindings and raw completed provider response.
+CLI 0.124.1 and the disclosed built-in blob/patch omissions remain unchanged. Sonar passed with
+the two prior Minor dispositions; there were no open scoped CodeQL alerts or unresolved review
+threads. Those passes do not waive the failed VM suite or qualify a future changed head.
+
+The new hosted benchmark also passed all nine modes and the original bounds: maximum measured
+request-p95 increase 3.040543 ms against 20 ms, maximum enqueue p95 0.023657 ms against 2 ms,
+and 660 retained observations with zero loss in each healthy repetition. Writer-lock losses
+were reported explicitly. It uses deterministic providers, not production load.
+
+### Teardown review and negative controls
+
+Independent review **OBS-VM-03** found that an Electron/provider close rejection could skip
+later cleanup. Every resource action is now attempted through an ordered cleanup collector;
+trace/attachment failures cannot bypass closure, and a later successful VM result cannot erase
+a prior cleanup failure. Fixed labels are reported after cleanup without replacing the original
+test failure. Roots are retained whenever release cannot be verified.
+
+The first corrected source passed twenty focused tests: eleven teardown controls and nine
+startup-evidence controls. Failure-injection cleanup tests prove every callback is reached;
+they are not themselves real VM teardown proof. A separate real stubborn-child test verifies
+that a successful stop acknowledgement does not substitute for observed process exit.
+The equivalent helper decomposition passed independent re-review and the same twenty tests;
+desktop typecheck, scoped lint, formatting and diff checks passed.
+
+### Actual sequential VM evidence
+
+Three separate real packaged-VM network-block journeys passed without retries, skips or flaky
+outcomes: Playwright durations were 43.505, 32.694 and 30.119 seconds within the unchanged
+60-second test limit. Each run used the existing signed helper and pinned VM assets, actual
+Electron/API/policy persistence and the deterministic external HTTP model fixture. Every saved
+policy evaluation passed `network: block`; each teardown attachment reports `ok: true`,
+`daemonExited: true` and `imageReleased: true`.
+
+Post-run process/handle snapshots found no fixture daemon or deleted fixture-image holder.
+Available disk space after the three runs was 46,101,192 / 46,132,528 / 46,130,532 KiB,
+which did not show the previous per-run 4 GiB image retention. A prior focused-test orphan was
+separately cleaned up only after exact PID, executable, runtime and deleted-image ownership were
+verified; both its daemon and virtualization process were observed to exit. No unrelated process
+was signalled and no retained checkout or evidence was removed.
+
+The fixture now allows 25 seconds for the helper's existing 20-second graceful-stop/escalation
+sequence, then uses a three-second polling window for daemon and exact-image release, with each
+holder probe limited to one second. A final probe may finish after that window. This changes the
+cleanup caller budget, not readiness, policy, native implementation or overall test limits.
+The local sequential exercise verifies this cleanup behavior; it does not replace fresh exact-head
+feature checks, ordinary full staging security analysis or the entire hosted macOS suite. The
+original failed runs and their cause/coverage boundaries remain retained above.
