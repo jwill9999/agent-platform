@@ -1,3 +1,38 @@
+# Current handoff — complete diagnostic reads before staging, 13 October 2026
+
+PR317 has merged into `feature/chat-reply-reliability` at `f5fdb464`, tree `efc52d6b`,
+after all nine executed feature checks passed, including a clean 55-case desktop run.
+Both complete result/session Notion mirrors were verified at source `f530821a`.
+PR315 remains open against staging `21191673`. Its 15 executed check badges passed,
+including actual full analysis, Sonar with zero open issues, CodeQL, browser and 19 real packaged-VM
+tests. Detailed desktop results instead reported 54 passes and one flaky provider-HTTP reject case:
+`waiting-diagnostics.json` existed but immediate JSON parsing failed. The merge is held.
+
+The existing Beads follow-up `agent-platform-diagnostic-export-file-read` is now in progress as a
+bounded prerequisite repair under the owner's CI-repair and conditional merge authority.
+`task/chat-reply-export-read` starts from actual feature `f5fdb464`. Independent critique CR-Q06
+approved polling for a complete readable JSON snapshot within the existing deadline at both export
+reads, preserving all scope, coverage, waiting-state, privacy and backend-effect assertions.
+The product exporter already awaits its write; runtime behavior and security policy are unchanged.
+The mechanism is source-supported, but original hosted writer timing is not definitively proven.
+
+Reader controls passed 3/3, including missing/malformed failures at the unchanged five-second deadline.
+All five affected provider journeys passed without retries; ten actual reports passed schema,
+correlation, coverage and privacy review. Production builds are unchanged. Detailed results and
+retained failures are in the verification record.
+
+Next: complete independent final evidence/document review and full changed mirrors, then deliver
+the task repair into the existing feature after its current-head checks clear.
+Then qualify PR315 on the resulting head with clean desktop execution, actual full scan/VM and all
+protected checks and review findings. Only after verified staging delivery may the six delivered
+chat-reply branches be recovery-protected and removed. Main and paused PR283/orchestration remain
+separate. Current task state and actual delivery receipts are in Beads and
+`/Users/letuscode/.codex/chat-reply-implementation-20261013`.
+
+All handoffs below are historical; completed PR317 work is not pending work to repeat.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — retained CI evidence for reply qualification, 13 October 2026
 
 The owner-authorized staging promotion remains in progress in Beads `agent-platform-sizx`.

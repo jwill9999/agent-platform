@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import type { DiagnosticReport } from '@agent-platform/contracts';
 import { expect, test, type TestInfo } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 
@@ -52,6 +53,25 @@ const JOURNEY_BEFORE = 'original content\n';
 const JOURNEY_AFTER = `${JOURNEY_BEFORE}approved change\n`;
 const JOURNEY_FINAL = 'Evaluation turn finished';
 const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+
+async function readCompleteDiagnosticReport(path: string) {
+  let snapshot: { text: string; report: DiagnosticReport } | undefined;
+  await expect
+    .poll(() => {
+      try {
+        const text = readFileSync(path, 'utf8');
+        const report = JSON.parse(text) as DiagnosticReport;
+        snapshot = { text, report };
+        return 'ready';
+      } catch (error) {
+        // Keep filesystem paths, report contents and parser excerpts out of failure output.
+        return error instanceof SyntaxError ? 'incomplete-json' : 'unreadable-file';
+      }
+    })
+    .toBe('ready');
+  if (!snapshot) throw new Error('Diagnostic report snapshot unavailable');
+  return snapshot;
+}
 
 type VmFixtureHealth = 'ready' | 'failed';
 
@@ -236,12 +256,10 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
       mark('approval_pending_file_unchanged');
       if (provider) {
         await page.getByRole('button', { name: 'Export diagnostic report', exact: true }).click();
-        await expect
-          .poll(() => existsSync(join(fixture.tempRoot, 'waiting-diagnostics.json')))
-          .toBe(true);
-        const waiting = JSON.parse(
-          readFileSync(join(fixture.tempRoot, 'waiting-diagnostics.json'), 'utf8'),
+        const waitingSnapshot = await readCompleteDiagnosticReport(
+          join(fixture.tempRoot, 'waiting-diagnostics.json'),
         );
+        const waiting = waitingSnapshot.report;
         expect(waiting.scope).toEqual({ sessionId: approval!.sessionId });
         expect(
           waiting.events.some(
@@ -250,7 +268,7 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
           ),
         ).toBe(true);
         await test.info().attach('waiting-diagnostic-report', {
-          path: join(fixture.tempRoot, 'waiting-diagnostics.json'),
+          body: waitingSnapshot.text,
           contentType: 'application/json',
         });
       }
@@ -397,11 +415,10 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
       if (provider) {
         await page.getByRole('button', { name: 'Export diagnostic report', exact: true }).click();
         const diagnosticPath = join(fixture.tempRoot, 'finished-diagnostics.json');
-        await expect.poll(() => existsSync(diagnosticPath)).toBe(true);
-        const diagnosticText = readFileSync(diagnosticPath, 'utf8');
-        const diagnostic = JSON.parse(diagnosticText);
+        const { text: diagnosticText, report: diagnostic } =
+          await readCompleteDiagnosticReport(diagnosticPath);
         await test.info().attach('finished-diagnostic-report', {
-          path: diagnosticPath,
+          body: diagnosticText,
           contentType: 'application/json',
         });
         expect(diagnostic.scope).toEqual({ sessionId: approval!.sessionId });
