@@ -413,3 +413,56 @@ explicit:404,404 and418 events. The maximum enqueue p95 was0.006666ms. Existing 
 and worker source remained unchanged. Local execution fits the existing30-minute job budget, but
 actual hosted duration and all new-head gates still require qualification. Full logs, source/test
 inventory and measurements are retained in the `pr315-serial-` evidence files.
+
+## Refreshed staging evidence and retry artifact retention
+
+PR316 merged at `98efcd6c` after allnine executed checks passed on `226fc1a4`; feature Electron
+passed55/55 without flaky retries, and benchmark `completed=true`. The feature tree and staging
+rehearsal equal the reviewed source. PR315's fresh ordinary scan38442728388/job115453155522 performed
+actual analysis with no findings. Download ZIP SHA-256
+`ad12d8da3d25057895e99ecf7bcd053c01f78bf1aea6a930f4948105a19546e9` and all member/proof/SARIF
+bindings were independently verified. Sonar has zero open issues, scoped CodeQL is clear. Actual VM
+job115453157185 passed19 tests; ZIP SHA-256
+`77d86642bcb79f192d74f21c5ae8fa3489f153fe82f0bbb8fccf4d6f00c4c96f` binds the verified signature,
+ready VM, manifests and tested host-path/secret non-exposure. These are CI development checks,
+not release signing/notarization; scanner built-in omissions remain disclosed.
+
+The hosted serial inventory passed3005 tests with77 existing optional skips in15 packages. The
+physical test file completed in28.066seconds, retaining its original deadlines. Benchmark artifact
+SHA-256 `1a082876f8798c7f7e28262107f9688896b73b71c0825990f20e179a9198d486` has `completed=true`
+and allnine samples under the original20ms/2ms limits. Actual logs and source-bound receipts remain
+in the `pr315-*-98ef` evidence files. Passing these gates does not erase the desktop observations.
+
+Desktop job115453157230 passed54 cases and retried one diagnostics-export case: its health probe did
+not observe connection refusal within5000ms after SIGTERM to the proven owned API child. No hosted
+trace was uploaded because the final job was green. The unchanged instrumented local case passed
+1/1 first attempt in7.9seconds, with unique owned listener before signal, first health refusal in1ms,
+old PID subsequently gone and the expected deliberately restarted child. All original partial-export,
+privacy and durable-history assertions passed. Shutdown logs were unavailable at the probed location;
+no absence-of-logging claim or exact Linux failure cause follows. Temporary instrumentation was removed
+and source restored exactly. Receipt `pr315-shutdown-probe-receipt.json` SHA-256
+`a2d19d412e258ec99ad53270c0360643455f0213aa124d3e385ea936420f6056` records this bounded evidence.
+
+The independent critic approved one unchanged hosted desktop-job rerun, requiring a clean result.
+Job115460532545 passed the shutdown case but reported54 passes and a different first-attempt120-second
+timeout in CR-T01/02/06/07 Chromium restoration. Its log supplies no awaited-stage stack, and again
+failure-only uploads lost first-attempt evidence. The exact cause remains unknown. No further
+unchanged rerun is authorized by this diagnostic disposition; existing14 green check badges do not
+qualify this desktop result. Both observations are retained in the open observability epic.
+
+Independent source critique approved a bounded evidence correction: always upload the two existing
+Electron report/results paths, retaining their existing contents and retention policy, and record
+safe incremental fixture-stage progress before startup/restoration/scenario/export/cleanup waits.
+Manual tracing ownership remains unchanged. This changes test observability, not application
+behavior, test assertions, deadlines, retry policy or scanner rules. Fresh source review, focused
+verification, full documentation readbacks and hosted checks remain required. Later actual results
+are recorded below and in Beads; old-head successes do not qualify a changed head.
+
+Focused verification of the final progress helper passed the original Chromium restoration journey
+1/1 in10.6seconds without retries or skips. Its37 safe progress records end with completed journey,
+process cleanup and provider cleanup; both actual V1 diagnostic reports are schema-valid, and all
+existing success/failure/correlation/privacy assertions passed. Two source-backed controls passed
+for the128-entry bound/omission reporting and write-failure handling without cleanup interruption.
+Strict TypeScript, lint, formatting and diff checks pass. Receipt `ci-evidence-helper-receipt.json`
+SHA-256 `38a95fdf26a43b624a9b011dbab2b42f4b6543bd3cb6d52f6b2a7250b57e439f` binds source,
+artifacts and420 unchanged production build files. No original hosted cause is claimed.
