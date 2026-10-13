@@ -522,3 +522,47 @@ TypeScript, lint, formatting and diff checks passed. Receipt `pr317-binding-repa
 SHA-256 `f070036d0a1669f4fdd32039dcf5fc2fd35bf2dba2587303e844143e339c06ea` binds the frozen helper,
 71 artifact hashes and control results. This qualifies the bounded local fixture correction;
 PR317 and then PR315 still require new exact-head hosted checks and review before merging.
+
+## CR-Q06 — complete diagnostic reads during staging qualification
+
+PR317 merged at `f5fdb464` after clean 55-case feature desktop qualification. PR315's next run
+`38453594361` had 15 successful executed check badges, but desktop `115490472672` recorded 54 passes
+and one flaky provider-HTTP reject journey: `Unexpected end of JSON input` at the waiting export read.
+The retained results ZIP SHA-256 is
+`7498484c1ad7ba802a297168dea47ddb9aa9e11809c9415aa7e96ca44bfcc49f`; digest and every member CRC
+were verified. Full verify passed 3005 tests with 77 existing optional skips; all nine benchmark
+samples completed at the original 20ms/2ms limits. Latest ordinary scan `38454219379` completed three
+batches without reported findings, and the actual packaged-VM job passed all 19 tests. Those successes
+do not turn the flaky desktop result into clean qualification or qualify a later changed head.
+
+The existing `agent-platform-diagnostic-export-file-read` follow-up now supplies the bounded repair.
+Independent critique CR-Q06 found both waiting/finished readers wait only for existence, whereas
+native export awaits asynchronous writing. The source-supported race is not definitive proof of the
+hosted writer timing. Both readers now poll for complete readable JSON within the original deadline
+and retain the same successful bytes for semantic assertions and attachments. Failure states expose
+only fixed labels. No production changes, timeouts, assertions or retry policies were relaxed.
+
+Deterministic controls passed 3/3 in 10.5 seconds: the old immediate reader throws on an empty file;
+the corrected reader waits for completed bytes and retains that snapshot after the file changes;
+missing and permanently malformed data fail at the original 5000ms deadline. The initial missing-file
+control correctly failed the reader but its error-text check missed ANSI highlighting. The control
+now strips terminal escapes; the original failed control evidence remains retained.
+
+All five original provider-HTTP approval journeys passed without retries, failures, flakes or skips
+(approve/reject, each reload path, and transient-provider recovery). Initial verification took
+32.1 seconds; final JSON-reporter evidence capture took 30.6 seconds. Ten actual waiting/finished
+V1 reports passed the shared runtime schema, matched their durable session/approval, and reported
+durable/verified history with zero dropped, pending, conflicting or truncated events. Existing
+privacy, actual file-effect, audit, denial and replay assertions passed. Providers and VM execution
+in these focused journeys are deterministic fixtures; the separate protected actual-VM gate remains.
+All 420 existing production build artifacts are unchanged. Scoped TypeScript/lint/format/diff passed.
+
+Evidence: `pr318-repair-receipt.json` SHA-256
+`8d2d3b629ba9120e7baf9b74f1c8339058c36fd237338a159ee495585c45ecf0`, and
+`pr318-report-review.json` SHA-256
+`b482de74ada2115481c8f4dd10f8fd24cce56b26400a8f23a3260643947c7e56`, in the existing evidence root.
+The fixture source SHA-256 is
+`1c195f480758f26837f5139cfa0ade22558ebeb4ad216cc05fb6347a0df0f21d`.
+Independent source review approved the bounded correction; final evidence/document review, full
+changed mirrors and new-head hosted feature/staging qualification remain delivery gates. Prior
+shutdown/export/timeout causes without sufficient evidence remain recorded follow-ups.
