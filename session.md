@@ -1,3 +1,26 @@
+<!-- markdownlint-disable MD025 MD024 MD029 MD013 -->
+
+# Current handoff — GitHub read responsiveness planning, 14 October 2026
+
+The owner selected `agent-platform-d185` for planning only, with independent critique before
+implementation. The [bounded plan](docs/planning/github-read-responsiveness.md),
+[task spec](docs/tasks/agent-platform-d185.md), [verification contract](docs/testing/github-read-responsiveness.md)
+and [review record](docs/reviews/github-read-responsiveness.md) define the current proposal.
+No implementation or merge is authorized yet; product verification has not run.
+
+The reply fix is already delivered in staging `1e4bd7af30b092cc9a2d795e9c022ebfd5212176` via PR315.
+The later general handoff update is separately pushed at161ebfd3 in PR319, not incorporated by this
+planning branch. Preserve that history on eventual integration; no dependency on its pending merge.
+Planning branches are feature/github-read-responsiveness → task/github-read-responsiveness-plan
+from actual staging1e4bd7af. Existing paused orchestration and unrelated worktrees remain untouched.
+
+Proposed scope: async/bounded checks and PR-list reads, caller/identity safety and actual concurrent
+chat/diagnostic evidence. Git writes, broader workflow UI, dashboards, distribution and paused
+orchestration are excluded. The plan and critic record carry current status; all historical
+implementation-ready/pending-merge wording below belongs to its own dated delivery, not d185.
+
+## Retained previous handoff
+
 # Current handoff — complete diagnostic reads before staging, 13 October 2026
 
 PR317 has merged into `feature/chat-reply-reliability` at `f5fdb464`, tree `efc52d6b`,
