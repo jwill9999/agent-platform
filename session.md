@@ -1,3 +1,24 @@
+# Diagnostic review checkpoints — 13 October 2026
+
+This branch contains the owner-requested contributor skill update, tracked in
+`agent-platform-diagnostic-review-checkpoints`. The feature-implementation skill now specifies
+reviews after meaningful agent-run end-to-end tests and before completion: collect safe reports,
+inspect flow and coverage, separate facts from hypotheses, fix scoped issues or link Beads findings,
+and record the outcome. Documentation-only work can record not applicable; existing evidence may
+be reused when still valid. This does not enable unattended monitoring or start V2–V5.
+
+The change is isolated from the main conversation and paused orchestration. Base: PR303 staging
+`50cc8727`. Skill validation/publication outcomes and the eventual PR belong in the task's Beads
+notes. This is a pre-integration snapshot; the change is not active in staging until authorized
+integration. No runtime test results or independent subagent review are claimed for this edit.
+
+## Historical diagnostics delivery handoff
+
+The prior handoff below is preserved as historical context; its pending PR303 instructions were
+superseded by the merged staging baseline used above.
+
+<!-- markdownlint-disable MD025 -->
+
 # Diagnostics VM teardown repair — 13 October 2026
 
 PR302 and the startup-evidence repair PR304 are merged into `feature/agent-observability`.
