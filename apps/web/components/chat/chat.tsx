@@ -22,7 +22,7 @@ export interface ChatProps {
   diagnosticRequestId?: string | null;
   diagnosticFailure?: DiagnosticPartialFailure | null;
   messages: UIMessage[];
-  onSend: (text: string) => void;
+  onSend: (text: string) => boolean;
   isLoading: boolean;
   inputPlaceholder?: string;
   emptyStateTitle?: string;
@@ -31,6 +31,7 @@ export interface ChatProps {
   canSend?: boolean;
   /** Optional input helper text shown below the composer. */
   inputStatusText?: string;
+  onRetryHistory?: () => void;
   /** Context attachments (optional — pass to enable attachment UI). */
   attachments?: AttachmentEntry[];
   /** Callback when user picks or drops files. */
@@ -85,6 +86,7 @@ export function Chat({
   emptyStateDescription,
   canSend = true,
   inputStatusText,
+  onRetryHistory,
   attachments,
   onAddFiles,
   onRemoveAttachment,
@@ -210,6 +212,7 @@ export function Chat({
             placeholder={inputPlaceholder}
             canSend={canSend}
             statusText={inputStatusText}
+            onRetryHistory={onRetryHistory}
             attachments={attachments}
             onAddFiles={onAddFiles}
             onRemoveAttachment={onRemoveAttachment}
