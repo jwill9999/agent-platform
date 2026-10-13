@@ -1,3 +1,32 @@
+# Current handoff — disappearing reply planning, 13 October 2026
+
+MCP onboarding is delivered: PR313 merged into staging at
+`211916739642f5b095ba35100b3b452779969feb` after all14 executed checks passed, including the actual
+full scan and19 packaged VM tests, with no unresolved review threads. Delivered MCP branches were
+recovery-protected and cleaned; Beads is closed and synced. Prior handoffs below describe historical
+checkpoints and do not reopen completed MCP work. Paused PR283/orchestration remain separate.
+
+The owner selected `agent-platform-sizx` for **planning only**, with an independent critic before
+implementation. See the [bounded plan](docs/planning/chat-reply-reliability.md),
+[specification](docs/tasks/agent-platform-sizx.md), [verification map](docs/testing/chat-reply-reliability.md)
+and [critique/results](docs/reviews/chat-reply-reliability.md). Current actual planning branch is
+`task/chat-reply-reliability-plan` from `feature/chat-reply-reliability`, based on staging21191673.
+Proposed implementation branch is `task/chat-reply-reliability` from the pushed planning tip.
+
+The proposed small repair gates Send until history and approvals finish loading, scopes all late
+results to the owning session/operation, preserves refused drafts/attachments, and gives a manual
+retry for restoration failures. Reuse existing V1 diagnostics with controlled browser/Electron race
+traces and independent SQLite checks; diagnostics do not themselves prove UI visibility. No new
+logging service or dashboard. No product implementation or tests have run in this planning phase.
+The independent critic approved the corrected plan with no actionable findings; CR-C01 added saved
+Project link/reopen coverage. Documentation validation and Beads spec/acceptance readback pass.
+Full mirror/push/sync receipts are recorded against the pushed revision in canonical Beads and
+`/Users/letuscode/.codex/chat-reply-plan-20261013/publication.json`. Beads remains in progress;
+next action after publication is owner discussion, not automatic implementation. Preserve dirty primary,
+paused checkout, all separate orchestration refs and unrelated services. Full earlier handoff follows.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — MCP onboarding implementation, 13 October 2026
 
 The owner approved the bounded MCP onboarding plan at `f75fba7d` and instructed completion
