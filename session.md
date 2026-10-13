@@ -20,7 +20,8 @@ traces and independent SQLite checks; diagnostics do not themselves prove UI vis
 logging service or dashboard. No product implementation or tests have run in this planning phase.
 The independent critic approved the corrected plan with no actionable findings; CR-C01 added saved
 Project link/reopen coverage. Documentation validation and Beads spec/acceptance readback pass.
-Full mirror/push/sync receipts are recorded against the pushed revision in canonical Beads and
+Full mirror/push/sync receipts will be recorded against the resulting pushed revision when
+publication completes, in canonical Beads and
 `/Users/letuscode/.codex/chat-reply-plan-20261013/publication.json`. Beads remains in progress;
 next action after publication is owner discussion, not automatic implementation. Preserve dirty primary,
 paused checkout, all separate orchestration refs and unrelated services. Full earlier handoff follows.

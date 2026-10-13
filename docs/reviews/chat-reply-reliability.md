@@ -26,13 +26,18 @@ The assignment is read-only responsibility, not technical tool isolation. Final 
 | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | CR-C01  | Saved Project requested-session reopen resets resume=false then selects a saved session without restoring it (page.tsx966,1045–1054). Added explicit saved-session entry-point correction to plan/spec/R1 and a real requested-session link/reopen regression to CR-T06. Rechecked and resolved by the critic. |
 
+CR-C02 (low, final metadata recheck): replaced premature “receipts are recorded” wording with
+“will be recorded when publication completes” in the review and session. This concerns publication
+status only; implementation requirements and test map are unchanged.
+
 ## Actual results and remaining authority
 
 Product implementation, baseline reproduction and CR-T01–08: **not run**; planning-only scope.
 Direct Markdown lint for all five files, formatting, local links and historical session-body equality
 passed. Canonical Beads spec/acceptance/dependency readback passed; its status remains in progress.
-Normal commit/push hooks, source-bound full Notion mirrors/readbacks and final Dolt sync are recorded
-against the resulting pushed revision in Beads and the publication receipt, rather than treated as
+Normal commit/push hooks, source-bound full Notion mirrors/readbacks and final Dolt sync will be
+recorded against the resulting pushed revision in Beads and the publication receipt when publication
+completes, rather than treated as
 product-test evidence. See `/Users/letuscode/.codex/chat-reply-plan-20261013/publication.json`
 for the final mirror identities, revision/hashes and readback outcomes when publication completes.
 Owner implementation agreement and new merge authority: not granted by the planning request.
