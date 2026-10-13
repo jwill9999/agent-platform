@@ -64,6 +64,10 @@ function failedRunMessage(errorMessage: string): string {
   return `The agent run failed before returning a response.\n\n${friendlyChatErrorMessage(errorMessage)}`;
 }
 
+function finalAssistantText(text: string, errorMessage: string | null): string {
+  return text.trim() || !errorMessage ? text : failedRunMessage(errorMessage);
+}
+
 function makeTextParts(text: string): NonNullable<UIMessage['parts']> {
   return [{ type: 'text', text }];
 }
@@ -764,10 +768,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         if (!res.body) throw new Error('No response body');
 
         const result = await streamAssistantResponse(assistantId, res.body);
-        const finalText =
-          result.text.trim() || !result.errorMessage
-            ? result.text
-            : failedRunMessage(result.errorMessage);
+        const finalText = finalAssistantText(result.text, result.errorMessage);
 
         // Publish a single final answer for the turn after all revisions/streaming settle.
         updateAssistantMessage(assistantId, finalText);
@@ -838,10 +839,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         if (res.body && !res.headers.get('content-type')?.includes('application/json')) {
           const result = await streamAssistantResponse(assistantId, res.body);
           mcpHaltMessage = result.mcpHaltMessage;
-          accumulated =
-            result.text.trim() || !result.errorMessage
-              ? result.text
-              : failedRunMessage(result.errorMessage);
+          accumulated = finalAssistantText(result.text, result.errorMessage);
         }
 
         updateAssistantMessage(assistantId, accumulated);

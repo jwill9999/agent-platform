@@ -174,3 +174,11 @@ because its diff exceeds the 150,000-character review limit; this is a review li
 Independent source review remains recorded. The feature-targeted packaged VM skip does not qualify
 a future staging promotion. Full staging security analysis and actual packaged VM execution are
 separate future gates. No owner acceptance, merge or staging readiness is claimed here.
+
+Follow-up analysis at `9466d609797d9ef4a2f71536084fe611ac321772` cleared 15 findings;
+one approval callback remained at complexity16 against limit15. A further private helper now
+shares its unchanged final-text expression at both existing call sites. All 34 focused web tests,
+web typecheck, scoped lint/format and diff checks pass. Fresh hosted analysis must confirm clearance;
+no remaining finding is waived. Normal push checks at the prior `9466d609` checkpoint passed
+1,634 tests across six affected packages. Both changed documentation mirrors at that revision
+were fully read back and independently approved; this follow-up again requires fresh readbacks.

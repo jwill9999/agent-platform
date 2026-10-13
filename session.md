@@ -35,6 +35,11 @@ passed. Credential/approval/error behavior is preserved; exhaustive Unicode equi
 byte-identical generated upstream code are verified. No rules, assertions or timeouts were weakened.
 Fresh exact-head hosted checks and detailed findings inspection must qualify the repaired source.
 Sourcery skipped the oversized diff; independent review is recorded, not a claimed hosted review pass.
+The first repair at `9466d609` cleared 15 findings, leaving one callback-complexity issue.
+A second small helper extraction preserves the identical expression and passes 34 focused web
+tests plus typecheck/lint/format. Fresh hosted analysis must establish final clearance. The prior
+repair's normal push passed 1,634 affected tests and its two changed mirrors are read back;
+this follow-up requires its own source-bound publication and checks.
 
 See the [approved plan](docs/planning/mcp-onboarding-mvp.md),
 [task specification](docs/tasks/agent-platform-mcp-onboarding.md),
