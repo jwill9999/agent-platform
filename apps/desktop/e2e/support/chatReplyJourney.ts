@@ -172,7 +172,8 @@ async function settleReplyCleanup(
   actions: Array<Promise<unknown> | undefined>,
   failures: unknown[],
 ) {
-  const results = await Promise.allSettled(actions);
+  const pending = actions.filter((action): action is Promise<unknown> => action !== undefined);
+  const results = await Promise.allSettled(pending);
   for (const result of results) {
     if (result.status === 'rejected') failures.push(result.reason);
   }

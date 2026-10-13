@@ -4,7 +4,9 @@ Owner approved the bounded plan at `34d6397b` and authorized implementation of
 `agent-platform-sizx`, with Beads, critic review and browser/Electron/diagnostic checks.
 Current branch `task/chat-reply-reliability` chains from the pushed planning tip, targeting
 `feature/chat-reply-reliability` at staging `21191673`. This authorization covers implementation
-and hosted merge readiness; new merges and staging promotion remain reserved. MCP onboarding is
+and hosted merge readiness. After reviewing the changes, the owner additionally accepted them and
+authorized PR314 to merge into its existing feature destination once current checks and findings
+clear, including routine repairs. Staging/main promotion remains reserved. MCP onboarding is
 already delivered and paused PR283/orchestration remain separate and unchanged.
 
 The fix gates sending until history and approvals both load, provides safe15-second failure/manual
@@ -51,10 +53,21 @@ diagnostic-file read observed in one
 existing test is recorded separately as `agent-platform-diagnostic-export-file-read`; its original
 failed attempt and successful normal retry remain evidence, not a new repair in this scope.
 
-Next: complete independent final evidence review, push and read back the changed documentation
-mirrors, then qualify PR314's new exact-head hosted checks and actual review/Sonar findings. Beads
-remains in progress through its integration gate. No merge, task closure or staging readiness is
-claimed; owner acceptance and merge authority remain separate.
+Final local evidence review is approved. The repairs are pushed at `ed63db14`; normal hooks passed
+build/typecheck/cycles and423 package tests (web270, desktop153). Four changed full Notion mirrors
+were read back at that revision, with earlier unchanged plan/spec mirrors retained. Hosted Sonar
+cleared the seven original findings but identified one critical cleanup-helper issue involving
+optional undefined inputs to Promise.allSettled. The narrow correction passes three actual-source
+settlement controls and strict typecheck/lint/format. Its first representative Electron run hit a
+generic diagnostic preparation error before cleanup; one bounded follow-up with additive metadata
+capture passed the original assertions and both complete exports. The original failure remains
+unexplained and retained for diagnostics follow-up; no timeout or assertion changed. Temporary
+instrumentation is removed. The earlier green badge alone did not clear the findings gate.
+
+Next: finish final evidence review and source-bound publication for that helper correction, then
+qualify all new exact-head PR314 pipelines and actual review/Sonar findings before the
+owner-authorized feature merge. Beads remains in progress through that integration gate. No merge,
+task closure or staging readiness is claimed at this checkpoint.
 Primary and paused snapshots match the planning-final preservation record, including its one prior
 authorized Beads status append; retain all separate refs and unrelated services. Earlier handoffs
 below are historical, including the superseded planning-only authorization.

@@ -251,6 +251,34 @@ and tool effects are checked independently. `final-isolated-connected-receipt.js
 supersede earlier source checkpoints for current local qualification; they do not erase failed
 attempts or qualify a future different source. New exact-head hosted analysis remains required.
 
+The complete final local evidence and four changed documents passed independent review. Normal
+commit/push hooks passed build/typecheck/cycles and423 package tests (web270, desktop153) at
+`ed63db14`; four full changed Notion bodies and source metadata were verified in
+`repair-publication-ed63.json`. Fresh hosted Sonar cleared all seven prior issues, but reported a
+new critical `typescript:S4123` on optional undefined entries passed to the cleanup aggregator.
+The overall green badge is not treated as clearance. The corrected helper filters only undefined
+entries before awaiting the real cleanup promises. Three controls execute the actual helper source
+and verify undefined-only input, mixed rejection ordering and independently delayed settlement;
+strict TypeScript, lint and formatting pass. Independent review approved its exact source without
+changing application behavior or cleanup error collection.
+
+The first representative Electron run reached its reply assertions but failed the diagnostic-export
+success-status assertion before cleanup began. It retained a generic native preparation error and
+two durable rows; that evidence does not establish the transport status or cause. One bounded
+follow-up added only temporary transport/store capture in cleanup, retaining every assertion and
+timeout. It passed1/1 in40.1seconds, including two full V1 reports, HTTP200 responses,16 durable
+events/12 session events, zero dropped events and successful cleanup. Instrumentation was restored
+to exact reviewed helper hash `5d3be44b`;420 current build hashes were unchanged during this run.
+Both outcomes remain in `s4123-cleanup-repair-receipt.json` (SHA-256
+`d725e45608097c88c282cc27fe8c3ed681c6b96f015bb2f9d86524acf614d9e1`). A successful retry does not
+prove the earlier cause or silently repair diagnostic reliability. The unresolved sample is retained
+for diagnostics follow-up; no product timeout or assertion was weakened. Earlier complete application
+evidence remains bound to its recorded source; new exact-head hosted analysis is still mandatory.
+
+The owner has now accepted the reviewed changes and authorized PR314's merge into its existing
+feature destination after all current checks and findings clear, including routine repairs. No
+staging/main promotion or paused-work integration is inferred.
+
 ## Publication and completion boundary
 
 Planning publication is complete at `34d6397b`: five full mirrors/readbacks, normal hooks and Dolt

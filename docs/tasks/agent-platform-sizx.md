@@ -12,6 +12,11 @@ a separate decision. The required behavior is a visible
 history/approval loading gate, manual restoration retry and session/operation-scoped publications.
 Preserve accepted final replies, refusal drafts/attachments, approval semantics and diagnostic privacy.
 
+After reviewing the implementation, the owner accepted the changes and authorized PR314 to merge
+into its existing `feature/chat-reply-reliability` destination once current checks and findings clear,
+including routine feedback repairs. That subsequent authority satisfies the feature-merge decision;
+staging/main promotion and paused orchestration remain outside this authorization.
+
 ## Dependency order
 
 No blocking upstream/downstream edges are required. The existing `discovered-from` relationship to
