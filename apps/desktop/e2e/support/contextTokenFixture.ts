@@ -262,11 +262,8 @@ export async function launchContextTokenFixture(
   }
 }
 
-export async function createContextTokenAgent(
-  fixture: ContextTokenFixture,
-  outputCap = CONTEXT_OUTPUT,
-): Promise<Agent> {
-  const model = await readContextTokenApi<{ id: string }>(fixture, 'model-configs', {
+export async function createContextTokenModel(fixture: ContextTokenFixture) {
+  return await readContextTokenApi<{ id: string }>(fixture, 'model-configs', {
     method: 'POST',
     body: JSON.stringify({
       name: 'Context external wire fixture',
@@ -275,6 +272,13 @@ export async function createContextTokenAgent(
       apiKey: CONTEXT_PROVIDER_KEY,
     }),
   });
+}
+
+export async function createContextTokenAgent(
+  fixture: ContextTokenFixture,
+  outputCap = CONTEXT_OUTPUT,
+): Promise<Agent> {
+  const model = await createContextTokenModel(fixture);
   return readContextTokenApi<Agent>(fixture, 'agents', {
     method: 'POST',
     body: JSON.stringify({
@@ -304,6 +308,26 @@ export async function openContextTokenProject(
   await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
   await expect(page.getByPlaceholder('Ask about this Project...')).toBeEnabled();
   const selector = page.getByRole('combobox', { name: 'Active agent' });
+  // A freshly seeded Personal assistant is already selected after opening a Project.
+  // Use a real alternate UI selection first so the requested agent has an observable
+  // binding transition; never manufacture a session or agent configuration through fixtures.
+  if ((await selector.textContent())?.includes(agent.name)) {
+    const alternate = (await readContextTokenApi<Agent[]>(fixture, 'agents')).find(
+      (candidate) =>
+        candidate.id !== agent.id && ['default-agent', 'coding'].includes(candidate.slug),
+    );
+    if (!alternate) throw new Error('Seeded alternate agent is unavailable');
+    const alternateBinding = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/v1/sessions/project') &&
+        response.request().method() === 'POST' &&
+        response.request().postDataJSON()?.agentId === alternate.id,
+    );
+    await selector.click();
+    await page.getByRole('option', { name: alternate.name, exact: true }).click();
+    expect((await alternateBinding).ok()).toBe(true);
+    await expect(selector).toContainText(alternate.name);
+  }
   const binding = page.waitForResponse(
     (response) =>
       response.url().endsWith('/api/v1/sessions/project') &&
@@ -601,6 +625,12 @@ export async function recordContextTokenEvidence(
             'packages/harness/src/nodes/llmReason.ts',
             'apps/api/src/infrastructure/http/v1/chatRouter.ts',
             'packages/contracts/src/diagnostics.ts',
+            'packages/contracts/src/agent.ts',
+            'packages/db/src/mappers.ts',
+            'packages/db/src/seed/runSeed.ts',
+            'packages/contracts/dist/agent.js',
+            'packages/harness/dist/providerContext.js',
+            'packages/harness/dist/nodes/llmReason.js',
           ].map((file) => [
             file,
             createHash('sha256')
@@ -635,7 +665,7 @@ export async function recordContextTokenEvidence(
           'External deterministic HTTP provider and native Save As destination double; real managed desktop/BFF/API/SQLite/policy/tool dispatch and disposable file effects.',
           'Synthetic provider usage, not real provider billing/quality/tokenization/capacity; cap serialization is verified, live cap enforcement is not.',
           'The SDK fetch guard is configured for participating Node children; blanket Electron-main network isolation is not claimed.',
-          'Explicit configured input14000; does not establish default8000 profile usability.',
+          'Budget qualification is scenario-specific: adversarial journeys explicitly configure14000; seeded-profile journeys use absent-policy defaults shown in their agent and V1 report. Live model capacity remains unverified.',
         ],
       },
       null,

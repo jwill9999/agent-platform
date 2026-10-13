@@ -1,5 +1,7 @@
 import { expect, test, type TestInfo } from '@playwright/test';
 import type { ElectronApplication, Page } from 'playwright';
+import type { Agent } from '@agent-platform/contracts';
+import { SYSTEM_TOOLS } from '../../../packages/harness/dist/systemTools.js';
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -8,6 +10,7 @@ import {
   CONTEXT_INPUT,
   CONTEXT_MARKERS,
   createContextTokenAgent,
+  createContextTokenModel,
   createContextTokenFixture,
   exportContextTokenReport,
   launchContextTokenFixture,
@@ -210,6 +213,103 @@ function contextDecisions(report: Awaited<ReturnType<typeof exportContextTokenRe
 
 async function attachReport(info: TestInfo, destination: string, name: string) {
   await info.attach(name, { path: destination, contentType: 'application/json' });
+}
+
+for (const slug of ['default-agent', 'coding'] as const) {
+  test(`context/token: freshly seeded ${slug} uses the approved default budget for a real read and reply`, async () => {
+    test.setTimeout(90_000);
+    await journey(test.info(), `seeded-default-${slug}`, async (ctx) => {
+      const { fixture, page, replies } = ctx;
+      const agent = await readContextTokenApi<Agent>(fixture, `agents/${slug}`);
+      expect(agent.contextWindow).toEqual({
+        maxInputTokens: 16_000,
+        maxOutputTokens: 2048,
+        strategy: 'truncate',
+      });
+      // Only select the deterministic external provider; leave the seeded agent,
+      // instructions, tool/skill registry and absent stored context policy untouched.
+      await createContextTokenModel(fixture);
+      const file = join(fixture.projectDir, 'default-read.txt');
+      const contents = 'PRIVATE_DEFAULT_RESULT_CANARY disposable seeded-profile read\n';
+      writeFileSync(file, contents);
+      replies.push(
+        {
+          kind: 'tools',
+          calls: [{ id: 'default-profile-read', name: 'sys_read_file', args: { path: file } }],
+        },
+        { kind: 'text', text: `Seeded ${slug} default journey complete.` },
+      );
+      const session = await openContextTokenProject(page, fixture, agent);
+      ctx.sessionId = session.id;
+      const prompt = 'PRIVATE_DEFAULT_PROMPT_CANARY read the disposable Project file once.';
+      await sendContextTokenMessage(page, prompt);
+      await expect(
+        page.getByText(`Seeded ${slug} default journey complete.`, { exact: true }).last(),
+      ).toBeVisible();
+      await expect(page.getByPlaceholder('Ask about this Project...')).toBeEnabled();
+      expect(fixture.provider.requests).toHaveLength(2);
+      expect(fixture.provider.errors).toEqual([]);
+      const wireEstimates = assertContextTokenWire(fixture.provider.requests, 16_000, 2048);
+      const requiredSystemTools = SYSTEM_TOOLS.map((tool) => tool.id.replaceAll(':', '__'));
+      for (const request of fixture.provider.requests) {
+        expect(request.tools!.map((tool) => tool.function.name)).toEqual(
+          expect.arrayContaining(requiredSystemTools),
+        );
+        expect(request.tools!.length).toBeGreaterThanOrEqual(requiredSystemTools.length);
+      }
+      const completed = snapshotContextTokenDb(fixture, session.id);
+      expect(
+        completed.audits.filter(
+          (row) => row.tool_name === 'sys_read_file' && row.status === 'success',
+        ),
+      ).toHaveLength(1);
+      expect(completed.approvals).toHaveLength(0);
+      expect(readFileSync(file, 'utf8')).toBe(contents);
+      expect(
+        completed.messages.filter(
+          (row) =>
+            row.role === 'assistant' && row.content === `Seeded ${slug} default journey complete.`,
+        ),
+      ).toHaveLength(1);
+      expect(await readContextTokenApi<Agent>(fixture, `agents/${slug}`)).toEqual(agent);
+      const destination = join(fixture.root, 'first-report.json');
+      const report = await exportContextTokenReport(page, destination, [
+        fixture.root,
+        prompt,
+        'PRIVATE_DEFAULT_RESULT_CANARY',
+      ]);
+      expect(report.scope).toEqual({ sessionId: session.id });
+      const decisions = contextDecisions(report);
+      expect(decisions).toHaveLength(2);
+      expect(decisions.map((event) => event.contextDecision!.estimatedInputAfter)).toEqual(
+        wireEstimates,
+      );
+      for (const event of decisions) {
+        expect(event.outcome).toBe('succeeded');
+        expect(event.contextDecision).toMatchObject({
+          configuredInputTokens: 16_000,
+          effectiveInputTokens: 14_400,
+          outputCap: 2048,
+          reason: 'unchanged',
+          omittedGroups: 0,
+        });
+      }
+      expect(
+        report.events.filter(
+          (row) => row.event.phase === 'model' && row.event.outcome === 'started',
+        ),
+      ).toHaveLength(2);
+      await attachReport(test.info(), destination, `seeded-${slug}-default-success-report`);
+      ctx.evidence = {
+        ...ctx.evidence,
+        seededAgent: agent,
+        requiredSystemToolCount: requiredSystemTools.length,
+        wireEstimates,
+        completedDb: completed,
+        diagnosticReport: report,
+      };
+    });
+  });
 }
 
 // Real managed desktop/BFF/API/SQLite/tool dispatch; only external model and Save As destination are doubled.

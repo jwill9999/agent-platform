@@ -3,7 +3,7 @@
 Implementation checkpoint: runtime `b4559f7c` and verification through `808dc301` are pushed; work continues on
 `task/context-token-verification`. [Actual results](docs/reviews/context-token-optimisation-results.md)
 record browser success, API247 passing tests, all three configured-budget native journeys and five
-verified exports. The owner input-default decision and final hosted qualification remain pending. No implementation merge or staging promotion is authorized or claimed.
+verified exports. The approved default adjustment and final hosted qualification are being verified. No implementation merge or staging promotion is authorized or claimed.
 
 The owner approved the bounded plan at `294a52c8` and authorised implementation with Beads,
 the implementation skill, critic review and the agreed tests. The task is
@@ -24,18 +24,21 @@ approved effects. Independent review verifies five actual V1 reports and retaine
 hashes; restart honestly reports unfinishedPriorProcess. These configured-budget results do not
 prove default usability or full hosted qualification.
 
-One material decision is pending: complete schema counting makes seeded Personal Assistant/Coding
-requests approximately 8,353/8,374 tokens, above the approved default's effective 7,200. The owner has
-been asked about a 16,000 absent/new default, preserving saved budgets and output2048. Do not assume
-approval or silently remove tools. Current code retains8000. Continue independent tests while waiting.
+The owner has now approved16,000 input tokens for absent/new settings, preserving explicitly saved
+limits including8000. Output2048 and10%margin remain unchanged; no migration or silent tool removal.
+Shared/OpenAPI defaults now agree. Thirty-three focused tests pass, including saved8,000 rejection
+before provider/effects and persistence across update/copy/reopen. Both fresh Personal/Coding native
+journeys pass without budget overrides, retaining56tools and verified local V1 reports. Earlier
+configured-budget journeys remain separate retained evidence. The unchanged19-case desktop permission/effect regression also passes; fresh full hosted CI
+still qualifies the final source.
 
 Hosted run38338322697 at3cdf failed15 existing desktop tests because their saved8,000 budget rejected
-requests before any provider/effect, plus two new fixture readiness failures. The latter have local
-source-backed corrections; keep the default decision pending and do not claim the permission tests
-passed. Separate GitHub check responsiveness finding agent-platform-d185 is tracked alongside the
-three earlier findings. Draft PR309 remains unmerged. Next resolve the input-default decision,
-complete CT-T13/default regression, final source review, publication/readbacks and exact-head hosted
-quality gates before owner acceptance.
+requests before any provider/effect, plus two new fixture readiness failures repaired locally.
+A subsequent hosted DB physical-cap test timed out; the unchanged focused suite passed2/2 in20.94s
+under its original60s timeout. Keep both outcomes. Separate GitHub check responsiveness finding
+agent-platform-d185 is tracked alongside the three earlier findings. Draft PR309 remains unmerged.
+Next qualify CT-T13/default regression, independent review, full publication/readbacks and fresh
+exact-head hosted quality gates before owner acceptance.
 [Plan](docs/planning/context-token-optimisation-mvp.md),
 [task](docs/tasks/agent-platform-context-optimisation.md),
 [verification](docs/testing/context-token-optimisation-mvp.md) and

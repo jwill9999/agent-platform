@@ -29,8 +29,8 @@ The plan replaces this document's historical timing proposal; it does not reopen
   provider projection, replacing the old initial lossy cutoff and retaining stable payload/cap across
   a retry. Auxiliary model calls are excluded.
 - CT-R2: Count complete selected messages and mapped tool schemas under an explicitly approximate
-  input budget with 10% margin. The input8000 default has a measured feasibility conflict and an owner decision pending in the plan;
-  retain it until resolved. Default output2048; persist configurable output cap,
+  input budget with10%margin. Owner-approved input16000 applies to absent/new settings; preserve
+  explicitly saved limits including8000 without a migration. Default output2048; persist configurable output cap,
   preserve configured model/provider and distinguish cumulative run limits and actual provider usage.
 - CT-R3: Preserve current instructions/request/continuity and atomic tool groups; reuse scoped durable
   working memory; leave transcript/audit/effect persistence unchanged. Accept legacy strategy values

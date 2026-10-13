@@ -223,7 +223,7 @@ curl -X POST http://localhost:3000/v1/agents \
       "maxToolCallsTotal": 100
     },
     "contextWindow": {
-      "maxInputTokens": 8000,
+      "maxInputTokens": 16000,
       "maxOutputTokens": 2048,
       "strategy": "truncate"
     },
@@ -258,14 +258,16 @@ The context/token MVP branch applies admission before each conversational reason
 tool-loop iterations and approval resume. It is under verification; see the
 [task and delivery status](tasks/agent-platform-context-optimisation.md).
 
-| Field             | Default                   | Description                                                                                                  |
-| ----------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `maxInputTokens`  | `8000` (decision pending) | Approximate input allowance for complete mapped messages and tool schemas; admission uses 90% of this value. |
-| `maxOutputTokens` | `2048`                    | Separate positive-integer completion allowance sent as the installed SDK's `maxTokens` option.               |
-| `strategy`        | `truncate`                | Both `truncate` and legacy `summarize` use atomic history groups plus existing working memory.               |
+| Field             | Default    | Description                                                                                                  |
+| ----------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
+| `maxInputTokens`  | `16000`    | Approximate input allowance for complete mapped messages and tool schemas; admission uses 90% of this value. |
+| `maxOutputTokens` | `2048`     | Separate positive-integer completion allowance sent as the installed SDK's `maxTokens` option.               |
+| `strategy`        | `truncate` | Both `truncate` and legacy `summarize` use atomic history groups plus existing working memory.               |
 
-Complete schema counting exceeds the existing input default for seeded profiles. The proposed
-16,000 default is awaiting owner agreement; explicitly saved budgets remain unchanged. Configure
+The owner-approved16,000 default applies to absent/new settings. Explicitly saved budgets remain
+unchanged, including the previous8,000 value; no automatic migration increases existing limits.
+If a saved limit cannot fit required instructions and tools, explicitly adjust it through the existing
+configuration API. Configure
 input plus output below the selected model's capacity. Estimates are character-based, not exact token
 counts, billing measurements or provider rate-limit guarantees. Auxiliary planner, critic-model,
 sensor, DoD and connection-test calls are outside this conversational guard.

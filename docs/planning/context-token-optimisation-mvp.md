@@ -5,7 +5,7 @@ Actual implementation outcomes: [result record](../reviews/context-token-optimis
 **Owner task:** `agent-platform-context-optimisation` — Add context window and token optimisation.
 
 **Status:** Owner-approved bounded scope; implementation authorised on 13 October 2026.
-The input-default feasibility decision below remains pending; no default change is assumed.
+The owner also approved the16,000 absent/new input default below; explicit saved limits are preserved.
 
 **Runtime source reviewed:** `d199ad0172dfe016490533444d5b7c46733c8f4d` (`origin/staging`).
 
@@ -66,13 +66,14 @@ Do not change their budgets, SDK versions, model routing or evaluator activation
 
 ### CT-R2 — Explicit estimated input and bounded output
 
-The approved plan retained **8000 estimated input tokens**. Actual seeded-profile measurement during
-implementation found required requests at 8,353 (Personal Assistant) and 8,374 (Coding Agent), including
-all 56 mapped system tools; the effective allowance is only 7,200. The owner has been asked whether to
-use 16,000 for absent/new defaults while preserving explicitly saved values and output2048, or retain
-8000 with manual configuration required. The critic supports the bounded alternative; the owner
-decision is pending. These measurements exclude additional Project/memory context and do not establish
-universal model capacity. Keep the existing default until that decision arrives.
+The owner approved **16000 estimated input tokens** for absent/new settings on13October, after
+complete seeded-profile measurement showed that the original8000 default could not fit required
+instructions and all56 mapped system tools. Personal Assistant/Coding measured8,353/8,374 before
+extra Project/memory content, above the old effective7,200 allowance. The new effective allowance is
+14,400. Preserve explicitly saved budgets, including8000; do not migrate stored values or silently
+remove tools. Existing users with an insufficient saved limit can adjust it through the existing
+configuration API. These lower-bound measurements do not guarantee that every Project fits or that
+every provider supports the combined input/output allowance. Output2048 remains unchanged.
 
 Count the actual selected message roles,
 content, tool names/IDs/arguments/results and the final mapped tool definitions/schema descriptions

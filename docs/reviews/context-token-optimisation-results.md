@@ -1,7 +1,7 @@
 # Context/token MVP — implementation and verification results
 
 **Task:** `agent-platform-context-optimisation`.
-**Status:** Configured-budget connected MVP journeys passed; default-budget decision and hosted qualification remain pending.
+**Status:** Configured and fresh-default connected MVP journeys passed; local default regression passed; hosted qualification remains pending.
 **Source:** Runtime checkpoint `b4559f7c037558b89f5833890006b5a4a866963a`, based on approved plan
 `294a52c8d877038164f636e06208625871888214` and staging `d199ad01`.
 
@@ -22,19 +22,31 @@ local admission from actual model attempts. The implementation introduces no sum
 new storage backend, dashboard, account, paid-call requirement or automatic diagnostic sharing.
 Auxiliary model callers listed in the plan remain outside this boundary.
 
-## Required default decision
+## Approved default adjustment
 
-The source still defaults to 8,000 estimated input tokens and 2,048 output tokens. Complete counting
-exposes a feasibility conflict: migrated, seeded Personal assistant and Coding profiles require at
-least 8,353 and 8,374 estimated input tokens respectively, including all 56 mapped system tools. The
-8,000 setting permits only 7,200 after the agreed margin. These measurements exclude additional
-Project instructions and working memory, so they are lower bounds.
+The owner approved16,000 estimated input tokens for absent/new settings on13October. The previous
+8,000 default admitted only7,200 after the framing margin; required seeded Personal/Coding payloads
+measured at least8,353/8,374 including all56 tool schemas. Output2048 and10%margin remain unchanged.
+The change preserves all explicit saved limits, including8000, and adds no migration or tool removal.
+Users must still configure input plus output within the selected provider/model capacity. Existing
+saved limits that cannot fit instructions/tools require an explicit configuration change.
 
-The owner has been asked whether absent/new input defaults should become 16,000. Explicit stored
-budgets would remain unchanged; input plus output must fit the selected model. No response or
-approval is assumed. CT-T13 cannot be called complete while this decision remains unresolved.
-Connected fixtures explicitly configure their budgets and do not prove the unmodified default is
-usable. `default-profile-footprint.json` records the measurements.
+Saved-value tests pass across contract parsing, raw SQLite reopen/reseed and API create/update/copy.
+A test exposed the API validator's separate8,000 partial-settings default; its OpenAPI schema is aligned
+with16,000 and explicitly describes the existing output allowance. An explicit saved8,000 request
+still fails admission before provider/effects and remains8,000 after reopen. Fresh Personal/Coding profiles now pass real desktop read-and-reply journeys without agent budget
+overrides. Both retain all56 mapped schemas and show input16,000/effective14,400/output2,048 in V1
+reports. Independent wire estimates are9,036/9,208 for Personal and9,057/9,229 for Coding. Their reports
+are durable and verified, untruncated, with zero loss counters. Earlier14,000 adversarial fixtures
+remain evidence for long-history and overflow behavior, separately from these default journeys.
+`default-profile-footprint.json` retains the original measurement and failures. The final focused
+set passes33 tests (contracts9, DB2, API22), with source/log hashes in
+`default16000-source-receipt.json`. Actual native reports and per-run source are bound in
+`electron-default-final-receipt.json`; its OpenAPI hash is explicitly observed after execution, not
+misrepresented as a run-start capture. No live-model capacity or performance SLO is inferred.
+The unchanged19-case desktop permission/effect regression also passes in1.8minutes, including
+approval, rejection, reload, transient retry, Ask/Auto/Block and revocation. Its local VM bridge and
+node doubles are disclosed; this is not an actual packaged macOS VM qualification.
 
 ## Source review
 
@@ -162,6 +174,6 @@ hosted issue clearance are separate from the earlier green Sonar gate.
 Runtime b4559f7c and verification checkpoints through808dc301 are pushed. Normal pre-push affected
 build, typecheck, cycles and tests passed, including API247 and workflow-control1141 with77 optional
 skips. Configured-budget connected MVP tests and independent diagnostic evidence review now pass.
-The default-input decision, CT-T13 default usability, final documentation publication/readbacks,
+Final documentation publication/readbacks,
 exact-head hosted checks and owner acceptance remain outstanding. Beads remains `in_progress`.
 No feature merge, staging promotion, distribution or paused-orchestration integration has occurred.

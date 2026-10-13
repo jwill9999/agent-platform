@@ -11,7 +11,7 @@ const modelOverrideShape = z
 /** Context window configuration for conversation windowing. */
 export const ContextWindowSchema = z.object({
   /** Estimated input allowance for complete mapped messages and tool schemas. */
-  maxInputTokens: z.number().int().positive().default(8000),
+  maxInputTokens: z.number().int().positive().default(16000),
   /** Separate provider completion allowance; input plus output must fit the selected model. */
   maxOutputTokens: z.number().int().positive().default(2048),
   /** Both compatibility values use atomic group windowing plus existing working memory. */
@@ -21,7 +21,7 @@ export const ContextWindowSchema = z.object({
 export type ContextWindow = z.infer<typeof ContextWindowSchema>;
 
 export const DEFAULT_CONTEXT_WINDOW: ContextWindow = {
-  maxInputTokens: 8000,
+  maxInputTokens: 16000,
   maxOutputTokens: 2048,
   strategy: 'truncate',
 };

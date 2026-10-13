@@ -541,6 +541,95 @@ describe('context admission through API and SQLite', () => {
     },
   );
 
+  it('keeps a persisted8000 allowance enforced before provider invocation with the complete tool schemas', async () => {
+    f.budget(8000, 2048);
+    const storedBefore = f.sqlite
+      .prepare('SELECT context_window_json FROM agents WHERE id = ?')
+      .get(DEFAULT_AGENT_ID);
+    const sessionId = await f.session();
+    const rejected = await request(f.app)
+      .post('/v1/chat')
+      .send({ sessionId, message: 'Explain the available tools briefly.' })
+      .expect(200);
+    expect(rejected.text).toContain('CONTEXT_BUDGET_EXCEEDED');
+    expect(stream).not.toHaveBeenCalled();
+    expect(f.effects).toBe(0);
+    expect(
+      f.sqlite.prepare('SELECT context_window_json FROM agents WHERE id = ?').get(DEFAULT_AGENT_ID),
+    ).toEqual(storedBefore);
+    f.restart();
+    expect(
+      (await request(f.app).get(`/v1/agents/${DEFAULT_AGENT_ID}`).expect(200)).body.data
+        .contextWindow,
+    ).toEqual({ maxInputTokens: 8000, maxOutputTokens: 2048, strategy: 'truncate' });
+  });
+
+  it.each([0, -1, 1.5])(
+    'rejects invalid public completion allowance %s',
+    async (maxOutputTokens) => {
+      const original = (await request(f.app).get(`/v1/agents/${DEFAULT_AGENT_ID}`).expect(200)).body
+        .data;
+      await request(f.app)
+        .post('/v1/agents')
+        .send({ ...original, name: 'Invalid output limit', contextWindow: { maxOutputTokens } })
+        .expect(400);
+      expect(stream).not.toHaveBeenCalled();
+    },
+  );
+
+  it('defaults new absent and partial settings without changing persisted explicit8000 on reads, updates or copies', async () => {
+    const original = (await request(f.app).get(`/v1/agents/${DEFAULT_AGENT_ID}`).expect(200)).body
+      .data;
+    const absent = await request(f.app)
+      .post('/v1/agents')
+      .send({ ...original, name: 'Absent context', contextWindow: undefined })
+      .expect(201);
+    const partial = await request(f.app)
+      .post('/v1/agents')
+      .send({
+        ...original,
+        name: 'Partial context',
+        contextWindow: { maxOutputTokens: 321, strategy: 'summarize' },
+      })
+      .expect(201);
+    const legacy = await request(f.app)
+      .post('/v1/agents')
+      .send({ ...original, name: 'Explicit context8000', contextWindow: { maxInputTokens: 8000 } })
+      .expect(201);
+    const expectedLegacy = { maxInputTokens: 8000, maxOutputTokens: 2048, strategy: 'truncate' };
+    expect(absent.body.data.contextWindow).toEqual({
+      maxInputTokens: 16000,
+      maxOutputTokens: 2048,
+      strategy: 'truncate',
+    });
+    expect(partial.body.data.contextWindow).toEqual({
+      maxInputTokens: 16000,
+      maxOutputTokens: 321,
+      strategy: 'summarize',
+    });
+    expect(legacy.body.data.contextWindow).toEqual(expectedLegacy);
+    const updated = await request(f.app)
+      .put(`/v1/agents/${legacy.body.data.id}`)
+      .send({ ...legacy.body.data, name: 'Renamed explicit context' })
+      .expect(200);
+    const copied = await request(f.app)
+      .post('/v1/agents')
+      .send({ ...updated.body.data, name: 'Copied explicit context' })
+      .expect(201);
+    f.restart();
+    for (const [id, expected] of [
+      [absent.body.data.id, absent.body.data.contextWindow],
+      [partial.body.data.id, partial.body.data.contextWindow],
+      [legacy.body.data.id, expectedLegacy],
+      [copied.body.data.id, expectedLegacy],
+    ]) {
+      expect(
+        (await request(f.app).get(`/v1/agents/${id}`).expect(200)).body.data.contextWindow,
+      ).toEqual(expected);
+    }
+    expect(stream).not.toHaveBeenCalled();
+  });
+
   it('round-trips explicit context settings through create, update, copy and reopened SQLite', async () => {
     const original = (await request(f.app).get(`/v1/agents/${DEFAULT_AGENT_ID}`).expect(200)).body
       .data;
