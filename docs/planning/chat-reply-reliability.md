@@ -1,6 +1,6 @@
 # Disappearing replies — bounded local MVP plan
 
-Status: independently reviewed proposal; owner agreement required before implementation.
+Status: owner-approved bounded plan; implementation authorized on 13 October 2026.
 Source reviewed: staging `211916739642f5b095ba35100b3b452779969feb`, 13 October 2026.
 Owner request: use Feature Planning, review the existing bug/current code, obtain a critic review,
 and present a bounded plan before implementation. Subsequent owner question adds explicit inspection
@@ -56,7 +56,7 @@ A hook-level guard remains mandatory; disabling a button alone is insufficient.
 | CR-R4 | Normal final replies match persisted assistant content and remain present once, including after reopening. Approval cards remain usable, pending approvals block sends, approve executes once, reject executes zero times. Existing context-limit refusal and MCP not-completed semantics remain unchanged.                  |
 | CR-R5 | Browser and Electron deterministic race evidence connects UI/network ordering, SQLite state and existing safe diagnostic request/session records. Logs alone are not proof of visibility; disclose unavailable/dropped telemetry.                                                                                            |
 
-### Concrete implementation choices proposed for approval
+### Approved implementation choices
 
 Use a small session lifecycle inside the hook (unbound/restoring/ready/restore-error), with a
 monotonic generation and per-operation token. Readiness must be derived against the current session

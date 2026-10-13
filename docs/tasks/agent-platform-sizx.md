@@ -6,8 +6,9 @@
 
 ## Task requirements
 
-Implement CR-R1–CR-R5 in the [bounded plan](../planning/chat-reply-reliability.md), only after owner
-agreement. Planning is currently authorized; implementation is not. The proposed behavior is a visible
+Implement CR-R1–CR-R5 in the [bounded plan](../planning/chat-reply-reliability.md), under the owner agreement
+of 13 October 2026. Implementation, critic review and the agreed tests are authorized; merging remains
+a separate decision. The required behavior is a visible
 history/approval loading gate, manual restoration retry and session/operation-scoped publications.
 Preserve accepted final replies, refusal drafts/attachments, approval semantics and diagnostic privacy.
 
@@ -31,14 +32,14 @@ integration after CR-T01–07, so no cross-task verification can be lost.
 4. Execute [CR-T01–08](../testing/chat-reply-reliability.md), review V1 diagnostics at investigation
    and verification checkpoints, repair within scope and obtain independent source review.
 5. Update actual results/spec/session/full mirrors and Beads; use normal quality gates and the segment
-   workflow below once implementation and appropriate delivery authority have been granted.
+   workflow below under the recorded implementation authority. Obtain separate merge authority.
 
 ## Git workflow (mandatory)
 
 Actual feature `feature/chat-reply-reliability` starts at staging21191673. Actual planning branch
-`task/chat-reply-reliability-plan` is the segment's first task tip. Proposed implementation branch
-`task/chat-reply-reliability` chains from its pushed tip. Open one cumulative task-tip PR into the
-feature after authorized implementation; feature promotion is by protected staging PR under applicable
+`task/chat-reply-reliability-plan` is the segment's first task tip. Implementation branch
+`task/chat-reply-reliability` chains from pushed planning tip `34d6397b`. Open one cumulative task-tip PR into the
+feature after verified implementation; feature promotion is by protected staging PR under applicable
 owner merge authority. No direct main/staging push, force update, paused-code integration or cleanup
 of uncertain/in-use refs. Planning publication alone does not grant implementation or merge authority.
 
@@ -46,7 +47,7 @@ of uncertain/in-use refs. Planning publication alone does not grant implementati
 
 Use the complete [verification map](../testing/chat-reply-reliability.md), including actual hook
 lifecycle, real connected browser and source-tree Electron, real API/SQLite and loopback model double.
-Product tests below are planned, not executed. No checkout-free distribution test is added.
+The verification/results record distinguishes planned scenarios from actual execution. No checkout-free distribution test is added.
 
 ```gherkin
 Feature: Reliable session restoration and final replies
@@ -88,7 +89,7 @@ Feature: Reliable session restoration and final replies
 ## Definition of done and pre-close sign-off
 
 Task tracking and sign-off remain in Beads, not a second Markdown backlog. This issue stays in progress
-while only planning is complete. Before closing the bug, CR-R1–R5 and every required CR-T scenario
+through implementation verification and its integration gate. Before closing the bug, CR-R1–R5 and every required CR-T scenario
 must pass on the tested revision, including baseline-fails/fix-passes evidence, exact SQLite/audit
 checks and diagnostic privacy/coverage inspection. A skipped or blocked required journey blocks close.
 

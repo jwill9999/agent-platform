@@ -645,6 +645,33 @@ export default function HomePage() {
   const projectGitRefreshTimeoutRef = useRef<number | null>(null);
   const agentSelectionSourceRef = useRef<'system' | 'user'>('system');
   const personalChatRepairRef = useRef<string | null>(null);
+  const selectionGenerationRef = useRef(0);
+  const selectionPendingRef = useRef(false);
+  const beginSelection = useCallback((clearSession = true) => {
+    const generation = ++selectionGenerationRef.current;
+    selectionPendingRef.current = false;
+    if (clearSession) {
+      setSessionId(null);
+      setSensorDashboard(null);
+      setSensorError(null);
+      setSensorLoading(false);
+    }
+    setIsOpeningProject(false);
+    setIsCreatingProject(false);
+    personalChatRepairRef.current = null;
+    return () => selectionGenerationRef.current === generation;
+  }, []);
+  const currentSelection = useCallback(() => {
+    const generation = selectionGenerationRef.current;
+    return () => selectionGenerationRef.current === generation;
+  }, []);
+  useEffect(
+    () => () => {
+      selectionGenerationRef.current += 1;
+      selectionPendingRef.current = false;
+    },
+    [],
+  );
 
   const {
     messages,
@@ -661,6 +688,10 @@ export default function HomePage() {
     approvalEventsByMessage,
     decideApproval,
     hasPendingApproval,
+    canSend: chatCanSend,
+    restorationStatus,
+    restorationError,
+    retryHistory,
   } = useHarnessChat(sessionId, isResuming);
   const { sessions, loading: sessionsLoading, refresh: refreshSessions } = useSessions();
   const scopedSessions =
@@ -717,24 +748,30 @@ export default function HomePage() {
     setIsDesktopProjectIdeBridgeAvailable(hasDesktopProjectIdeBridge());
   }, []);
 
-  const refreshSensors = useCallback(async (id: string, retry = false) => {
-    setSensorLoading(true);
-    setSensorError(null);
-    try {
-      const path = apiPath('sessions', id, 'sensors');
-      const data = retry
-        ? await apiPost<SensorDashboardResponse>(`${path}/retry`, {})
-        : await apiGet<SensorDashboardResponse>(path);
-      setSensorDashboard(data ?? null);
-    } catch (e) {
-      setSensorError(e instanceof ApiRequestError ? e.message : String(e));
-    } finally {
-      setSensorLoading(false);
-    }
-  }, []);
+  const refreshSensors = useCallback(
+    async (id: string, retry = false, isCurrent = currentSelection()) => {
+      if (!isCurrent()) return;
+      setSensorLoading(true);
+      setSensorError(null);
+      try {
+        const path = apiPath('sessions', id, 'sensors');
+        const data = retry
+          ? await apiPost<SensorDashboardResponse>(`${path}/retry`, {})
+          : await apiGet<SensorDashboardResponse>(path);
+        if (isCurrent()) setSensorDashboard(data ?? null);
+      } catch (e) {
+        if (isCurrent()) setSensorError(e instanceof ApiRequestError ? e.message : String(e));
+      } finally {
+        if (isCurrent()) setSensorLoading(false);
+      }
+    },
+    [currentSelection],
+  );
 
   const createSessionForAgent = useCallback(
     async (agentId: string) => {
+      const isCurrent = beginSelection();
+      selectionPendingRef.current = true;
       const chatAgentId = pickDefaultAgentForMode(agents, 'chat')?.id ?? agentId;
       setSessionError(null);
       setIsResuming(false);
@@ -743,6 +780,7 @@ export default function HomePage() {
           agentId: chatAgentId,
           mode: 'chat',
         });
+        if (!isCurrent()) return;
         if (!session?.id) {
           setSessionError('Failed to create session');
           setSessionId(null);
@@ -756,12 +794,15 @@ export default function HomePage() {
         setSensorError(null);
         setSensorLoading(false);
       } catch (e) {
+        if (!isCurrent()) return;
         setSessionError(e instanceof ApiRequestError ? e.message : String(e));
         setSessionId(null);
         setSensorDashboard(null);
+      } finally {
+        if (isCurrent()) selectionPendingRef.current = false;
       }
     },
-    [agents, modelConfigs],
+    [agents, beginSelection, modelConfigs],
   );
 
   const normalizePersonalChatSession = useCallback(
@@ -801,7 +842,7 @@ export default function HomePage() {
     if (!selectedAgentId) return;
     // Only create a new session when agent selection changes organically
     // (not via resume, which sets sessionId directly)
-    if (!isResuming) {
+    if (!isResuming && !selectionPendingRef.current) {
       createSessionForAgent(selectedAgentId).catch(() => {});
     }
   }, [selectedAgentId, createSessionForAgent, isResuming, selectedMode]);
@@ -815,8 +856,10 @@ export default function HomePage() {
     if (personalChatRepairRef.current === session.id) return;
 
     personalChatRepairRef.current = session.id;
+    const isCurrent = currentSelection();
     normalizePersonalChatSession(session)
       .then((normalizedSession) => {
+        if (!isCurrent()) return;
         agentSelectionSourceRef.current = 'system';
         setSelectedAgentId(normalizedSession.agentId);
         setSelectedModelConfigId(
@@ -828,6 +871,7 @@ export default function HomePage() {
         refreshSessions().catch(() => {});
       })
       .catch((repairError) => {
+        if (!isCurrent()) return;
         setSessionError(
           repairError instanceof ApiRequestError
             ? repairError.message
@@ -835,10 +879,11 @@ export default function HomePage() {
         );
       })
       .finally(() => {
-        personalChatRepairRef.current = null;
+        if (isCurrent()) personalChatRepairRef.current = null;
       });
   }, [
     agents,
+    currentSelection,
     modelConfigs,
     normalizePersonalChatSession,
     refreshSessions,
@@ -849,16 +894,18 @@ export default function HomePage() {
 
   const handleAgentChange = useCallback(
     (agentId: string) => {
+      beginSelection();
       agentSelectionSourceRef.current = 'user';
       setIsResuming(false);
       setSelectedAgentId(agentId);
       setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
     },
-    [agents, modelConfigs],
+    [agents, beginSelection, modelConfigs],
   );
 
   const handleOpenChat = useCallback(
     (options?: { readonly updateUrl?: boolean }) => {
+      beginSelection();
       if (options?.updateUrl !== false && globalThis.window !== undefined) {
         globalThis.window.history.pushState(null, '', buildPersonalChatHref());
         globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
@@ -880,10 +927,11 @@ export default function HomePage() {
         setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
       }
     },
-    [agents, clearAttachments, modelConfigs],
+    [agents, beginSelection, clearAttachments, modelConfigs],
   );
 
   const handleReturnHome = useCallback(() => {
+    beginSelection();
     if (globalThis.window !== undefined) {
       globalThis.window.history.pushState(null, '', '/');
       globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
@@ -898,7 +946,7 @@ export default function HomePage() {
     setSessionError(null);
     setIsResuming(false);
     clearAttachments();
-  }, [clearAttachments]);
+  }, [beginSelection, clearAttachments]);
 
   useEffect(() => {
     if (globalThis.window === undefined) return;
@@ -923,13 +971,16 @@ export default function HomePage() {
   }, [handleOpenChat]);
 
   const bindActiveProjectSession = useCallback(
-    async (agentId: string, projectId: string) => {
+    async (agentId: string, projectId: string, isCurrent = currentSelection()) => {
+      if (!isCurrent()) return;
+      selectionPendingRef.current = true;
       setSessionError(null);
       try {
         const result = await bindProjectSession({
           agentId,
           projectId,
         });
+        if (!isCurrent()) return;
         const session = result?.session;
         if (!session?.id) {
           setSessionError('Failed to create Project chat session');
@@ -939,20 +990,28 @@ export default function HomePage() {
         }
         setIsResuming(Boolean(result && !result.created));
         setSessionId(session.id);
-        await refreshSensors(session.id);
+        await refreshSensors(session.id, false, isCurrent);
       } catch (error) {
+        if (!isCurrent()) return;
         setSessionError(
           error instanceof ApiRequestError ? error.message : 'Failed to open Project chat',
         );
         setSessionId(null);
         setSensorDashboard(null);
+      } finally {
+        if (isCurrent()) selectionPendingRef.current = false;
       }
     },
-    [refreshSensors],
+    [currentSelection, refreshSensors],
   );
 
   const openProjectChat = useCallback(
-    (project: ProjectDesktopRecord, options?: { readonly updateUrl?: boolean }) => {
+    (
+      project: ProjectDesktopRecord,
+      options?: { readonly updateUrl?: boolean; readonly isCurrent?: () => boolean },
+    ) => {
+      const isCurrent = options?.isCurrent ?? beginSelection();
+      if (!isCurrent()) return null;
       if (options?.updateUrl !== false && globalThis.window !== undefined) {
         globalThis.window.history.pushState(null, '', buildProjectChatHref(project.id));
         globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
@@ -974,28 +1033,31 @@ export default function HomePage() {
       }
       return nextAgentId ?? null;
     },
-    [agents, clearAttachments, modelConfigs, selectedAgentId],
+    [agents, beginSelection, clearAttachments, modelConfigs, selectedAgentId],
   );
 
   const handleOpenProject = useCallback(async () => {
+    const isCurrent = beginSelection(false);
+    selectionPendingRef.current = true;
     setIsOpeningProject(true);
     setSessionError(null);
     try {
       const result = await selectAndRegisterDesktopProject();
-      if (!result) return;
-      const agentId = openProjectChat(result.project);
-      if (agentId) {
-        await bindActiveProjectSession(agentId, result.project.id);
-      }
+      if (!isCurrent() || !result) return;
+      const agentId = openProjectChat(result.project, { isCurrent });
+      if (agentId) await bindActiveProjectSession(agentId, result.project.id, isCurrent);
+      if (!isCurrent()) return;
       if (globalThis.window !== undefined) {
         globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
       }
     } catch (error) {
+      if (!isCurrent()) return;
       setSessionError(error instanceof ApiRequestError ? error.message : 'Failed to open Project');
     } finally {
-      setIsOpeningProject(false);
+      if (isCurrent()) selectionPendingRef.current = false;
+      if (isCurrent()) setIsOpeningProject(false);
     }
-  }, [bindActiveProjectSession, openProjectChat]);
+  }, [beginSelection, bindActiveProjectSession, openProjectChat]);
 
   const handleCreateProject = useCallback(async () => {
     const name = newProjectName.trim();
@@ -1004,58 +1066,68 @@ export default function HomePage() {
       return;
     }
 
+    const isCurrent = beginSelection(false);
+    selectionPendingRef.current = true;
     setIsCreatingProject(true);
     setNewProjectError(null);
     setSessionError(null);
     try {
       const result = await createAndRegisterDesktopProject({ name });
+      if (!isCurrent()) return;
       if (!result) {
         setNewProjectError('Project creation is available only in the desktop app.');
         return;
       }
-      const agentId = openProjectChat(result.project);
-      if (agentId) {
-        await bindActiveProjectSession(agentId, result.project.id);
-      }
+      const agentId = openProjectChat(result.project, { isCurrent });
+      if (agentId) await bindActiveProjectSession(agentId, result.project.id, isCurrent);
+      if (!isCurrent()) return;
       setIsNewProjectDialogOpen(false);
       setNewProjectName('');
       if (globalThis.window !== undefined) {
         globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
       }
     } catch (error) {
+      if (!isCurrent()) return;
       let message = 'Failed to create Project';
       if (error instanceof ApiRequestError || error instanceof Error) {
         message = error.message;
       }
       setNewProjectError(message);
     } finally {
-      setIsCreatingProject(false);
+      if (isCurrent()) selectionPendingRef.current = false;
+      if (isCurrent()) setIsCreatingProject(false);
     }
-  }, [bindActiveProjectSession, newProjectName, openProjectChat]);
+  }, [beginSelection, bindActiveProjectSession, newProjectName, openProjectChat]);
 
   const reopenRecentProject = useCallback(
     async (projectId: string, requestedSessionId: string | null) => {
+      const isCurrent = beginSelection();
+      selectionPendingRef.current = true;
       try {
         const projects = await loadRecentDesktopProjects();
+        if (!isCurrent()) return;
         const project = projects.find((candidate) => candidate.id === projectId);
         if (!project || !desktopProjectIsAvailable(project)) {
           setSessionError('This recent Project is no longer available. Open it again.');
           return;
         }
-        const agentId = openProjectChat(project, { updateUrl: false });
+        const agentId = openProjectChat(project, { updateUrl: false, isCurrent });
         if (requestedSessionId) {
           const session = await apiGet<SessionRecord>(apiPath('sessions', requestedSessionId));
+          if (!isCurrent()) return;
           if (session?.mode === 'project' && session.projectId === project.id) {
+            setIsResuming(true);
             setSelectedAgentId(session.agentId);
             setSelectedModelConfigId(
               resolveChatModelConfigId(session.agentId, agents, modelConfigs),
             );
             setSessionId(session.id);
-            await refreshSensors(session.id);
+            await refreshSensors(session.id, false, isCurrent);
             return;
           }
         }
         const projectSessions = (await apiGet<SessionRecord[]>(apiPath('sessions'))) ?? [];
+        if (!isCurrent()) return;
         const reusableSession = mostRecentTitledProjectSession(projectSessions, project.id);
         if (reusableSession) {
           setIsResuming(true);
@@ -1064,32 +1136,45 @@ export default function HomePage() {
             resolveChatModelConfigId(reusableSession.agentId, agents, modelConfigs),
           );
           setSessionId(reusableSession.id);
-          await refreshSensors(reusableSession.id);
+          await refreshSensors(reusableSession.id, false, isCurrent);
           return;
         }
         if (agentId) {
-          await bindActiveProjectSession(agentId, project.id);
+          await bindActiveProjectSession(agentId, project.id, isCurrent);
         }
       } catch (error) {
+        if (!isCurrent()) return;
         setSessionError(
           error instanceof ApiRequestError ? error.message : 'Failed to reopen Project',
         );
+      } finally {
+        if (isCurrent()) selectionPendingRef.current = false;
       }
     },
-    [agents, bindActiveProjectSession, modelConfigs, openProjectChat, refreshSensors],
+    [
+      agents,
+      beginSelection,
+      bindActiveProjectSession,
+      modelConfigs,
+      openProjectChat,
+      refreshSensors,
+    ],
   );
 
-  const refreshActiveProject = useCallback(async () => {
-    if (!activeProject?.id) return;
-    const project = await apiPost<ProjectDesktopRecord>(
-      apiPath('projects', activeProject.id, 'refresh'),
-      {},
-    );
-    if (project) {
-      setActiveProject(project);
-      setProjectGitRefreshKey((value) => value + 1);
-    }
-  }, [activeProject?.id]);
+  const refreshActiveProject = useCallback(
+    async (isCurrent = currentSelection()) => {
+      if (!activeProject?.id || !isCurrent()) return;
+      const project = await apiPost<ProjectDesktopRecord>(
+        apiPath('projects', activeProject.id, 'refresh'),
+        {},
+      );
+      if (project && isCurrent()) {
+        setActiveProject(project);
+        setProjectGitRefreshKey((value) => value + 1);
+      }
+    },
+    [activeProject?.id, currentSelection],
+  );
 
   const refreshCommandRunnerHealth = useCallback(async () => {
     try {
@@ -1318,10 +1403,13 @@ export default function HomePage() {
 
   const handleSelectSession = useCallback(
     (session: SessionRecord) => {
+      const isCurrent = beginSelection();
+      selectionPendingRef.current = true;
       const selectSession = async () => {
         agentSelectionSourceRef.current = 'system';
         setIsResuming(true);
         const normalizedSession = await normalizePersonalChatSession(session);
+        if (!isCurrent()) return;
         const repairedPersonalSession = normalizedSession.agentId !== session.agentId;
 
         setSelectedMode(normalizedSession.mode === 'project' ? 'project-chat' : 'chat');
@@ -1332,28 +1420,42 @@ export default function HomePage() {
         setSessionId(normalizedSession.id);
         clearAttachments();
         if (normalizedSession.mode === 'project') {
-          refreshSensors(normalizedSession.id).catch(() => {});
+          refreshSensors(normalizedSession.id, false, isCurrent).catch(() => {});
         } else {
           setSensorDashboard(null);
           setSensorError(null);
           setSensorLoading(false);
         }
         if (repairedPersonalSession) {
-          refreshSessions().catch(() => {});
+          refreshSessions(isCurrent).catch(() => {});
         }
       };
 
-      selectSession().catch((error) => {
-        setSessionError(
-          error instanceof ApiRequestError ? error.message : 'Failed to open chat session',
-        );
-      });
+      selectSession()
+        .catch((error) => {
+          if (!isCurrent()) return;
+          setSessionError(
+            error instanceof ApiRequestError ? error.message : 'Failed to open chat session',
+          );
+        })
+        .finally(() => {
+          if (isCurrent()) selectionPendingRef.current = false;
+        });
     },
-    [clearAttachments, modelConfigs, normalizePersonalChatSession, refreshSensors, refreshSessions],
+    [
+      agents,
+      beginSelection,
+      clearAttachments,
+      modelConfigs,
+      normalizePersonalChatSession,
+      refreshSensors,
+      refreshSessions,
+    ],
   );
 
   const handleNewChatForAgent = useCallback(
     (agentId: string) => {
+      const isCurrent = beginSelection();
       const chatAgentId =
         selectedMode === 'project-chat'
           ? agentId
@@ -1364,6 +1466,7 @@ export default function HomePage() {
       setSelectedModelConfigId(resolveChatModelConfigId(chatAgentId, agents, modelConfigs));
       clearAttachments();
       if (selectedMode === 'project-chat' && activeProject?.id) {
+        selectionPendingRef.current = true;
         setSessionError(null);
         apiPost<SessionRecord>(apiPath('sessions'), {
           agentId: chatAgentId,
@@ -1371,18 +1474,23 @@ export default function HomePage() {
           projectId: activeProject.id,
         })
           .then((session) => {
+            if (!isCurrent()) return;
             if (!session?.id) {
               setSessionError('Failed to create Project chat session');
               return;
             }
             setSessionId(session.id);
-            refreshSessions().catch(() => {});
-            refreshSensors(session.id).catch(() => {});
+            refreshSessions(isCurrent).catch(() => {});
+            refreshSensors(session.id, false, isCurrent).catch(() => {});
           })
           .catch((error) => {
+            if (!isCurrent()) return;
             setSessionError(
               error instanceof ApiRequestError ? error.message : 'Failed to create Project chat',
             );
+          })
+          .finally(() => {
+            if (isCurrent()) selectionPendingRef.current = false;
           });
         return;
       }
@@ -1391,6 +1499,7 @@ export default function HomePage() {
     [
       activeProject?.id,
       agents,
+      beginSelection,
       clearAttachments,
       createSessionForAgent,
       modelConfigs,
@@ -1402,10 +1511,14 @@ export default function HomePage() {
 
   const isLoading = status === 'streaming';
   const hasUsableModelConfig = modelConfigs.length > 0;
-  const canSend = Boolean(sessionId) && !hasPendingApproval && hasUsableModelConfig;
-  const inputStatusText = hasUsableModelConfig
+  const canSend = chatCanSend && hasUsableModelConfig;
+  const modelStatusText = hasUsableModelConfig
     ? getInputStatusText(hasPendingApproval, selectedMode, sessionId)
     : 'Create a model in Settings > Models before sending.';
+  let inputStatusText = modelStatusText;
+  if (restorationStatus === 'restoring') inputStatusText = 'Restoring chat history and approvals…';
+  if (restorationStatus === 'restore-error')
+    inputStatusText = restorationError ?? 'Unable to restore chat history.';
   let workspaceWebViewProjectId: string | null = null;
   if (selectedMode === 'project-chat') {
     workspaceWebViewProjectId = activeProject?.id ?? null;
@@ -1424,29 +1537,34 @@ export default function HomePage() {
   });
 
   useEffect(() => {
-    if (selectedMode !== 'project-chat') return;
+    if (selectedMode !== 'project-chat' || sessionId || selectionPendingRef.current) return;
     if (!selectedAgentId || !activeProject?.id) return;
     bindActiveProjectSession(selectedAgentId, activeProject.id).catch(() => {});
-  }, [activeProject?.id, bindActiveProjectSession, selectedAgentId, selectedMode]);
+  }, [activeProject?.id, bindActiveProjectSession, selectedAgentId, selectedMode, sessionId]);
 
   const handleSend = useCallback(
     (text: string) => {
-      setApprovedProjectInstructions(null);
-      setRejectedProjectInstructions(null);
       const messageForApi = formattedContext ? `${formattedContext}\n${text}` : text;
       const displayText = formattedContext ? text : undefined;
-      sendMessage(messageForApi, displayText, selectedModelConfigId)
+      const admission = sendMessage(messageForApi, displayText, selectedModelConfigId);
+      if (!admission.accepted) return false;
+      setApprovedProjectInstructions(null);
+      setRejectedProjectInstructions(null);
+      admission.completion
         .then(async () => {
-          await refreshSessions();
+          if (!admission.isCurrent()) return;
+          await refreshSessions(admission.isCurrent);
+          if (!admission.isCurrent()) return;
           if (selectedMode === 'project-chat' && sessionId) {
-            await refreshSensors(sessionId);
+            await refreshSensors(sessionId, false, admission.isCurrent);
           }
-          if (selectedMode === 'project-chat' && activeProject?.id) {
-            await refreshActiveProject();
+          if (admission.isCurrent() && selectedMode === 'project-chat' && activeProject?.id) {
+            await refreshActiveProject(admission.isCurrent);
           }
         })
         .catch(() => {});
       clearAttachments();
+      return true;
     },
     [
       sendMessage,
@@ -1615,6 +1733,7 @@ export default function HomePage() {
               isLoading={isLoading}
               canSend={canSend}
               inputStatusText={inputStatusText}
+              onRetryHistory={restorationStatus === 'restore-error' ? retryHistory : undefined}
               attachments={attachments}
               onAddFiles={addFiles}
               onRemoveAttachment={removeAttachment}

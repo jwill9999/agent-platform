@@ -1,6 +1,7 @@
 # Disappearing replies — verification plan
 
-Status: proposed; all product scenarios not-run in this planning phase.
+Status: owner-approved verification contract; implementation qualification in progress.
+Actual results and retained failures: [execution record](../reviews/chat-reply-reliability.md).
 Owner/task for every scenario and the final integration gate: `agent-platform-sizx` implementer.
 Requirements and scope: [plan](../planning/chat-reply-reliability.md); [spec](../tasks/agent-platform-sizx.md).
 
@@ -40,7 +41,7 @@ web unit tests with `pnpm --filter @agent-platform/web test`, plus hook lifecycl
 browser `pnpm exec playwright test -c e2e/playwright.config.ts e2e/chat-reply-reliability.spec.ts`
 against owned configured services. Desktop:
 `pnpm exec playwright test -c apps/desktop/e2e/playwright.electron.config.ts chat-reply-reliability.e2e.ts`.
-Final filenames may move with a reviewed equivalent test map; these proposed files do not yet exist.
+The connected files now exist; the actual result map records runs and any bounded fixture repairs.
 Use Node24.14, canonical `WORKFLOW_GIT_BINARY=/usr/bin/git`, Vitest min/max forks1, tracing disabled
 and normal hooks. A pre-existing unrelated hook-baseline bug is recorded separately; diagnose any
 actual failure, do not silently skip or weaken gates.
@@ -59,5 +60,5 @@ and verify zero POST/database/tool effects rather than manufacturing a diagnosti
 Retain baseline failure, final logs/traces/screenshots/video on failure, request counters, synthetic
 SQLite/audit snapshots, safe diagnostic exports and review findings under an owned evidence directory.
 Run each required scenario with controlled order, preserve first-attempt failures and justify bounded
-retries after diagnosis. Required failed/skipped/blocked coverage prevents completion. No product
-scenario has run or passed merely because this plan is published.
+retries after diagnosis. Required failed/skipped/blocked coverage prevents completion. Baseline reproduction and unit checks are recorded separately; publishing this contract does not
+establish that any remaining connected scenario has passed.

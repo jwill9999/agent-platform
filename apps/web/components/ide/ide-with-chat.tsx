@@ -1862,6 +1862,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     workspaceEventsByMessage,
     approvalEventsByMessage,
     decideApproval,
+    canSend: chatCanSend,
   } = useHarnessChat(sessionId);
 
   useEffect(() => {
@@ -2256,11 +2257,14 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     }
   }, [activeProject?.id, onboardingAnswer, onboardingDialogue?.activeQuestionId]);
 
-  const refreshActiveProject = useCallback(async () => {
-    if (!activeProject?.id) return;
-    const project = await apiGet<ProjectRecord>(apiPath('projects', activeProject.id));
-    if (project) setActiveProject(project);
-  }, [activeProject?.id]);
+  const refreshActiveProject = useCallback(
+    async (isCurrent: () => boolean = () => true) => {
+      if (!activeProject?.id || !isCurrent()) return;
+      const project = await apiGet<ProjectRecord>(apiPath('projects', activeProject.id));
+      if (project && isCurrent()) setActiveProject(project);
+    },
+    [activeProject?.id],
+  );
 
   // --- File operations ---
 
@@ -2603,9 +2607,12 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       userLine,
       sanitisedFiles: contextDraft.sanitisedFiles,
     });
-    sendMessage(messageForApi, userLine)
+    const admission = sendMessage(messageForApi, userLine);
+    if (!admission.accepted) return;
+    admission.completion
       .then(async () => {
-        if (shouldRefreshProject) await refreshActiveProject();
+        if (admission.isCurrent() && shouldRefreshProject)
+          await refreshActiveProject(admission.isCurrent);
       })
       .catch(() => {});
     setChatInput('');
@@ -3035,7 +3042,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   agents={agents}
                   selectedAgentId={selectedAgentId}
                   onAgentChange={setSelectedAgentId}
-                  sessionReady={Boolean(sessionId)}
+                  sessionReady={chatCanSend}
                   chatUnavailableText={chatUnavailableText}
                   criticEventsByMessage={criticEventsByMessage}
                   thinkingByMessage={thinkingByMessage}

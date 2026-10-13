@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import type {
   DiagnosticPartialFailure,
@@ -11,7 +11,7 @@ import type {
   WorkspaceEvent,
 } from '@agent-platform/contracts';
 import { WorkspaceEventSchema } from '@agent-platform/contracts';
-import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
+import { apiPath, apiPost } from '@/lib/apiClient';
 import { observeChatResponse, partialChatFailure } from '@/lib/chat-diagnostics';
 import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
 
@@ -502,394 +502,515 @@ export function hasBlockingApprovalEvents(
   );
 }
 
-async function listPendingApprovals(sessionId: string): Promise<ApprovalRequest[]> {
-  const params = new URLSearchParams({ sessionId, status: 'pending' });
-  const res = await fetch(`${apiPath('approval-requests')}?${params.toString()}`, {
-    cache: 'no-store',
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(text || `Approval requests failed (${res.status})`);
-  if (!text.trim()) return [];
-  const json = JSON.parse(text) as { data?: ApprovalRequest[] };
-  return json.data ?? [];
+// ---------------------------------------------------------------------------
+// Session-owned lifecycle
+// ---------------------------------------------------------------------------
+
+export type ChatRestorationStatus = 'unbound' | 'restoring' | 'ready' | 'restore-error';
+export type ChatAdmission =
+  | {
+      accepted: false;
+      reason:
+        | 'unbound'
+        | 'restoring'
+        | 'restore-error'
+        | 'busy'
+        | 'pending-approval'
+        | 'empty'
+        | 'invalid-approval';
+    }
+  | { accepted: true; completion: Promise<void>; isCurrent: () => boolean };
+
+type ChatView = {
+  selection: symbol;
+  epoch: number;
+  messages: UIMessage[];
+  status: 'ready' | 'streaming';
+  error: string | null;
+  diagnosticRequestId: string | null;
+  diagnosticFailure: DiagnosticPartialFailure | null;
+  criticEventsByMessage: Record<string, CriticEvent[]>;
+  thinkingByMessage: Record<string, string>;
+  toolEventsByMessage: Record<string, ToolTraceEvent[]>;
+  workspaceEventsByMessage: Record<string, WorkspaceEvent[]>;
+  approvalEventsByMessage: Record<string, ApprovalCardState[]>;
+  restorationStatus: ChatRestorationStatus;
+  restorationError: string | null;
+};
+type ChatOperation = { busy: boolean };
+type ChatGeneration = {
+  sessionId: string | null;
+  selection: symbol;
+  epoch: number;
+  active: boolean;
+  operation: ChatOperation | null;
+  state: ChatView;
+};
+type PublishChat = (update: (previous: ChatView) => ChatView) => void;
+const RESTORE_FAILURE = 'Conversation history could not be restored. Retry history before sending.';
+const RESTORE_TIMEOUT = 'Conversation history took too long to load. Retry history before sending.';
+const RESTORE_DEADLINE_MS = 15_000;
+
+function emptyChatView(selection: symbol, epoch: number, status: ChatRestorationStatus): ChatView {
+  return {
+    selection,
+    epoch,
+    messages: [],
+    status: 'ready',
+    error: null,
+    diagnosticRequestId: null,
+    diagnosticFailure: null,
+    criticEventsByMessage: {},
+    thinkingByMessage: {},
+    toolEventsByMessage: {},
+    workspaceEventsByMessage: {},
+    approvalEventsByMessage: {},
+    restorationStatus: status,
+    restorationError: null,
+  };
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
+function createChatGeneration(sessionId: string | null, resume: boolean): ChatGeneration {
+  const selection = Symbol('chat-selection');
+  return {
+    sessionId,
+    selection,
+    epoch: 0,
+    active: false,
+    operation: null,
+    state: emptyChatView(selection, 0, sessionId ? (resume ? 'restoring' : 'ready') : 'unbound'),
+  };
+}
 
-/**
- * Chat against the platform harness via `POST /api/chat` → `POST /v1/chat`
- * (NDJSON stream). When `sessionId` changes:
- * - If `resume` is true, fetches existing messages from the backend.
- * - Otherwise, starts with an empty message list (new session).
- */
+async function restoredRecords<T>(path: string, signal: AbortSignal): Promise<T[]> {
+  const response = await fetch(path, { cache: 'no-store', signal });
+  if (!response.ok) throw new Error(RESTORE_FAILURE);
+  const body = await response.text();
+  if (!body.trim()) return [];
+  const data: unknown = (JSON.parse(body) as { data?: unknown }).data;
+  if (!Array.isArray(data)) throw new Error(RESTORE_FAILURE);
+  return data as T[];
+}
+
+async function restoreChatSnapshot(sessionId: string, signal: AbortSignal) {
+  const params = new URLSearchParams({ sessionId, status: 'pending' });
+  const [records, approvals] = await Promise.all([
+    restoredRecords<MessageRecord>(apiPath('sessions', sessionId, 'messages'), signal),
+    restoredRecords<ApprovalRequest>(`${apiPath('approval-requests')}?${params}`, signal),
+  ]);
+  const messages = records.map(messageRecordToUi).filter((m): m is UIMessage => m !== null);
+  const approvalEventsByMessage: Record<string, ApprovalCardState[]> = {};
+  if (approvals.length) {
+    let assistant = [...messages].reverse().find((message) => message.role === 'assistant');
+    if (!assistant) {
+      assistant = uiMessage(`restored-approvals:${sessionId}`, 'assistant', '');
+      messages.push(assistant);
+    }
+    approvalEventsByMessage[assistant.id] = approvals.map(approvalFromRecord);
+  }
+  return { messages, approvalEventsByMessage };
+}
+
+function appendChatEvent<T>(previous: Record<string, T[]>, id: string, event: T) {
+  return { ...previous, [id]: [...(previous[id] ?? []), event] };
+}
+
+function publishApprovalStatus(
+  publish: PublishChat,
+  requestId: string,
+  status: ApprovalCardStatus,
+  error?: string,
+) {
+  publish((previous) => ({
+    ...previous,
+    approvalEventsByMessage: Object.fromEntries(
+      Object.entries(previous.approvalEventsByMessage).map(([id, approvals]) => [
+        id,
+        updateApprovalStatus(approvals, requestId, status, error),
+      ]),
+    ),
+  }));
+}
+
+async function streamOwnedResponse(
+  assistantId: string,
+  body: ReadableStream<Uint8Array>,
+  publish: PublishChat,
+): Promise<StreamAssistantResult> {
+  let accumulated = '';
+  let streamErrorMessage: string | null = null;
+  let mcpHaltMessage: string | null = null;
+  let pendingRevisionReset = false;
+  // Obsolete streams are still drained: losing display ownership is not server cancellation.
+  await readNdjsonStream(body, {
+    onText: (chunk) => {
+      if (!chunk) return;
+      accumulated = pendingRevisionReset ? chunk : accumulated + chunk;
+      pendingRevisionReset = false;
+    },
+    onError: (message) => {
+      streamErrorMessage = message;
+      publish((previous) => ({ ...previous, error: message }));
+    },
+    onCritic: (event) => {
+      pendingRevisionReset = event.kind === 'revise' || pendingRevisionReset;
+      publish((previous) => ({
+        ...previous,
+        criticEventsByMessage: appendChatEvent(previous.criticEventsByMessage, assistantId, event),
+        thinkingByMessage:
+          event.kind === 'revise'
+            ? { ...previous.thinkingByMessage, [assistantId]: THINKING_REVISE_PLACEHOLDER }
+            : previous.thinkingByMessage,
+      }));
+    },
+    onThinking: (chunk) => {
+      if (!chunk) return;
+      publish((previous) => {
+        const current = previous.thinkingByMessage[assistantId] ?? '';
+        const text =
+          current === THINKING_PLACEHOLDER || current === THINKING_REVISE_PLACEHOLDER
+            ? chunk
+            : current + chunk;
+        return {
+          ...previous,
+          thinkingByMessage: { ...previous.thinkingByMessage, [assistantId]: text },
+        };
+      });
+    },
+    onToolTrace: (event) => {
+      mcpHaltMessage = mcpApprovalHaltMessage(event) ?? mcpHaltMessage;
+      publish((previous) => ({
+        ...previous,
+        toolEventsByMessage: appendChatEvent(previous.toolEventsByMessage, assistantId, event),
+      }));
+    },
+    onWorkspaceEvent: (event) =>
+      publish((previous) => ({
+        ...previous,
+        workspaceEventsByMessage: appendChatEvent(
+          previous.workspaceEventsByMessage,
+          assistantId,
+          event,
+        ),
+      })),
+    onApprovalRequired: (event) =>
+      publish((previous) => ({
+        ...previous,
+        approvalEventsByMessage: {
+          ...previous.approvalEventsByMessage,
+          [assistantId]: mergeApprovalEvent(
+            previous.approvalEventsByMessage[assistantId] ?? [],
+            event,
+          ),
+        },
+      })),
+  });
+  return { text: accumulated, errorMessage: streamErrorMessage, mcpHaltMessage };
+}
+
+function publishAssistant(publish: PublishChat, assistantId: string, text: string) {
+  publish((previous) => ({
+    ...previous,
+    messages: previous.messages.map((message) =>
+      message.id === assistantId ? uiMessage(assistantId, 'assistant', text) : message,
+    ),
+  }));
+}
+
+async function runOwnedSend(
+  sessionId: string,
+  assistantId: string,
+  trimmed: string,
+  modelConfigId: string | null | undefined,
+  publish: PublishChat,
+) {
+  const observedAtMs = Date.now();
+  const started = performance.now();
+  let requestId = crypto.randomUUID();
+  let apiObserved = false;
+  let responseStatus: number | undefined;
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        message: trimmed,
+        ...(modelConfigId ? { modelConfigId } : {}),
+      }),
+    });
+    ({ requestId, apiObserved, responseStatus } = observeChatResponse(response, requestId));
+    if (apiObserved && !response.ok)
+      publish((previous) => ({ ...previous, diagnosticRequestId: requestId }));
+    if (!response.ok) throw new Error(await parseErrorResponse(response));
+    if (!response.body) throw new Error('No response body');
+    const result = await streamOwnedResponse(assistantId, response.body, publish);
+    publishAssistant(publish, assistantId, finalAssistantText(result.text, result.errorMessage));
+    publish((previous) => ({
+      ...previous,
+      thinkingByMessage: clearThinkingPlaceholder(previous.thinkingByMessage, assistantId),
+    }));
+  } catch (error) {
+    const failure = partialChatFailure({
+      requestId,
+      observedAtMs,
+      durationMs: performance.now() - started,
+      apiObserved,
+      responseStatus,
+    });
+    publish((previous) => ({
+      ...previous,
+      diagnosticFailure: failure ?? previous.diagnosticFailure,
+      error: friendlyChatErrorMessage(error instanceof Error ? error.message : String(error)),
+      messages: previous.messages.filter((message) => message.id !== assistantId),
+      criticEventsByMessage: removeMessageEntry(previous.criticEventsByMessage, assistantId),
+      thinkingByMessage: removeMessageEntry(previous.thinkingByMessage, assistantId),
+      toolEventsByMessage: removeMessageEntry(previous.toolEventsByMessage, assistantId),
+      workspaceEventsByMessage: removeMessageEntry(previous.workspaceEventsByMessage, assistantId),
+      approvalEventsByMessage: removeMessageEntry(previous.approvalEventsByMessage, assistantId),
+    }));
+  }
+}
+
+async function runOwnedApproval(
+  sessionId: string,
+  assistantId: string,
+  requestId: string,
+  decision: ApprovalDecision,
+  modelConfigId: string | null | undefined,
+  publish: PublishChat,
+) {
+  let mcpHaltMessage: string | null = null;
+  try {
+    await apiPost<ApprovalRequest>(apiPath('approval-requests', requestId, decision), {});
+    publishApprovalStatus(publish, requestId, decision === 'approve' ? 'approved' : 'rejected');
+    const response = await fetch(apiPath('sessions', sessionId, 'resume'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(modelConfigId ? { 'x-model-config-id': modelConfigId } : {}),
+      },
+      body: JSON.stringify({ approvalRequestId: requestId }),
+    });
+    if (!response.ok) {
+      mcpHaltMessage = await mcpApprovalHaltFromResponse(response);
+      throw new Error(await parseErrorResponse(response));
+    }
+    let accumulated = '';
+    if (response.body && !response.headers.get('content-type')?.includes('application/json')) {
+      const result = await streamOwnedResponse(assistantId, response.body, publish);
+      mcpHaltMessage = result.mcpHaltMessage;
+      accumulated = finalAssistantText(result.text, result.errorMessage);
+    }
+    publishAssistant(publish, assistantId, accumulated);
+    const completedStatus = decision === 'approve' ? 'executed' : 'rejected';
+    publishApprovalStatus(
+      publish,
+      requestId,
+      mcpHaltMessage ? 'not_completed' : completedStatus,
+      mcpHaltMessage ?? undefined,
+    );
+    publish((previous) => ({
+      ...previous,
+      thinkingByMessage: removeMessageEntry(previous.thinkingByMessage, assistantId),
+    }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    publishApprovalStatus(
+      publish,
+      requestId,
+      mcpHaltMessage ? 'not_completed' : 'failed',
+      mcpHaltMessage ?? message,
+    );
+    publish((previous) => ({
+      ...previous,
+      error: message,
+      messages: previous.messages.filter((item) => item.id !== assistantId),
+      thinkingByMessage: removeMessageEntry(previous.thinkingByMessage, assistantId),
+      toolEventsByMessage: removeMessageEntry(previous.toolEventsByMessage, assistantId),
+      workspaceEventsByMessage: removeMessageEntry(previous.workspaceEventsByMessage, assistantId),
+    }));
+  }
+}
+
+/** Session restoration and accepted operations publish only to their current selection epoch. */
 export function useHarnessChat(sessionId: string | null, resume = false) {
-  const [messages, setMessages] = useState<UIMessage[]>([]);
-  const [status, setStatus] = useState<'ready' | 'streaming'>('ready');
-  const [error, setError] = useState<string | null>(null);
-  const [diagnosticRequestId, setDiagnosticRequestId] = useState<string | null>(null);
-  const [diagnosticFailure, setDiagnosticFailure] = useState<DiagnosticPartialFailure | null>(null);
-  const diagnosticSessionRef = useRef(sessionId);
-  diagnosticSessionRef.current = sessionId;
-  useEffect(() => {
-    setDiagnosticRequestId(null);
-    setDiagnosticFailure(null);
-  }, [sessionId]);
-  const [criticEventsByMessage, setCriticEventsByMessage] = useState<Record<string, CriticEvent[]>>(
-    {},
+  const [retryVersion, setRetryVersion] = useState(0);
+  const generation = useMemo(
+    () => createChatGeneration(sessionId, resume),
+    [sessionId, resume, retryVersion],
   );
-  const [thinkingByMessage, setThinkingByMessage] = useState<Record<string, string>>({});
-  const [toolEventsByMessage, setToolEventsByMessage] = useState<Record<string, ToolTraceEvent[]>>(
-    {},
-  );
-  const [workspaceEventsByMessage, setWorkspaceEventsByMessage] = useState<
-    Record<string, WorkspaceEvent[]>
-  >({});
-  const [approvalEventsByMessage, setApprovalEventsByMessage] = useState<
-    Record<string, ApprovalCardState[]>
-  >({});
-  const hasPendingApproval = useMemo(
-    () => hasBlockingApprovalEvents(approvalEventsByMessage),
-    [approvalEventsByMessage],
-  );
-  const resumeRef = useRef(resume);
-  resumeRef.current = resume;
+  const current = useRef<ChatGeneration | null>(null);
+  const [storedView, setStoredView] = useState<ChatView>(generation.state);
 
-  useEffect(() => {
-    setError(null);
-    if (!sessionId) {
-      setMessages([]);
-      setCriticEventsByMessage({});
-      setThinkingByMessage({});
-      setToolEventsByMessage({});
-      setWorkspaceEventsByMessage({});
-      setApprovalEventsByMessage({});
-      return;
-    }
-    if (!resumeRef.current) {
-      setMessages([]);
-      setCriticEventsByMessage({});
-      setThinkingByMessage({});
-      setToolEventsByMessage({});
-      setWorkspaceEventsByMessage({});
-      setApprovalEventsByMessage({});
-      return;
-    }
-
-    let cancelled = false;
-    apiGet<MessageRecord[]>(apiPath('sessions', sessionId, 'messages'))
-      .then((records) => {
-        if (cancelled) return;
-        const uiMsgs = (records ?? [])
-          .map(messageRecordToUi)
-          .filter((m): m is UIMessage => m !== null);
-        setMessages(uiMsgs);
-        return listPendingApprovals(sessionId).then((approvals) => ({ uiMsgs, approvals }));
-      })
-      .then((result) => {
-        if (cancelled || !result) return;
-        const assistant = [...result.uiMsgs]
-          .reverse()
-          .find((message) => message.role === 'assistant');
-        if (!assistant || result.approvals.length === 0) return;
-        setApprovalEventsByMessage((prev) => ({
-          ...prev,
-          [assistant.id]: result.approvals.map(approvalFromRecord),
-        }));
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : String(e));
-          setMessages([]);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId]);
-
-  // Extracted to keep sendMessage's nesting depth within 4 levels (sonar S2004).
-  const updateAssistantMessage = useCallback((id: string, text: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === id ? uiMessage(id, 'assistant', text) : m)));
-  }, []);
-
-  const appendCriticEvent = useCallback((id: string, event: CriticEvent) => {
-    setCriticEventsByMessage((prev) => {
-      const existing = prev[id] ?? [];
-      return { ...prev, [id]: [...existing, event] };
-    });
-  }, []);
-
-  const appendThinking = useCallback((id: string, chunk: string) => {
-    if (!chunk) return;
-    setThinkingByMessage((prev) => {
-      const current = prev[id] ?? '';
-      if (current === THINKING_PLACEHOLDER || current === THINKING_REVISE_PLACEHOLDER) {
-        return { ...prev, [id]: chunk };
-      }
-      return { ...prev, [id]: current + chunk };
-    });
-  }, []);
-
-  const appendToolTrace = useCallback((id: string, event: ToolTraceEvent) => {
-    setToolEventsByMessage((prev) => {
-      const existing = prev[id] ?? [];
-      return { ...prev, [id]: [...existing, event] };
-    });
-  }, []);
-
-  const appendWorkspaceEvent = useCallback((id: string, event: WorkspaceEvent) => {
-    setWorkspaceEventsByMessage((prev) => {
-      const existing = prev[id] ?? [];
-      return { ...prev, [id]: [...existing, event] };
-    });
-  }, []);
-
-  const appendApprovalRequired = useCallback((id: string, event: ApprovalRequiredStreamEvent) => {
-    setApprovalEventsByMessage((prev) => {
-      const existing = prev[id] ?? [];
-      return { ...prev, [id]: mergeApprovalEvent(existing, event) };
-    });
-  }, []);
-
-  const setApprovalStatus = useCallback(
-    (approvalRequestId: string, status: ApprovalCardStatus, errorMessage?: string) => {
-      setApprovalEventsByMessage((prev) => {
-        const next = { ...prev };
-        for (const [messageId, approvals] of Object.entries(next)) {
-          if (approvals.some((approval) => approval.approvalRequestId === approvalRequestId)) {
-            next[messageId] = updateApprovalStatus(
-              approvals,
-              approvalRequestId,
-              status,
-              errorMessage,
-            );
-          }
-        }
-        return next;
-      });
+  const makePublisher = useCallback(
+    (owner: ChatGeneration, epoch: number, operation?: ChatOperation) => {
+      const isCurrent = () =>
+        current.current === owner &&
+        owner.active &&
+        owner.epoch === epoch &&
+        (!operation || owner.operation === operation);
+      const publish: PublishChat = (update) => {
+        if (!isCurrent()) return;
+        owner.state = update(owner.state);
+        setStoredView(owner.state);
+      };
+      return { isCurrent, publish };
     },
     [],
   );
 
-  const streamAssistantResponse = useCallback(
-    async (
-      assistantId: string,
-      body: ReadableStream<Uint8Array>,
-    ): Promise<StreamAssistantResult> => {
-      let accumulated = '';
-      let streamErrorMessage: string | null = null;
-      let mcpHaltMessage: string | null = null;
-      let pendingRevisionReset = false;
-      await readNdjsonStream(body, {
-        onText: (chunk) => {
-          if (!chunk) return;
-          if (pendingRevisionReset) {
-            accumulated = chunk;
-            pendingRevisionReset = false;
-          } else {
-            accumulated += chunk;
-          }
-        },
-        onError: (msg) => {
-          streamErrorMessage = msg;
-          setError(msg);
-        },
-        onCritic: (event) => {
-          appendCriticEvent(assistantId, event);
-          if (event.kind === 'revise') {
-            pendingRevisionReset = true;
-            setThinkingByMessage((prev) => ({
-              ...prev,
-              [assistantId]: THINKING_REVISE_PLACEHOLDER,
-            }));
-          }
-        },
-        onThinking: (chunk) => appendThinking(assistantId, chunk),
-        onToolTrace: (event) => {
-          mcpHaltMessage = mcpApprovalHaltMessage(event) ?? mcpHaltMessage;
-          appendToolTrace(assistantId, event);
-        },
-        onWorkspaceEvent: (event) => appendWorkspaceEvent(assistantId, event),
-        onApprovalRequired: (event) => appendApprovalRequired(assistantId, event),
+  useLayoutEffect(() => {
+    current.current = generation;
+    generation.active = true;
+    generation.epoch += 1;
+    generation.operation = null;
+    const { publish } = makePublisher(generation, generation.epoch);
+    const status: ChatRestorationStatus = sessionId ? (resume ? 'restoring' : 'ready') : 'unbound';
+    publish(() => emptyChatView(generation.selection, generation.epoch, status));
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    if (sessionId && resume) {
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+          reject(new Error(RESTORE_TIMEOUT));
+        }, RESTORE_DEADLINE_MS);
       });
-      return { text: accumulated, errorMessage: streamErrorMessage, mcpHaltMessage };
-    },
-    [
-      appendApprovalRequired,
-      appendCriticEvent,
-      appendThinking,
-      appendToolTrace,
-      appendWorkspaceEvent,
-    ],
-  );
-
-  const sendMessage = useCallback(
-    async (messageForApi: string, displayText?: string, modelConfigId?: string | null) => {
-      const trimmed = messageForApi.trim();
-      if (!sessionId || !trimmed || hasPendingApproval) return;
-
-      const userVisible = displayText ?? trimmed;
-      const assistantId = crypto.randomUUID();
-
-      setMessages((prev) => [
-        ...prev,
-        uiMessage(crypto.randomUUID(), 'user', userVisible),
-        uiMessage(assistantId, 'assistant', ''),
-      ]);
-      setThinkingByMessage((prev) => ({ ...prev, [assistantId]: THINKING_PLACEHOLDER }));
-      setStatus('streaming');
-      setError(null);
-
-      const observedAtMs = Date.now();
-      const started = performance.now();
-      let requestId = crypto.randomUUID();
-      let apiObserved = false;
-      let responseStatus: number | undefined;
-      setDiagnosticRequestId(null);
-      setDiagnosticFailure(null);
-      try {
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId,
-            message: trimmed,
-            ...(modelConfigId ? { modelConfigId } : {}),
-          }),
+      void Promise.race([restoreChatSnapshot(sessionId, controller.signal), deadline])
+        .then((snapshot) =>
+          publish((previous) => ({ ...previous, ...snapshot, restorationStatus: 'ready' })),
+        )
+        .catch(() =>
+          publish((previous) => ({
+            ...previous,
+            restorationStatus: 'restore-error',
+            restorationError: timedOut ? RESTORE_TIMEOUT : RESTORE_FAILURE,
+          })),
+        )
+        .finally(() => {
+          clearTimeout(timer);
+          controller.abort();
         });
+    }
+    return () => {
+      generation.active = false;
+      if (current.current === generation) current.current = null;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [generation, makePublisher, sessionId, resume]);
 
-        ({ requestId, apiObserved, responseStatus } = observeChatResponse(res, requestId));
-        if (apiObserved && !res.ok && diagnosticSessionRef.current === sessionId)
-          setDiagnosticRequestId(requestId);
-        if (!res.ok) throw new Error(await parseErrorResponse(res));
-        if (!res.body) throw new Error('No response body');
+  const refusal = (): Extract<ChatAdmission, { accepted: false }> | null => {
+    if (!sessionId || current.current !== generation || !generation.active)
+      return { accepted: false, reason: 'unbound' };
+    if (generation.state.restorationStatus !== 'ready')
+      return {
+        accepted: false,
+        reason:
+          generation.state.restorationStatus === 'restore-error' ? 'restore-error' : 'restoring',
+      };
+    if (generation.operation?.busy) return { accepted: false, reason: 'busy' };
+    return null;
+  };
 
-        const result = await streamAssistantResponse(assistantId, res.body);
-        const finalText = finalAssistantText(result.text, result.errorMessage);
+  const startOperation = (run: (publish: PublishChat) => Promise<void>): ChatAdmission => {
+    const operation: ChatOperation = { busy: true };
+    generation.operation = operation;
+    const { isCurrent, publish } = makePublisher(generation, generation.epoch, operation);
+    publish((previous) => ({ ...previous, status: 'streaming', error: null }));
+    const completion = run(publish).finally(() => {
+      if (!isCurrent()) return;
+      operation.busy = false;
+      publish((previous) => ({ ...previous, status: 'ready' }));
+    });
+    return { accepted: true, completion, isCurrent };
+  };
 
-        // Publish a single final answer for the turn after all revisions/streaming settle.
-        updateAssistantMessage(assistantId, finalText);
-        setThinkingByMessage((prev) => clearThinkingPlaceholder(prev, assistantId));
-      } catch (e) {
-        const partialFailure = partialChatFailure({
-          requestId,
-          observedAtMs,
-          durationMs: performance.now() - started,
-          apiObserved,
-          responseStatus,
-        });
-        if (partialFailure && diagnosticSessionRef.current === sessionId)
-          setDiagnosticFailure(partialFailure);
-        setError(friendlyChatErrorMessage(e instanceof Error ? e.message : String(e)));
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
-        setCriticEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
-        setThinkingByMessage((prev) => removeMessageEntry(prev, assistantId));
-        setToolEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
-        setWorkspaceEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
-        setApprovalEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
-      } finally {
-        setStatus('ready');
-      }
-    },
-    [sessionId, hasPendingApproval, updateAssistantMessage, streamAssistantResponse],
-  );
+  const sendMessage = (
+    messageForApi: string,
+    displayText?: string,
+    modelConfigId?: string | null,
+  ): ChatAdmission => {
+    const denied = refusal();
+    if (denied) return denied;
+    const trimmed = messageForApi.trim();
+    if (!trimmed) return { accepted: false, reason: 'empty' };
+    if (hasBlockingApprovalEvents(generation.state.approvalEventsByMessage))
+      return { accepted: false, reason: 'pending-approval' };
+    const assistantId = crypto.randomUUID();
+    return startOperation(async (publish) => {
+      publish((previous) => ({
+        ...previous,
+        messages: [
+          ...previous.messages,
+          uiMessage(crypto.randomUUID(), 'user', displayText ?? trimmed),
+          uiMessage(assistantId, 'assistant', ''),
+        ],
+        thinkingByMessage: { ...previous.thinkingByMessage, [assistantId]: THINKING_PLACEHOLDER },
+        diagnosticRequestId: null,
+        diagnosticFailure: null,
+      }));
+      await runOwnedSend(sessionId!, assistantId, trimmed, modelConfigId, publish);
+    });
+  };
 
-  const decideApproval = useCallback(
-    async (
-      approvalRequestId: string,
-      decision: ApprovalDecision,
-      modelConfigId?: string | null,
-    ) => {
-      if (!sessionId || status === 'streaming') return;
-      const inFlightStatus = decision === 'approve' ? 'approving' : 'rejecting';
-      const terminalStatus = decision === 'approve' ? 'executed' : 'rejected';
-      let mcpHaltMessage: string | null = null;
-      setApprovalStatus(approvalRequestId, inFlightStatus);
-      setStatus('streaming');
-      setError(null);
+  const decideApproval = (
+    requestId: string,
+    decision: ApprovalDecision,
+    modelConfigId?: string | null,
+  ): ChatAdmission => {
+    const denied = refusal();
+    if (denied) return denied;
+    const approval = Object.values(generation.state.approvalEventsByMessage)
+      .flat()
+      .find((item) => item.approvalRequestId === requestId);
+    if (!approval || !['pending', 'failed'].includes(approval.status))
+      return { accepted: false, reason: 'invalid-approval' };
+    const assistantId = crypto.randomUUID();
+    return startOperation(async (publish) => {
+      publishApprovalStatus(publish, requestId, decision === 'approve' ? 'approving' : 'rejecting');
+      publish((previous) => ({
+        ...previous,
+        messages: [...previous.messages, uiMessage(assistantId, 'assistant', '')],
+        thinkingByMessage: { ...previous.thinkingByMessage, [assistantId]: THINKING_PLACEHOLDER },
+      }));
+      await runOwnedApproval(sessionId!, assistantId, requestId, decision, modelConfigId, publish);
+    });
+  };
 
-      const assistantId = crypto.randomUUID();
-      setMessages((prev) => [...prev, uiMessage(assistantId, 'assistant', '')]);
-      setThinkingByMessage((prev) => ({ ...prev, [assistantId]: THINKING_PLACEHOLDER }));
-
-      try {
-        await apiPost<ApprovalRequest>(
-          apiPath('approval-requests', approvalRequestId, decision),
-          {},
-        );
-        setApprovalStatus(approvalRequestId, decision === 'approve' ? 'approved' : 'rejected');
-
-        const res = await fetch(apiPath('sessions', sessionId, 'resume'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(modelConfigId ? { 'x-model-config-id': modelConfigId } : {}),
-          },
-          body: JSON.stringify({ approvalRequestId }),
-        });
-        if (!res.ok) {
-          mcpHaltMessage = await mcpApprovalHaltFromResponse(res);
-          throw new Error(await parseErrorResponse(res));
-        }
-
-        let accumulated = '';
-        if (res.body && !res.headers.get('content-type')?.includes('application/json')) {
-          const result = await streamAssistantResponse(assistantId, res.body);
-          mcpHaltMessage = result.mcpHaltMessage;
-          accumulated = finalAssistantText(result.text, result.errorMessage);
-        }
-
-        updateAssistantMessage(assistantId, accumulated);
-        setApprovalStatus(
-          approvalRequestId,
-          mcpHaltMessage ? 'not_completed' : terminalStatus,
-          mcpHaltMessage ?? undefined,
-        );
-        setThinkingByMessage((prev) => {
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        setApprovalStatus(
-          approvalRequestId,
-          mcpHaltMessage ? 'not_completed' : 'failed',
-          mcpHaltMessage ?? message,
-        );
-        setError(message);
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
-        setThinkingByMessage((prev) => {
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-        setToolEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
-        setWorkspaceEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
-      } finally {
-        setStatus('ready');
-      }
-    },
-    [sessionId, status, setApprovalStatus, updateAssistantMessage, streamAssistantResponse],
-  );
-
+  const retryHistory = () => {
+    if (
+      current.current !== generation ||
+      !generation.active ||
+      generation.state.restorationStatus !== 'restore-error'
+    )
+      return;
+    generation.active = false;
+    setRetryVersion((version) => version + 1);
+  };
+  const setError = (error: string | null) =>
+    makePublisher(generation, generation.epoch).publish((previous) => ({ ...previous, error }));
+  const view =
+    storedView.selection === generation.selection && storedView.epoch === generation.epoch
+      ? storedView
+      : generation.state;
+  const hasPendingApproval = hasBlockingApprovalEvents(view.approvalEventsByMessage);
+  const canSend =
+    generation.active &&
+    current.current === generation &&
+    view.restorationStatus === 'ready' &&
+    view.status === 'ready' &&
+    !hasPendingApproval;
   return {
-    diagnosticRequestId,
-    diagnosticFailure,
-    messages,
+    ...view,
     sendMessage,
     decideApproval,
-    status,
-    error,
     setError,
-    criticEventsByMessage,
-    thinkingByMessage,
-    toolEventsByMessage,
-    workspaceEventsByMessage,
-    approvalEventsByMessage,
     hasPendingApproval,
+    canSend,
+    retryHistory,
   };
 }

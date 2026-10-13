@@ -1,3 +1,40 @@
+# Current handoff — disappearing reply implementation, 13 October 2026
+
+Owner approved the bounded plan at `34d6397b` and authorized implementation of
+`agent-platform-sizx`, with Beads, critic review and browser/Electron/diagnostic checks.
+Current branch `task/chat-reply-reliability` chains from the pushed planning tip, targeting
+`feature/chat-reply-reliability` at staging `21191673`. This authorization covers implementation
+and hosted merge readiness; new merges and staging promotion remain reserved. MCP onboarding is
+already delivered and paused PR283/orchestration remain separate and unchanged.
+
+The fix gates sending until history and approvals both load, provides safe15-second failure/manual
+retry, and scopes asynchronous updates to the active selection and admitted operation. Refused sends
+retain drafts/attachments; saved-session links and delayed Project selection are guarded. The critic
+approved the runtime after three caller-ownership findings were repaired. Baseline Chromium/Electron
+reproduced the missing visible reply while SQLite held the final assistant. The fixed18-case matrix
+passed (nine per mode), and the normal Docker browser case passed with retained trace/screenshot/DB.
+Ten actual V1 reports join to request/session IDs, with durable verified coverage, no truncation or
+lost/pending events and tested private-data canaries absent. The critic independently approved this
+evidence. Mounted caller/hook/composer35pass; full repository typecheck/lint/format/cycles pass.
+
+See the [approved plan](docs/planning/chat-reply-reliability.md),
+[task specification](docs/tasks/agent-platform-sizx.md),
+[verification map](docs/testing/chat-reply-reliability.md) and
+[actual results](docs/reviews/chat-reply-reliability.md). Evidence and retained earlier failures are in
+`/Users/letuscode/.codex/chat-reply-implementation-20261013`. Fixture repairs did not weaken runtime
+policy or acceptance assertions. Source-tree Electron and deterministic providers are not protected
+staging packaged-VM or release qualification.
+
+All eight unchanged adjacent context/MCP connected regressions also passed. Next: complete cumulative
+normal push hooks and final independent review, publish all five complete source-bound Notion mirrors, and qualify the
+cumulative task-to-feature PR's actual hosted checks and review findings. Beads remains in progress
+through its integration gate; no PR, merge, task closure or staging-readiness claim at this checkpoint.
+Primary and paused snapshots match the planning-final preservation record, including its one prior
+authorized Beads status append; retain all separate refs and unrelated services. Earlier handoffs
+below are historical, including the superseded planning-only authorization.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — disappearing reply planning, 13 October 2026
 
 MCP onboarding is delivered: PR313 merged into staging at
