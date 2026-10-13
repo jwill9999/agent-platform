@@ -689,3 +689,5 @@ export {
   type WorkspaceAreaListing,
   type WorkspaceFilesResponse,
 } from './workspace.js';
+export * from './diagnostics.js';
+export * from './diagnosticReport.js';

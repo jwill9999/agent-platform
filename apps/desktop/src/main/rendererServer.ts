@@ -155,6 +155,8 @@ function spawnStandaloneServer({
       ...env,
       ELECTRON_RUN_AS_NODE: '1',
       HOSTNAME: hostname,
+      DIAGNOSTICS_WEB_HOST: `${hostname}:${port}`,
+      DIAGNOSTICS_LOCAL_TOPOLOGY: 'loopback',
       NODE_ENV: 'production',
       NEXT_TELEMETRY_DISABLED: '1',
       PORT: port,

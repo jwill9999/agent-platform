@@ -1,3 +1,10 @@
+import {
+  beginDiagnosticRun,
+  failDiagnosticRun,
+  observeDiagnosticNode,
+  observeDiagnosticTool,
+  observeDiagnosticApproval,
+} from '../../diagnostics/observations.js';
 import type { DrizzleDb } from '@agent-platform/db';
 import {
   getSession,
@@ -762,9 +769,18 @@ function refreshWorkingMemory({
 }
 
 function createAuditLog(db: DrizzleDb): ReturnType<typeof createToolAuditLogger> {
+  const observations = new Map<string, (status: string, durationMs: number) => void>();
   const auditStore: ToolAuditStore = {
-    insert: (entry) => insertToolExecution(db, entry),
-    complete: (id, data) => completeToolExecution(db, id, data),
+    insert: (entry) => {
+      insertToolExecution(db, entry);
+      if (observations.size < 256)
+        observations.set(entry.id, observeDiagnosticTool(entry.id, entry.toolName, entry.status));
+    },
+    complete: (id, data) => {
+      completeToolExecution(db, id, data);
+      observations.get(id)?.(data.status, data.durationMs);
+      observations.delete(id);
+    },
   };
   return createToolAuditLogger(auditStore);
 }
@@ -980,29 +996,32 @@ function createRuntimeToolDispatchNode({
     ? { projectId: workspaceResolution.projectId }
     : undefined;
 
-  return createToolDispatchNode({
-    agent: agentCtx.agent,
-    tools: agentCtx.tools,
-    mcpManager: agentCtx.mcpManager,
-    nativeToolExecutor: resolvedNativeToolExecutor,
-    emitter,
-    dispatcher: agentCtx.pluginDispatcher,
-    pathJail: new PathJail(mounts),
-    auditLog: createAuditLog(db),
-    approvalRequests: {
-      create: (request) =>
-        createApprovalRequest(db, {
-          id: randomUUID(),
-          ...request,
-        }),
-    },
-    approvedToolCallIds,
-    skillResolver: (id: string) => getSkill(db, id),
-    projectAccessPolicy,
-    workspaceResources,
-    projectWriteBlockHandler: createProjectWriteBlockHandler(db, sessionId),
-    executionPolicy: loadSettings(db).executionPolicy,
-  });
+  return observeDiagnosticNode(
+    'tool',
+    createToolDispatchNode({
+      agent: agentCtx.agent,
+      tools: agentCtx.tools,
+      mcpManager: agentCtx.mcpManager,
+      nativeToolExecutor: resolvedNativeToolExecutor,
+      emitter,
+      dispatcher: agentCtx.pluginDispatcher,
+      pathJail: new PathJail(mounts),
+      auditLog: createAuditLog(db),
+      approvalRequests: {
+        create: (request) => {
+          const record = createApprovalRequest(db, { id: randomUUID(), ...request });
+          observeDiagnosticApproval(record.id, 'waiting');
+          return record;
+        },
+      },
+      approvedToolCallIds,
+      skillResolver: (id: string) => getSkill(db, id),
+      projectAccessPolicy,
+      workspaceResources,
+      projectWriteBlockHandler: createProjectWriteBlockHandler(db, sessionId),
+      executionPolicy: loadSettings(db).executionPolicy,
+    }),
+  );
 }
 
 function projectAccessPolicyForSession(
@@ -1040,7 +1059,10 @@ function buildRuntimeGraph({
   const dispatcher = agentCtx.pluginDispatcher;
   return buildHarnessGraph({
     executeTool: async () => ({ ok: true }),
-    llmReasonNode: options.llmReasonNode ?? createLlmReasonNode({ emitter, dispatcher }),
+    llmReasonNode: observeDiagnosticNode(
+      'model',
+      options.llmReasonNode ?? createLlmReasonNode({ emitter, dispatcher }),
+    ),
     toolDispatchNode: createRuntimeToolDispatchNode({
       db,
       agentCtx,
@@ -1082,6 +1104,7 @@ async function emitRuntimeFailure(
   res: Response,
   err: unknown,
 ) {
+  failDiagnosticRun(signal);
   await safePluginCall(() =>
     agentCtx.pluginDispatcher.onTaskEnd({
       sessionId,
@@ -1209,6 +1232,12 @@ export async function handleSessionResume(
       mapResumeApprovalError(error);
     }
 
+    const completeDiagnostics = beginDiagnosticRun(sessionId, runId);
+    observeDiagnosticApproval(
+      approvalRequestId,
+      approval.status === 'rejected' ? 'failed' : 'started',
+      approval.runId,
+    );
     await emitTaskStart(agentCtx, sessionId, runId);
     ({ timeoutId, heartbeatId } = startRuntimeResponse(req, res, controller, timeoutMs));
     const emitter: OutputEmitter = createNdjsonEmitter(res);
@@ -1314,6 +1343,7 @@ export async function handleSessionResume(
       userMessage: 'Resume reviewed tool call.',
       newMessages: persistedMessages?.slice(initialCount) ?? [],
     });
+    completeDiagnostics();
     await safePluginCall(() =>
       agentCtx.pluginDispatcher.onTaskEnd({ sessionId, runId, taskId: runId, ok: true }),
     );
@@ -1364,6 +1394,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
       const controller = new AbortController();
       const { signal } = controller;
       const runId = randomUUID();
+      const completeDiagnostics = beginDiagnosticRun(sessionId, runId);
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
       let heartbeatId: ReturnType<typeof setInterval> | undefined;
 
@@ -1427,6 +1458,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           userMessage: message,
           newMessages: persistedMessages?.slice(messages.length) ?? [],
         });
+        completeDiagnostics();
         await safePluginCall(() =>
           dispatcher.onTaskEnd({
             sessionId,

@@ -26,6 +26,20 @@ describe('correlation middleware', () => {
     expect(res.headers['x-correlation-id']).toBe('client-abc-123');
   });
 
+  it('keeps repeated caller IDs separate and rejects unsafe caller metadata', async () => {
+    const app = createApp({ db: null });
+    const responses = await Promise.all([
+      request(app).get('/health').set('x-correlation-id', 'same'),
+      request(app).get('/health').set('x-correlation-id', 'same'),
+    ]);
+    expect(responses[0]!.headers['x-request-id']).not.toBe(responses[1]!.headers['x-request-id']);
+    for (const caller of ['a'.repeat(129), 'Bearer secret value', 'https://private.example']) {
+      const res = await request(app).get('/health').set('x-correlation-id', caller);
+      expect(res.headers['x-correlation-id']).toBe(res.headers['x-request-id']);
+      expect(res.headers['x-request-id']).not.toBe(caller);
+    }
+  });
+
   it('propagates correlationId into structured log output', async () => {
     const app = createApp({ db: null });
     await request(app).get('/health').set('x-correlation-id', 'trace-xyz');

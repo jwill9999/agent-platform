@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import type {
+  DiagnosticPartialFailure,
   ApprovalRequest,
   ApprovalRequestStatus,
   CapabilityRecovery,
@@ -11,12 +12,27 @@ import type {
 } from '@agent-platform/contracts';
 import { WorkspaceEventSchema } from '@agent-platform/contracts';
 import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
+import { observeChatResponse, partialChatFailure } from '@/lib/chat-diagnostics';
 import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
 
 export type { CriticEvent } from '@/lib/critic-events';
 
 const THINKING_PLACEHOLDER = 'The agent is thinking…';
 const THINKING_REVISE_PLACEHOLDER = 'The agent is revising…';
+function removeMessageEntry<T>(previous: Record<string, T>, messageId: string): Record<string, T> {
+  if (!(messageId in previous)) return previous;
+  const next = { ...previous };
+  delete next[messageId];
+  return next;
+}
+
+function clearThinkingPlaceholder(previous: Record<string, string>, messageId: string) {
+  const current = previous[messageId];
+  if (current === THINKING_PLACEHOLDER || current === THINKING_REVISE_PLACEHOLDER)
+    return removeMessageEntry(previous, messageId);
+  return previous;
+}
+
 const CREDENTIAL_PATTERNS: readonly RegExp[] = [
   /sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/g,
   /(ghp|gho|ghu|ghs|ghr)_\w{36,}/g,
@@ -483,6 +499,14 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [status, setStatus] = useState<'ready' | 'streaming'>('ready');
   const [error, setError] = useState<string | null>(null);
+  const [diagnosticRequestId, setDiagnosticRequestId] = useState<string | null>(null);
+  const [diagnosticFailure, setDiagnosticFailure] = useState<DiagnosticPartialFailure | null>(null);
+  const diagnosticSessionRef = useRef(sessionId);
+  diagnosticSessionRef.current = sessionId;
+  useEffect(() => {
+    setDiagnosticRequestId(null);
+    setDiagnosticFailure(null);
+  }, [sessionId]);
   const [criticEventsByMessage, setCriticEventsByMessage] = useState<Record<string, CriticEvent[]>>(
     {},
   );
@@ -686,6 +710,13 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       setStatus('streaming');
       setError(null);
 
+      const observedAtMs = Date.now();
+      const started = performance.now();
+      let requestId = crypto.randomUUID();
+      let apiObserved = false;
+      let responseStatus: number | undefined;
+      setDiagnosticRequestId(null);
+      setDiagnosticFailure(null);
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
@@ -697,6 +728,9 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           }),
         });
 
+        ({ requestId, apiObserved, responseStatus } = observeChatResponse(res, requestId));
+        if (apiObserved && !res.ok && diagnosticSessionRef.current === sessionId)
+          setDiagnosticRequestId(requestId);
         if (!res.ok) throw new Error(await parseErrorResponse(res));
         if (!res.body) throw new Error('No response body');
 
@@ -708,48 +742,24 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
 
         // Publish a single final answer for the turn after all revisions/streaming settle.
         updateAssistantMessage(assistantId, finalText);
-        setThinkingByMessage((prev) => {
-          const current = prev[assistantId];
-          if (current === THINKING_PLACEHOLDER || current === THINKING_REVISE_PLACEHOLDER) {
-            const next = { ...prev };
-            delete next[assistantId];
-            return next;
-          }
-          return prev;
-        });
+        setThinkingByMessage((prev) => clearThinkingPlaceholder(prev, assistantId));
       } catch (e) {
+        const partialFailure = partialChatFailure({
+          requestId,
+          observedAtMs,
+          durationMs: performance.now() - started,
+          apiObserved,
+          responseStatus,
+        });
+        if (partialFailure && diagnosticSessionRef.current === sessionId)
+          setDiagnosticFailure(partialFailure);
         setError(friendlyChatErrorMessage(e instanceof Error ? e.message : String(e)));
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
-        setCriticEventsByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-        setThinkingByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-        setToolEventsByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-        setWorkspaceEventsByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-        setApprovalEventsByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
+        setCriticEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
+        setThinkingByMessage((prev) => removeMessageEntry(prev, assistantId));
+        setToolEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
+        setWorkspaceEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
+        setApprovalEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
       } finally {
         setStatus('ready');
       }
@@ -837,6 +847,8 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   );
 
   return {
+    diagnosticRequestId,
+    diagnosticFailure,
     messages,
     sendMessage,
     decideApproval,

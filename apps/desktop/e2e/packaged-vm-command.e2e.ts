@@ -13,11 +13,33 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type TestInfo } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 
 import { JOURNEY_CALL_ID, JOURNEY_MODEL, startJourneyProvider } from './support/providerJourney.js';
 import { getOpenPort } from './support/runtime.js';
+import { attemptFixtureCleanup, releaseOwnedVmFixture } from './support/vmFixtureTeardown.js';
+import {
+  attemptStartupEvidenceAttachment,
+  createStartupEvidence,
+} from './support/startupEvidence.js';
+
+const failedStartupAttachments = new WeakSet<TestInfo>();
+const failedVmTeardowns = new WeakSet<TestInfo>();
+const failedFixtureCleanup = new WeakMap<TestInfo, string[]>();
+test.afterEach(() => {
+  const testInfo = test.info();
+  // Report secondary failures after cleanup attempts; unverified fixture roots are retained.
+  expect
+    .soft(failedStartupAttachments.has(testInfo), 'Startup evidence attachment failed')
+    .toBe(false);
+  expect
+    .soft(failedVmTeardowns.has(testInfo), 'VM teardown unverified; fixture retained')
+    .toBe(false);
+  expect(failedFixtureCleanup.get(testInfo) ?? [], 'Fixture cleanup failed; root retained').toEqual(
+    [],
+  );
+});
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
@@ -35,10 +57,14 @@ type VmFixtureHealth = 'ready' | 'failed';
 
 type VmFixture = {
   backendPort: number;
+  startup: ReturnType<typeof createStartupEvidence>;
   evidenceDir?: string;
   heartbeatTimer?: NodeJS.Timeout;
   projectDir: string;
   realVmRuntimeDir?: string;
+  vmStartAttempted?: boolean;
+  vmDaemonPid?: number;
+  vmTeardownFailed?: boolean;
   rendererPort: number;
   resourcesDir: string;
   runtimeDir: string;
@@ -76,10 +102,8 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await expect(page.getByText(HOST_ONLY_CANARY_VALUE)).toHaveCount(0);
       writeVmEvidence(fixture, 'success', realVmStatus);
     } finally {
-      await app?.close();
-      stopRealVmRunner(fixture);
-      if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
-      rmSync(fixture.tempRoot, { recursive: true, force: true });
+      await cleanupFixtureResources(fixture, app);
+      if (!fixture.vmTeardownFailed) rmSync(fixture.tempRoot, { recursive: true, force: true });
     }
   });
 
@@ -108,9 +132,8 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await expect(page.getByText(`HOST_CWD:${fixture.projectDir}`)).toHaveCount(0);
       await expect(page.getByText(HOST_ONLY_CANARY_VALUE)).toHaveCount(0);
     } finally {
-      await app?.close();
-      if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
-      rmSync(fixture.tempRoot, { recursive: true, force: true });
+      await cleanupFixtureResources(fixture, app);
+      if (!fixture.vmTeardownFailed) rmSync(fixture.tempRoot, { recursive: true, force: true });
     }
   });
 });
@@ -146,7 +169,6 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
     const duplicateResumes: Array<{ status: number; body: unknown }> = [];
     let messages: Array<{ role: string; content: string }> = [];
     const streams: Array<{ status: number; events: unknown[] }> = [];
-    const captures: Promise<void>[] = [];
     const milestones: Array<{ event: string; at: string }> = [];
     const mark = (event: string) => milestones.push({ event, at: new Date().toISOString() });
     let tracing = false;
@@ -160,29 +182,37 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
       await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
       tracing = true;
       const page = await app.firstWindow();
-      page.on('response', (response) => {
-        if (!response.headers()['content-type']?.includes('application/x-ndjson')) return;
-        captures.push(
-          response
-            .text()
-            .then((body) => {
-              const events = body
-                .split('\n')
-                .filter(Boolean)
-                .map((line) => {
-                  try {
-                    return JSON.parse(line) as unknown;
-                  } catch {
-                    return { type: 'unparsed_event' };
-                  }
-                });
-              streams.push({ status: response.status(), events });
-            })
-            .catch(() => {
-              streams.push({ status: response.status(), events: [{ type: 'capture_failed' }] });
-            }),
-        );
+      // Observe a clone of the real browser fetch stream. Chromium may discard a
+      // completed no-store response before Playwright response.text() reads it.
+      // This does not substitute bytes, transport, status or application parsing.
+      await page.exposeFunction('__recordJourneyStream', (status: number, body: string) => {
+        const events = body
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => JSON.parse(line) as unknown);
+        streams.push({ status, events });
       });
+      const observeRealFetch = () => {
+        const original = window.fetch.bind(window);
+        window.fetch = async (...args) => {
+          const response = await original(...args);
+          if (response.headers.get('content-type')?.includes('application/x-ndjson')) {
+            void response
+              .clone()
+              .text()
+              .then((body) =>
+                (
+                  window as unknown as {
+                    __recordJourneyStream: (status: number, body: string) => Promise<void>;
+                  }
+                ).__recordJourneyStream(response.status, body),
+              );
+          }
+          return response;
+        };
+      };
+      await page.addInitScript(observeRealFetch);
+      await page.evaluate(observeRealFetch);
       await openProject(page);
       if (fixture.realVmRuntimeDir) startRealVmRunner(fixture);
       await sendChatMessage(page, '/init');
@@ -192,7 +222,9 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
       mark('project_onboarding_approved');
       await sendChatMessage(page, 'Append one line saying approved change to journey.txt.');
       const card = page.getByTestId('approval-card').last();
-      await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+      await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible({
+        timeout: failFirst ? 20_000 : 5_000,
+      });
       expect(readFileSync(file, 'utf8')).toBe(JOURNEY_BEFORE);
       const pending = await readEvidence<ApprovalEvidence>(fixture, 'approval-requests');
       approval = pending.find((row) => row.toolName === 'sys_bash');
@@ -202,8 +234,37 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
         expect(provider.requests[0]?.messages.some((m) => m.role === 'tool')).toBe(false);
       }
       mark('approval_pending_file_unchanged');
+      if (provider) {
+        await page.getByRole('button', { name: 'Export diagnostic report', exact: true }).click();
+        await expect
+          .poll(() => existsSync(join(fixture.tempRoot, 'waiting-diagnostics.json')))
+          .toBe(true);
+        const waiting = JSON.parse(
+          readFileSync(join(fixture.tempRoot, 'waiting-diagnostics.json'), 'utf8'),
+        );
+        expect(waiting.scope).toEqual({ sessionId: approval!.sessionId });
+        expect(
+          waiting.events.some(
+            ({ event }: { event: { phase: string; outcome: string } }) =>
+              event.phase === 'approval' && event.outcome === 'waiting',
+          ),
+        ).toBe(true);
+        await test.info().attach('waiting-diagnostic-report', {
+          path: join(fixture.tempRoot, 'waiting-diagnostics.json'),
+          contentType: 'application/json',
+        });
+      }
       if (reload) {
-        await Promise.all(captures);
+        // Let the original NDJSON response finish before navigation invalidates Chromium's body.
+        await expect
+          .poll(() =>
+            streams.some((stream) =>
+              stream.events.some(
+                (event) => (event as { type?: string }).type === 'approval_required',
+              ),
+            ),
+          )
+          .toBe(true);
         await page.reload();
         await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
         const restored = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
@@ -230,8 +291,7 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
             return row.type === type && (code === undefined || row.code === code);
           });
       expect(hasEvent('approval_required')).toBe(true);
-      // The denial card updates before the resume response is received. Promise.all(captures)
-      // only covers responses already observed, so wait for the terminal stream evidence itself.
+      // The denial card updates before the resume response is received; wait for actual stream evidence.
       await expect
         .poll(() =>
           hasEvent(
@@ -240,7 +300,6 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
           ),
         )
         .toBe(true);
-      await Promise.all(captures);
       approval = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
         (row) => row.id === approval?.id,
       );
@@ -255,7 +314,6 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
       const successes = audits.filter((row) => row.status === 'success');
       expect(successes).toHaveLength(decision === 'approve' ? 1 : 0);
       if (decision === 'reject') expect(audits.some((row) => row.status === 'denied')).toBe(true);
-      await Promise.all(captures);
       await expect
         .poll(
           () =>
@@ -336,6 +394,56 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
         );
         mark('duplicate_completed_resumes_no_new_effect');
       }
+      if (provider) {
+        await page.getByRole('button', { name: 'Export diagnostic report', exact: true }).click();
+        const diagnosticPath = join(fixture.tempRoot, 'finished-diagnostics.json');
+        await expect.poll(() => existsSync(diagnosticPath)).toBe(true);
+        const diagnosticText = readFileSync(diagnosticPath, 'utf8');
+        const diagnostic = JSON.parse(diagnosticText);
+        await test.info().attach('finished-diagnostic-report', {
+          path: diagnosticPath,
+          contentType: 'application/json',
+        });
+        expect(diagnostic.scope).toEqual({ sessionId: approval!.sessionId });
+        expect(diagnostic.coverage).toMatchObject({ durable: true, verified: true });
+        expect(
+          diagnostic.events.some(
+            ({ event }: { event: { phase: string; outcome: string; errorCode?: string } }) =>
+              event.phase === 'approval' &&
+              (decision === 'approve'
+                ? event.outcome === 'started'
+                : event.errorCode === 'permission_denied'),
+          ),
+        ).toBe(true);
+        if (decision === 'approve')
+          expect(
+            diagnostic.events.some(
+              ({ event }: { event: { phase: string; outcome: string } }) =>
+                event.phase === 'tool' && event.outcome === 'succeeded',
+            ),
+          ).toBe(true);
+        // The provider transcript proves SDK recovery after a real 503. SDK-internal
+        // attempts are opaque: the diagnostic contract truthfully reports the outer
+        // model operation rather than inventing a retry event for unseen attempts.
+        if (failFirst) {
+          const modelEvents = diagnostic.events.filter(
+            ({ event }: { event: { phase: string } }) => event.phase === 'model',
+          );
+          expect(
+            modelEvents.some(
+              ({ event }: { event: { outcome: string } }) => event.outcome === 'succeeded',
+            ),
+          ).toBe(true);
+          expect(
+            modelEvents.some(
+              ({ event }: { event: { outcome: string } }) => event.outcome === 'retrying',
+            ),
+          ).toBe(false);
+        }
+        expect(diagnosticText).not.toContain(JOURNEY_COMMAND);
+        expect(diagnosticText).not.toContain(HOST_ONLY_CANARY_VALUE);
+        expect(diagnosticText).not.toContain(fixture.projectDir);
+      }
       mark('turn_settled_file_and_audit_verified');
     } finally {
       // Snapshot durable evidence even when a UI assertion fails; never repair or manufacture it.
@@ -346,18 +454,22 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
       audits = (
         await readEvidence<AuditEvidence>(fixture, 'tool-executions').catch(() => audits)
       ).filter((row) => row.toolName === 'sys_bash');
-      if (app && tracing) {
-        const tracePath = test.info().outputPath('journey-trace.zip');
-        await app.context().tracing.stop({ path: tracePath });
-        await test
-          .info()
-          .attach('journey-browser-trace', { path: tracePath, contentType: 'application/zip' });
-      }
-      await app?.close();
-      await provider?.close();
-      await Promise.all(captures);
-      stopRealVmRunner(fixture);
-      if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
+      await recordCleanupFailures(fixture, [
+        {
+          name: 'trace',
+          run: async () => {
+            if (app && tracing) {
+              const tracePath = test.info().outputPath('journey-trace.zip');
+              await app.context().tracing.stop({ path: tracePath });
+              await test.info().attach('journey-browser-trace', {
+                path: tracePath,
+                contentType: 'application/zip',
+              });
+            }
+          },
+        },
+      ]);
+      await cleanupFixtureResources(fixture, app, () => provider?.close());
       try {
         const backendEvents = readBackendEvents(fixture);
         const evaluation = {
@@ -417,7 +529,7 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
           contentType: 'text/markdown',
         });
       } finally {
-        rmSync(fixture.tempRoot, { recursive: true, force: true });
+        if (!fixture.vmTeardownFailed) rmSync(fixture.tempRoot, { recursive: true, force: true });
       }
     }
   });
@@ -613,18 +725,22 @@ for (const { policy, unavailableFiles, action } of [
       ).filter((row) => row.toolName === toolName);
       savedPolicy = await readPolicy().catch(() => savedPolicy);
       try {
-        if (app && tracing) {
-          const trace = test.info().outputPath('policy-trace.zip');
-          await app.context().tracing.stop({ path: trace });
-          await test
-            .info()
-            .attach('policy-browser-trace', { path: trace, contentType: 'application/zip' });
-        }
+        await recordCleanupFailures(fixture, [
+          {
+            name: 'trace',
+            run: async () => {
+              if (app && tracing) {
+                const trace = test.info().outputPath('policy-trace.zip');
+                await app.context().tracing.stop({ path: trace });
+                await test
+                  .info()
+                  .attach('policy-browser-trace', { path: trace, contentType: 'application/zip' });
+              }
+            },
+          },
+        ]);
       } finally {
-        await app?.close();
-        await provider.close();
-        stopRealVmRunner(fixture);
-        if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
+        await cleanupFixtureResources(fixture, app, () => provider.close());
         try {
           const evidence = {
             policy,
@@ -656,7 +772,7 @@ for (const { policy, unavailableFiles, action } of [
           );
           await test.info().attach('policy-evaluation', { path, contentType: 'application/json' });
         } finally {
-          rmSync(fixture.tempRoot, { recursive: true, force: true });
+          if (!fixture.vmTeardownFailed) rmSync(fixture.tempRoot, { recursive: true, force: true });
         }
       }
     }
@@ -673,18 +789,54 @@ type ApprovalEvidence = {
 };
 type AuditEvidence = { id: string; sessionId: string; toolName: string; status: string };
 
-async function configureJourneyModel(fixture: VmFixture): Promise<void> {
-  await expect
-    .poll(
-      async () => {
-        try {
-          return (await fetch(`http://127.0.0.1:${fixture.backendPort}/health/ready`)).ok;
-        } catch {
-          return false;
-        }
+async function recordCleanupFailures(
+  fixture: VmFixture,
+  steps: Parameters<typeof attemptFixtureCleanup>[0],
+): Promise<void> {
+  const failed = await attemptFixtureCleanup(steps);
+  if (failed.length) {
+    const info = test.info();
+    failedFixtureCleanup.set(info, [...(failedFixtureCleanup.get(info) ?? []), ...failed]);
+    fixture.vmTeardownFailed = true;
+  }
+}
+
+async function cleanupFixtureResources(
+  fixture: VmFixture,
+  app?: ElectronApplication,
+  closeProvider: () => void | Promise<void> = () => {},
+): Promise<void> {
+  const priorFailure = fixture.vmTeardownFailed;
+  await recordCleanupFailures(fixture, [
+    { name: 'electron', run: () => closeVmFixtureApp(fixture, app) },
+    { name: 'provider', run: closeProvider },
+    { name: 'vm', run: () => stopRealVmRunner(fixture) },
+    {
+      name: 'heartbeat',
+      run: () => {
+        if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
       },
-      { timeout: 20_000 },
-    )
+    },
+  ]);
+  fixture.vmTeardownFailed ||= priorFailure;
+}
+
+async function closeVmFixtureApp(fixture: VmFixture, app?: ElectronApplication): Promise<void> {
+  const info = test.info();
+  const attached = await attemptStartupEvidenceAttachment(() =>
+    info.attach('startup-evidence', {
+      body: Buffer.from(JSON.stringify(fixture.startup.snapshot(), null, 2)),
+      contentType: 'application/json',
+    }),
+  );
+  if (!attached) failedStartupAttachments.add(info);
+  await app?.close();
+}
+
+async function configureJourneyModel(fixture: VmFixture): Promise<void> {
+  const deadline = performance.now() + 20_000;
+  await expect
+    .poll(() => fixture.startup.probe(deadline - performance.now()), { timeout: 20_000 })
     .toBe(true);
   const configs = await readEvidence<{ id: string }>(fixture, 'model-configs');
   expect(configs).toHaveLength(1);
@@ -719,7 +871,14 @@ function readBackendEvents(fixture: VmFixture) {
           level?: string;
           service?: string;
           correlationId?: string;
-          event?: { kind?: string; sessionId?: string; runId?: string; toolId?: string };
+          event?: {
+            kind?: string;
+            sessionId?: string;
+            runId?: string;
+            toolId?: string;
+            phase?: string;
+            outcome?: string;
+          };
         };
         if (!row.event) return [];
         return [
@@ -728,7 +887,17 @@ function readBackendEvents(fixture: VmFixture) {
             level: row.level,
             service: row.service,
             correlationId: row.correlationId,
-            kind: row.event.kind,
+            // The safe diagnostic sink uses explicit phase/outcome instead of legacy kind.
+            // A waiting request ends this invocation, not the overall approved action.
+            kind:
+              row.event.kind ??
+              (row.event.phase === 'request'
+                ? row.event.outcome === 'started'
+                  ? 'task_start'
+                  : 'task_end'
+                : undefined),
+            phase: row.event.phase,
+            outcome: row.event.outcome,
             sessionId: row.event.sessionId,
             runId: row.event.runId,
             toolId: row.event.toolId,
@@ -782,6 +951,7 @@ async function createVmFixture(options: { health: VmFixtureHealth }): Promise<Vm
 
   return {
     backendPort,
+    startup: createStartupEvidence(backendPort, rendererPort),
     evidenceDir,
     heartbeatTimer,
     projectDir,
@@ -802,11 +972,18 @@ async function launchVmFixture(
     workspaceRoot?: string;
   } = {},
 ): Promise<ElectronApplication> {
-  return electron.launch({
+  const app = await electron.launch({
     cwd: desktopDir,
     args: ['.'],
     env: {
       ...process.env,
+      LANGCHAIN_TRACING_V2: 'false',
+      LANGSMITH_TRACING: 'false',
+      LANGSMITH_TRACING_V2: 'false',
+      AGENT_PLATFORM_DESKTOP_TEST_SAVE_DIAGNOSTIC_PATHS: JSON.stringify([
+        join(fixture.tempRoot, 'waiting-diagnostics.json'),
+        join(fixture.tempRoot, 'finished-diagnostics.json'),
+      ]),
       WORKSPACE_ROOT: options.workspaceRoot ?? join(fixture.tempRoot, 'workspace'),
       AGENT_OPENAI_API_KEY: 'sk-test-key',
       AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
@@ -842,6 +1019,8 @@ async function launchVmFixture(
       ...(process.env.CI ? { CI: process.env.CI } : {}),
     },
   });
+  fixture.startup.observeProcess(app.process());
+  return app;
 }
 
 async function openProject(page: Page): Promise<void> {
@@ -961,11 +1140,26 @@ function assertPackagedResources(resourcesDir: string): void {
 function startRealVmRunner(fixture: VmFixture): unknown {
   if (!fixture.realVmRuntimeDir) return undefined;
   const helperPath = join(fixture.resourcesDir, 'macos-vm', 'macos-vm-runner');
-  const status = execFileSync(
-    helperPath,
-    ['start', '--runtime-dir', fixture.realVmRuntimeDir, '--workspace', fixture.projectDir],
-    { encoding: 'utf8', timeout: 90_000 },
-  );
+  fixture.vmStartAttempted = true;
+  let status: string;
+  try {
+    status = execFileSync(
+      helperPath,
+      ['start', '--runtime-dir', fixture.realVmRuntimeDir, '--workspace', fixture.projectDir],
+      { encoding: 'utf8', timeout: 90_000 },
+    );
+  } finally {
+    try {
+      const text = readFileSync(
+        join(fixture.realVmRuntimeDir, 'state', 'daemon.pid'),
+        'utf8',
+      ).trim();
+      if (/^[1-9]\d*$/.test(text) && Number.isSafeInteger(Number(text)))
+        fixture.vmDaemonPid = Number(text);
+    } catch {
+      /* Missing identity must fail teardown rather than signal an unknown process. */
+    }
+  }
   const parsed = JSON.parse(status) as { ok?: boolean; message?: string; state?: string };
   if (!parsed.ok || parsed.state !== 'ready') {
     throw new Error(`macOS VM runner did not start: ${status}`);
@@ -973,17 +1167,24 @@ function startRealVmRunner(fixture: VmFixture): unknown {
   return parsed;
 }
 
-function stopRealVmRunner(fixture: VmFixture): void {
+async function stopRealVmRunner(fixture: VmFixture): Promise<void> {
   if (!fixture.realVmRuntimeDir) return;
-  const helperPath = join(fixture.resourcesDir, 'macos-vm', 'macos-vm-runner');
-  try {
-    execFileSync(helperPath, ['stop', '--runtime-dir', fixture.realVmRuntimeDir], {
-      encoding: 'utf8',
-      timeout: 20_000,
-    });
-  } catch {
-    // Best-effort cleanup; the test has already captured the relevant failure.
-  }
+  const outcome = await releaseOwnedVmFixture({
+    runtimeDir: fixture.realVmRuntimeDir,
+    helperPath: join(fixture.resourcesDir, 'macos-vm', 'macos-vm-runner'),
+    projectDir: fixture.projectDir,
+    started: fixture.vmStartAttempted ?? false,
+    daemonPid: fixture.vmDaemonPid,
+  });
+  fixture.vmTeardownFailed = !outcome.ok;
+  if (!outcome.ok) failedVmTeardowns.add(test.info());
+  const attached = await attemptStartupEvidenceAttachment(() =>
+    test.info().attach('vm-teardown', {
+      body: Buffer.from(JSON.stringify(outcome)),
+      contentType: 'application/json',
+    }),
+  );
+  if (!attached) failedStartupAttachments.add(test.info());
 }
 
 function writeVmEvidence(fixture: VmFixture, scenario: string, runnerStatus: unknown): void {

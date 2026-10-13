@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import {
   desktopBridgeApiName,
+  saveDiagnosticReportIpcChannel,
+  savePartialDiagnosticReportIpcChannel,
   createProjectFolderIpcChannel,
   createTerminalIpcChannel,
   disposeTerminalIpcChannel,
@@ -33,6 +35,16 @@ import {
 } from './desktopBridge.js';
 
 const desktopApi = {
+  diagnostics: {
+    saveReport: (scope) =>
+      ipcRenderer.invoke(saveDiagnosticReportIpcChannel, scope) as ReturnType<
+        AgentPlatformDesktopApi['diagnostics']['saveReport']
+      >,
+    savePartial: (failure) =>
+      ipcRenderer.invoke(savePartialDiagnosticReportIpcChannel, failure) as ReturnType<
+        AgentPlatformDesktopApi['diagnostics']['savePartial']
+      >,
+  },
   maintenance: {
     getResetLocalDataConfirmation: () =>
       ipcRenderer.invoke(resetLocalDataConfirmationIpcChannel) as Promise<string>,

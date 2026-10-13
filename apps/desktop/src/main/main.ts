@@ -1,3 +1,11 @@
+import { diagnosticChildEnvironment, takeDiagnosticCapability } from './diagnosticEnvironment.js';
+import { randomBytes } from 'node:crypto';
+import {
+  saveDiagnosticReport,
+  savePartialDiagnosticReport,
+  validateDiagnosticScope,
+  validateDiagnosticPartial,
+} from './diagnosticExport.js';
 import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, WebContentsView } from 'electron';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +49,8 @@ import {
   resolveDesktopRuntimePathsFromApp,
 } from './runtimePaths.js';
 import {
+  saveDiagnosticReportIpcChannel,
+  savePartialDiagnosticReportIpcChannel,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
   repairMacosVmRuntimeIpcChannel,
@@ -94,6 +104,7 @@ import {
   getPreloadPath,
 } from './windowConfig.js';
 
+let diagnosticCapability = takeDiagnosticCapability(process.env);
 const smokeMode = process.argv.includes('--smoke');
 let mainWindow: BrowserWindow | undefined;
 let desktopBackend: DesktopBackendHandle | undefined;
@@ -140,6 +151,7 @@ async function resolveRendererUrl(
     standaloneRenderer = await startStandaloneRenderer({
       electronPath: process.execPath,
       paths: getStandaloneRendererPaths(repoRoot),
+      env: diagnosticChildEnvironment(process.env, diagnosticCapability),
     });
 
     return standaloneRenderer.url;
@@ -163,6 +175,7 @@ async function bootstrap(): Promise<void> {
   const runtimePaths = resolveDesktopRuntimePathsFromApp(app, process.env);
 
   if (resolveDesktopBackendMode(process.env) === 'managed') {
+    diagnosticCapability = randomBytes(32).toString('hex');
     ensureDesktopRuntimeDirectories(runtimePaths);
     const secrets = await ensureDesktopSecretsMasterKey({
       env: process.env,
@@ -172,6 +185,10 @@ async function bootstrap(): Promise<void> {
     desktopBackend = await startDesktopBackend({
       nodePath: resolveDesktopBackendNodePath(process.env, process.execPath),
       paths: getDesktopBackendPaths(repoRoot, runtimePaths),
+      env: {
+        ...diagnosticChildEnvironment(process.env, diagnosticCapability),
+        DIAGNOSTICS_APP_VERSION: app.getVersion(),
+      },
       secretsMasterKeyB64: secrets.masterKeyB64,
     });
     process.env.API_PROXY_URL = desktopBackend.url;
@@ -261,7 +278,7 @@ function spawnDesktopPty(options: DesktopPtySpawnOptions) {
     rows: options.rows,
     cwd: options.cwd,
     env: {
-      ...process.env,
+      ...diagnosticChildEnvironment(process.env),
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
     },
@@ -324,6 +341,24 @@ function registerDesktopWorkspaceIpc(window: BrowserWindow): void {
   window.once('closed', () => {
     desktopWebViewService?.disposeAll();
     desktopWebViewService = undefined;
+  });
+
+  ipcMain.removeHandler(saveDiagnosticReportIpcChannel);
+  ipcMain.handle(saveDiagnosticReportIpcChannel, async (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    return saveDiagnosticReport(validateIpcPayload(payload, validateDiagnosticScope), {
+      apiBaseUrl: resolveDesktopTerminalApiBaseUrl(),
+      capability: diagnosticCapability,
+      showSaveDialog: (options) => dialog.showSaveDialog(window, options),
+    });
+  });
+  ipcMain.removeHandler(savePartialDiagnosticReportIpcChannel);
+  ipcMain.handle(savePartialDiagnosticReportIpcChannel, async (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    return savePartialDiagnosticReport(validateIpcPayload(payload, validateDiagnosticPartial), {
+      apiBaseUrl: resolveDesktopTerminalApiBaseUrl(),
+      showSaveDialog: (options) => dialog.showSaveDialog(window, options),
+    });
   });
 
   ipcMain.removeHandler(saveWorkspaceResourceIpcChannel);

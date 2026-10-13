@@ -1,10 +1,9 @@
+import { diagnosticRetry } from '../../diagnostics/observations.js';
 import type { DrizzleDb } from '@agent-platform/db';
 import { loadSettings } from '@agent-platform/db';
-import { createLogger } from '@agent-platform/logger';
 import {
   createObservabilityPlugin,
   createObservabilityStore,
-  type ObservabilityEvent,
   type ObservabilityStore,
 } from '@agent-platform/plugin-observability';
 import type { RegisteredPlugin } from '@agent-platform/plugin-session';
@@ -28,8 +27,6 @@ import { createWorkspaceRouter } from './workspaceRouter.js';
 import { createDynamicRateLimiter } from '../dynamicRateLimiter.js';
 import { createInProcessSessionLock } from '../sessionLock.js';
 
-const observabilityLog = createLogger('api:observability');
-
 export type V1RouterOptions = {
   chat?: Pick<
     ChatRouterOptions,
@@ -47,10 +44,18 @@ export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Ro
   const observabilityStore = options.observabilityStore ?? createObservabilityStore();
   const globalPlugins: readonly RegisteredPlugin[] = [
     {
+      id: 'diagnostics-retry',
+      hooks: {
+        onError: (event) => {
+          if (event.retryAttempt !== undefined)
+            diagnosticRetry(event.retryAttempt, event.phase === 'tool' ? 'tool' : 'model');
+        },
+      },
+    },
+    {
       id: 'plugin-observability',
       hooks: createObservabilityPlugin({
         store: observabilityStore,
-        log: (event: ObservabilityEvent) => observabilityLog.info('observability.event', { event }),
       }),
     },
   ];

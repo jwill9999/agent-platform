@@ -648,6 +648,8 @@ export default function HomePage() {
 
   const {
     messages,
+    diagnosticRequestId,
+    diagnosticFailure,
     sendMessage,
     status,
     error,
@@ -1603,6 +1605,9 @@ export default function HomePage() {
             }}
           >
             <Chat
+              diagnosticSessionId={sessionId}
+              diagnosticRequestId={diagnosticRequestId}
+              diagnosticFailure={diagnosticFailure}
               key={`${selectedMode}:${activeProject?.id ?? 'none'}:${sessionId ?? 'none'}`}
               resetKey={`${selectedMode}:${activeProject?.id ?? 'none'}:${sessionId ?? 'none'}`}
               messages={messages}
