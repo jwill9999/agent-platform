@@ -27,3 +27,11 @@ export {
   DiagnosticStoreError,
   type DiagnosticStoreOptions,
 } from './diagnostics/store.js';
+
+export {
+  resolveMcpConnection,
+  updateMcpServer,
+  importMcpServers,
+  duplicateMcpServer,
+  McpConfigurationError,
+} from './repositories/mcpConnections.js';

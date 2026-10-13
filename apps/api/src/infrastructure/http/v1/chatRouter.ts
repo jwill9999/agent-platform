@@ -1,3 +1,4 @@
+import { parseToolId } from '@agent-platform/agent-validation';
 import {
   beginDiagnosticRun,
   failDiagnosticRun,
@@ -10,6 +11,8 @@ import {
 import type { DrizzleDb } from '@agent-platform/db';
 import {
   getSession,
+  getMcpServer,
+  loadAgentById,
   getSkill,
   appendMessage,
   listMessagesBySession,
@@ -78,6 +81,7 @@ import {
   type OutputEmitter,
   type ToolAuditStore,
   type ToolCallIntent,
+  type McpApprovalBinding,
 } from '@agent-platform/harness';
 import {
   resolveModelConfig,
@@ -198,11 +202,12 @@ function deriveSessionTitle(message: string): string {
 async function loadAgentContext(
   db: DrizzleDb,
   agentId: string,
-  options: Pick<ChatRouterOptions, 'globalPlugins'> = {},
+  options: Pick<ChatRouterOptions, 'globalPlugins'> & { signal?: AbortSignal } = {},
 ): Promise<AgentContext> {
   try {
     return await buildAgentContext(db, agentId, {
       globalPlugins: options.globalPlugins,
+      signal: options.signal,
     });
   } catch (err) {
     if (err instanceof AgentNotFoundError) {
@@ -213,6 +218,38 @@ async function loadAgentContext(
 }
 
 type ResolvedChatModel = { provider: string; model: string; apiKey?: string };
+
+async function acquireRuntimeContext(
+  db: DrizzleDb,
+  session: SessionRecord,
+  options: ChatRouterOptions,
+  req: Request,
+  sessionLock: SessionLock,
+  signal: AbortSignal,
+) {
+  const agentCtx = await loadAgentContext(db, session.agentId, {
+    globalPlugins: options.globalPlugins,
+    signal,
+  });
+  try {
+    const modelCfg = resolveModelOrThrow(
+      db,
+      agentCtx,
+      req.header('x-openai-key'),
+      req.header('x-model-config-id') || undefined,
+    );
+    const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
+    const release = await sessionLock.acquire(session.id, timeoutMs);
+    if (signal.aborted) {
+      release();
+      throw new HttpError(499, 'REQUEST_CANCELLED', 'Request was cancelled.');
+    }
+    return { agentCtx, modelCfg, timeoutMs, release };
+  } catch (error) {
+    await destroyAgentContext(agentCtx);
+    throw error;
+  }
+}
 
 function requiredSecretsMasterKey(): Buffer {
   const masterKeyB64 = process.env['SECRETS_MASTER_KEY'];
@@ -488,19 +525,30 @@ function parseExecutionPayload(request: ApprovalRequest): ToolCallIntent {
     );
   }
 
-  let parsed: { toolCallId: string; toolName: string; args: Record<string, unknown> };
+  let parsed: {
+    toolCallId: string;
+    toolName: string;
+    args: Record<string, unknown>;
+    mcpBinding?: McpApprovalBinding;
+  };
   try {
     parsed = z
       .object({
         toolCallId: z.string().min(1),
         toolName: z.string().min(1),
         args: z.record(z.string(), z.unknown()).default({}),
+        mcpBinding: z
+          .object({
+            serverId: z.string().min(1),
+            configurationRevision: z.number().int().nonnegative(),
+            toolRevision: z.string().regex(/^[a-f0-9]{64}$/),
+          })
+          .strict()
+          .optional(),
       })
       .parse(JSON.parse(request.executionPayloadJson));
-  } catch (error) {
-    throw new HttpError(409, 'APPROVAL_RESUME_STATE_INVALID', 'Approval resume state is invalid', {
-      cause: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
+    throw new HttpError(409, 'APPROVAL_RESUME_STATE_INVALID', 'Approval resume state is invalid');
   }
 
   if (parsed.toolName !== request.toolName) {
@@ -515,6 +563,7 @@ function parseExecutionPayload(request: ApprovalRequest): ToolCallIntent {
     id: parsed.toolCallId,
     name: parsed.toolName,
     args: parsed.args,
+    ...(parsed.mcpBinding ? { mcpBinding: parsed.mcpBinding } : {}),
   };
 }
 
@@ -1011,6 +1060,8 @@ function createRuntimeToolDispatchNode({
       agent: agentCtx.agent,
       tools: agentCtx.tools,
       mcpManager: agentCtx.mcpManager,
+      mcpApprovalBindings: agentCtx.mcpApprovalBindings,
+      isMcpBindingCurrent: agentCtx.isMcpBindingCurrent,
       nativeToolExecutor: resolvedNativeToolExecutor,
       emitter,
       dispatcher: agentCtx.pluginDispatcher,
@@ -1154,7 +1205,6 @@ async function emitTaskStart(agentCtx: AgentContext, sessionId: string, runId: s
 }
 
 function startRuntimeResponse(
-  req: Request,
   res: Response,
   controller: AbortController,
   timeoutMs: number,
@@ -1163,7 +1213,7 @@ function startRuntimeResponse(
   heartbeatId: ReturnType<typeof setInterval>;
 } {
   prepareNdjsonResponse(res);
-  req.on('close', () => {
+  res.once('close', () => {
     if (!res.writableFinished) controller.abort('client_disconnect');
   });
   const timeoutId = setTimeout(() => controller.abort('timeout'), timeoutMs);
@@ -1191,6 +1241,28 @@ async function closeRuntimeStream({
   release();
   await destroyAgentContext(agentCtx);
   if (!res.writableEnded) res.end();
+}
+
+function assertCurrentMcpApproval(db: DrizzleDb, agentId: string, call: ToolCallIntent): void {
+  const parsed = parseToolId(call.name);
+  if (parsed.kind !== 'mcp') return;
+  const binding = call.mcpBinding;
+  const server = getMcpServer(db, parsed.mcpServerId);
+  const agent = loadAgentById(db, agentId);
+  if (
+    !binding ||
+    binding.serverId !== parsed.mcpServerId ||
+    !server ||
+    server.needsReconfiguration ||
+    server.configurationRevision !== binding.configurationRevision ||
+    !agent?.allowedMcpServerIds.includes(parsed.mcpServerId)
+  ) {
+    throw new HttpError(
+      409,
+      'MCP_APPROVAL_STALE',
+      'MCP connection or assignment changed. Start a new request and review its permissions.',
+    );
+  }
 }
 
 export async function handleSessionResume(
@@ -1223,20 +1295,23 @@ export async function handleSessionResume(
   }
 
   const toolCall = parseExecutionPayload(approval);
-  const agentCtx = await loadAgentContext(db, session.agentId, {
-    globalPlugins: options.globalPlugins,
-  });
-  const modelCfg = resolveModelOrThrow(
-    db,
-    agentCtx,
-    req.header('x-openai-key'),
-    req.header('x-model-config-id') || undefined,
-  );
-  const { timeoutMs } = agentCtx.agent.executionLimits;
-  const release = await sessionLock.acquire(sessionId, timeoutMs);
+  // Reject substituted commands/endpoints before opening a replacement connection.
+  if (approval.status !== 'rejected') assertCurrentMcpApproval(db, session.agentId, toolCall);
 
   const controller = new AbortController();
   const { signal } = controller;
+  res.once('close', () => {
+    if (!res.writableFinished) controller.abort('client_disconnect');
+  });
+  const { agentCtx, modelCfg, timeoutMs, release } = await acquireRuntimeContext(
+    db,
+    session,
+    options,
+    req,
+    sessionLock,
+    signal,
+  );
+
   const runId = randomUUID();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   let heartbeatId: ReturnType<typeof setInterval> | undefined;
@@ -1255,7 +1330,7 @@ export async function handleSessionResume(
       approval.runId,
     );
     await emitTaskStart(agentCtx, sessionId, runId);
-    ({ timeoutId, heartbeatId } = startRuntimeResponse(req, res, controller, timeoutMs));
+    ({ timeoutId, heartbeatId } = startRuntimeResponse(res, controller, timeoutMs));
     const emitter: OutputEmitter = createNdjsonEmitter(res);
 
     const projectContext = resolveSessionProjectContext(db, session);
@@ -1274,6 +1349,8 @@ export async function handleSessionResume(
     const initialCount = messages.length - (resumeBuild.reconstructedToolCallContext ? 1 : 0);
 
     let resumeMessages: ChatMessage[];
+    let stopAfterDispatch = false;
+    let mcpHalt: HarnessStateType['mcpHalt'];
     let nativeToolExecutor: NativeToolExecutor | undefined;
     if (approval.status === 'rejected') {
       resumeMessages = [buildRejectedToolMessage(toolCall, approval)];
@@ -1318,6 +1395,8 @@ export async function handleSessionResume(
         configurable: { thread_id: sessionId, signal },
       });
       resumeMessages = dispatchResult.messages ?? [];
+      stopAfterDispatch = dispatchResult.halted === true;
+      mcpHalt = dispatchResult.mcpHalt;
     }
 
     const graph = buildRuntimeGraph({
@@ -1343,12 +1422,10 @@ export async function handleSessionResume(
       },
     );
 
-    const finalState: Pick<HarnessStateType, 'messages' | 'contextHalt'> = await graph.invoke(
-      resumeState,
-      {
-        configurable: { thread_id: sessionId, signal },
-      },
-    );
+    const finalState: Pick<HarnessStateType, 'messages' | 'contextHalt' | 'mcpHalt'> =
+      stopAfterDispatch
+        ? { ...resumeState, mcpHalt }
+        : await graph.invoke(resumeState, { configurable: { thread_id: sessionId, signal } });
 
     const persistedMessages = sanitizeProjectAssistantMessages(
       finalState?.messages,
@@ -1369,8 +1446,8 @@ export async function handleSessionResume(
         sessionId,
         runId,
         taskId: runId,
-        ok: !finalState.contextHalt,
-        ...(finalState.contextHalt ? { detail: finalState.contextHalt.code } : {}),
+        ok: !stopAfterDispatch && !finalState.contextHalt && !finalState.mcpHalt,
+        ...terminalFailureDetail(finalState),
       }),
     );
   } catch (err) {
@@ -1404,21 +1481,20 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         return;
       }
 
-      const agentCtx = await loadAgentContext(db, session.agentId, {
-        globalPlugins: options.globalPlugins,
-      });
-      const modelCfg = resolveModelOrThrow(
-        db,
-        agentCtx,
-        req.header('x-openai-key'),
-        req.header('x-model-config-id') || undefined,
-      );
-
-      const { timeoutMs } = agentCtx.agent.executionLimits;
-      const release = await sessionLock.acquire(sessionId, timeoutMs);
-
       const controller = new AbortController();
       const { signal } = controller;
+      res.once('close', () => {
+        if (!res.writableFinished) controller.abort('client_disconnect');
+      });
+      const { agentCtx, modelCfg, timeoutMs, release } = await acquireRuntimeContext(
+        db,
+        session,
+        options,
+        req,
+        sessionLock,
+        signal,
+      );
+
       const runId = randomUUID();
       const completeDiagnostics = beginDiagnosticRun(sessionId, runId);
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -1433,7 +1509,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           }),
         );
 
-        ({ timeoutId, heartbeatId } = startRuntimeResponse(req, res, controller, timeoutMs));
+        ({ timeoutId, heartbeatId } = startRuntimeResponse(res, controller, timeoutMs));
         const projectContext = resolveSessionProjectContext(db, session);
         const emitter: OutputEmitter = projectUserFacingEmitter(
           createNdjsonEmitter(res),
@@ -1459,12 +1535,10 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           projectAccessPolicy: projectAccessPolicyForSession(db, sessionId),
         });
 
-        const finalState: Pick<HarnessStateType, 'messages' | 'contextHalt'> = await graph.invoke(
-          initialState,
-          {
+        const finalState: Pick<HarnessStateType, 'messages' | 'contextHalt' | 'mcpHalt'> =
+          await graph.invoke(initialState, {
             configurable: { thread_id: sessionId, signal },
-          },
-        );
+          });
 
         const persistedMessages = sanitizeProjectAssistantMessages(
           finalState?.messages,
@@ -1488,8 +1562,8 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
             sessionId,
             runId,
             taskId: runId,
-            ok: !finalState.contextHalt,
-            ...(finalState.contextHalt ? { detail: finalState.contextHalt.code } : {}),
+            ok: !finalState.contextHalt && !finalState.mcpHalt,
+            ...terminalFailureDetail(finalState),
           }),
         );
       } catch (err) {
@@ -1665,6 +1739,13 @@ function withProjectInstructionPrompt(
   return prompt ? `${systemPrompt}\n\n${prompt}` : systemPrompt;
 }
 
+function terminalFailureDetail(state: Pick<HarnessStateType, 'contextHalt' | 'mcpHalt'>): {
+  detail?: string;
+} {
+  const failure = state.contextHalt ?? state.mcpHalt;
+  return failure ? { detail: failure.code } : {};
+}
+
 function buildInitialState(
   runId: string,
   sessionId: string,
@@ -1707,6 +1788,7 @@ function buildInitialState(
     pendingApprovalToolCallIds: contextInfo.pendingApprovalToolCallIds ?? [],
     approvalToolCallIds: contextInfo.approvalToolCallIds ?? [],
     contextHalt: null,
+    mcpHalt: null,
     toolDefinitions: contractToolsToDefinitions(tools),
     llmOutput: null,
     modelConfig,

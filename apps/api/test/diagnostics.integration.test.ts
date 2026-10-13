@@ -1,5 +1,5 @@
 import { request as httpRequest } from 'node:http';
-import { once } from 'node:events';
+import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,9 +37,16 @@ beforeEach(() => {
   vi.stubEnv('LANGSMITH_TRACING_V2', 'false');
 });
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+  const results = await Promise.allSettled(
+    cleanups
+      .splice(0)
+      .reverse()
+      .map((cleanup) => cleanup()),
+  );
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  const errors = results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
+  if (errors.length) throw new AggregateError(errors, 'Diagnostic fixture cleanup failed');
 });
 
 async function fixture(
@@ -54,15 +61,21 @@ async function fixture(
   let store: DiagnosticStore = createDiagnosticStore({ path: join(dir, 'diagnostics.sqlite') });
   await store.ready;
   expect(store.health().state).toBe('ready');
-  const app = appFactory({
-    db,
-    diagnostics: { store, access: { host, capability }, appVersion },
-    v1: { chat: { llmReasonNode: node, emitFinalAssistantMessage: true, ...extra } },
-  });
+  const app = await listenLoopback(
+    appFactory({
+      db,
+      diagnostics: { store, access: { host, capability }, appVersion },
+      v1: { chat: { llmReasonNode: node, emitFinalAssistantMessage: true, ...extra } },
+    }),
+  );
   cleanups.push(async () => {
-    await store.close();
-    closeDatabase(sqlite);
-    rmSync(dir, { recursive: true, force: true });
+    try {
+      await closeLoopback(app);
+    } finally {
+      await store.close();
+      closeDatabase(sqlite);
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
   const report = (scope: unknown, cursor?: string) =>
     request(app)
@@ -626,8 +639,7 @@ describe('local diagnostic API with real SQLite', () => {
       },
       { systemToolExecutorFactory: () => execute },
     );
-    const server = f.app.listen(0, '127.0.0.1');
-    await once(server, 'listening');
+    const server = f.app;
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('expected TCP socket');
     const client = httpRequest(

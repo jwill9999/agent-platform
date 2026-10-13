@@ -1,3 +1,4 @@
+import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,7 +15,7 @@ import {
 import { createApprovalRequestsRouter } from '../src/infrastructure/http/v1/approvalRequestsRouter.js';
 import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 
-function buildTestApp() {
+async function buildTestApp() {
   const tmpDir = mkdtempSync(path.join(tmpdir(), 'approval-requests-test-'));
   const dbPath = path.join(tmpDir, 'test.sqlite');
   const { db, sqlite } = openDatabase(dbPath);
@@ -25,7 +26,7 @@ function buildTestApp() {
   app.use('/v1/approval-requests', createApprovalRequestsRouter(db));
   app.use(errorMiddleware);
 
-  return { app, db, sqlite, tmpDir };
+  return { app: await listenLoopback(app), db, sqlite, tmpDir };
 }
 
 function seedApproval(db: DrizzleDb, id = 'approval-1') {
@@ -42,15 +43,19 @@ function seedApproval(db: DrizzleDb, id = 'approval-1') {
 }
 
 describe('approvalRequestsRouter', () => {
-  let ctx: ReturnType<typeof buildTestApp>;
+  let ctx: Awaited<ReturnType<typeof buildTestApp>>;
 
-  beforeEach(() => {
-    ctx = buildTestApp();
+  beforeEach(async () => {
+    ctx = await buildTestApp();
   });
 
-  afterEach(() => {
-    closeDatabase(ctx.sqlite);
-    rmSync(ctx.tmpDir, { recursive: true, force: true });
+  afterEach(async () => {
+    try {
+      await closeLoopback(ctx.app);
+    } finally {
+      closeDatabase(ctx.sqlite);
+      rmSync(ctx.tmpDir, { recursive: true, force: true });
+    }
   });
 
   it('lists pending approvals with redacted args', async () => {

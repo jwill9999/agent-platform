@@ -302,34 +302,83 @@ Agents control access to resources through ID-based allowlists:
 
 ## MCP Server Configuration
 
-MCP (Model Context Protocol) servers extend agent capabilities by providing tools.
+MCP (Model Context Protocol) servers extend agent capabilities with tools. This local MVP
+connects to a server you have reviewed and installed, or an existing Streamable HTTP endpoint.
+It does not install packages, provision servers, or provide interactive OAuth sign-in.
+
+### Import, Save and Test
+
+In the MCP dashboard, import an endpoint URL, a single configuration object, a named server map,
+or a `mcpServers` wrapper. Review the parsed entries and validation errors before saving.
+Unsupported fields and environment interpolation such as `${TOKEN}` are rejected.
+Saving, listing and assigning a server do not start a process or make a connection. Explicit
+**Test** opens the saved connection, performs the MCP handshake and tool discovery, applies the
+same trust filter as chat, then closes it. Test does not call a tool. Starting a stdio server still
+executes that server's code: use software you trust, with only the credentials it needs.
+
+Install both the stdio executable and its server package on the **API execution host** first.
+For the native app that is the managed local backend's host; with Docker it is the API container,
+so a path installed only on your laptop may not exist there. Commands run without a shell, with
+an argument array and explicit environment values plus the SDK's minimal default environment.
+This connection is not a sandbox for untrusted server code.
 
 ### Creating an MCP Server
+
+Replace the example path with a reviewed server already installed on the API execution host;
+`node` must also be available to that host. This request saves configuration only:
 
 ```bash
 curl -X POST http://localhost:3000/v1/mcp-servers \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "Filesystem MCP",
+    "name": "Reviewed local MCP",
     "transport": "stdio",
-    "command": "npx",
-    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+    "command": "node",
+    "args": ["/absolute/path/to/reviewed-server.js"]
   }'
 ```
 
+Then explicitly test the returned ID with `POST /v1/mcp-servers/:id/test`. The result distinguishes
+discovered tools, eligible tools and trust-policy rejections. A successful connection with zero
+eligible tools does not give an agent usable tools. Repair a failed or outdated configuration,
+save it, and test again; a result is evidence for its recorded configuration revision.
+
 ### Transport Types
 
-| Transport         | Fields            | Use Case                                        |
-| ----------------- | ----------------- | ----------------------------------------------- |
-| `stdio`           | `command`, `args` | Local process (e.g., filesystem server)         |
-| `sse`             | `url`             | Remote HTTP server (legacy SSE protocol)        |
-| `streamable-http` | `url`             | Remote HTTP server (current MCP HTTP transport) |
+| Transport         | Fields                     | Meaning                                                                                                    |
+| ----------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `stdio`           | `command`, optional `args` | Preinstalled executable on the API execution host                                                          |
+| `streamable-http` | `url`                      | MCP Streamable HTTP endpoint                                                                               |
+| `http`            | `url`                      | Input alias saved as `streamable-http`                                                                     |
+| `sse`             | `url`                      | Retained legacy configuration alias using the Streamable HTTP client; not support for the old SSE protocol |
 
-> Both `sse` and `streamable-http` use the `StreamableHTTPClientTransport` under the hood.
+HTTP endpoints must use HTTPS, or local HTTP on `localhost`, `127.x.x.x`, `[::1]` or
+`host.docker.internal`. URL user information, query strings, fragments and interpolation are
+rejected. Redirects are not followed. Supply credentials through the credential fields rather
+than embedding them in a URL. A legacy SSE-only endpoint requires a compatible Streamable HTTP
+endpoint; changing its label alone does not change its protocol.
+
+### Credentials and Duplication
+
+Create and update bodies accept `credentials.env` for stdio or `credentials.headers` for HTTP.
+Saved values use encrypted secret storage; public responses expose field names and boolean
+`credentialStatus` flags, never the values or secret references. Keep sensitive values out of
+command arguments and display names, which are public configuration.
+
+On edit, omit a credential field to retain it, provide a string to replace it, or provide `null`
+to clear it. An empty string replaces the value with an empty string; it does not clear the field.
+For example, `"credentials": { "headers": { "Authorization": null } }` clears that header.
+When switching transports, explicitly clear incompatible stored fields. Reserved environment
+variables and transport-managed headers are rejected, as are case-insensitive duplicate header
+names. If the API cannot access its encryption key, fix that setup before saving secrets.
+
+Duplicate copies configuration and credential field names, but never copies credential values.
+Re-enter the needed values on the copy and test it. `needsReconfiguration` also identifies unsafe
+or unsupported legacy configuration; it is not a live connection-health indicator.
 
 ### Assigning to Agents
 
-MCP servers are assigned to agents through the `allowedMcpServerIds` field:
+MCP servers are assigned to agents through `allowedMcpServerIds`:
 
 ```bash
 curl -X PUT http://localhost:3000/v1/agents/<id> \
@@ -343,6 +392,15 @@ curl -X PUT http://localhost:3000/v1/agents/<id> \
     "executionLimits": { "maxSteps": 10, "maxParallelTasks": 1, "timeoutMs": 120000 }
   }'
 ```
+
+Assignment permits connection and discovery during chat; it does not bypass trust checks,
+Ask/Block policy or approval. Approval is bound to the current server configuration and tool
+definition. If those change, start a new request and review it again. If a tool call loses its
+response after dispatch, the action may already have happened: the turn stops with
+`MCP_OUTCOME_UNKNOWN` and does not automatically retry or continue with another model/tool call.
+Inspect the server's actual effect before starting a new request.
+
+See [MCP API endpoints](api-reference.md#mcp-servers) for request and response details.
 
 ---
 

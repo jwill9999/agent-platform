@@ -10,40 +10,53 @@ import {
   updateSessionTitle,
 } from '@agent-platform/db';
 import request from 'supertest';
-import type { Application } from 'express';
+import type { Server } from 'node:http';
+import { listenLoopback, closeLoopbacks } from './support/loopbackServer.js';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/infrastructure/http/createApp.js';
 
-function createSeededApp(dirs: string[]): {
-  app: Application;
+const servers: Server[] = [];
+const databases: Array<ReturnType<typeof openDatabase>['sqlite']> = [];
+
+async function createSeededApp(dirs: string[]): Promise<{
+  app: Server;
   db: ReturnType<typeof openDatabase>['db'];
   sqlite: ReturnType<typeof openDatabase>['sqlite'];
-} {
+}> {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-title-'));
   dirs.push(dir);
   const sqlitePath = path.join(dir, 'db.sqlite');
   const { db, sqlite } = openDatabase(sqlitePath);
+  databases.push(sqlite);
   runSeed(db);
-  return { app: createApp({ db }), db, sqlite };
+  const app = await listenLoopback(createApp({ db }));
+  servers.push(app);
+  return { app, db, sqlite };
 }
 
 describe('Session title and messages endpoint', () => {
   const dirs: string[] = [];
 
-  afterEach(() => {
-    for (const d of dirs) {
-      try {
-        rmSync(d, { recursive: true, force: true });
-      } catch {
-        /* ignore */
+  afterEach(async () => {
+    try {
+      await closeLoopbacks(servers.splice(0));
+    } finally {
+      for (const sqlite of databases.splice(0)) sqlite.close();
+      for (const d of dirs) {
+        try {
+          rmSync(d, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
       }
+      dirs.length = 0;
     }
-    dirs.length = 0;
   });
 
   it('updateSessionTitle persists and returns on GET', async () => {
-    const { app, db } = createSeededApp(dirs);
+    const { app, db } = await createSeededApp(dirs);
 
     // Create a session
     const createRes = await request(app)
@@ -63,13 +76,13 @@ describe('Session title and messages endpoint', () => {
   });
 
   it('GET /v1/sessions/:id/messages returns 404 for unknown session', async () => {
-    const { app } = createSeededApp(dirs);
+    const { app } = await createSeededApp(dirs);
 
     await request(app).get('/v1/sessions/nonexistent-id/messages').expect(404);
   });
 
   it('GET /v1/sessions/:id/messages returns only user and assistant messages', async () => {
-    const { app, db } = createSeededApp(dirs);
+    const { app, db } = await createSeededApp(dirs);
 
     // Create a session
     const createRes = await request(app)
@@ -128,7 +141,7 @@ describe('Session title and messages endpoint', () => {
   });
 
   it('session title appears in session list', async () => {
-    const { app, db } = createSeededApp(dirs);
+    const { app, db } = await createSeededApp(dirs);
 
     // Create two sessions
     const s1 = await request(app)

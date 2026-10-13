@@ -1,3 +1,5 @@
+import type { Server } from 'node:http';
+import { listenLoopback, closeLoopbacks } from './support/loopbackServer.js';
 import type { DrizzleDb } from '@agent-platform/db';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -10,12 +12,18 @@ import {
   runReadinessCheck,
 } from '../src/application/health/readinessCheck.js';
 
+const servers: Server[] = [];
+
 function mockDb(overrides: Partial<DrizzleDb> = {}): DrizzleDb {
   return { run: vi.fn(), ...overrides } as unknown as DrizzleDb;
 }
 
-afterEach(() => {
-  vi.unstubAllEnvs();
+afterEach(async () => {
+  try {
+    await closeLoopbacks(servers.splice(0));
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -131,7 +139,8 @@ describe('runReadinessCheck', () => {
 
 describe('GET /health (regression)', () => {
   it('still returns { ok: true }', async () => {
-    const app = createApp({ db: null });
+    const app = await listenLoopback(createApp({ db: null }));
+    servers.push(app);
     const res = await request(app).get('/health').expect(200).expect('Content-Type', /json/);
     expect(res.body).toEqual({ ok: true });
   });
@@ -139,7 +148,8 @@ describe('GET /health (regression)', () => {
 
 describe('GET /health/ready', () => {
   it('returns 503 when db is null', async () => {
-    const app = createApp({ db: null });
+    const app = await listenLoopback(createApp({ db: null }));
+    servers.push(app);
     const res = await request(app).get('/health/ready').expect(503).expect('Content-Type', /json/);
     expect(res.body.status).toBe('unhealthy');
     expect(res.body.checks).toBeDefined();
@@ -148,7 +158,8 @@ describe('GET /health/ready', () => {
   });
 
   it('response conforms to ReadinessResponse schema', async () => {
-    const app = createApp({ db: null });
+    const app = await listenLoopback(createApp({ db: null }));
+    servers.push(app);
     const res = await request(app).get('/health/ready').expect(503);
 
     // Validate shape

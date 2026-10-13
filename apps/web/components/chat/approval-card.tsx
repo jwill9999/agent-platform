@@ -22,7 +22,7 @@ function canDecide(status: ApprovalCardState['status']) {
 }
 
 function cardTone(status: ApprovalCardState['status'], riskTier: string | undefined): string {
-  if (status === 'failed' || status === 'rejected') {
+  if (status === 'failed' || status === 'not_completed' || status === 'rejected') {
     return 'border-destructive/45 bg-destructive/10 text-foreground';
   }
   if (status === 'executed' || status === 'approved') {
@@ -37,7 +37,8 @@ function cardTone(status: ApprovalCardState['status'], riskTier: string | undefi
 function statusIcon(status: ApprovalCardState['status']) {
   if (status === 'executed') return <Play className="h-3.5 w-3.5" />;
   if (status === 'approved') return <Check className="h-3.5 w-3.5" />;
-  if (status === 'rejected' || status === 'failed') return <X className="h-3.5 w-3.5" />;
+  if (status === 'rejected' || status === 'failed' || status === 'not_completed')
+    return <X className="h-3.5 w-3.5" />;
   if (status === 'expired') return <Clock className="h-3.5 w-3.5" />;
   return <CircleAlert className="h-3.5 w-3.5" />;
 }
@@ -76,7 +77,9 @@ export function ApprovalCard({ approval, onDecision }: Props) {
             variant="outline"
             className={cn(
               'gap-1 bg-background/60',
-              approval.status === 'failed' || approval.status === 'rejected'
+              approval.status === 'failed' ||
+                approval.status === 'not_completed' ||
+                approval.status === 'rejected'
                 ? 'border-destructive/50 text-destructive'
                 : 'border-amber-500/50',
             )}

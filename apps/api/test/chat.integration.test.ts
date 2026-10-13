@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import type { Server } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -8,6 +9,7 @@ import type { Application } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/infrastructure/http/createApp.js';
+import { closeLoopback, listenLoopback } from './support/loopbackServer.js';
 import { restoreChatEnv, snapshotChatEnv } from './support/chatEnv.js';
 
 function createSeededChatApp(dirs: string[]): {
@@ -39,11 +41,13 @@ describe('POST /v1/chat/stream', () => {
   it('returns 400 when no API key is configured', async () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = createSeededChatApp(dirs);
+    let server: Server | undefined;
     try {
+      server = await listenLoopback(app);
       delete process.env.OPENAI_API_KEY;
       delete process.env.AGENT_OPENAI_API_KEY;
       delete process.env.OPENAI_ALLOW_LEGACY_ENV;
-      const res = await request(app)
+      const res = await request(server)
         .post('/v1/chat/stream')
         .send({
           model: 'gpt-4o-mini',
@@ -52,19 +56,25 @@ describe('POST /v1/chat/stream', () => {
         .expect(400);
       expect(res.body.error?.code).toBe('MISSING_KEY');
     } finally {
-      restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      try {
+        if (server) await closeLoopback(server);
+      } finally {
+        restoreChatEnv(envSnap);
+        closeDatabase(sqlite);
+      }
     }
   });
 
   it('returns 400 when only legacy OPENAI_API_KEY is set', async () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = createSeededChatApp(dirs);
+    let server: Server | undefined;
     try {
+      server = await listenLoopback(app);
       delete process.env.AGENT_OPENAI_API_KEY;
       process.env.OPENAI_API_KEY = 'sk-legacy';
       delete process.env.OPENAI_ALLOW_LEGACY_ENV;
-      const res = await request(app)
+      const res = await request(server)
         .post('/v1/chat/stream')
         .send({
           model: 'gpt-4o-mini',
@@ -73,8 +83,12 @@ describe('POST /v1/chat/stream', () => {
         .expect(400);
       expect(res.body.error?.code).toBe('LEGACY_ENV_BLOCKED');
     } finally {
-      restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      try {
+        if (server) await closeLoopback(server);
+      } finally {
+        restoreChatEnv(envSnap);
+        closeDatabase(sqlite);
+      }
     }
   });
 });

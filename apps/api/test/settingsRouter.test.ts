@@ -1,3 +1,4 @@
+import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,7 +13,7 @@ import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 
 const DEFAULTS = PlatformSettingsSchema.parse({});
 
-function buildTestApp() {
+async function buildTestApp() {
   const tmpDir = mkdtempSync(path.join(tmpdir(), 'settings-test-'));
   const dbPath = path.join(tmpDir, 'test.sqlite');
   const { db, sqlite } = openDatabase(dbPath);
@@ -28,19 +29,23 @@ function buildTestApp() {
   );
   app.use(errorMiddleware);
 
-  return { app, db, sqlite, reconfigureCalls, tmpDir };
+  return { app: await listenLoopback(app), db, sqlite, reconfigureCalls, tmpDir };
 }
 
 describe('settingsRouter', () => {
-  let ctx: ReturnType<typeof buildTestApp>;
+  let ctx: Awaited<ReturnType<typeof buildTestApp>>;
 
-  beforeEach(() => {
-    ctx = buildTestApp();
+  beforeEach(async () => {
+    ctx = await buildTestApp();
   });
 
-  afterEach(() => {
-    closeDatabase(ctx.sqlite);
-    rmSync(ctx.tmpDir, { recursive: true, force: true });
+  afterEach(async () => {
+    try {
+      await closeLoopback(ctx.app);
+    } finally {
+      closeDatabase(ctx.sqlite);
+      rmSync(ctx.tmpDir, { recursive: true, force: true });
+    }
   });
 
   it('GET returns defaults when empty', async () => {

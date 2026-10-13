@@ -1419,8 +1419,8 @@ describe('toolDispatchNode', () => {
     await dispatchExpectingError(
       ctx,
       { id: 'tc-7', name: 'mcp-fs:read', args: {} },
-      'MCP_CALL_FAILED',
-      'timeout',
+      'MCP_OUTCOME_UNKNOWN',
+      'The MCP action may have completed. Automatic execution stopped; check its effect before making a new request.',
     );
   });
 

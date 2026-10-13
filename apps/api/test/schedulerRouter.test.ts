@@ -1,3 +1,4 @@
+import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,12 +21,12 @@ import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 import { createSchedulerService } from '../src/application/scheduler/schedulerService.js';
 import { createSchedulerRouter } from '../src/infrastructure/http/v1/schedulerRouter.js';
 
-function buildTestApp(db: ReturnType<typeof openDatabase>['db']) {
+async function buildTestApp(db: ReturnType<typeof openDatabase>['db']) {
   const app = express();
   app.use(express.json());
   app.use('/v1/scheduler', createSchedulerRouter(db));
   app.use(errorMiddleware);
-  return app;
+  return listenLoopback(app);
 }
 
 function jobBody(overrides: Record<string, unknown> = {}) {
@@ -46,17 +47,21 @@ function jobBody(overrides: Record<string, unknown> = {}) {
 describe('schedulerRouter', () => {
   let opened: ReturnType<typeof openDatabase>;
   let tmpDir: string;
-  let app: ReturnType<typeof buildTestApp>;
+  let app: Awaited<ReturnType<typeof buildTestApp>>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-scheduler-api-'));
     opened = openDatabase(path.join(tmpDir, 'test.sqlite'));
-    app = buildTestApp(opened.db);
+    app = await buildTestApp(opened.db);
   });
 
-  afterEach(() => {
-    closeDatabase(opened.sqlite);
-    rmSync(tmpDir, { recursive: true, force: true });
+  afterEach(async () => {
+    try {
+      await closeLoopback(app);
+    } finally {
+      closeDatabase(opened.sqlite);
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it('creates, lists, updates, pauses, resumes, and schedules jobs to run now', async () => {

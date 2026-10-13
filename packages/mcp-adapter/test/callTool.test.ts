@@ -19,7 +19,11 @@ describe('callToolResultToOutput', () => {
       isError: true,
       content: [{ type: 'text', text: 'nope' }],
     });
-    expect(o).toEqual({ type: 'error', code: 'MCP_TOOL_ERROR', message: 'nope' });
+    expect(o).toEqual({
+      type: 'error',
+      code: 'MCP_TOOL_ERROR',
+      message: 'The MCP server reported a tool error. Inspect the server before retrying.',
+    });
   });
 });
 
