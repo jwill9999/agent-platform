@@ -1,3 +1,5 @@
+import type { ContextDecisionMetadata } from '@agent-platform/contracts';
+import { admitProviderContext } from '../providerContext.js';
 import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
 import { streamText, jsonSchema, type StreamTextResult, type ToolSet, type CoreMessage } from 'ai';
 import type { RunnableConfig } from '@langchain/core/runnables';
@@ -20,7 +22,7 @@ import { checkDeadline } from '../deadline.js';
 // ---------------------------------------------------------------------------
 
 /** Convert harness ChatMessage[] to Vercel AI SDK CoreMessage[]. */
-function toCoreMessages(messages: ChatMessage[]): CoreMessage[] {
+export function toCoreMessages(messages: ChatMessage[]): CoreMessage[] {
   return messages.map((m): CoreMessage => {
     if (m.role === 'tool') {
       return {
@@ -168,24 +170,28 @@ function makeStrictSchema(schema: unknown): unknown {
  * Build a bidirectional map between sanitised (LLM-safe) names and original
  * harness tool IDs so we can translate tool-call responses back.
  */
-function buildToolNameMap(defs: ToolDefinition[]): {
+export function buildToolNameMap(defs: ToolDefinition[]): {
   tools: Record<string, { description: string; parameters: unknown }>;
   /** sanitised → original */
   toOriginal: Map<string, string>;
+  mappedSchemas: Array<{ name: string; description: string; parameters: unknown }>;
 } {
   const tools: Record<string, { description: string; parameters: unknown }> = {};
   const toOriginal = new Map<string, string>();
+  const mappedSchemas: Array<{ name: string; description: string; parameters: unknown }> = [];
 
   for (const def of defs) {
     const safe = sanitiseToolName(def.name);
+    const parameters = makeStrictSchema(def.parameters) as Record<string, unknown>;
+    mappedSchemas.push({ name: safe, description: def.description, parameters });
     tools[safe] = {
       description: def.description,
-      parameters: jsonSchema(makeStrictSchema(def.parameters) as Record<string, unknown>),
+      parameters: jsonSchema(parameters),
     };
     toOriginal.set(safe, def.name);
   }
 
-  return { tools, toOriginal };
+  return { tools, toOriginal, mappedSchemas };
 }
 
 /**
@@ -219,6 +225,8 @@ function placeholderLabelsForToolCalls(
 export type LlmReasonNodeOptions = {
   emitter?: OutputEmitter;
   dispatcher?: PluginDispatcher;
+  onContextDecision?: (decision: ContextDecisionMetadata) => void;
+  onModelAttempt?: () => void;
 };
 
 /** Safely fire the onPromptBuild plugin hook — swallows errors. */
@@ -554,6 +562,29 @@ async function checkBudgetLimits(
   return false;
 }
 
+function notifyObserver(notify: () => void): void {
+  try {
+    notify();
+  } catch {
+    /* Diagnostics are observational. */
+  }
+}
+
+async function emitContextHalt(
+  emitter: OutputEmitter | undefined,
+  code: import('../graphState.js').ContextHalt['code'],
+): Promise<void> {
+  const messages = {
+    CONTEXT_BUDGET_EXCEEDED:
+      'Required context exceeds the input budget. Reduce input or tools, or adjust the configured budget. Earlier completed actions are retained.',
+    CONTEXT_INVALID_HISTORY:
+      'Required conversation history is incomplete or invalid. Earlier completed actions are retained; start a new request with the needed context.',
+    MODEL_OUTPUT_INCOMPLETE:
+      'The model reached its output limit. Its response is incomplete; no tool calls from this response were executed.',
+  };
+  await emitter?.emit({ type: 'error', code, message: messages[code] });
+}
+
 /**
  * Creates a graph node that invokes the LLM via the Vercel AI SDK using streamText.
  *
@@ -566,7 +597,7 @@ async function checkBudgetLimits(
  * Supports AbortSignal via `config.configurable.signal` for cancellation.
  */
 export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptions) {
-  const { emitter, dispatcher } = normaliseOptions(options);
+  const { emitter, dispatcher, onContextDecision, onModelAttempt } = normaliseOptions(options);
 
   return async function llmReasonNode(
     state: HarnessStateType,
@@ -602,22 +633,40 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       throw new Error('llm_reason: modelConfig is required in state');
     }
 
+    const {
+      tools: sdkTools,
+      toOriginal: toolNameMap,
+      mappedSchemas,
+    } = buildToolNameMap(toolDefinitions);
+    const tools = Object.keys(sdkTools).length > 0 ? sdkTools : undefined;
+    const admission = admitProviderContext({
+      messages,
+      mappedMessages: toCoreMessages(messages),
+      mappedTools: mappedSchemas,
+      contextWindow: state.contextWindow,
+      currentTurnStartIndex: state.currentTurnStartIndex,
+      approvalToolCallIds: state.approvalToolCallIds,
+      pendingApprovalToolCallIds: state.pendingApprovalToolCallIds,
+    });
+    notifyObserver(() => onContextDecision?.(admission.decision));
+    const contextTrace: TraceEvent = {
+      type: 'context_decision',
+      step: state.taskIndex ?? 0,
+      ...admission.decision,
+    };
+    if (!admission.admitted) {
+      const code =
+        admission.decision.reason === 'invalid_history'
+          ? 'CONTEXT_INVALID_HISTORY'
+          : 'CONTEXT_BUDGET_EXCEEDED';
+      await emitContextHalt(emitter, code);
+      return { halted: true, contextHalt: { code }, llmOutput: null, trace: [contextTrace] };
+    }
     const model = createLanguageModel({
       provider: (modelConfig.provider ?? 'openai') as SupportedProvider,
       model: modelConfig.model,
       apiKey: modelConfig.apiKey,
     });
-    const { tools: sdkTools, toOriginal: toolNameMap } =
-      toolDefinitions.length > 0
-        ? buildToolNameMap(toolDefinitions)
-        : {
-            tools: undefined as
-              | Record<string, { description: string; parameters: unknown }>
-              | undefined,
-            toOriginal: new Map<string, string>(),
-          };
-    const tools = sdkTools && Object.keys(sdkTools).length > 0 ? sdkTools : undefined;
-
     if (dispatcher) {
       await firePromptBuildHook(dispatcher, state);
     }
@@ -626,13 +675,14 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     const retryTraceEvents: TraceEvent[] = [];
     const retryCounter = { count: 0 };
 
-    const { fullText, finalToolCalls, usage } = await withRetry(
+    const { fullText, finalToolCalls, usage, finishReason } = await withRetry(
       async () => {
         let streamError: Error | null = null;
-        const coreMessages = toCoreMessages(messages);
+        notifyObserver(() => onModelAttempt?.());
         const res = streamText({
           model,
-          messages: coreMessages,
+          messages: admission.messages,
+          maxTokens: admission.decision.outputCap,
           tools,
           maxSteps: 1,
           abortSignal: signal,
@@ -650,22 +700,32 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
         const toolCalls = await res.toolCalls;
         const usageInfo = await res.usage;
 
-        await emitToolCallPlaceholder(text, toolCalls, toolDefinitions, toolNameMap, emitter);
+        const finishReason = await res.finishReason;
+        if (finishReason !== 'length')
+          await emitToolCallPlaceholder(text, toolCalls, toolDefinitions, toolNameMap, emitter);
 
-        return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo };
+        return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo, finishReason };
       },
       LLM_RETRY_CONFIG,
       buildRetryCallback(step, retryTraceEvents, retryCounter, dispatcher, state),
     );
 
     const tokenUsage = normaliseTokenUsage(usage);
-    const { output, assistantMessage } = buildLlmOutput(fullText, finalToolCalls, toolNameMap);
+    const { output, assistantMessage } = buildLlmOutput(
+      fullText,
+      finishReason === 'length' ? [] : finalToolCalls,
+      toolNameMap,
+    );
 
     const tokenDelta = sumUsageTokens(usage);
     const newTotalTokens = state.totalTokensUsed + tokenDelta;
     const costDelta = tokenDelta / 1000;
     const newTotalCost = (state.totalCostUnits ?? 0) + costDelta;
-    const traceEvents: TraceEvent[] = [...retryTraceEvents, { type: 'llm_call', step, tokenUsage }];
+    const traceEvents: TraceEvent[] = [
+      contextTrace,
+      ...retryTraceEvents,
+      { type: 'llm_call', step, tokenUsage },
+    ];
 
     const halted = await checkBudgetLimits(
       state,
@@ -675,14 +735,17 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       emitter,
     );
 
+    const incomplete = finishReason === 'length';
+    if (incomplete) await emitContextHalt(emitter, 'MODEL_OUTPUT_INCOMPLETE');
     return {
-      llmOutput: output,
+      ...(incomplete ? { contextHalt: { code: 'MODEL_OUTPUT_INCOMPLETE' as const } } : {}),
+      llmOutput: incomplete ? null : output,
       messages: [assistantMessage],
       trace: traceEvents,
       totalTokensUsed: newTotalTokens,
       totalCostUnits: newTotalCost,
       totalRetries: (state.totalRetries ?? 0) + retryCounter.count,
-      ...(halted ? { halted: true } : {}),
+      ...(halted || incomplete ? { halted: true } : {}),
     };
   };
 }

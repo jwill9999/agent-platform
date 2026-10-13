@@ -334,6 +334,17 @@ describe('local diagnostic API with real SQLite', () => {
     vi.resetModules();
     const { createApp: createRetryApp } = await import('../src/infrastructure/http/createApp.js');
     const f = await fixture(undefined, { disableEvaluatorNodes: true }, undefined, createRetryApp);
+    // This test qualifies retries, not the default agent's independent context-admission limit.
+    // Keep its full tool inventory and admit it through the existing persisted configuration API.
+    const agent = (await request(f.app).get(`/v1/agents/${DEFAULT_AGENT_ID}`).expect(200)).body
+      .data;
+    await request(f.app)
+      .put(`/v1/agents/${DEFAULT_AGENT_ID}`)
+      .send({
+        ...agent,
+        contextWindow: { ...agent.contextWindow, maxInputTokens: 100000 },
+      })
+      .expect(200);
     await request(f.app)
       .post('/v1/chat')
       .send({ sessionId: f.sessionId, message: canary })
@@ -341,15 +352,20 @@ describe('local diagnostic API with real SQLite', () => {
     const res = await f.report({ sessionId: f.sessionId }).expect(200);
     const report = DiagnosticReportSchema.parse(res.body);
     const models = report.events.map((row) => row.event).filter((event) => event.phase === 'model');
+    expect(
+      report.events.find(({ event }) => event.phase === 'context')?.event.contextDecision,
+    ).toMatchObject({ reason: 'unchanged' });
     expect(mockStreamText).toHaveBeenCalledTimes(3);
     expect(models.map((event) => event.outcome)).toEqual([
       'started',
       'retrying',
+      'started',
       'retrying',
+      'started',
       'failed',
     ]);
     expect(new Set(models.map((event) => event.operationId)).size).toBe(1);
-    expect(models.map((event) => event.attempt)).toEqual([1, 1, 2, 3]);
+    expect(models.map((event) => event.attempt)).toEqual([1, 1, 2, 2, 3, 3]);
     expect(
       report.events.some((row) => row.event.phase === 'request' && row.event.outcome === 'failed'),
     ).toBe(true);

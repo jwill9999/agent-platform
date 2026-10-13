@@ -224,6 +224,7 @@ curl -X POST http://localhost:3000/v1/agents \
     },
     "contextWindow": {
       "maxInputTokens": 8000,
+      "maxOutputTokens": 2048,
       "strategy": "truncate"
     },
     "allowedSkillIds": ["<skill-id>"],
@@ -253,12 +254,35 @@ Budget warnings are emitted at 80% utilisation for `maxTokens`, `maxCostUnits`, 
 
 ### Context Window
 
-Controls how conversation history is windowed before each LLM call.
+The context/token MVP branch applies admission before each conversational reasoning call, including
+tool-loop iterations and approval resume. It is under verification; see the
+[task and delivery status](tasks/agent-platform-context-optimisation.md).
 
-| Field            | Default    | Description                                                         |
-| ---------------- | ---------- | ------------------------------------------------------------------- |
-| `maxInputTokens` | `8000`     | Maximum input tokens (system prompt + history + new message)        |
-| `strategy`       | `truncate` | Overflow strategy: `truncate` (drop oldest messages) or `summarize` |
+| Field             | Default                   | Description                                                                                                  |
+| ----------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `maxInputTokens`  | `8000` (decision pending) | Approximate input allowance for complete mapped messages and tool schemas; admission uses 90% of this value. |
+| `maxOutputTokens` | `2048`                    | Separate positive-integer completion allowance sent as the installed SDK's `maxTokens` option.               |
+| `strategy`        | `truncate`                | Both `truncate` and legacy `summarize` use atomic history groups plus existing working memory.               |
+
+Complete schema counting exceeds the existing input default for seeded profiles. The proposed
+16,000 default is awaiting owner agreement; explicitly saved budgets remain unchanged. Configure
+input plus output below the selected model's capacity. Estimates are character-based, not exact token
+counts, billing measurements or provider rate-limit guarantees. Auxiliary planner, critic-model,
+sensor, DoD and connection-test calls are outside this conversational guard.
+
+Configure these fields through the existing agent create/update API; no new settings screen is added.
+An update uses the complete agent body, as before. Keep the explicit provider/model selection.
+The input/output allowances are distinct from the cumulative `executionLimits.maxTokens` run budget.
+
+The provider view retains system instructions, scoped working memory, the current request and all
+active-turn tool effects. Older complete groups may be omitted without changing saved history.
+An older pending approval group is omitted only with matching durable provenance; no approval or
+result is invented. `summarize` does not enable a model-generated summary in this MVP.
+
+If required context cannot fit, the application reports a context-budget error before that model call.
+Reduce the input or configure a suitable allowance; earlier completed tool effects remain retained.
+A model response stopped by its output limit is marked incomplete and its tool calls are not executed.
+[Diagnostic reports](development/diagnostics.md) distinguish estimates, local admission and real attempts.
 
 ### Allowlists
 

@@ -2,7 +2,8 @@
 
 **Owner task:** `agent-platform-context-optimisation` — Add context window and token optimisation.
 
-**Status:** Proposed implementation scope; planning authorised on 13 October 2026.
+**Status:** Owner-approved bounded scope; implementation authorised on 13 October 2026.
+The input-default feasibility decision below remains pending; no default change is assumed.
 
 **Runtime source reviewed:** `d199ad0172dfe016490533444d5b7c46733c8f4d` (`origin/staging`).
 
@@ -18,8 +19,9 @@ Stop when first-call, multi-tool-loop and approval-resume journeys meet the veri
 short-chat regression and restart evidence. This is one implementation task with three internal
 slices, not a new infrastructure programme. A green unit suite alone does not meet the stopping point.
 
-Owner explicitly requested a reviewed plan **before implementation**. This document and its publication
-are not implementation, paid-call, merge, staging-promotion or release approval. Phase one remains a
+The owner reviewed this plan and explicitly authorised implementation with Beads, the implementation
+skill, critic review and the agreed tests. That does not authorise paid calls, merge, staging promotion
+or release. Phase one remains a
 working local single-user MVP; distribution, multi-user architecture and its operating model are phase two.
 
 ## Existing foundations and verified gaps
@@ -39,7 +41,7 @@ historical evidence, not a newly reproduced failure or proof of one present-day 
 can reduce avoidable request volume; it cannot guarantee provider rate limits will never be hit.
 Memory epic and tasks `.2`/`.4` are closed. No dependency on dashboards or paused orchestration is needed.
 
-## Proposed requirements and decisions
+## Approved requirements and implementation checkpoint
 
 ### CT-R1 — One admission point for conversational reasoning
 
@@ -62,7 +64,15 @@ Do not change their budgets, SDK versions, model routing or evaluator activation
 
 ### CT-R2 — Explicit estimated input and bounded output
 
-Retain the existing **8000 estimated input tokens** default. Count the actual selected message roles,
+The approved plan retained **8000 estimated input tokens**. Actual seeded-profile measurement during
+implementation found required requests at 8,353 (Personal Assistant) and 8,374 (Coding Agent), including
+all 56 mapped system tools; the effective allowance is only 7,200. The owner has been asked whether to
+use 16,000 for absent/new defaults while preserving explicitly saved values and output2048, or retain
+8000 with manual configuration required. The critic supports the bounded alternative; the owner
+decision is pending. These measurements exclude additional Project/memory context and do not establish
+universal model capacity. Keep the existing default until that decision arrives.
+
+Count the actual selected message roles,
 content, tool names/IDs/arguments/results and the final mapped tool definitions/schema descriptions
 used by the SDK, not only plain text. Define a versioned deterministic estimator covering the serialised
 request data. Retain character-based estimation for this MVP; test Unicode and JSON escaping and label
@@ -70,7 +80,7 @@ all counts as estimates. Reserve 10% of the configured input allowance for unmod
 `admissionEstimate <= floor(maxInputTokens * 0.9)`. The margin is a conservative policy choice, not a
 measured accuracy guarantee. Keep estimated and provider-reported usage distinct.
 
-Propose `contextWindow.maxOutputTokens`, default **2048**, positive integer, persisted through the
+Add `contextWindow.maxOutputTokens`, default **2048**, positive integer, persisted through the
 existing agent configuration API. Pass it to installed AI SDK 4.3.19's `maxTokens` request option.
 Input allowance and output allowance are separate; neither is the existing cumulative run
 `executionLimits.maxTokens`. Document that the owner must configure their sum below the selected
@@ -96,6 +106,13 @@ Completed groups from older user turns may be omitted as complete groups, newest
 omission counts. A long active turn may therefore halt rather than forget its earlier effects; continued
 automatic summarisation of an active turn is deferred.
 This MVP does not truncate individual tool results or invent replacement result text.
+
+A pending approval can leave an intentional incomplete group in durable history. Provider-only
+projection may omit that older group only when every missing call has matching same-session durable
+approval provenance (unique call identity, name and arguments). Current-turn incomplete groups still
+halt. Delayed actual results may be paired with their approval-backed call in the provider view; raw
+transcript order and append offsets remain unchanged. No result, permission or completion is invented.
+Independent critique requires delayed, intervening-message and multi-call regression evidence.
 
 Reuse the already bounded deterministic working-memory fields (goal, task/project, decisions, blockers,
 important files, tool summaries, next action). Preserve provenance through session/project/run identity.
@@ -146,12 +163,12 @@ gap, not a clean pass. Diagnostics remain observational: storage failure never c
 
 | Item                          | Mapping                                                                                                                                                                                               |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Existing owning task          | `agent-platform-context-optimisation`, P1; in progress for planning only                                                                                                                              |
+| Existing owning task          | `agent-platform-context-optimisation`, P1; in progress for implementation                                                                                                                             |
 | Spec / tests / critique       | [Task spec](../tasks/agent-platform-context-optimisation.md), [verification map](../testing/context-token-optimisation-mvp.md), [critic record](../reviews/context-token-optimisation-plan-review.md) |
 | Related closed foundation     | `agent-platform-memory`, `.2`, `.4`; V1 `agent-platform-harness-v1`                                                                                                                                   |
 | Current checkout              | `/Users/letuscode/.codex/worktrees/codex-developer-autonomy/agent-platform`                                                                                                                           |
 | Feature / planning branch     | `feature/context-token-optimisation` from reviewed staging; `task/context-token-plan`                                                                                                                 |
-| Proposed implementation chain | After owner review: `task/context-token-boundary` from planning tip, then `task/context-token-verification`; one cumulative segment-tip PR into the feature                                           |
+| Proposed implementation chain | Authorised: `task/context-token-boundary` from planning tip, then `task/context-token-verification`; one cumulative segment-tip PR into the feature                                                   |
 | Final integration owner       | Same existing Beads task owns all three slices and the connected feature gate; do not close after an intermediate slice                                                                               |
 | Ultimate destination          | Protected staging through feature PR only with owner merge authority and all current-head gates; no main/release implied                                                                              |
 
@@ -196,6 +213,6 @@ HTTP isolation finding remains open; this plan does not promise to repair unrela
 required failures. Credentials are fixture-only; do not read user secrets or issue paid requests.
 
 The [verification map](../testing/context-token-optimisation-mvp.md) defines the measurable gate.
-Owner agreement is needed on this proposed scope before implementation. Planning completion means
+Owner agreement was received before implementation. Planning completion means
 critic findings resolved, consistent Beads/spec/verification, pushed source and full mirror readbacks;
 it does not mean product tests passed or the feature is delivered.

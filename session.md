@@ -1,31 +1,36 @@
-# Current planning — context and token optimisation, 13 October 2026
+# Context and token optimisation implementation — 13 October 2026
 
-Owner selected `agent-platform-context-optimisation` as the next local-MVP task and explicitly
-requested a bounded plan and independent critic review **before implementation**. Current work is
-planning only; no runtime edits, paid calls, merge or paused orchestration resumption.
+The owner approved the bounded plan at `294a52c8` and authorised implementation with Beads,
+the implementation skill, critic review and the agreed tests. The task is
+`agent-platform-context-optimisation`, in progress. Main/staging merges are not authorised for this
+feature yet. Keep PR308, paused PR283 and all retained orchestration work separate.
 
-Runtime baseline remains staging `d199ad01` (PR303 diagnostics V1 and PR307 review checkpoints delivered).
-The separate post-V1 handoff PR308 at `d275e7a0` is open at planning start; preserve it and its branches.
-Phase one is a working local single-user MVP. Distribution to others and its architecture/model are
-phase two. The local iMessage repair was test-confirmed; check current tool availability before sending.
+Current chain: `feature/context-token-optimisation` → `task/context-token-plan` →
+`task/context-token-boundary`; verification is the final planned slice. Runtime baseline is
+staging `d199ad01`. No dependency or provider upgrade, paid call or distribution work is included.
 
-Current branch mapping: `feature/context-token-optimisation` → `task/context-token-plan`.
+The shared provider projection, output cap, full-history API assembly and strict V1 decision metadata
+are implemented locally. Initial core 703 tests, focused contracts/diagnostic tests and API regressions
+passed. Critic CP01/CP02 required explicit handling of older pending approval groups and delayed
+approval results; repairs have focused tests, with final review and connected verification pending.
+These are intermediate results, not feature completion or hosted qualification.
+
+One material decision is pending: complete schema counting makes seeded Personal Assistant/Coding
+requests approximately 8,353/8,374 tokens, above the approved default's effective 7,200. The owner has
+been asked about a 16,000 absent/new default, preserving saved budgets and output2048. Do not assume
+approval or silently remove tools. Current code retains8000. Continue independent tests while waiting.
+
+Next verify real Docker Project Chat and standalone Electron success, overflow/recovery, approval
+exactly-once effects and restart/export. Review actual V1 success/failure reports, finish the CT-T01–13
+map, source review, documentation/readbacks and exact-head quality/CI before final acceptance.
 [Plan](docs/planning/context-token-optimisation-mvp.md),
 [task](docs/tasks/agent-platform-context-optimisation.md),
 [verification](docs/testing/context-token-optimisation-mvp.md) and
-[critique](docs/reviews/context-token-optimisation-plan-review.md) are the planning handoff.
-Beads remains authoritative. Existing task is in progress for planning; do not close it on plan delivery.
+[plan critique](docs/reviews/context-token-optimisation-plan-review.md) remain canonical.
 
-Source confirms initial approximate windowing and durable memory already exist, but later reasoning
-calls/resume need consistent admission, schemas must be counted, groups kept valid, and required
-overflow handled honestly. The critic approved the final plan with no outstanding findings after CT01–CT08 were addressed.
-All runtime tests are planned, not executed. Planning publication and validation receipts belong in
-the Beads notes and external planning evidence directory. Return the reviewed scope and tradeoffs to
-the owner; do not start implementation from this handoff alone.
-
-Keep main, paused PR283/four orchestration refs and dirty/unrelated worktrees intact. Legacy local
-context-start branch `jwill9999/context-optimisation-session-compaction` remains retained separately.
-Release export verification remains phase-two work; broader V5 QA and dashboards remain open.
+Phase one is a working local single-user MVP; distribution architecture and checkout-free export
+verification remain phase two. Preserve primary/paused dirty worktrees and the retained legacy local
+context branch. Beads owns task status; no task closure on intermediate test results.
 
 ## Historical handoffs
 

@@ -6,14 +6,15 @@
 
 **Related closed foundation:** `agent-platform-memory`; this task is independently scheduled.
 
-**Status:** Planning in progress; implementation awaits owner review of this bounded proposal.
+**Status:** Implementation in progress under owner approval; final verification and integration remain open.
 
 ## Summary and owner scope
 
 Make normal local session/Project Chat reasoning requests bounded and inspectable as history and tool
 loops grow. Reuse current working memory and V1 diagnostics. The owner selected this task on 13 October
 and asked for Feature Planning plus independent critique, with a plan presented before implementation.
-Distribution architecture and releases to other users remain phase two. No runtime work starts here.
+The owner subsequently approved the plan and requested implementation, critic review and agreed tests.
+Distribution architecture and releases to other users remain phase two.
 
 Canonical detail: [MVP plan](../planning/context-token-optimisation-mvp.md),
 [verification map](../testing/context-token-optimisation-mvp.md),
@@ -26,7 +27,8 @@ The plan replaces this document's historical timing proposal; it does not reopen
   provider projection, replacing the old initial lossy cutoff and retaining stable payload/cap across
   a retry. Auxiliary model calls are excluded.
 - CT-R2: Count complete selected messages and mapped tool schemas under an explicitly approximate
-  input budget with 10% margin. Propose default input8000/output2048; persist configurable output cap,
+  input budget with 10% margin. The input8000 default has a measured feasibility conflict and an owner decision pending in the plan;
+  retain it until resolved. Default output2048; persist configurable output cap,
   preserve configured model/provider and distinguish cumulative run limits and actual provider usage.
 - CT-R3: Preserve current instructions/request/continuity and atomic tool groups; reuse scoped durable
   working memory; leave transcript/audit/effect persistence unchanged. Accept legacy strategy values
@@ -38,7 +40,7 @@ The plan replaces this document's historical timing proposal; it does not reopen
   compatible with existing records; diagnostics failure must not affect execution admission.
 
 The [plan](../planning/context-token-optimisation-mvp.md) defines exact semantics and non-goals.
-Proposals are awaiting owner agreement, not claims of current behavior or passed product tests.
+The bounded scope is approved. Implementation/test results are recorded separately and do not imply delivery.
 
 ## Dependency order
 
@@ -52,7 +54,7 @@ failures must be diagnosed, not waived. No blanket dependency on all of V5 or ol
 
 Runtime baseline: staging `d199ad0172dfe016490533444d5b7c46733c8f4d`.
 Planning work: `feature/context-token-optimisation` → `task/context-token-plan`.
-After owner review, proposed chained implementation branches are `task/context-token-boundary` →
+The authorised chained implementation branches are `task/context-token-boundary` →
 `task/context-token-verification`, with one final cumulative segment-tip PR to the feature.
 The existing Beads task owns all slices; no new epic or independent completion claims per slice.
 Refresh staging/ref compatibility before execution and preserve separate PR308 and all paused work.
@@ -85,4 +87,4 @@ Protected staging needs its own authority and full gates. Main/distribution are 
 Planning sign-off is narrower: complete reviewed plan/spec/test map, Beads alignment, preserved prior
 scope/history, pushed documentation and full mirror verification; product task stays in progress.
 Actual implementation results will be recorded at `docs/reviews/context-token-optimisation-results.md`
-after implementation begins. That file and runtime tests do not exist as completed evidence yet.
+during implementation. A draft or partial result record does not establish final acceptance.
