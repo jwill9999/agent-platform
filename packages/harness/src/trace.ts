@@ -1,4 +1,5 @@
 import type {
+  ContextDecisionMetadata,
   RiskTier,
   SensorAgentProfile,
   SensorResultStatus,
@@ -7,6 +8,7 @@ import type {
 
 /** Observability events emitted by the harness graph (append-only in state). */
 export type TraceEvent =
+  | ({ type: 'context_decision'; step: number } & ContextDecisionMetadata)
   | { type: 'graph_start'; runId: string }
   | { type: 'plan_ready'; planId: string; taskCount: number }
   | { type: 'task_start'; taskId: string; step: number }

@@ -4,6 +4,7 @@ import { CriticVerdictSchema } from '@agent-platform/contracts';
 import {
   buildHarnessGraph,
   createCriticNode,
+  createLlmReasonNode,
   resolveCriticCap,
   DEFAULT_MAX_CRITIC_ITERATIONS,
   type GraphNodeFn,
@@ -11,13 +12,17 @@ import {
 import type { HarnessStateType } from '../src/graphState.js';
 import type { ChatMessage, LlmOutput } from '../src/types.js';
 import { captureEmitter, createIncrementingTextNode } from './testUtils.js';
+import { mockStreamResult } from './helpers/aiMock.js';
 
 // Spy on the Vercel AI SDK's generateText so tests can assert the default
 // evaluator does not reach the model when no modelConfig is present.
-const { generateTextSpy } = vi.hoisted(() => ({ generateTextSpy: vi.fn() }));
+const { generateTextSpy, streamTextSpy } = vi.hoisted(() => ({
+  generateTextSpy: vi.fn(),
+  streamTextSpy: vi.fn(),
+}));
 vi.mock('ai', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ai')>();
-  return { ...actual, generateText: generateTextSpy };
+  return { ...actual, generateText: generateTextSpy, streamText: streamTextSpy };
 });
 
 const baseLimits: ExecutionLimits = {
@@ -158,6 +163,60 @@ describe('createCriticNode (unit)', () => {
 });
 
 describe('createCriticNode (graph integration)', () => {
+  it('readmits actual critic revision feedback and halts oversized revision before another provider attempt', async () => {
+    streamTextSpy.mockReset();
+    streamTextSpy.mockReturnValueOnce(mockStreamResult({ textChunks: ['First draft'] }));
+    const onModelAttempt = vi.fn();
+    const onContextDecision = vi.fn();
+    const feedback = 'CRITIC_REVISION_REQUIRED '.repeat(4000);
+    const evaluate = vi.fn(async (state: HarnessStateType) => {
+      expect(state.messages.at(-1)).toMatchObject({ role: 'assistant', content: 'First draft' });
+      return { verdict: 'revise' as const, reasons: [feedback] };
+    });
+    const executeTool = vi.fn();
+    const toolDispatchNode = vi.fn(async () => ({}));
+    const { emitter, events } = captureEmitter();
+    const graph = buildHarnessGraph({
+      executeTool,
+      toolDispatchNode,
+      llmReasonNode: createLlmReasonNode({ emitter, onModelAttempt, onContextDecision }),
+      criticNode: createCriticNode({ evaluate }),
+    });
+    const original = [{ role: 'user' as const, content: 'Write a first draft' }];
+    const out = await graph.invoke(
+      initialState({
+        messages: original,
+        llmOutput: null,
+        currentTurnStartIndex: 0,
+        modelConfig: { provider: 'openai', model: 'fixture-model', apiKey: 'fixture-only' },
+        contextWindow: { maxInputTokens: 16000, maxOutputTokens: 73, strategy: 'truncate' },
+      }),
+      { configurable: { thread_id: 'critic-revision-admission' } },
+    );
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(out.messages).toEqual([
+      ...original,
+      { role: 'assistant', content: 'First draft' },
+      { role: 'system', content: `<critique>\n${feedback}\n</critique>` },
+    ]);
+    expect(out).toMatchObject({
+      halted: true,
+      contextHalt: { code: 'CONTEXT_BUDGET_EXCEEDED' },
+      llmOutput: null,
+      iterations: 1,
+    });
+    expect(onContextDecision).toHaveBeenCalledTimes(2);
+    expect(onContextDecision.mock.calls.map(([decision]) => decision.reason)).toEqual([
+      'unchanged',
+      'required_overflow',
+    ]);
+    expect(streamTextSpy).toHaveBeenCalledTimes(1);
+    expect(onModelAttempt).toHaveBeenCalledTimes(1);
+    expect(executeTool).not.toHaveBeenCalled();
+    expect(toolDispatchNode).not.toHaveBeenCalled();
+    expect(events).toContainEqual(expect.objectContaining({ code: 'CONTEXT_BUDGET_EXCEEDED' }));
+  });
+
   it('routes llmReason → critic → END on accept', async () => {
     let llmCalls = 0;
     const llmNode: GraphNodeFn = vi.fn(async () => {

@@ -29,6 +29,21 @@ A browser connected to the supported local web/API topology offers a manual file
 normal Docker split-network deployment does not currently meet this topology and therefore cannot
 read diagnostic history. This restriction does not block normal chat operation.
 
+## Context decisions
+
+The context/token MVP branch adds optional V1 context-decision metadata; it remains under
+[implementation verification](../tasks/agent-platform-context-optimisation.md). Existing V1 records
+stay readable. A context event records the estimator and effective-policy versions, configured and
+effective input allowances, estimated before/after input and schema cost, included/omitted group
+counts, output cap and a fixed decision reason. It contains no prompt, tool name, argument, result,
+working-memory content, file path or custom model label.
+
+`unchanged` and `windowed` describe admission. `required_overflow` and `invalid_history` describe a
+local rejection. Rejection does not create a model-attempt event. Actual retries remain separate
+attempts of a model operation. Estimates are not provider-reported usage; a length-limited model
+response is incomplete, even if it includes partial text. Check request/operation identity and
+coverage before interpreting absent attempts or comparing totals.
+
 ## Local configuration
 
 Desktop manages a per-launch private capability and loopback service addresses automatically.

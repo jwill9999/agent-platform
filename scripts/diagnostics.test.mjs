@@ -206,3 +206,48 @@ test('oversized or failed response emits only bounded generic error', async () =
     );
   }
 });
+
+test('CLI list and report explain local context decisions separately from provider usage', async () => {
+  const contextEvent = {
+    ...event,
+    phase: 'context',
+    errorCode: 'context_budget_exceeded',
+    contextDecision: {
+      estimatorVersion: 'serialized_request_chars_v1',
+      effectivePolicy: 'group_window_working_memory_v1',
+      requestedStrategy: 'truncate',
+      configuredInputTokens: 8000,
+      effectiveInputTokens: 7200,
+      estimatedInputBefore: 9000,
+      estimatedInputAfter: 9000,
+      schemaEstimate: 200,
+      includedGroups: 2,
+      omittedGroups: 0,
+      outputCap: 2048,
+      reason: 'required_overflow',
+    },
+  };
+  const contextPage = { ...page, events: [{ sequence: 1, event: contextEvent }] };
+  await serverFixture(
+    (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify(
+          req.url.endsWith('/list')
+            ? { events: contextPage.events, health }
+            : buildDiagnosticReport(contextPage),
+        ),
+      );
+    },
+    async (env) => {
+      for (const args of [['list'], ['report', '--request', requestId]]) {
+        const result = await invoke(args, env);
+        assert.equal(result.code, 0);
+        assert.match(result.stdout, /local context admission required_overflow/);
+        assert.match(result.stdout, /estimated input 9000 -> 9000/);
+        assert.match(result.stdout, /not a provider attempt/);
+        assert.doesNotMatch(result.stdout, /provider-reported input\/output/);
+      }
+    },
+  );
+});

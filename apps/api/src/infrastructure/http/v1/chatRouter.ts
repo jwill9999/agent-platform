@@ -2,6 +2,8 @@ import {
   beginDiagnosticRun,
   failDiagnosticRun,
   observeDiagnosticNode,
+  observeDiagnosticContextDecision,
+  observeDiagnosticModelAttempt,
   observeDiagnosticTool,
   observeDiagnosticApproval,
 } from '../../diagnostics/observations.js';
@@ -37,7 +39,6 @@ import {
 } from '@agent-platform/db';
 import type {
   ApprovalRequest,
-  ContextWindow,
   MessageRecord,
   ModelConfig,
   Output,
@@ -66,8 +67,6 @@ import {
   createSensorCheckNode,
   createNdjsonEmitter,
   contractToolsToDefinitions,
-  createApproximateCounter,
-  buildWindowedContext,
   createSystemToolExecutor,
   PathJail,
   DEFAULT_MOUNTS,
@@ -91,6 +90,7 @@ import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import type { Request, Response, Router } from 'express';
 import { Router as createRouter } from 'express';
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { isAbsolute, relative, sep } from 'node:path';
 import { z } from 'zod';
 
@@ -341,82 +341,19 @@ export function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
   return { role: m.role as 'user' | 'assistant' | 'system', content: m.content };
 }
 
-/**
- * Sanitise replayed history so that persisted tool-call conversations satisfy
- * OpenAI's adjacency rule:
- *   assistant(tool_calls=[a,b]) → tool(a) → tool(b)
- *
- * Pending approval turns intentionally have an assistant `tool_calls` row with
- * no tool result yet. Those rows must not be replayed during a later normal
- * chat request, or OpenAI rejects the entire conversation. The resume endpoint
- * appends the reviewed assistant tool call at the end immediately before it
- * dispatches the matching tool result.
- *
- * Older rows may also lack persisted assistant `toolCalls`; strip any orphan
- * tool rows that cannot be paired with the immediately preceding assistant.
- */
-function sanitiseToolCallHistory(history: ChatMessage[]): ChatMessage[] {
-  const cleaned: ChatMessage[] = [];
-  let index = 0;
-  while (index < history.length) {
-    const msg = history[index]!;
-    const paired = pairedAssistantToolMessages(history, index);
-    if (paired) {
-      cleaned.push(...paired.messages);
-      index = paired.nextIndex;
-      continue;
-    }
-
-    if (shouldSkipReplayMessage(cleaned, msg)) {
-      index += 1;
-      continue;
-    }
-
-    cleaned.push(msg);
-    index += 1;
-  }
-  return cleaned;
-}
-
-function shouldSkipReplayMessage(cleaned: ChatMessage[], msg: ChatMessage): boolean {
-  if (msg.role === 'assistant' && msg.toolCalls?.length) return true;
-  if (msg.role !== 'tool') return false;
-  return !hasMatchingPreviousToolCall(cleaned, msg);
-}
-
-function pairedAssistantToolMessages(
-  history: ChatMessage[],
-  assistantIndex: number,
-): { messages: ChatMessage[]; nextIndex: number } | undefined {
-  const assistant = history[assistantIndex];
-  if (assistant?.role !== 'assistant' || !assistant.toolCalls?.length) return undefined;
-
-  const toolResults = assistant.toolCalls.map((toolCall, offset): ChatMessage | undefined => {
-    const candidate = history[assistantIndex + offset + 1];
-    if (candidate?.role !== 'tool' || candidate.toolCallId !== toolCall.id) return undefined;
-    return { ...candidate, toolName: candidate.toolName || toolCall.name };
+/** Restore tool names absent from the DB row without dropping or rearranging history. */
+function persistedHistory(records: MessageRecord[]): ChatMessage[] {
+  const names = new Map(
+    records.flatMap((record) =>
+      (record.toolCalls ?? []).map((call) => [call.id, call.name] as const),
+    ),
+  );
+  return records.map((record) => {
+    const message = dbRecordToChatMessage(record);
+    return message.role === 'tool'
+      ? { ...message, toolName: names.get(message.toolCallId) ?? '' }
+      : message;
   });
-
-  if (toolResults.includes(undefined)) return undefined;
-  const pairedToolResults = toolResults.filter(
-    (result): result is ChatMessage => result !== undefined,
-  );
-  return {
-    messages: [assistant, ...pairedToolResults],
-    nextIndex: assistantIndex + toolResults.length + 1,
-  };
-}
-
-function hasMatchingPreviousToolCall(
-  cleaned: ChatMessage[],
-  msg: Extract<ChatMessage, { role: 'tool' }>,
-): boolean {
-  const prev = cleaned.at(-1);
-  return (
-    prev?.role === 'assistant' &&
-    Array.isArray(prev.toolCalls) &&
-    prev.toolCalls.some((call) => call.id === msg.toolCallId)
-  );
 }
 
 /** Persist only the new assistant/tool messages the graph appended. */
@@ -581,12 +518,45 @@ function parseExecutionPayload(request: ApprovalRequest): ToolCallIntent {
   };
 }
 
-function hasAssistantToolCall(history: ChatMessage[], toolCallId: string): boolean {
-  return history.some(
-    (message) =>
-      message.role === 'assistant' &&
-      message.toolCalls?.some((toolCall) => toolCall.id === toolCallId),
+function approvalContext(
+  db: DrizzleDb,
+  sessionId: string,
+  messages: ChatMessage[],
+): {
+  approvalToolCallIds: string[];
+  pendingApprovalToolCallIds: string[];
+} {
+  const reviewedIds: string[] = [];
+  const approvalToolCallIds: string[] = [];
+  const pendingApprovalToolCallIds: string[] = [];
+  for (const approval of listApprovalRequests(db, { sessionId, limit: 1000, offset: 0 })) {
+    try {
+      const reviewed = parseExecutionPayload(approval);
+      reviewedIds.push(reviewed.id);
+      const matches = messages.flatMap((message) =>
+        message.role === 'assistant'
+          ? (message.toolCalls ?? []).filter((call) => call.id === reviewed.id)
+          : [],
+      );
+      if (
+        matches.length !== 1 ||
+        matches[0]?.name !== reviewed.name ||
+        !isDeepStrictEqual(matches[0]?.args, reviewed.args)
+      )
+        continue;
+      approvalToolCallIds.push(reviewed.id);
+      if (!approval.resumedAtMs) pendingApprovalToolCallIds.push(reviewed.id);
+    } catch {
+      // Invalid records never authorize omission or execution; admission stays fail-closed.
+    }
+  }
+  const unique = approvalToolCallIds.filter(
+    (id) => reviewedIds.indexOf(id) === reviewedIds.lastIndexOf(id),
   );
+  return {
+    approvalToolCallIds: unique,
+    pendingApprovalToolCallIds: pendingApprovalToolCallIds.filter((id) => unique.includes(id)),
+  };
 }
 
 function buildResumeMessages(
@@ -594,19 +564,30 @@ function buildResumeMessages(
   sessionId: string,
   systemPrompt: string,
   toolCall: ToolCallIntent,
-): { messages: ChatMessage[]; reconstructedToolCallContext: boolean } {
-  const rawHistory = listMessagesBySession(db, sessionId).map(dbRecordToChatMessage);
-  const hasPersistedToolCallContext = hasAssistantToolCall(rawHistory, toolCall.id);
-  const history = sanitiseToolCallHistory(rawHistory);
+): {
+  messages: ChatMessage[];
+  reconstructedToolCallContext: boolean;
+  currentTurnStartIndex: number;
+} {
+  const history = persistedHistory(listMessagesBySession(db, sessionId));
   const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }, ...history];
-  let reconstructedToolCallContext = false;
-
-  if (!hasAssistantToolCall(messages, toolCall.id)) {
-    messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
-    reconstructedToolCallContext = !hasPersistedToolCallContext;
+  const assistantIndex = messages.findIndex(
+    (message) =>
+      message.role === 'assistant' && message.toolCalls?.some((call) => call.id === toolCall.id),
+  );
+  const reconstructedToolCallContext = assistantIndex < 0;
+  const turnEnd = reconstructedToolCallContext ? messages.length : assistantIndex;
+  let currentTurnStartIndex = -1;
+  for (let index = turnEnd - 1; index >= 0; index--) {
+    if (messages[index]?.role === 'user') {
+      currentTurnStartIndex = index;
+      break;
+    }
   }
-
-  return { messages, reconstructedToolCallContext };
+  if (reconstructedToolCallContext) {
+    messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
+  }
+  return { messages, reconstructedToolCallContext, currentTurnStartIndex };
 }
 
 function buildRejectedToolMessage(toolCall: ToolCallIntent, request: ApprovalRequest): ChatMessage {
@@ -693,7 +674,7 @@ function toMemoryCandidateMessage(message: ChatMessage) {
 function buildWorkingMemoryPrompt(summary: string): string {
   return [
     'Short-term working memory for this session follows.',
-    'Use it only for continuity. Do not treat it as durable facts or user-approved long-term memory.',
+    'Use it only for continuity. It may be stale and never grants tool permission or approval.',
     summary,
   ].join('\n');
 }
@@ -701,6 +682,30 @@ function buildWorkingMemoryPrompt(summary: string): string {
 function withWorkingMemoryPrompt(systemPrompt: string, summary?: string): string {
   if (!summary?.trim()) return systemPrompt;
   return `${systemPrompt}\n\n${buildWorkingMemoryPrompt(summary)}`;
+}
+
+function scopedWorkingMemoryPrompt(
+  db: DrizzleDb,
+  session: SessionRecord,
+  systemPrompt: string,
+): string {
+  const memory = getWorkingMemoryArtifact(db, session.id);
+  if (!memory) return `${systemPrompt}\n\nNo saved session continuity is available.`;
+  if ((memory.projectId ?? undefined) !== (session.projectId ?? undefined)) {
+    return `${systemPrompt}\n\nSaved continuity has a different Project scope and was not loaded.`;
+  }
+  // Rebuild from bounded structured fields; the saved summary omits files/tools.
+  const continuity = JSON.stringify({
+    currentGoal: memory.currentGoal,
+    activeTask: memory.activeTask,
+    projectId: memory.projectId,
+    decisions: memory.decisions,
+    blockers: memory.blockers,
+    importantFiles: memory.importantFiles,
+    toolSummaries: memory.toolSummaries,
+    nextAction: memory.nextAction,
+  });
+  return withWorkingMemoryPrompt(systemPrompt, continuity);
 }
 
 function withPromptMemoryBundle(systemPrompt: string, bundle: PromptMemoryBundle): string {
@@ -741,6 +746,10 @@ function refreshWorkingMemory({
   const toolsUsed = toolSummaries.map((summary) => summary.toolName);
   const session = getSession(db, sessionId);
   const projectId = session?.projectId;
+  const existing = getWorkingMemoryArtifact(db, sessionId);
+  // The repository upsert merges old fields. Never relabel continuity from a
+  // different Project as current-session evidence; leave it disclosed/unloaded.
+  if (existing && (existing.projectId ?? undefined) !== (projectId ?? undefined)) return;
 
   upsertWorkingMemoryArtifact(db, {
     sessionId,
@@ -1061,7 +1070,14 @@ function buildRuntimeGraph({
     executeTool: async () => ({ ok: true }),
     llmReasonNode: observeDiagnosticNode(
       'model',
-      options.llmReasonNode ?? createLlmReasonNode({ emitter, dispatcher }),
+      options.llmReasonNode ??
+        createLlmReasonNode({
+          emitter,
+          dispatcher,
+          onContextDecision: observeDiagnosticContextDecision,
+          onModelAttempt: observeDiagnosticModelAttempt,
+        }),
+      { deferModelStart: !options.llmReasonNode },
     ),
     toolDispatchNode: createRuntimeToolDispatchNode({
       db,
@@ -1248,12 +1264,13 @@ export async function handleSessionResume(
       sessionId,
       withProjectInstructionPrompt(
         projectContext,
-        agentCtx.systemPrompt,
+        scopedWorkingMemoryPrompt(db, session, agentCtx.systemPrompt),
         JSON.stringify(toolCall.args),
       ),
       toolCall,
     );
     const messages = resumeBuild.messages;
+    const approvalHistory = approvalContext(db, sessionId, messages);
     const initialCount = messages.length - (resumeBuild.reconstructedToolCallContext ? 1 : 0);
 
     let resumeMessages: ChatMessage[];
@@ -1292,8 +1309,8 @@ export async function handleSessionResume(
         nativeToolExecutor,
       });
       const dispatchState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
-        dropped: 0,
-        contextTokens: 0,
+        currentTurnStartIndex: resumeBuild.currentTurnStartIndex,
+        ...approvalHistory,
         projectAccessPolicy: projectAccessPolicyForSession(db, sessionId),
       });
       dispatchState.llmOutput = { kind: 'tool_calls', calls: [toolCall] };
@@ -1320,15 +1337,18 @@ export async function handleSessionResume(
       agentCtx,
       modelCfg,
       {
-        dropped: 0,
-        contextTokens: 0,
+        currentTurnStartIndex: resumeBuild.currentTurnStartIndex,
+        ...approvalHistory,
         projectAccessPolicy: projectAccessPolicyForSession(db, sessionId),
       },
     );
 
-    const finalState: { messages?: ChatMessage[] } = await graph.invoke(resumeState, {
-      configurable: { thread_id: sessionId, signal },
-    });
+    const finalState: Pick<HarnessStateType, 'messages' | 'contextHalt'> = await graph.invoke(
+      resumeState,
+      {
+        configurable: { thread_id: sessionId, signal },
+      },
+    );
 
     const persistedMessages = sanitizeProjectAssistantMessages(
       finalState?.messages,
@@ -1340,12 +1360,18 @@ export async function handleSessionResume(
       sessionId,
       agentId: session.agentId,
       runId,
-      userMessage: 'Resume reviewed tool call.',
+      userMessage: messages[resumeBuild.currentTurnStartIndex]?.content ?? '',
       newMessages: persistedMessages?.slice(initialCount) ?? [],
     });
     completeDiagnostics();
     await safePluginCall(() =>
-      agentCtx.pluginDispatcher.onTaskEnd({ sessionId, runId, taskId: runId, ok: true }),
+      agentCtx.pluginDispatcher.onTaskEnd({
+        sessionId,
+        runId,
+        taskId: runId,
+        ok: !finalState.contextHalt,
+        ...(finalState.contextHalt ? { detail: finalState.contextHalt.code } : {}),
+      }),
     );
   } catch (err) {
     if (!res.headersSent && err instanceof HttpError) {
@@ -1419,28 +1445,26 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
 
         const graph = buildRuntimeGraph({ db, agentCtx, runId, sessionId, emitter, options });
 
-        const { messages, dropped, contextTokens, memoryBundle } = buildConversationMessages(
-          db,
-          session,
-          message,
-          agentCtx.systemPrompt,
-          agentCtx.agent.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
-        );
+        const { messages, currentTurnStartIndex, memoryBundle, approvalHistory } =
+          buildConversationMessages(db, session, message, agentCtx.systemPrompt);
 
         // Auto-generate a human-readable title on first user message
         if (!session.title) {
           updateSessionTitle(db, sessionId, deriveSessionTitle(message));
         }
         const initialState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
-          dropped,
-          contextTokens,
+          currentTurnStartIndex,
+          ...approvalHistory,
           memoryBundle,
           projectAccessPolicy: projectAccessPolicyForSession(db, sessionId),
         });
 
-        const finalState: { messages?: ChatMessage[] } = await graph.invoke(initialState, {
-          configurable: { thread_id: sessionId, signal },
-        });
+        const finalState: Pick<HarnessStateType, 'messages' | 'contextHalt'> = await graph.invoke(
+          initialState,
+          {
+            configurable: { thread_id: sessionId, signal },
+          },
+        );
 
         const persistedMessages = sanitizeProjectAssistantMessages(
           finalState?.messages,
@@ -1464,7 +1488,8 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
             sessionId,
             runId,
             taskId: runId,
-            ok: true,
+            ok: !finalState.contextHalt,
+            ...(finalState.contextHalt ? { detail: finalState.contextHalt.code } : {}),
           }),
         );
       } catch (err) {
@@ -1578,18 +1603,16 @@ function buildConversationMessages(
   session: SessionRecord,
   newMessage: string,
   systemPrompt: string,
-  contextWindow: ContextWindow,
 ): {
   messages: ChatMessage[];
-  dropped: number;
-  contextTokens: number;
+  currentTurnStartIndex: number;
   memoryBundle: PromptMemoryBundle;
+  approvalHistory: ReturnType<typeof approvalContext>;
 } {
   return withTransaction(db, (tx) => {
     const sessionId = session.id;
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
-    const workingMemory = getWorkingMemoryArtifact(tx, sessionId);
     const projectContext = resolveSessionProjectContext(tx, session);
     const memoryBundle = retrievePromptMemories(tx, {
       scope: {
@@ -1600,20 +1623,21 @@ function buildConversationMessages(
       query: newMessage,
     });
 
-    const history = sanitiseToolCallHistory(priorMessages.map(dbRecordToChatMessage));
+    const history = persistedHistory(priorMessages);
     const userMsg: ChatMessage = { role: 'user' as const, content: newMessage };
-    const counter = createApproximateCounter();
     const effectiveSystemPrompt = withPromptMemoryBundle(
       withProjectInstructionPrompt(
         projectContext,
-        withWorkingMemoryPrompt(systemPrompt, workingMemory?.summary),
+        scopedWorkingMemoryPrompt(tx, session, systemPrompt),
         newMessage,
       ),
       memoryBundle,
     );
 
     return {
-      ...buildWindowedContext(effectiveSystemPrompt, history, userMsg, contextWindow, counter),
+      messages: [{ role: 'system', content: effectiveSystemPrompt }, ...history, userMsg],
+      currentTurnStartIndex: history.length + 1,
+      approvalHistory: approvalContext(tx, sessionId, history),
       memoryBundle,
     };
   });
@@ -1648,26 +1672,18 @@ function buildInitialState(
   agentCtx: AgentContext,
   modelConfig: { provider: string; model: string; apiKey?: string },
   contextInfo: {
-    dropped: number;
-    contextTokens: number;
+    currentTurnStartIndex: number;
+    pendingApprovalToolCallIds?: string[];
+    approvalToolCallIds?: string[];
     memoryBundle?: PromptMemoryBundle;
     projectAccessPolicy?: ProjectAccessPolicy;
   },
 ): HarnessStateType {
-  const strategy = agentCtx.agent.contextWindow?.strategy ?? 'truncate';
-  const totalMessages = messages.length - 2 + contextInfo.dropped; // exclude system + user
   const memoryBundle = contextInfo.memoryBundle;
   const sensorProfile = inferSensorAgentProfile(agentCtx);
   const tools = visibleToolsForProjectPolicy(agentCtx.tools, contextInfo.projectAccessPolicy);
   return {
     trace: [
-      {
-        type: 'context_window' as const,
-        contextTokens: contextInfo.contextTokens,
-        messagesTotal: totalMessages,
-        messagesIncluded: messages.length - 2, // exclude system + new user message
-        strategy,
-      },
       ...(memoryBundle
         ? [
             {
@@ -1686,6 +1702,11 @@ function buildInitialState(
     halted: false,
     mode: 'react' as const,
     messages,
+    contextWindow: agentCtx.agent.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+    currentTurnStartIndex: contextInfo.currentTurnStartIndex,
+    pendingApprovalToolCallIds: contextInfo.pendingApprovalToolCallIds ?? [],
+    approvalToolCallIds: contextInfo.approvalToolCallIds ?? [],
+    contextHalt: null,
     toolDefinitions: contractToolsToDefinitions(tools),
     llmOutput: null,
     modelConfig,

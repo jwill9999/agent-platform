@@ -64,8 +64,8 @@ describe('llmReasonNode', () => {
     expect(result.llmOutput).toEqual({ kind: 'text', content: 'Hello, world!' });
     expect(result.messages).toHaveLength(1);
     expect(result.messages![0]).toEqual({ role: 'assistant', content: 'Hello, world!' });
-    expect(result.trace).toHaveLength(1);
-    expect(result.trace![0]).toMatchObject({
+    expect(result.trace).toHaveLength(2);
+    expect(result.trace![1]).toMatchObject({
       type: 'llm_call',
       step: 0,
       tokenUsage: { promptTokens: 10, completionTokens: 5 },
@@ -426,5 +426,93 @@ describe('llmReasonNode — deadline propagation', () => {
 
     expect(result.halted).toBeUndefined();
     expect(result.llmOutput).toBeDefined();
+  });
+});
+
+describe('provider admission boundary', () => {
+  it('returns a typed halt without a provider attempt or changing existing effects', async () => {
+    mockStreamText.mockClear();
+    const onModelAttempt = vi.fn();
+    const onContextDecision = vi.fn();
+    const state = makeState({
+      contextWindow: { maxInputTokens: 10, maxOutputTokens: 2048, strategy: 'truncate' },
+      totalToolCalls: 2,
+    });
+    const before = structuredClone(state.messages);
+    const result = await _createNode({ onModelAttempt, onContextDecision })(state);
+    expect(result).toMatchObject({
+      halted: true,
+      contextHalt: { code: 'CONTEXT_BUDGET_EXCEEDED' },
+      llmOutput: null,
+    });
+    expect(result.messages).toBeUndefined();
+    expect(state.messages).toEqual(before);
+    expect(state.totalToolCalls).toBe(2);
+    expect(mockStreamText).not.toHaveBeenCalled();
+    expect(onModelAttempt).not.toHaveBeenCalled();
+    expect(onContextDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'required_overflow' }),
+    );
+  });
+
+  it('passes output cap and fixes admission payload once across transient retries', async () => {
+    mockStreamText.mockClear();
+    const error = Object.assign(new Error('transient'), { status: 503 });
+    mockStreamText.mockImplementationOnce(() => {
+      throw error;
+    });
+    mockStreamText.mockReturnValueOnce(mockStreamResult({ textChunks: ['ok'] }));
+    const onModelAttempt = vi.fn();
+    const onContextDecision = vi.fn();
+    const result = await _createNode({ onModelAttempt, onContextDecision })(
+      makeState({
+        contextWindow: { maxInputTokens: 8000, maxOutputTokens: 123, strategy: 'truncate' },
+      }),
+    );
+    expect(result.contextHalt).toBeUndefined();
+    expect(mockStreamText).toHaveBeenCalledTimes(2);
+    expect(mockStreamText.mock.calls[0]![0].messages).toBe(
+      mockStreamText.mock.calls[1]![0].messages,
+    );
+    expect(mockStreamText.mock.calls[0]![0].maxTokens).toBe(123);
+    expect(onContextDecision).toHaveBeenCalledTimes(1);
+    expect(onModelAttempt).toHaveBeenCalledTimes(2);
+  });
+
+  it('marks length completion incomplete and never creates tool intents or tool placeholders', async () => {
+    const emit = vi.fn(async () => {});
+    mockStreamText.mockReturnValueOnce({
+      ...mockStreamResult({
+        textChunks: ['partial'],
+        toolCalls: [{ toolCallId: 'call', toolName: 'danger', args: {} }],
+      }),
+      finishReason: Promise.resolve('length'),
+    });
+    const result = await _createNode({ emitter: { emit } })(makeState());
+    expect(result).toMatchObject({
+      halted: true,
+      contextHalt: { code: 'MODEL_OUTPUT_INCOMPLETE' },
+      llmOutput: null,
+      messages: [{ role: 'assistant', content: 'partial' }],
+    });
+    expect(emit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error', code: 'MODEL_OUTPUT_INCOMPLETE' }),
+    );
+    expect(emit.mock.calls.flat()).not.toContainEqual(
+      expect.objectContaining({ content: expect.stringContaining('Calling') }),
+    );
+  });
+
+  it('does not let a diagnostic observer failure change admission or call execution', async () => {
+    mockStreamText.mockReturnValueOnce(mockStreamResult({ textChunks: ['ok'] }));
+    const result = await _createNode({
+      onContextDecision: () => {
+        throw new Error('storage unavailable');
+      },
+      onModelAttempt: () => {
+        throw new Error('storage unavailable');
+      },
+    })(makeState());
+    expect(result.llmOutput).toEqual({ kind: 'text', content: 'ok' });
   });
 });

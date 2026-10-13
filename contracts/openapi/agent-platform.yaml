@@ -1143,7 +1143,11 @@ components:
         maxInputTokens:
           type: integer
           minimum: 1
-          default: 8000
+          default: 16000
+        maxOutputTokens:
+          type: integer
+          minimum: 1
+          default: 2048
         strategy:
           type: string
           enum: [truncate, summarize]
