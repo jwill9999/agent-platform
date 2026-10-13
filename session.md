@@ -1,9 +1,9 @@
 # Context and token optimisation implementation — 13 October 2026
 
-Implementation checkpoint: runtime `b4559f7c` and verification `3cdfd571` are pushed; work continues on
+Implementation checkpoint: runtime `b4559f7c` and verification through `808dc301` are pushed; work continues on
 `task/context-token-verification`. [Actual results](docs/reviews/context-token-optimisation-results.md)
-record browser success, API247 passing tests, unresolved native export and the owner input-default
-decision. No implementation merge or staging promotion is authorized or claimed.
+record browser success, API247 passing tests, all three configured-budget native journeys and five
+verified exports. The owner input-default decision and final hosted qualification remain pending. No implementation merge or staging promotion is authorized or claimed.
 
 The owner approved the bounded plan at `294a52c8` and authorised implementation with Beads,
 the implementation skill, critic review and the agreed tests. The task is
@@ -19,17 +19,23 @@ are implemented and source-reviewed. CP01/CP02 approval-provenance findings are 
 build/typecheck/cycles and affected tests pass, including harness707, API247 and workflow-control1141
 with77 existing optional skips. Original failed attempts remain recorded. The browser journey passed
 with independent per-request estimates, atomic tool groups, real file effects, denial, overflow and
-recovery assertions. Native export and complete Electron qualification remain pending. These are
-intermediate results, not feature completion or hosted qualification.
+recovery assertions. All three native journeys now pass, including export, restart and no repeated
+approved effects. Independent review verifies five actual V1 reports and retained per-run source
+hashes; restart honestly reports unfinishedPriorProcess. These configured-budget results do not
+prove default usability or full hosted qualification.
 
 One material decision is pending: complete schema counting makes seeded Personal Assistant/Coding
 requests approximately 8,353/8,374 tokens, above the approved default's effective 7,200. The owner has
 been asked about a 16,000 absent/new default, preserving saved budgets and output2048. Do not assume
 approval or silently remove tools. Current code retains8000. Continue independent tests while waiting.
 
-Next finish standalone Electron success, overflow/recovery, approval
-exactly-once effects and restart/export. Review actual V1 success/failure reports, finish the CT-T01–13
-map, source review, documentation/readbacks and exact-head quality/CI before final acceptance.
+Hosted run38338322697 at3cdf failed15 existing desktop tests because their saved8,000 budget rejected
+requests before any provider/effect, plus two new fixture readiness failures. The latter have local
+source-backed corrections; keep the default decision pending and do not claim the permission tests
+passed. Separate GitHub check responsiveness finding agent-platform-d185 is tracked alongside the
+three earlier findings. Draft PR309 remains unmerged. Next resolve the input-default decision,
+complete CT-T13/default regression, final source review, publication/readbacks and exact-head hosted
+quality gates before owner acceptance.
 [Plan](docs/planning/context-token-optimisation-mvp.md),
 [task](docs/tasks/agent-platform-context-optimisation.md),
 [verification](docs/testing/context-token-optimisation-mvp.md) and

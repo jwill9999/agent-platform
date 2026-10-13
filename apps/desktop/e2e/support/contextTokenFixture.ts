@@ -54,6 +54,41 @@ export async function createContextTokenFixture(
   const projectDir = join(root, 'context-token-project');
   mkdirSync(projectDir);
   writeFileSync(join(projectDir, 'README.md'), '# Disposable context-token project\n');
+  // The Project is nested under this checkout. Give it its own Git boundary so
+  // background Project checks cannot inherit the real repository's GitHub remote.
+  const git = (args: string[]) =>
+    execFileSync('/usr/bin/git', args, {
+      cwd: projectDir,
+      encoding: 'utf8',
+      timeout: 10_000,
+      env: {
+        PATH: '/usr/bin:/bin',
+        LANG: 'C',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_CONFIG_SYSTEM: '/dev/null',
+      },
+    }).trim();
+  git(['init', '--initial-branch=context-fixture', '.']);
+  git(['add', '--', 'README.md']);
+  git([
+    '-c',
+    'core.hooksPath=/dev/null',
+    '-c',
+    'commit.gpgsign=false',
+    '-c',
+    'user.name=Context fixture',
+    '-c',
+    'user.email=context-fixture@example.invalid',
+    'commit',
+    '-m',
+    'Initial disposable context fixture',
+  ]);
+  const repositoryRootMatched = git(['rev-parse', '--show-toplevel']) === projectDir;
+  const remotes = git(['remote']);
+  const branch = git(['branch', '--show-current']);
+  if (!repositoryRootMatched || remotes || branch !== 'context-fixture')
+    throw new Error('Disposable Project Git boundary is invalid');
+  const gitIsolation = { repositoryRootMatched, branch, remotes: [] as string[] };
   const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
   mkdirSync(join(runtimeDir, 'logs'), { recursive: true });
   seedDesktopDatabase(sqlitePath, {
@@ -93,6 +128,7 @@ export async function createContextTokenFixture(
     root,
     runtimeDir,
     projectDir,
+    gitIsolation,
     sqlitePath,
     backendPort,
     rendererPort,
@@ -212,6 +248,13 @@ export async function launchContextTokenFixture(
         { timeout: 30_000 },
       )
       .toBe(true);
+    // firstWindow observes construction before createMainWindow's initial loadURL.
+    // Wait for the real owned renderer load before any journey issues navigation.
+    const initialWindow = await app.firstWindow();
+    await initialWindow.waitForURL(
+      (url) => url.origin === `http://127.0.0.1:${fixture.rendererPort}`,
+      { waitUntil: 'load', timeout: 30_000 },
+    );
     return app;
   } catch (error) {
     await app.close();
@@ -409,7 +452,7 @@ export function snapshotContextTokenDiagnosticStore(
       [
         '--input-type=module',
         '-e',
-        String.raw`
+        `
 import { readFileSync } from 'node:fs';
 import Database from './packages/db/node_modules/better-sqlite3/lib/index.js';
 const input = JSON.parse(readFileSync(0, 'utf8'));

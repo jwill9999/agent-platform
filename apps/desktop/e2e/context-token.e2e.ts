@@ -50,7 +50,13 @@ async function journey(info: TestInfo, name: string, run: (ctx: Journey) => Prom
       join(fixture!.root, file),
     );
     const app = await launchContextTokenFixture(fixture, reports);
-    ctx = { fixture, app, page: await app.firstWindow(), evidence: { reports }, replies };
+    ctx = {
+      fixture,
+      app,
+      page: await app.firstWindow(),
+      evidence: { reports, gitIsolation: fixture.gitIsolation },
+      replies,
+    };
     await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
     tracing = true;
     await run(ctx);
