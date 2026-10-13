@@ -24,8 +24,11 @@ its own delivery status belongs in Beads and its PR, separately from the already
 
 ## Remaining work and boundaries
 
+- Owner-confirmed phase one: a working local MVP for current use. Distribution to other users,
+  and the architecture and operating model needed to support it, will be considered in phase two.
+  Release/distribution work is not the immediate priority or a prerequisite for local MVP progress.
 - `agent-platform-electron-release.diagnostics-export` remains open: checkout-free export from
-  the released artifact belongs to release qualification, as agreed, not a reopened V1 task.
+  the released artifact belongs to phase-two release qualification, not a reopened V1 task.
 - `agent-platform-harness-v5` retains the local macOS HTTP test-isolation finding. Matching explicit
   loopback binding is a proposed bounded repair; no source fix or V5 completion is claimed.
 - Larger dashboards, external tracing and accounts remain future work. No new product feature
@@ -63,9 +66,10 @@ records need explicit scoped reconciliation, not revival of paused orchestration
 
 Before relying on local macOS API qualification, take the small HTTP fixture-isolation repair
 recorded under V5. Treat that as enabling QA work, not expansion into the whole V5 programme.
-If the owner instead prioritises distributing the app now, move release qualification (including
-checkout-free diagnostic export) ahead of new functionality. No backlog priorities or dependencies
-were changed by this recommendation.
+The owner has confirmed local MVP development takes priority; distribution architecture and
+checkout-free release export qualification remain for phase two. Context and token optimisation
+remains the recommended next product task, pending selection and planning. No backlog priorities
+or dependencies were changed by this recommendation.
 
 ## Historical handoffs
 
