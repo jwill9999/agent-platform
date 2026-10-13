@@ -1,6 +1,6 @@
 # MCP onboarding verification plan
 
-**Status:** planned, not executed. **Owner:** `agent-platform-mcp-onboarding`.  
+**Status:** approved verification contract; execution in progress, final gates outstanding. **Owner:** `agent-platform-mcp-onboarding`.
 **Contract:** [MCP-01 through MCP-08](../planning/mcp-onboarding-mvp.md).  
 **Results:** [Planning critique and later execution evidence](../reviews/mcp-onboarding-planning.md).
 
@@ -33,3 +33,27 @@ Final implementation review uses the actual changed source plus evidence. Inspec
 ## Result schema and cleanup
 
 For each V ID record revision, environment, fixture/upstream version, exact command, outcome (passed/failed/skipped/blocked/not run), UI observation, independent state/effect assertion, diagnostic IDs and artifact paths, limitations and repairs. Missing required evidence is inconclusive and blocks completion. Capture success as well as failure evidence. Teardown only owned fixture processes/ports, disposable DB/key/app-data and temporary Compose resources; never reset personal app data or paused worktrees. Limit identical transient retries to two, inspect failures and preserve original evidence; do not weaken the acceptance threshold.
+
+## Implementation test entry points
+
+The implementation adds contract/DB tests for configuration and secret ownership,
+`packages/mcp-adapter/test/connected.test.ts` for real protocol/lifecycle behavior,
+`packages/harness/test/mcpOnboarding.test.ts` for approval binding and no replay, and
+API MCP server/chat/diagnostic integration tests. These use real stores/processes where stated;
+provider selection is deterministic and does not qualify live-model behavior.
+
+Browser tests are `e2e/mcp-onboarding.spec.ts` and `e2e/mcp-chat.spec.ts`. The
+`mcp-onboarding` Playwright project runs them sequentially after `chromium` in the default
+CI command, preserving all seven cases while isolating shared disposable settings and the
+in-container provider fixture. A focused local run may select that project with `--no-deps`.
+The tests restore supported rate-limit and permission settings; production defaults are unchanged.
+
+Native tests are `apps/desktop/e2e/mcp-onboarding.e2e.ts`. Upstream interoperability uses
+`apps/desktop/e2e/mcp-reference.config.ts` and an explicitly supplied
+`MCP_EVERYTHING_ENTRYPOINT` to the externally installed, integrity-verified Everything1.0.0.
+The reference test is a separate explicit gate; an absent fixture fails its invocation rather
+than silently qualifying it. Application MCP SDK remains1.29.0; reference SDK is1.32.1.
+No repository dependency was upgraded for the reference test.
+
+See the [execution results](../reviews/mcp-onboarding-planning.md) for terminal outcomes,
+source hashes, retained failures, independent review and final qualification limits.

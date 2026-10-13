@@ -1,3 +1,4 @@
+import { sameMcpApprovalBinding, type McpApprovalBinding } from '../security/mcpApproval.js';
 import type {
   Agent,
   ApprovalRequest,
@@ -46,6 +47,8 @@ export type ToolDispatchContext = {
   agent: Agent;
   tools?: readonly ContractTool[];
   mcpManager: McpSessionManager;
+  mcpApprovalBindings?: ReadonlyMap<string, McpApprovalBinding>;
+  isMcpBindingCurrent?: (binding: McpApprovalBinding) => boolean;
   nativeToolExecutor?: NativeToolExecutor;
   emitter?: OutputEmitter;
   dispatcher?: PluginDispatcher;
@@ -395,12 +398,38 @@ async function enforcePathJail(
   return { args: resolvedArgs };
 }
 
+/** MCP assignment and discovery remain mandatory even after a human approval. */
+function mcpAdmissionError(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+  approved: boolean,
+): Output | undefined {
+  const parsed = parseToolId(call.name);
+  if (parsed.kind !== 'mcp') return undefined;
+  const binding = ctx.mcpApprovalBindings?.get(call.name);
+  const eligible =
+    ctx.agent.allowedMcpServerIds.includes(parsed.mcpServerId) &&
+    (!ctx.tools || ctx.tools.some((tool) => tool.id === call.name));
+  const current =
+    !ctx.mcpApprovalBindings ||
+    (!!binding && (!ctx.isMcpBindingCurrent || ctx.isMcpBindingCurrent(binding)));
+  if (!eligible || !current || (approved && !sameMcpApprovalBinding(call.mcpBinding, binding))) {
+    return {
+      type: 'error',
+      code: 'MCP_APPROVAL_STALE',
+      message:
+        'MCP assignment, connection or tool definition changed or is unavailable. Start a new request and review its permissions.',
+    };
+  }
+  return undefined;
+}
+
 /** Dispatch a tool call to an MCP session. */
 async function dispatchMcpTool(
   parsed: { mcpServerId: string; mcpToolName: string },
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
-  options?: { timeoutMs?: number },
+  options?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
   const session = ctx.mcpManager.getSession(parsed.mcpServerId);
   if (!session) {
@@ -416,11 +445,19 @@ async function dispatchMcpTool(
   try {
     const { output, images } = await session.callToolAsOutput(parsed.mcpToolName, call.args, {
       timeoutMs: options?.timeoutMs,
+      signal: options?.signal,
     });
     return { output, ok: output.type !== 'error', images };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { output: { type: 'error', code: 'MCP_CALL_FAILED', message }, ok: false };
+  } catch {
+    return {
+      output: {
+        type: 'error',
+        code: 'MCP_OUTCOME_UNKNOWN',
+        message:
+          'The MCP action may have completed. Automatic execution stopped; check its effect before making a new request.',
+      },
+      ok: false,
+    };
   }
 }
 
@@ -471,7 +508,7 @@ function isOutputOk(output: Output): boolean {
 async function dispatchSingleTool(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
-  options?: { timeoutMs?: number },
+  options?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
   const approvedForResume = ctx.approvedToolCallIds?.has(call.id) ?? false;
   if (!approvedForResume && !isToolExecutionAllowed(ctx.agent, call.name)) {
@@ -515,6 +552,8 @@ async function dispatchSingleTool(
   }
 
   const parsed = parseToolId(safeCall.name);
+  const denial = mcpAdmissionError(safeCall, ctx, approvedForResume);
+  if (denial) return { output: denial, ok: false };
   if (parsed.kind === 'mcp') return dispatchMcpTool(parsed, safeCall, ctx, options);
   return dispatchNativeTool(safeCall, ctx);
 }
@@ -623,8 +662,25 @@ function executionPolicyDecision(
   toolMetadata: ContractTool | undefined,
 ):
   | ReturnType<typeof classifyBashCommand>
-  | { state: 'denied'; category: 'workspace_write'; code: string; reason: string }
+  | { state: 'denied'; category: ExecutionPolicyCategory; code: string; reason: string }
   | undefined {
+  if (parseToolId(call.name).kind === 'mcp' && !toolMetadata?.riskTier) {
+    if (policyModeForTool(ctx) === 'block')
+      return {
+        state: 'denied',
+        category: 'unknown',
+        code: 'mcp_policy_blocked',
+        reason: 'Unclassified MCP tools are blocked by the selected permission setting.',
+      };
+    return {
+      state: 'approval_required',
+      category: 'unknown',
+      riskTier: 'high',
+      code: 'mcp_approval_required',
+      reason:
+        'This MCP tool has no trusted risk classification. Review this action before allowing it.',
+    };
+  }
   if (call.name === 'sys_bash') {
     const command = typeof call.args.command === 'string' ? call.args.command : '';
     return classifyBashCommand(command, { policy: ctx.executionPolicy });
@@ -726,6 +782,9 @@ async function createApprovalRequiredOutput(
       toolCallId: executionCall.id,
       toolName: executionCall.name,
       args: executionCall.args,
+      ...(ctx.mcpApprovalBindings?.get(executionCall.name)
+        ? { mcpBinding: ctx.mcpApprovalBindings.get(executionCall.name) }
+        : {}),
     }),
     riskTier,
     createdAtMs: Date.now(),
@@ -796,6 +855,12 @@ async function executeToolWithRetry(
 ): Promise<{ output: Output; ok: boolean; retryCount: number; images?: Output[] }> {
   const effectiveTimeout = resolveToolTimeout(agentToolTimeoutMs, undefined, remainingDeadlineMs);
   let retryCount = 0;
+
+  // The adapter owns cancellation/timeout. Replaying an ambiguous MCP call may duplicate effects.
+  if (parseToolId(call.name).kind === 'mcp') {
+    const result = await dispatchSingleTool(call, ctx, { timeoutMs: effectiveTimeout, signal });
+    return { ...result, retryCount: 0 };
+  }
 
   try {
     const result = await withRetry(
@@ -1168,6 +1233,24 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       rateLimiter.record(call.name);
 
       const approvedForResume = ctx.approvedToolCallIds?.has(call.id) ?? false;
+      const mcpDenial = mcpAdmissionError(call, ctx, approvedForResume);
+      if (mcpDenial) {
+        await emitToolOutput(ctx, mcpDenial);
+        toolMessages.push({
+          role: 'tool',
+          toolCallId: call.id,
+          toolName: call.name,
+          content: outputToContent(call.name, mcpDenial),
+        });
+        return {
+          halted: true,
+          mcpHalt: { code: 'MCP_APPROVAL_STALE' },
+          llmOutput: null,
+          messages: toolMessages,
+          trace: traceEvents,
+          totalToolCalls: toolCallCount,
+        };
+      }
       if (!approvedForResume && !isToolExecutionAllowed(ctx.agent, call.name)) {
         const reviewableTool = reviewableUnallowlistedTool(call, ctx);
         if (reviewableTool && ctx.approvalRequests) {
@@ -1299,7 +1382,11 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       const actionPolicy = executionPolicyDecision(ctx, safeCall, toolMetadata);
       if (actionPolicy?.state === 'denied') {
         const denialCode =
-          safeCall.name === 'sys_bash' ? 'COMMAND_POLICY_DENIED' : 'WORKSPACE_WRITE_POLICY_DENIED';
+          parseToolId(safeCall.name).kind === 'mcp'
+            ? 'MCP_POLICY_DENIED'
+            : safeCall.name === 'sys_bash'
+              ? 'COMMAND_POLICY_DENIED'
+              : 'WORKSPACE_WRITE_POLICY_DENIED';
         const output: Output = {
           type: 'error',
           code: denialCode,
@@ -1517,6 +1604,21 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok });
       totalToolRetries += retryCount;
+      if (
+        output.type === 'error' &&
+        (output.code === 'MCP_OUTCOME_UNKNOWN' || output.code === 'MCP_APPROVAL_STALE')
+      ) {
+        return {
+          halted: true,
+          mcpHalt: { code: output.code },
+          llmOutput: null,
+          messages: toolMessages,
+          trace: traceEvents,
+          totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
+          totalToolCalls: toolCallCount,
+          loadedSkillIds: newLoadedSkillIds,
+        };
+      }
     }
 
     return {

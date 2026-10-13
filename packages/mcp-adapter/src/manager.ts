@@ -1,6 +1,7 @@
-import type { McpServer } from '@agent-platform/contracts';
+import type { ResolvedMcpConnection } from '@agent-platform/contracts';
 import { createLogger } from '@agent-platform/logger';
-import type { McpSession } from './session.js';
+import { safeMcpFailure } from './errors.js';
+import type { McpSession, McpOperationOptions } from './session.js';
 import { openMcpSession } from './session.js';
 
 const log = createLogger('mcp-adapter');
@@ -18,6 +19,17 @@ export type McpSessionOpenResult = {
  */
 export class McpSessionManager {
   private readonly sessions = new Map<string, McpSession>();
+  private operations: Promise<void> = Promise.resolve();
+
+  /** Serialize ownership changes so concurrent open/close cannot orphan a transport. */
+  private mutate<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.operations.then(operation);
+    this.operations = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
 
   /** Read-only view of currently connected sessions. */
   getSessions(): ReadonlyMap<string, McpSession> {
@@ -28,12 +40,24 @@ export class McpSessionManager {
    * Opens sessions to multiple MCP servers in parallel.
    * Failures are collected and logged — they do not prevent other sessions from opening.
    */
-  async openSessions(configs: McpServer[]): Promise<McpSessionOpenResult[]> {
-    if (configs.length === 0) return [];
+  async openSessions(
+    configs: ResolvedMcpConnection[],
+    options: McpOperationOptions = {},
+  ): Promise<McpSessionOpenResult[]> {
+    return this.mutate(() => this.openUniqueSessions(configs, options));
+  }
+
+  private async openUniqueSessions(
+    configs: ResolvedMcpConnection[],
+    options: McpOperationOptions,
+  ): Promise<McpSessionOpenResult[]> {
+    // A manager owns one request snapshot per server. Repeated opens reuse it; replacement is explicit.
+    const unique = [...new Map(configs.map((config) => [config.id, config])).values()];
+    if (unique.length === 0) return [];
 
     const settled = await Promise.allSettled(
-      configs.map(async (config) => {
-        const session = await openMcpSession(config);
+      unique.map(async (config) => {
+        const session = this.sessions.get(config.id) ?? (await openMcpSession(config, options));
         return { config, session };
       }),
     );
@@ -42,17 +66,15 @@ export class McpSessionManager {
 
     for (let i = 0; i < settled.length; i++) {
       const outcome = settled[i]!;
-      const config = configs[i]!;
+      const config = unique[i]!;
 
       if (outcome.status === 'fulfilled') {
         this.sessions.set(config.id, outcome.value.session);
         results.push({ serverId: config.id, status: 'connected' });
       } else {
-        const error =
-          outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
+        const error = safeMcpFailure(outcome.reason, 'connect').message;
         log.warn('Failed to connect to MCP server', {
           serverId: config.id,
-          transport: config.transport,
           error,
         });
         results.push({ serverId: config.id, status: 'failed', error });
@@ -77,7 +99,17 @@ export class McpSessionManager {
    * Closes the old session if one exists before opening a new one.
    * Always keys on `config.id` to avoid serverId/config.id mismatch.
    */
-  async reconnect(config: McpServer): Promise<boolean> {
+  async reconnect(
+    config: ResolvedMcpConnection,
+    options: McpOperationOptions = {},
+  ): Promise<boolean> {
+    return this.mutate(() => this.replaceSession(config, options));
+  }
+
+  private async replaceSession(
+    config: ResolvedMcpConnection,
+    options: McpOperationOptions,
+  ): Promise<boolean> {
     const existing = this.sessions.get(config.id);
     if (existing) {
       try {
@@ -89,14 +121,13 @@ export class McpSessionManager {
     }
 
     try {
-      const session = await openMcpSession(config);
+      const session = await openMcpSession(config, options);
       this.sessions.set(config.id, session);
       return true;
     } catch (err) {
-      const error = err instanceof Error ? err.message : String(err);
+      const error = safeMcpFailure(err, 'connect').message;
       log.warn('Reconnect failed', {
         serverId: config.id,
-        transport: config.transport,
         error,
       });
       return false;
@@ -105,6 +136,10 @@ export class McpSessionManager {
 
   /** Close all active sessions. Errors during close are swallowed. */
   async closeAll(): Promise<void> {
+    return this.mutate(() => this.closeOwnedSessions());
+  }
+
+  private async closeOwnedSessions(): Promise<void> {
     const entries = [...this.sessions.entries()];
     this.sessions.clear();
 
@@ -113,7 +148,7 @@ export class McpSessionManager {
         try {
           await session.close();
         } catch (err) {
-          const error = err instanceof Error ? err.message : String(err);
+          const error = safeMcpFailure(err, 'connect').message;
           log.warn('Error closing session', { serverId, error });
         }
       }),

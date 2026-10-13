@@ -1,6 +1,6 @@
 # MCP onboarding planning review and results
 
-**Status:** source investigation complete; independent critique approved; awaiting owner scope agreement.  
+**Status:** planning approved by owner; implementation and final verification in progress.
 **Task:** `agent-platform-mcp-onboarding`. **Source baseline:** `26e90126a1987b1dc6e689438b471fe5ed932235`.  
 **Plan:** [Bounded MCP onboarding](../planning/mcp-onboarding-mvp.md).  
 **Verification:** [V01–V09](../testing/mcp-onboarding-mvp.md).
@@ -33,3 +33,89 @@ Direct Markdown validation of all five documents, explicit Prettier and new rela
 The source-aware critic approved the corrected plan hash `2f416b17ea258cb9b8e05826a0b56a8b6adadf3e14c46595f1015912dff7773a`, verification hash `11e67535d51f6a0f0b0a8512aed4223ede04e34a359279f83a9dc54aeac0151c` and spec hash `e79c5283793ab9efcf69488ae278292dbef9ab072d36df3bc74427e583dd1af5`. Hashes describe the reviewed bytes, not a product qualification.
 
 Planning publication requires normal commit/push hooks and complete branch-specific Notion body/source/hash/destination readbacks before the owner briefing. Final publication receipts are maintained outside the mirrored source to avoid self-referential revision churn, in the scoped external evidence directory `/Users/letuscode/.codex/mcp-onboarding-plan-20261013`; no test success is inferred from those receipts. Product execution results will be appended against actual implementation revisions after owner agreement.
+
+## Execution update — 13 October 2026
+
+The owner approved reviewed planning revision `f75fba7de65957e071a6cf7e99ad860cfddd01b9`
+and instructed delivery of the epic's concrete tasks. The sole live child remains
+`agent-platform-mcp-onboarding`; the broader registry epic and paused orchestration are separate.
+The planning-only statements above describe that earlier phase, not current authority.
+
+Implementation is on `task/mcp-onboarding-connection` from the reviewed planning tip.
+Source changes are currently uncommitted; external evidence binds individual file hashes.
+No final implementation revision, hosted qualification, owner acceptance or merge is claimed.
+The scoped evidence root is `/Users/letuscode/.codex/mcp-onboarding-plan-20261013`.
+
+### Implemented behavior
+
+Shared validation now governs import/save/Test/chat. Env/header values use encrypted
+server-owned storage with masked public fields and explicit retain/replace/clear behavior.
+Legacy malformed or unsafe records fail closed; successful migration is atomic.
+Connection tests discover and trust-filter without calling tools. Actual chat uses the same
+resolver and binds approval to assignment/configuration/schema, halting on stale or uncertain
+outcomes without automatic replay. The existing settings UI reviews imports, explains the
+execution host, manages credentials and marks stale test results.
+
+### Independent implementation findings
+
+| Finding                                         | Disposition                                                                                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| MCP-I01 malformed legacy metadata/envelopes     | Corrected: activation fails closed; retained storage is not silently rewritten; focused tests pass                                                     |
+| MCP-I02 pre-stream model/lock failure leaks     | Corrected: acquired MCP context is closed on model-resolution or lock failure; real-process tests pass                                                 |
+| MCP-I03 repeated assignment/session ownership   | Corrected: deduplicated assignment and serialized manager ownership; real lifecycle tests pass                                                         |
+| MCP-I04 failure evidence prevents teardown      | Corrected: guarded observations and independent finally cleanup preserve original failures; critic approved                                            |
+| MCP-I05 terminal MCP failure appears successful | Corrected: explicit MCP halt discriminator drives normal/resumed task-end and V1 failure categories; 14 harness and 16 API tests pass; critic approved |
+
+The critic inspected cumulative production source and found no further concrete backend
+blocker. Connected browser/native evidence is verified below; full regression and hosted gates
+remain separate.
+The joined unknown-outcome journey also exposed an approval-card success label after
+an uncertain result. The bounded terminal-state repair is source-reviewed and passes 22 focused
+tests plus the final browser unknown/reload scenario. No retry or completed label is shown.
+Final acceptance critique found one missing composed context-budget refusal test (MCP-Q01).
+The added real API/SQLite/MCP test passes: saved input budget1, real discovered eligible catalog,
+zero provider calls/effects/approvals, and durable context/request refusal diagnostics. No
+production change was needed for that case. The critic verified the exact test and terminal
+16/16 log, and approved the cumulative source and connected evidence with no remaining findings.
+
+### Current test evidence and remaining qualification
+
+- Shared contract, DB secret/migration, real-transport API, adapter and real-process chat tests
+  passed in focused runs. Full repository typecheck passed before the last diagnostic/UI changes;
+  final cumulative typecheck and lint now pass. A deliberate header-control regex was replaced
+  with an equivalent character-code predicate; all128 ASCII values and representative Unicode
+  pass equivalence coverage, and the critic approved the exact source/test delta. Historical
+  connected receipts retain their original hashes and remain applicable to accepted inputs.
+- Final browser suite **7/7 passed in 24.1 seconds**, zero skips, on rebuilt API/web images.
+  Import/Test/assignment, approve, reject, Block, stale credentials and unknown outcome/reload
+  have independent backend/effect assertions. `browser-final-verification.json` binds source,
+  image IDs and artifacts. Compose diagnostic export remains denied by its existing boundary;
+  native export evidence below supplies the required V1 reports.
+- Final source-tree Electron suite **3/3 passed in 43.6 seconds**: stdio, Streamable HTTP and
+  unknown outcome, including import/Test/assignment/restart and actual UI approval. Successful
+  cases record one effect/two model requests; unknown records one effect/one model request,
+  no replay and a failed terminal request. All cleanup evidence is clear.
+- Final official upstream native reference refresh **2/2 passed in 15.5 seconds**, using pinned
+  Everything 1.0.0, client SDK 1.29.0 and reference SDK 1.32.1, actual UI approval and read-only echo.
+  `native-final-verification.json` binds current source, native/upstream artifacts and V1 reports;
+  earlier package integrity remains in `upstream-reference/native-interoperability-result.json`.
+- Actual waiting, successful and failed native V1 reports are durable/verified, untruncated,
+  with zero dropped, pending, conflict or pruned records. Unknown ends failed/tool_error; nested
+  outer/inner tool spans do not imply duplicate side effects. This is deterministic-provider,
+  source-tree proof, not live-model or checkout-free release qualification or a latency benchmark.
+- Earlier native startup/report HTTP 503 failures and assertion errors remain in evidence. Final runs
+  pass after observable test-control corrections and the product terminal-state repair; resource
+  pressure was a hypothesis, not an established sole cause. No timeout/policy was weakened.
+- Initial broad unit run failed three existing workflow-control tests. All three pass isolated
+  at unchanged timeouts. The 100 ms lease fixture also uses real monotonic elapsed time; concurrent
+  load is plausible but not proven as the sole cause. No paused runtime/test policy was changed.
+  `workflow-failure-diagnosis.json` and `workflow-failures-isolated.log` retain the diagnosis.
+  The later four-fork full run again failed:1,137passed,4failed,77existing optional skips in
+  workflow-control, stopping later tiers. Two lease failures and two five-second timeouts are
+  all pass individually at one fork with identical assertions/timeouts. The complete one-fork
+  run is underway; no full pass is claimed before its terminal result.
+
+Cumulative regressions, final source-bound independent review, full
+documentation mirrors, pushed branch chain and exact-head hosted checks remain outstanding.
+These pending gates prevent product completion. No setup or decision is currently required
+from the owner.

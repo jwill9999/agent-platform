@@ -1,3 +1,37 @@
+# Current handoff — MCP onboarding implementation, 13 October 2026
+
+The owner approved the bounded MCP onboarding plan at `f75fba7d` and instructed completion
+of the epic's concrete tasks. Canonical Beads `agent-platform-mcp-onboarding` remains in progress;
+its broader capability-registry parent remains open. Current branch is
+`task/mcp-onboarding-connection`, chained from the pushed planning tip under
+`feature/mcp-onboarding` at staging `26e90126`. Implementation is authorized;
+final owner acceptance and feature/staging merge authority remain separate.
+
+Shared configuration/encrypted credentials, Test/chat parity, safe connection lifecycle,
+configuration-bound approval and the onboarding UI are implemented. Independent review repaired
+malformed legacy state, pre-stream cleanup, repeated ownership and truthful terminal failure
+diagnostics. The corrected approval card now reports uncertain actions truthfully. Final browser
+7/7, source-tree desktop 3/3 and upstream reference 2/2 journeys passed. The critic-requested
+context-budget refusal case passes; cumulative regression/publication gates remain. Do not claim completion.
+
+See the [approved plan](docs/planning/mcp-onboarding-mvp.md),
+[task specification](docs/tasks/agent-platform-mcp-onboarding.md),
+[verification map](docs/testing/mcp-onboarding-mvp.md) and
+[actual execution results](docs/reviews/mcp-onboarding-planning.md).
+Evidence and source hashes are under `/Users/letuscode/.codex/mcp-onboarding-plan-20261013`.
+Current evidence binds source/artifacts and actual durable V1 waiting/success/failure reports,
+with no reported loss. Complete cumulative regression checks, final review,
+full Notion readbacks, pushed chain and exact-head hosted gates. Model fixtures are deterministic;
+source-tree desktop success does not establish checkout-free release qualification.
+
+Preserve the dirty primary checkout, paused thirteen-path checkout, PR283 and all retained
+orchestration refs. Existing unrelated Docker stacks remain untouched. Only the dedicated
+`mcp-onboarding` Compose project and disposable native fixtures are owned by this task.
+No installer, OAuth, marketplace, paid call, distribution, main promotion or orchestration
+resumption is included. The complete earlier handoff follows as historical evidence.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — MCP onboarding planning, 13 October 2026
 
 The owner selected reliable MCP onboarding as the next local-MVP investigation. This is

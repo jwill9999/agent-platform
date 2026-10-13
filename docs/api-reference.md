@@ -63,6 +63,8 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `PUT /v1/tools/:id`                        |    ✅    |       ✅        | Tools dashboard                              |
 | `DELETE /v1/tools/:id`                     |    ✅    |       ✅        | Tools dashboard                              |
 | `GET /v1/mcp-servers`                      |    ✅    |       ✅        | MCP dashboard, agent editor                  |
+| `POST /v1/mcp-servers/import`              |    ✅    |       ✅        | MCP dashboard — reviewed batch import        |
+| `POST /v1/mcp-servers/:id/duplicate`       |    ✅    |       ✅        | MCP dashboard — copy without secret values   |
 | `POST /v1/mcp-servers`                     |    ✅    |       ✅        | MCP dashboard                                |
 | `PUT /v1/mcp-servers/:id`                  |    ✅    |       ✅        | MCP dashboard                                |
 | `DELETE /v1/mcp-servers/:id`               |    ✅    |       ✅        | MCP dashboard                                |
@@ -256,15 +258,66 @@ See [Workspace Storage](workspace-storage.md) for the host workspace model, secu
 
 ### MCP Servers
 
-| Method   | Path                  | Description           |
-| -------- | --------------------- | --------------------- |
-| `GET`    | `/v1/mcp-servers`     | List all MCP servers  |
-| `GET`    | `/v1/mcp-servers/:id` | Get MCP server by ID  |
-| `POST`   | `/v1/mcp-servers`     | Create an MCP server  |
-| `PUT`    | `/v1/mcp-servers/:id` | Replace an MCP server |
-| `DELETE` | `/v1/mcp-servers/:id` | Delete an MCP server  |
+| Method   | Path                                  | Description                                                          |
+| -------- | ------------------------------------- | -------------------------------------------------------------------- |
+| `GET`    | `/v1/mcp-servers`                     | List public MCP configurations                                       |
+| `GET`    | `/v1/mcp-servers/:idOrSlug`           | Get one public configuration                                         |
+| `POST`   | `/v1/mcp-servers`                     | Save a configuration; returns `201`                                  |
+| `POST`   | `/v1/mcp-servers/import`              | Atomically save reviewed configurations; returns `201`               |
+| `PUT`    | `/v1/mcp-servers/:idOrSlug`           | Replace connection fields and apply explicit credential changes      |
+| `POST`   | `/v1/mcp-servers/:idOrSlug/duplicate` | Copy configuration without credential values; returns `201`          |
+| `DELETE` | `/v1/mcp-servers/:idOrSlug`           | Delete configuration and its owned stored credentials; returns `204` |
+| `POST`   | `/v1/mcp-servers/:idOrSlug/test`      | Explicit handshake, discovery and trust-filter check, then close     |
 
-Body schema: `McpServerSchema` — requires `name`, `transport`. Optional: `command`, `args`, `url`, `metadata`.
+Create/update body: strict `McpServerCreateBodySchema` / `McpServerUpdateBodySchema`, not the
+public `McpServerSchema`. `name` and `transport` are required. For `stdio`, supply `command` and
+optional string-array `args`; `url` is forbidden. For HTTP, supply `url`; `command` and `args`
+are forbidden. `http` is normalized to `streamable-http`. Retained `sse` configurations use the
+Streamable HTTP client; they do not enable the old SSE protocol. Arbitrary `metadata`, IDs,
+unknown fields and `${...}` interpolation are rejected.
+
+URLs allow HTTPS or HTTP on `localhost`, `127.x.x.x`, `[::1]` and `host.docker.internal`, without
+user information, query or fragment. Redirects are refused. See the
+[configuration guide](configuration.md#mcp-server-configuration) for execution-host setup.
+
+Optional `credentials` contains `env` (stdio) or `headers` (HTTP), each mapping validated names
+to strings or `null`. Values are encrypted at rest and never returned. During update, an omitted
+name retains its saved value, a string replaces it and `null` clears it. An empty string is a
+value, not a clear operation. Clear incompatible saved credentials when changing transport.
+Reserved environment names and transport-managed headers are rejected; header names must be
+unique ignoring case. Configuration, secret changes and batch imports are transactional.
+
+`POST /import` accepts `{ "servers": [<create body>, ...] }` with 1–100 entries. It receives the
+reviewed, normalized entries, not raw pasted URL/JSON text: the dashboard previews those import
+formats before submitting. Save/import/duplicate/assignment do not launch servers. Duplicate
+requires no body; it retains credential names with unset flags so values can be re-entered.
+Test uses the saved credential resolver, not caller-supplied credentials, and never sends
+`tools/call`. A stdio Test does launch the preinstalled executable on the API execution host.
+
+Public responses use `{ "data": ... }` and include `id`, `slug`, `name`, `transport`, applicable
+`command`/`args`/`url`, `credentialStatus: { "env": { "NAME": true }, "headers": {} }`,
+`configurationRevision` and `needsReconfiguration`. Credential flags indicate whether a saved
+field is set; unsafe legacy URLs are withheld. Secret values, encrypted references and arbitrary
+stored metadata are not returned. `needsReconfiguration` describes configuration readiness,
+not current network health. A saved update advances the revision.
+
+Test returns HTTP `200` for a completed test attempt, including a connection failure:
+
+- Success: `data.status: "ok"`, `discoveredCount`, `eligibleCount`, compatibility `toolCount`
+  (equal to eligible count), eligible `tools: [{ "name": "..." }]`, grouped `rejections`,
+  `latencyMs`, `testedAt` and `configurationRevision`.
+- Failure: `data.status: "error"`, safe `code` and `error`, `stage` (`configuration`, `connect`
+  or `discovery`), `retryGuidance`, `latencyMs`, `testedAt` and `configurationRevision`.
+
+Missing servers return `404`. Invalid create/update/import bodies return `400` with
+`MCP_CONFIGURATION_INVALID`; unavailable credential encryption returns `503` with
+`MCP_SECRET_KEY_UNAVAILABLE`. Test failures expose fixed guidance rather than server stderr or
+exception bodies. An outdated Test result cannot qualify a later saved revision.
+
+Chat still enforces agent assignment, tool trust and approval. A stale approved binding stops
+with `MCP_APPROVAL_STALE`; a lost post-dispatch response stops with `MCP_OUTCOME_UNKNOWN`.
+The latter does not prove the action failed: inspect its effect before a new request. Neither
+terminal failure automatically retries the action or continues the turn.
 
 ### Agents
 

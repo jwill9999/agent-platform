@@ -122,6 +122,7 @@ export type ApprovalCardStatus =
   | 'rejected'
   | 'expired'
   | 'executed'
+  | 'not_completed'
   | 'failed';
 
 export type ApprovalCardState = ApprovalRequiredStreamEvent & {
@@ -135,6 +136,16 @@ export type ToolTraceEvent =
   | { type: 'status'; label: string }
   | { type: 'result'; toolId: string; data: unknown; status: 'success' | 'error' | 'denied' }
   | { type: 'error'; code?: string; message: string; recovery?: CapabilityRecovery };
+
+/** Terminal MCP failures cannot be replayed through the same approval card. */
+export function mcpApprovalHaltMessage(event: ToolTraceEvent): string | null {
+  if (event.type !== 'error') return null;
+  if (event.code === 'MCP_OUTCOME_UNKNOWN')
+    return 'The MCP action may have taken effect, but its result was not confirmed. Inspect the server before starting a new request. This approval cannot be retried.';
+  if (event.code === 'MCP_APPROVAL_STALE')
+    return 'The MCP connection or assignment changed. This action was not run. Start a new request and review its permissions.';
+  return null;
+}
 
 const BLOCKING_APPROVAL_STATUSES = new Set<ApprovalCardStatus>([
   'pending',
@@ -273,6 +284,7 @@ export type StreamRenderResult =
 type StreamAssistantResult = {
   text: string;
   errorMessage: string | null;
+  mcpHaltMessage: string | null;
 };
 
 type NdjsonStreamHandlers = {
@@ -652,6 +664,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     ): Promise<StreamAssistantResult> => {
       let accumulated = '';
       let streamErrorMessage: string | null = null;
+      let mcpHaltMessage: string | null = null;
       let pendingRevisionReset = false;
       await readNdjsonStream(body, {
         onText: (chunk) => {
@@ -678,11 +691,14 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           }
         },
         onThinking: (chunk) => appendThinking(assistantId, chunk),
-        onToolTrace: (event) => appendToolTrace(assistantId, event),
+        onToolTrace: (event) => {
+          mcpHaltMessage = mcpApprovalHaltMessage(event) ?? mcpHaltMessage;
+          appendToolTrace(assistantId, event);
+        },
         onWorkspaceEvent: (event) => appendWorkspaceEvent(assistantId, event),
         onApprovalRequired: (event) => appendApprovalRequired(assistantId, event),
       });
-      return { text: accumulated, errorMessage: streamErrorMessage };
+      return { text: accumulated, errorMessage: streamErrorMessage, mcpHaltMessage };
     },
     [
       appendApprovalRequired,
@@ -776,6 +792,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       if (!sessionId || status === 'streaming') return;
       const inFlightStatus = decision === 'approve' ? 'approving' : 'rejecting';
       const terminalStatus = decision === 'approve' ? 'executed' : 'rejected';
+      let mcpHaltMessage: string | null = null;
       setApprovalStatus(approvalRequestId, inFlightStatus);
       setStatus('streaming');
       setError(null);
@@ -799,11 +816,25 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           },
           body: JSON.stringify({ approvalRequestId }),
         });
-        if (!res.ok) throw new Error(await parseErrorResponse(res));
+        if (!res.ok) {
+          const failure = await res
+            .clone()
+            .json()
+            .catch(() => null);
+          if (isRecord(failure) && isRecord(failure.error)) {
+            mcpHaltMessage = mcpApprovalHaltMessage({
+              type: 'error',
+              code: typeof failure.error.code === 'string' ? failure.error.code : undefined,
+              message: '',
+            });
+          }
+          throw new Error(await parseErrorResponse(res));
+        }
 
         let accumulated = '';
         if (res.body && !res.headers.get('content-type')?.includes('application/json')) {
           const result = await streamAssistantResponse(assistantId, res.body);
+          mcpHaltMessage = result.mcpHaltMessage;
           accumulated =
             result.text.trim() || !result.errorMessage
               ? result.text
@@ -811,7 +842,11 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         }
 
         updateAssistantMessage(assistantId, accumulated);
-        setApprovalStatus(approvalRequestId, terminalStatus);
+        setApprovalStatus(
+          approvalRequestId,
+          mcpHaltMessage ? 'not_completed' : terminalStatus,
+          mcpHaltMessage ?? undefined,
+        );
         setThinkingByMessage((prev) => {
           const next = { ...prev };
           delete next[assistantId];
@@ -819,7 +854,11 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         });
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        setApprovalStatus(approvalRequestId, 'failed', message);
+        setApprovalStatus(
+          approvalRequestId,
+          mcpHaltMessage ? 'not_completed' : 'failed',
+          mcpHaltMessage ?? message,
+        );
         setError(message);
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
         setThinkingByMessage((prev) => {

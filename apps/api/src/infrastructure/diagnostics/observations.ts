@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
+import { parseToolId } from '@agent-platform/agent-validation';
 import {
   ContextDecisionMetadataSchema,
   DiagnosticEventSchema,
@@ -304,7 +305,7 @@ function observeNodeResult(
 ): void {
   const traces = result.trace ?? [];
   if (result.halted) parent.halted = true;
-  const haltError = observedContextHalt(result);
+  const haltError = observedContextHalt(result) ?? observedMcpHalt(result);
   if (haltError) parent.haltError = haltError;
   const waiting = traces.some((event) => event.type === 'tool_approval_required');
   if (waiting) parent.waiting = true;
@@ -344,6 +345,12 @@ function observedContextHalt(result: NodeResult): DiagnosticEvent['errorCode'] {
   return undefined;
 }
 
+function observedMcpHalt(result: NodeResult): DiagnosticEvent['errorCode'] {
+  if (result.mcpHalt?.code === 'MCP_APPROVAL_STALE') return 'permission_denied';
+  if (result.mcpHalt?.code === 'MCP_OUTCOME_UNKNOWN') return 'tool_error';
+  return undefined;
+}
+
 function observeToolRetries(traces: NonNullable<NodeResult['trace']>): void {
   for (const event of traces) {
     if (event.type === 'tool_retry') diagnosticRetry(event.attempt, 'tool');
@@ -360,7 +367,7 @@ function observedTokenUsage(traces: NonNullable<NodeResult['trace']>): Partial<D
 }
 
 function toolFamily(toolName: string): DiagnosticEvent['toolId'] {
-  if (toolName.startsWith('mcp:')) return 'mcp';
+  if (parseToolId(toolName).kind === 'mcp') return 'mcp';
   if (toolName.startsWith('sys_file_') || toolName === 'sys_read_file') return 'read';
   if (toolName === 'sys_write_file' || toolName === 'sys_apply_patch') return 'write';
   if (['sys_run_command', 'sys_bash', 'sys_run_quality_gate'].includes(toolName)) return 'command';

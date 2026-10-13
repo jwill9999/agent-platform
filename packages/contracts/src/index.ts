@@ -16,12 +16,7 @@ export {
 } from './modelConfig.js';
 export { ExecutionLimitsSchema, type ExecutionLimits } from './limits.js';
 export { CriticVerdictSchema, type CriticVerdict } from './critic.js';
-export {
-  McpServerSchema,
-  McpServerCreateBodySchema,
-  type McpServer,
-  type McpServerCreateBody,
-} from './mcpServer.js';
+export * from './mcpServer.js';
 export {
   CapabilityRecoveryOptionSchema,
   CapabilityRecoverySchema,

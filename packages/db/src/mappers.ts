@@ -11,7 +11,6 @@ import {
   ContextWindowSchema,
   DEFAULT_CONTEXT_WINDOW,
   ExecutionLimitsSchema,
-  McpServerSchema,
   SessionRecordSchema,
   SkillSchema,
   ToolSchema,
@@ -20,6 +19,7 @@ import { eq } from 'drizzle-orm';
 
 import type { DrizzleDb } from './database.js';
 import * as schema from './schema.js';
+import { publicMcpServer } from './repositories/mcpConnections.js';
 
 export function skillToRow(skill: Skill): typeof schema.skills.$inferInsert {
   return {
@@ -130,31 +130,7 @@ export function toolToRow(tool: Tool): typeof schema.tools.$inferInsert {
 }
 
 export function mcpRowToContract(row: typeof schema.mcpServers.$inferSelect): McpServer {
-  return McpServerSchema.parse({
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    transport: row.transport,
-    command: row.command ?? undefined,
-    args: row.argsJson ? (JSON.parse(row.argsJson) as string[]) : undefined,
-    url: row.url ?? undefined,
-    metadata: row.metadataJson
-      ? (JSON.parse(row.metadataJson) as Record<string, unknown>)
-      : undefined,
-  });
-}
-
-export function mcpToRow(m: McpServer): typeof schema.mcpServers.$inferInsert {
-  return {
-    id: m.id,
-    slug: m.slug,
-    name: m.name,
-    transport: m.transport,
-    command: m.command ?? null,
-    argsJson: m.args ? JSON.stringify(m.args) : null,
-    url: m.url ?? null,
-    metadataJson: m.metadata ? JSON.stringify(m.metadata) : null,
-  };
+  return publicMcpServer(row);
 }
 
 export function sessionRowToContract(row: typeof schema.sessions.$inferSelect) {

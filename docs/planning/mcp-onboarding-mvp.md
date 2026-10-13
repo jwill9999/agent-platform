@@ -1,8 +1,18 @@
 # Reliable MCP onboarding — bounded local MVP
 
-**Status:** proposed execution plan; owner discussion before implementation.  
+**Status:** owner-approved bounded plan; implementation and verification in progress.
 **Date:** 13 October 2026. **Source:** staging `26e90126a1987b1dc6e689438b471fe5ed932235`.  
 **Owner intent:** make existing open-source MCP servers straightforward to connect and use. Keep the local MVP small; investigate and obtain independent critique before agreeing implementation.
+
+## Recorded owner authorization
+
+On 13 October the owner accepted the independently reviewed plan at
+`f75fba7de65957e071a6cf7e99ad860cfddd01b9` and instructed completing the epic's tasks.
+The live epic contains this one concrete onboarding child; its broader installer, marketplace
+and policy-profile description does not expand this approved slice. Proceed through routine
+implementation, repairs, connected verification, independent review, documentation and CI.
+Owner acceptance and feature/staging merge authority remain separate. Actual execution evidence
+belongs in the [results record](../reviews/mcp-onboarding-planning.md).
 
 ## Briefing and stopping point
 
@@ -12,7 +22,7 @@ Recommend **preinstalled stdio servers and Streamable HTTP endpoints**, includin
 
 No new account, subscription, database, SDK major upgrade or external dashboard is required. Existing TypeScript, SQLite, encrypted secret storage and MCP SDK are sufficient. Estimate **5–7 focused engineering days**, including connected tests and review, plus variable hosted CI time. This is a planning estimate, not a deadline. Reassess after the connection/credential slice; if the remaining work cannot fit seven days, bring a reduced proposal rather than expanding silently.
 
-## Current evidence and gaps
+## Planning baseline evidence and gaps
 
 All repository paths below were inspected at the source revision above.
 

@@ -13,6 +13,7 @@ vi.mock('@agent-platform/db', () => ({
   getSkill: vi.fn(),
   getTool: vi.fn(),
   getMcpServer: vi.fn(),
+  resolveMcpConnection: vi.fn(),
 }));
 
 const mockCloseAll = vi.fn(async () => {});
@@ -31,7 +32,13 @@ vi.mock('@agent-platform/mcp-adapter', () => ({
   })),
 }));
 
-import { loadAgentById, getSkill, getTool, getMcpServer } from '@agent-platform/db';
+import {
+  loadAgentById,
+  getSkill,
+  getTool,
+  getMcpServer,
+  resolveMcpConnection,
+} from '@agent-platform/db';
 
 const mockLoadAgent = vi.mocked(loadAgentById);
 const mockGetSkill = vi.mocked(getSkill);
@@ -102,6 +109,11 @@ function createMockSession(tools: ContractTool[] = []): McpSession {
 beforeEach(() => {
   vi.clearAllMocks();
   mockOpenSessions.mockResolvedValue([]);
+  vi.mocked(resolveMcpConnection).mockImplementation((db, id) => {
+    const value = getMcpServer(db, id);
+    if (!value) throw new Error('missing');
+    return value;
+  });
   mockGetSession.mockReturnValue(undefined);
   mockCloseAll.mockResolvedValue(undefined);
 });
@@ -129,7 +141,7 @@ describe('buildAgentContext', () => {
     expect(ctx.skills).toEqual([skill1]);
     expect(ctx.tools).toEqual([...SYSTEM_TOOLS, tool1, mcpTool]);
     expect(ctx.mcpManager).toBeDefined();
-    expect(mockOpenSessions).toHaveBeenCalledWith([mcpServer1]);
+    expect(mockOpenSessions).toHaveBeenCalledWith([mcpServer1], { signal: undefined });
     expect(ctx.pluginDispatcher).toBeDefined();
     expect(ctx.modelConfig).toEqual({ provider: 'openai', model: 'gpt-4o' });
   });
