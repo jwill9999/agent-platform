@@ -352,3 +352,64 @@ All five initial implementation mirrors were read back at `5f09ac45` (receipt `p
 PR314 is open; no merge or task closure is claimed. Later substantive changes require updated full
 mirrors and source-bound readbacks. Final hosted results and publication receipts are recorded in
 Beads against the actual revision; opening a PR does not establish qualification.
+
+## Protected staging qualification and adjacent fixture correction
+
+The previous sections are historical qualification checkpoints. PR314 subsequently merged at
+`60b6e36c` with the exact reviewed tree, nine successful executed checks, clean55-test Electron
+qualification and no unresolved findings. The owner separately authorized PR315 staging promotion
+and delivered-branch cleanup. Beads was reopened for that additional delivery phase.
+
+PR315's initial ordinary scan performed actual analysis with no reported vulnerabilities. Sonar and
+CodeQL are clear. All19 actual packaged macOS VM tests passed with signature/ready-VM/user-exposure
+evidence verified. These results do not erase its failed diagnostic benchmark: repetition3 had
+healthy p9573.268ms versus disabled16.425ms, a56.843ms overhead above20ms. Other275 API tests passed;
+allnine measurements were retained with `completed=false`. No cause is established. The critic
+approved one unchanged failed verify-job retry, preserving workload, thresholds and the first failure.
+
+The desktop job badge was successful, but its detailed log reports53 passed and two flaky cases:
+provider-HTTP approve/reject journeys with reload recovery. The reject case did not show `/init`
+after Enter; source review found the helper does not wait for the bound session and enabled Send.
+CR-Q03 requires the same readiness sequence already qualified in the diagnostic-export fixture.
+The approve case did not create `finished-diagnostics.json` within5000ms. Absence alone does not
+establish whether export preparation, transport, destination or writing failed. No hosted desktop
+traces were uploaded because the final job succeeded; original logs are retained in
+`pr315-desktop-attempt1.log` and summarized by `pr315-desktop-flaky-triage.json`.
+
+The bounded task branch `task/chat-reply-staging-fixture` starts from the delivered feature source.
+The helper now waits for the ready-session status before drafting and enabled Send before Enter;
+product runtime and all existing assertions/timeouts are unchanged. The instrumented affected
+approve/reject reload journeys passed2/2. Allfour native report responses wereHTTP200: waiting
+reports took164/165ms and finished reports5ms each. Selected events grew10-to-21 for approve and
+10-to-19 for reject, matching the local diagnostic store; durable verified coverage, zero dropped
+or pending events and no truncation were retained. Both destinations existed and exactlytwo save
+destinations were consumed per case. This does not establish the original hosted cause. That
+unknown sample remains recorded in `agent-platform-llm-observability-export`; a repeat symptom
+requires further investigation. Temporary observation code was removed before final qualification. New exact-head feature and protected staging checks remain mandatory before
+merge. Current receipts and subsequent delivery state are recorded against the actual revision in
+Beads; the old green job badge is not a clean first-attempt desktop result.
+
+The final uninstrumented affected two-case run passed2/2 in13.0seconds, with no failures, retries or
+skips. Strict TypeScript, ESLint, formatting and diff checks pass. Receipt
+`pr315-packaged-fixture-receipt.json` (SHA-256
+`0488a2ba2fd67cf70fe3038aa9652e7825871454f86eb557b21674f2b8f28abe`) binds all30 artifacts,
+four schema-valid final V1 reports and420 unchanged build files. The independent critic approved
+source hash `cc1a4aa40b652a51a84fb78456405156a941db355b54c2b030d6846313d9f004` with no findings.
+
+The unchanged verify retry failed a different test: the actual diagnostic database ceiling test
+reached its60-second timeout;142 other DB tests passed. The API benchmark did not run in that
+attempt. The first run's identical capacity test passed in33seconds. Both failed attempts are
+retained; no hosted root cause or successful benchmark retry is claimed. The independently reviewed
+CI-only correction serializes workspace and file execution using the installed Vitest2.1.9 CLI. All
+fifteen workspace test scripts, including workflow-control's build prerequisite, remain selected.
+The full physical workload,60-second test deadline and benchmark20ms/2ms limits are unchanged. This
+reduces competing test load without proving the original hosted cause. The exact complete serial
+command passed3005 tests with77 existing optional skips across all15 workspaces in557.53seconds.
+The DB suite passed143/143, including the unchanged capacity test in19.733seconds; API276/276 passed.
+The benchmark records `completed=true`, allnine samples,900 measured requests and90 warmups under
+the original20ms request-overhead and2ms enqueue limits. Healthy overheads were -0.772ms,1.167ms
+and1.019ms; healthy retained660 events per repetition with zero drops. Locked-store loss remains
+explicit:404,404 and418 events. The maximum enqueue p95 was0.006666ms. Existing production build
+and worker source remained unchanged. Local execution fits the existing30-minute job budget, but
+actual hosted duration and all new-head gates still require qualification. Full logs, source/test
+inventory and measurements are retained in the `pr315-serial-` evidence files.

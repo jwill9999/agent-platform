@@ -1031,8 +1031,14 @@ async function openProject(page: Page): Promise<void> {
 }
 
 async function sendChatMessage(page: Page, message: string): Promise<void> {
+  await expect(
+    page.getByRole('status').filter({
+      hasText: 'Press Enter to send, Shift+Enter for new line',
+    }),
+  ).toBeVisible();
   const input = page.getByPlaceholder('Ask about this Project...');
   await input.fill(message);
+  await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled();
   await input.press('Enter');
   await expect(page.getByText(message, { exact: true }).last()).toBeVisible();
 }
