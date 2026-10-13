@@ -1,3 +1,39 @@
+# Current planning — context and token optimisation, 13 October 2026
+
+Owner selected `agent-platform-context-optimisation` as the next local-MVP task and explicitly
+requested a bounded plan and independent critic review **before implementation**. Current work is
+planning only; no runtime edits, paid calls, merge or paused orchestration resumption.
+
+Runtime baseline remains staging `d199ad01` (PR303 diagnostics V1 and PR307 review checkpoints delivered).
+The separate post-V1 handoff PR308 at `d275e7a0` is open at planning start; preserve it and its branches.
+Phase one is a working local single-user MVP. Distribution to others and its architecture/model are
+phase two. The local iMessage repair was test-confirmed; check current tool availability before sending.
+
+Current branch mapping: `feature/context-token-optimisation` → `task/context-token-plan`.
+[Plan](docs/planning/context-token-optimisation-mvp.md),
+[task](docs/tasks/agent-platform-context-optimisation.md),
+[verification](docs/testing/context-token-optimisation-mvp.md) and
+[critique](docs/reviews/context-token-optimisation-plan-review.md) are the planning handoff.
+Beads remains authoritative. Existing task is in progress for planning; do not close it on plan delivery.
+
+Source confirms initial approximate windowing and durable memory already exist, but later reasoning
+calls/resume need consistent admission, schemas must be counted, groups kept valid, and required
+overflow handled honestly. The critic approved the final plan with no outstanding findings after CT01–CT08 were addressed.
+All runtime tests are planned, not executed. Planning publication and validation receipts belong in
+the Beads notes and external planning evidence directory. Return the reviewed scope and tradeoffs to
+the owner; do not start implementation from this handoff alone.
+
+Keep main, paused PR283/four orchestration refs and dirty/unrelated worktrees intact. Legacy local
+context-start branch `jwill9999/context-optimisation-session-compaction` remains retained separately.
+Release export verification remains phase-two work; broader V5 QA and dashboards remain open.
+
+## Historical handoffs
+
+The complete earlier staging handoff follows unchanged. Its pending PR303/PR307 instructions are
+historical and superseded by their verified merged status above. Do not repeat those deliveries.
+
+<!-- markdownlint-disable MD025 -->
+
 # Diagnostic review checkpoints — 13 October 2026
 
 This branch contains the owner-requested contributor skill update, tracked in

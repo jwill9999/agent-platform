@@ -1,58 +1,88 @@
-# Task: Add context window and token optimisation
+# Task: Context window and token optimisation — local MVP
 
-**Beads id:** `agent-platform-context-optimisation`  
-**Priority:** P2  
-**Related epic:** `agent-platform-memory`
+**Beads issue:** `agent-platform-context-optimisation`
 
-## Summary
+**Priority:** P1 (live Beads; corrects historical P2 document label).
 
-Add context window management and token-budget optimisation once the memory foundations are in place. The goal is to compact long sessions deliberately, preserving important task state through short-term memory/session summaries rather than blindly dropping old messages.
+**Related closed foundation:** `agent-platform-memory`; this task is independently scheduled.
 
-## Background
+**Status:** Planning in progress; implementation awaits owner review of this bounded proposal.
 
-There is older planning in `docs/tasks/agent-platform-psa.md` for context window management. That spec is useful source material, but it is not currently attached to a live Beads issue and predates the current memory epic.
+## Summary and owner scope
 
-This backlog task keeps the optimisation work visible until the right stage of the memory roadmap.
+Make normal local session/Project Chat reasoning requests bounded and inspectable as history and tool
+loops grow. Reuse current working memory and V1 diagnostics. The owner selected this task on 13 October
+and asked for Feature Planning plus independent critique, with a plan presented before implementation.
+Distribution architecture and releases to other users remain phase two. No runtime work starts here.
 
-## Intended Timing
+Canonical detail: [MVP plan](../planning/context-token-optimisation-mvp.md),
+[verification map](../testing/context-token-optimisation-mvp.md),
+[critic record](../reviews/context-token-optimisation-plan-review.md).
+The plan replaces this document's historical timing proposal; it does not reopen the memory epic.
 
-Pick this up after the memory epic has enough foundation to provide structured short-term state, especially:
+## Task requirements and acceptance
 
-- `agent-platform-memory.2` short-term working memory artifacts.
-- `agent-platform-memory.4` retrieval and prompt memory bundles.
+- CT-R1: Budget initial, subsequent and resumed conversational reasoning calls through one shared
+  provider projection, replacing the old initial lossy cutoff and retaining stable payload/cap across
+  a retry. Auxiliary model calls are excluded.
+- CT-R2: Count complete selected messages and mapped tool schemas under an explicitly approximate
+  input budget with 10% margin. Propose default input8000/output2048; persist configurable output cap,
+  preserve configured model/provider and distinguish cumulative run limits and actual provider usage.
+- CT-R3: Preserve current instructions/request/continuity and atomic tool groups; reuse scoped durable
+  working memory; leave transcript/audit/effect persistence unchanged. Accept legacy strategy values
+  with explicitly documented effective deterministic policy, without claiming generative summarisation.
+- CT-R4: Required-content overflow halts before that provider call, visibly and without retry/replay;
+  retain prior effects/messages, settle the stream, release the session and report failure honestly.
+  Existing approval, cancellation, deadline and policy authority remain unchanged.
+- CT-R5: V1 report/CLI exposes strict content-free decision metadata and honest coverage, backward
+  compatible with existing records; diagnostics failure must not affect execution admission.
 
-## Requirements
+The [plan](../planning/context-token-optimisation-mvp.md) defines exact semantics and non-goals.
+Proposals are awaiting owner agreement, not claims of current behavior or passed product tests.
 
-- Define an input context budget per agent/model.
-- Track approximate or model-specific input token usage before LLM calls.
-- Preserve required context:
-  - system/developer instructions
-  - latest user request
-  - active project/task state
-  - pending approvals
-  - current working summary
-  - high-value recent messages and tool summaries
-- Compact or window long conversation history within the budget.
-- Prefer structured short-term memory/session summaries over blind truncation.
-- Emit trace metadata for context decisions, including included/dropped message counts and estimated tokens.
-- Keep behaviour inspectable and test-covered.
+## Dependency order
 
-## Non-Goals For First Pass
+No open blocking edges currently exist in Beads. Closed capability prerequisites verified during
+planning: `agent-platform-memory.2`, `agent-platform-memory.4`, `agent-platform-harness-v1`.
+Existing deferred downstream D1/K4 records remain untouched; this task does not start them.
+The broader V5 local HTTP test-isolation finding must inform new/touched fixtures; unrelated suite
+failures must be diagnosed, not waived. No blanket dependency on all of V5 or old review-gate records.
 
-- Perfect model-specific tokenizer support for every provider.
-- Aggressive cost optimisation across all prompt inputs.
-- Automatic long-term memory creation from every compacted message.
+## Implementation plan and branch mapping
 
-## Tests And Verification
+Runtime baseline: staging `d199ad0172dfe016490533444d5b7c46733c8f4d`.
+Planning work: `feature/context-token-optimisation` → `task/context-token-plan`.
+After owner review, proposed chained implementation branches are `task/context-token-boundary` →
+`task/context-token-verification`, with one final cumulative segment-tip PR to the feature.
+The existing Beads task owns all slices; no new epic or independent completion claims per slice.
+Refresh staging/ref compatibility before execution and preserve separate PR308 and all paused work.
 
-- Unit coverage for token counting and budget enforcement.
-- Unit coverage for preserving required context under tight budgets.
-- Integration coverage for long chat histories that would otherwise exceed the configured budget.
-- Regression coverage proving short conversations are unaffected.
+1. Pin boundary/error/configuration semantics and regression fixtures (CT-T01–03).
+2. Implement shared projection, chat/resume policy propagation, cap and diagnostics (CT-T04–11).
+3. Verify connected journeys and full regression/diagnostic evidence (CT-T12–13), independent source
+   review, publication and exact-head CI. Do not close the task before actual feature integration.
 
-## Definition Of Done
+Expected scope and 2.5–4 day provisional effort, pause/escalation thresholds, costs and destinations
+are in the plan. No new tokenizer service, model summariser, framework upgrade, dashboard, distributed
+architecture, automatic session selection change or prototype resumption.
 
-- Long sessions are compacted or windowed within a configured input token budget.
-- Important session state survives compaction through structured memory.
-- Prompt construction records context-window trace metadata.
-- The behaviour is documented and covered by tests.
+## Gherkin E2E strategy
+
+The [verification map](../testing/context-token-optimisation-mvp.md#connected-gherkin-strategy)
+contains the authoritative Gherkin scenarios: long-chat success, mandatory overflow/recovery,
+approved effect followed by reasoning overflow, and restart/local export. CT-T12 requires the real
+UI plus independent backend/SQLite/audit/effect evidence and bounded synthetic provider captures.
+No live-provider or release-artifact claim follows from deterministic fixture passes.
+
+## Definition of done and sign-off
+
+All CT-R1–R5 and required CT-T01–T13 pass on the actual final source; every exclusion has an explicit
+reason. Independent review has no unresolved actionable findings, V1 reports reviewed at both
+checkpoints, scoped local and hosted quality/security/UI gates pass, full result and documentation
+mirrors are read back, source pushed and authorised feature PR merged, Beads read back and Dolt synced.
+Protected staging needs its own authority and full gates. Main/distribution are outside this task.
+
+Planning sign-off is narrower: complete reviewed plan/spec/test map, Beads alignment, preserved prior
+scope/history, pushed documentation and full mirror verification; product task stays in progress.
+Actual implementation results will be recorded at `docs/reviews/context-token-optimisation-results.md`
+after implementation begins. That file and runtime tests do not exist as completed evidence yet.
