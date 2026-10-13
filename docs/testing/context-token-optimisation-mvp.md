@@ -1,5 +1,7 @@
 # Context/token MVP — verification map
 
+Actual implementation outcomes: [result record](../reviews/context-token-optimisation-results.md).
+
 **Owner:** `agent-platform-context-optimisation`; [plan](../planning/context-token-optimisation-mvp.md).
 
 **Status:** Verification in progress. Baseline `d199ad01`; individual outcomes belong in the result

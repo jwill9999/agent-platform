@@ -1,5 +1,7 @@
 # Task: Context window and token optimisation — local MVP
 
+Actual implementation outcomes: [result record](../reviews/context-token-optimisation-results.md).
+
 **Beads issue:** `agent-platform-context-optimisation`
 
 **Priority:** P1 (live Beads; corrects historical P2 document label).

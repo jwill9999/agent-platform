@@ -1,5 +1,7 @@
 # Context and token optimisation — bounded local MVP plan
 
+Actual implementation outcomes: [result record](../reviews/context-token-optimisation-results.md).
+
 **Owner task:** `agent-platform-context-optimisation` — Add context window and token optimisation.
 
 **Status:** Owner-approved bounded scope; implementation authorised on 13 October 2026.

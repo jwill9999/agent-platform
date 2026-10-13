@@ -1,5 +1,10 @@
 # Context and token optimisation implementation — 13 October 2026
 
+Implementation checkpoint: runtime `b4559f7c` is committed; verification continues on
+`task/context-token-verification`. [Actual results](docs/reviews/context-token-optimisation-results.md)
+record browser success, API247 passing tests, unresolved native export and the owner input-default
+decision. No implementation merge or staging promotion is authorized or claimed.
+
 The owner approved the bounded plan at `294a52c8` and authorised implementation with Beads,
 the implementation skill, critic review and the agreed tests. The task is
 `agent-platform-context-optimisation`, in progress. Main/staging merges are not authorised for this
