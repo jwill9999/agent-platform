@@ -148,3 +148,113 @@ describe('strict diagnostic envelopes and support reports', () => {
     ).toBe(false);
   });
 });
+
+describe('context decision compatibility and privacy', () => {
+  const decision = {
+    estimatorVersion: 'serialized_request_chars_v1' as const,
+    effectivePolicy: 'group_window_working_memory_v1' as const,
+    requestedStrategy: 'summarize' as const,
+    configuredInputTokens: 8000,
+    effectiveInputTokens: 7200,
+    estimatedInputBefore: 9200,
+    estimatedInputAfter: 6900,
+    schemaEstimate: 300,
+    includedGroups: 3,
+    omittedGroups: 2,
+    outputCap: 2048,
+    reason: 'windowed' as const,
+  };
+  it('reads old V1 events and strictly projects additive local estimates separately from usage', () => {
+    const old = page();
+    expect(DiagnosticEventSchema.parse(old.events[0]!.event).contextDecision).toBeUndefined();
+    old.events[0]!.event = {
+      ...old.events[0]!.event,
+      phase: 'context',
+      outcome: 'succeeded',
+      contextDecision: decision,
+    };
+    const report = projectDiagnosticReport(buildDiagnosticReport(old));
+    expect(report.schemaVersion).toBe(1);
+    expect(report.summary).toContain('estimated input 9200 -> 6900');
+    expect(report.summary).toContain('this decision is not a provider attempt');
+    expect(report.summary).toContain(
+      'requested summarize, effective group_window_working_memory_v1',
+    );
+    expect(report.summary).not.toContain('provider-reported input/output');
+    old.events[0]!.event = { ...page().events[0]!.event, inputTokens: 123, outputTokens: 4 };
+    expect(buildDiagnosticReport(old).summary).toContain('provider-reported input/output 123/4');
+  });
+  it.each(['prompt', 'memory', 'args', 'result', 'apiKey', 'path', 'contentHash', 'toolName'])(
+    'rejects unapproved nested context field %s',
+    (key) => {
+      expect(
+        DiagnosticEventSchema.safeParse({
+          ...page().events[0]!.event,
+          contextDecision: { ...decision, [key]: 'SECRET-CANARY' },
+        }).success,
+      ).toBe(false);
+    },
+  );
+  it('rejects invalid counters and arbitrary decision/policy versions', () => {
+    for (const value of [-1, 1.5, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(
+        DiagnosticEventSchema.safeParse({
+          ...page().events[0]!.event,
+          contextDecision: { ...decision, schemaEstimate: value },
+        }).success,
+      ).toBe(false);
+    }
+    for (const key of ['reason', 'effectivePolicy', 'estimatorVersion', 'requestedStrategy']) {
+      expect(
+        DiagnosticEventSchema.safeParse({
+          ...page().events[0]!.event,
+          contextDecision: { ...decision, [key]: 'SECRET-CANARY' },
+        }).success,
+      ).toBe(false);
+    }
+  });
+  it('keeps explicit degraded/truncated/dropped coverage alongside a local rejection', () => {
+    const input = page();
+    input.truncated = true;
+    input.health = { ...input.health, state: 'degraded', reason: 'queue_full', dropped: 2 };
+    input.events[0]!.event = {
+      ...input.events[0]!.event,
+      phase: 'context',
+      outcome: 'failed',
+      errorCode: 'context_budget_exceeded',
+      contextDecision: { ...decision, reason: 'required_overflow' },
+    };
+    const report = projectDiagnosticReport(buildDiagnosticReport(input));
+    expect(report.coverage).toMatchObject({ state: 'degraded', dropped: 2, truncated: true });
+    expect(report.summary).toContain('local context admission required_overflow');
+    expect(report.summary).toContain('2 dropped');
+    expect(report.summary).toContain('History is truncated');
+  });
+  it('fails closed rather than returning a summary outside the existing report bound', () => {
+    const input = page();
+    const large = Object.fromEntries(
+      [
+        'configuredInputTokens',
+        'effectiveInputTokens',
+        'estimatedInputBefore',
+        'estimatedInputAfter',
+        'schemaEstimate',
+        'includedGroups',
+        'omittedGroups',
+        'outputCap',
+      ].map((key) => [key, Number.MAX_SAFE_INTEGER]),
+    );
+    input.events = Array.from({ length: 1000 }, (_, index) => ({
+      sequence: index + 1,
+      event: {
+        ...input.events[0]!.event,
+        eventId: randomUUID(),
+        operationId: randomUUID(),
+        phase: 'context' as const,
+        contextDecision: { ...decision, ...large, reason: 'required_overflow' as const },
+      },
+    }));
+    input.snapshotSequence = 1000;
+    expect(() => buildDiagnosticReport(input)).toThrow('diagnostic_report_limit');
+  });
+});

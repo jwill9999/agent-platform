@@ -28,12 +28,20 @@ function durationSuffix(durationMs: number | undefined): string {
   return durationMs === undefined ? '' : ` (${durationMs.toFixed(1)} ms)`;
 }
 
-function renderObservation(sequence: number, event: DiagnosticEvent): string {
+export function renderDiagnosticObservation(sequence: number, event: DiagnosticEvent): string {
   const duration = durationSuffix(event.durationMs);
   const error = event.errorCode ? ` [${event.errorCode}]` : '';
   const operation = event.operationId ? `; operation ${event.operationId}` : '';
   const attempt = event.attempt ? `; attempt ${event.attempt}` : '';
-  return `${sequence}. ${event.phase}: ${event.outcome}${duration}${error}; request ${event.requestId}${operation}${attempt}`;
+  const decision = event.contextDecision;
+  const context = decision
+    ? `; local context admission ${decision.reason}; estimated input ${decision.estimatedInputBefore} -> ${decision.estimatedInputAfter}; configured/effective input ${decision.configuredInputTokens}/${decision.effectiveInputTokens}; estimated schemas ${decision.schemaEstimate}; groups included/omitted ${decision.includedGroups}/${decision.omittedGroups}; output cap ${decision.outputCap}; requested ${decision.requestedStrategy}, effective ${decision.effectivePolicy}; estimator ${decision.estimatorVersion}; this decision is not a provider attempt`
+    : '';
+  const usage =
+    event.inputTokens !== undefined || event.outputTokens !== undefined
+      ? `; provider-reported input/output ${event.inputTokens ?? 'unknown'}/${event.outputTokens ?? 'unknown'}`
+      : '';
+  return `${sequence}. ${event.phase}: ${event.outcome}${duration}${error}; request ${event.requestId}${operation}${attempt}${context}${usage}`;
 }
 
 function renderSummary(report: DiagnosticReport): string {
@@ -68,7 +76,7 @@ function renderSummary(report: DiagnosticReport): string {
       'Prior-process unfinished work has unknown status after restart; no replay is implied.',
     );
   for (const { sequence, event } of report.events) {
-    lines.push(renderObservation(sequence, event));
+    lines.push(renderDiagnosticObservation(sequence, event));
   }
   return lines.join('\n');
 }
@@ -113,7 +121,10 @@ export function buildDiagnosticReport(
     },
   });
   report.summary = renderSummary(report);
-  if (new TextEncoder().encode(JSON.stringify(report)).length > 5 * 1024 * 1024)
+  if (
+    report.summary.length > 500000 ||
+    new TextEncoder().encode(JSON.stringify(report)).length > 5 * 1024 * 1024
+  )
     throw new Error('diagnostic_report_limit');
   return report;
 }
@@ -167,7 +178,10 @@ export function projectDiagnosticReport(input: unknown): DiagnosticReport {
     snapshotSequence: report.coverage.snapshotSequence,
   });
   report.summary = renderSummary(report);
-  if (new TextEncoder().encode(JSON.stringify(report)).length > 5 * 1024 * 1024)
+  if (
+    report.summary.length > 500000 ||
+    new TextEncoder().encode(JSON.stringify(report)).length > 5 * 1024 * 1024
+  )
     throw new Error('diagnostic_report_limit');
   return report;
 }

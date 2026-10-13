@@ -170,3 +170,7 @@ export type {
   ToolAuditEntry,
   ToolAuditCompletion,
 } from './audit/index.js';
+
+export { admitProviderContext, estimateProviderInput } from './providerContext.js';
+export type { ProviderAdmission } from './providerContext.js';
+export type { ContextHalt } from './graphState.js';

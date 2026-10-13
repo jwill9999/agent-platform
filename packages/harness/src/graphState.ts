@@ -1,5 +1,6 @@
 import { Annotation } from '@langchain/langgraph';
 import type {
+  ContextWindow,
   DodContract,
   ExecutionLimits,
   Plan,
@@ -20,6 +21,10 @@ function appendMessages(left: ChatMessage[], right: ChatMessage | ChatMessage[])
   const next = Array.isArray(right) ? right : [right];
   return [...left, ...next];
 }
+
+export type ContextHalt = {
+  code: 'CONTEXT_BUDGET_EXCEEDED' | 'CONTEXT_INVALID_HISTORY' | 'MODEL_OUTPUT_INCOMPLETE';
+};
 
 /** Graph execution mode: ReAct (LLM↔tool loop) or plan (plan-execute). */
 export type GraphMode = 'react' | 'plan';
@@ -50,6 +55,13 @@ export const HarnessState = Annotation.Root({
   toolDefinitions: Annotation<ToolDefinition[]>(),
   llmOutput: Annotation<LlmOutput | null>(),
   modelConfig: Annotation<LlmModelConfig | null>(),
+  contextWindow: Annotation<ContextWindow | undefined>(),
+  /** Index of the original current user request in the unmodified graph history. */
+  currentTurnStartIndex: Annotation<number | undefined>(),
+  /** Same-session DB approval identities for provider-only history pairing; never execution authority. */
+  approvalToolCallIds: Annotation<string[] | undefined>(),
+  pendingApprovalToolCallIds: Annotation<string[] | undefined>(),
+  contextHalt: Annotation<ContextHalt | null | undefined>(),
 
   // -- ReAct loop tracking (task n0l.3) --
   /** Number of LLM reasoning steps in the current ReAct loop. */

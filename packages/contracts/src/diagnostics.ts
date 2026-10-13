@@ -3,10 +3,30 @@ import { z } from 'zod';
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const duration = z.number().finite().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const id = z.string().uuid();
+/** Versioned estimates and fixed decisions only; never provider usage or prompt content. */
+export const ContextDecisionMetadataSchema = z
+  .object({
+    estimatorVersion: z.literal('serialized_request_chars_v1'),
+    effectivePolicy: z.literal('group_window_working_memory_v1'),
+    requestedStrategy: z.enum(['truncate', 'summarize']),
+    configuredInputTokens: count.min(1),
+    effectiveInputTokens: count,
+    estimatedInputBefore: count,
+    estimatedInputAfter: count,
+    schemaEstimate: count,
+    includedGroups: count,
+    omittedGroups: count,
+    outputCap: count.min(1),
+    reason: z.enum(['unchanged', 'windowed', 'required_overflow', 'invalid_history']),
+  })
+  .strict();
+export type ContextDecisionMetadata = z.infer<typeof ContextDecisionMetadataSchema>;
+
 export const DiagnosticPhaseSchema = z.enum([
   'ingress',
   'request',
   'model',
+  'context',
   'tool',
   'approval',
   'connection',
@@ -33,6 +53,9 @@ export const DiagnosticErrorCodeSchema = z.enum([
   'cancelled',
   'internal_error',
   'storage_unavailable',
+  'context_budget_exceeded',
+  'context_invalid_history',
+  'model_output_incomplete',
 ]);
 /** Metadata only. Unknown keys fail closed; no free-form payload or error text. */
 export const DiagnosticEventSchema = z
@@ -61,6 +84,7 @@ export const DiagnosticEventSchema = z
     errorCode: DiagnosticErrorCodeSchema.optional(),
     inputTokens: count.optional(),
     outputTokens: count.optional(),
+    contextDecision: ContextDecisionMetadataSchema.optional(),
   })
   .strict();
 export type DiagnosticEvent = z.infer<typeof DiagnosticEventSchema>;

@@ -21,7 +21,8 @@ const OVERHEAD_PER_MESSAGE = 4;
 /**
  * Creates an approximate token counter using character-based estimation.
  * Suitable for budget enforcement where exact counts aren't critical.
- * Accuracy: within ~10-20% of tiktoken for English text.
+ * This legacy text counter is not the provider admission estimator.
+ * Character counts do not guarantee tokenizer accuracy.
  */
 export function createApproximateCounter(): TokenCounter {
   return {

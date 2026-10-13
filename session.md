@@ -1,3 +1,64 @@
+# Context and token optimisation implementation — 13 October 2026
+
+The bounded local MVP is implemented on `task/context-token-verification`, with PR309 open for
+review into `feature/context-token-optimisation`. The approved default checkpoint `38244723`
+passed all nine executed hosted checks, including34 desktop end-to-end tests and zero open Sonar
+issues. Final test-only acceptance coverage passed locally; its final publication and exact-head CI
+are the remaining verification steps before owner acceptance. No merge is authorized for this feature.
+
+The owner approved plan `294a52c8` and implementation using Beads, the implementation skill,
+independent critique and agreed tests. Canonical task `agent-platform-context-optimisation` remains
+`in_progress` through its specified authorized feature integration. Preserve unrelated PR308,
+paused draft PR283, primary/paused dirty checkouts and all retained orchestration branches.
+Staging baseline is `d199ad01`; no staging/main promotion, paid model call or dependency upgrade.
+
+Provider admission now includes mapped messages and all tool schemas before conversational model
+calls, tool iterations and approval continuation. Required current-turn groups and scoped memory
+are preserved in the provider view; original history stays in storage. Output caps are independent,
+and partial length-limited tool calls cannot execute. V1 diagnostics explain admission and actual
+model attempts without exposing content or secrets. CP01/CP02 approval-provenance findings are fixed.
+
+The owner approved16,000 estimated input tokens for absent/new settings, retaining every explicit
+saved limit, including8000. Output2048 and10%framing margin remain unchanged. Shared/OpenAPI
+normalization agrees, with no migration or tool removal. Thirty-three focused tests passed across
+contracts, raw SQLite persistence and real API create/update/copy/reopen; explicit8000 still rejects
+before provider/effects when required context does not fit. Fresh Personal/Coding desktop journeys
+both pass without budget overrides, retaining all56 tools and durable verified V1 exports.
+The unchanged19-case desktop permission/effect suite also passes.
+
+Configured-budget browser and all three native adversarial journeys passed with independent wire
+estimates, real effects, denial, overflow/recovery, approval/restart/replay and five native exports.
+Reports are durable, untruncated and have zero loss counters; the restart report honestly records
+unfinished prior work. Diagnostic review findings outside scope are tracked separately as
+agent-platform-est0, agent-platform-sizx, agent-platform-lnbn and agent-platform-d185.
+Fixture boundaries and retained failures are documented in the results; no live-provider performance,
+exact token count or release/distribution claim follows from these tests.
+
+The final acceptance audit added CT-T04 actual critic-feedback readmission and CT-T08 persisted stale
+memory versus actual Ask/Block policy. Both focused suites pass:14 harness and24 API tests, no
+production changes. Their source/log hashes are retained in ct-coverage-cq01-cq02-receipt.json.
+Earlier failed fixture attempts remain evidence. Hosted checkpoint38244723 is green; these later
+coverage additions still require their own final-head CI and full changed-document mirror readbacks.
+Sourcery skipped the cumulative diff above150,000characters; independent review is recorded.
+Feature-targeted staging VM skip is not staging qualification. Local IDE Problems is unavailable;
+terminal quality checks and hosted Sonar findings provide the documented fallback.
+
+[Plan](docs/planning/context-token-optimisation-mvp.md),
+[task](docs/tasks/agent-platform-context-optimisation.md),
+[verification](docs/testing/context-token-optimisation-mvp.md) and
+[actual results](docs/reviews/context-token-optimisation-results.md) are canonical.
+Current final revision/check/publication evidence belongs in Beads and PR309. Present the verified
+implementation for owner acceptance; do not merge or clean delivered branches without that authority.
+Phase two retains distribution architecture and checkout-free export verification. The local MVP
+introduces no dashboard, summarizer, external account or automatic diagnostic sharing.
+
+## Historical handoffs
+
+The complete earlier staging handoff follows unchanged. Its pending PR303/PR307 instructions are
+historical and superseded by their verified merged status above. Do not repeat those deliveries.
+
+<!-- markdownlint-disable MD025 -->
+
 # Diagnostic review checkpoints — 13 October 2026
 
 This branch contains the owner-requested contributor skill update, tracked in

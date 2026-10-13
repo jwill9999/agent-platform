@@ -1,3 +1,4 @@
+import { inferCurrentTurnStartIndex } from './providerContext.js';
 import { END, MemorySaver, START, StateGraph } from '@langchain/langgraph';
 import type { RunnableConfig } from '@langchain/core/runnables';
 import type { Plan } from '@agent-platform/contracts';
@@ -187,7 +188,9 @@ function createReactLlmWrapper(llmReasonNode: GraphNodeFn) {
     config?: RunnableConfig,
   ): Promise<Partial<HarnessStateType>> => {
     const stepCount = (state.stepCount ?? 0) + 1;
-    const result = await llmReasonNode(state, config);
+    const currentTurnStartIndex =
+      state.currentTurnStartIndex ?? inferCurrentTurnStartIndex(state.messages);
+    const result = await llmReasonNode({ ...state, currentTurnStartIndex }, config);
 
     const trace: TraceEvent[] = [];
     if ((state.stepCount ?? 0) === 0) {
@@ -200,6 +203,7 @@ function createReactLlmWrapper(llmReasonNode: GraphNodeFn) {
     return {
       ...result,
       stepCount,
+      currentTurnStartIndex,
       trace,
     };
   };
