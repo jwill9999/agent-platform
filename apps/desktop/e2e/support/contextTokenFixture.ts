@@ -55,6 +55,7 @@ export async function createContextTokenFixture(
   mkdirSync(projectDir);
   writeFileSync(join(projectDir, 'README.md'), '# Disposable context-token project\n');
   const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
+  mkdirSync(join(runtimeDir, 'logs'), { recursive: true });
   seedDesktopDatabase(sqlitePath, {
     secretsMasterKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
   });
@@ -134,11 +135,71 @@ export async function launchContextTokenFixture(
     app.process()[channel]?.on('data', (chunk: Buffer) => {
       if (remaining <= 0) return;
       const retained = chunk.subarray(0, remaining);
-      appendFileSync(path, retained);
-      remaining -= retained.length;
+      try {
+        appendFileSync(path, retained);
+        remaining -= retained.length;
+      } catch {
+        // Owned cleanup may remove the path after process exit; logging is observational.
+      }
     });
   }
   try {
+    await app.evaluate((_electron, origin) => {
+      const { subscribe } = (
+        process as NodeJS.Process & {
+          getBuiltinModule(id: string): typeof import('node:diagnostics_channel');
+        }
+      ).getBuiltinModule('node:diagnostics_channel');
+      const observed: Array<{ status?: number; errorName?: string; errorCode?: string }> = [];
+      (
+        globalThis as typeof globalThis & { __contextTokenNativeTransport?: typeof observed }
+      ).__contextTokenNativeTransport = observed;
+      const owned = (request: unknown) => {
+        if (!request || typeof request !== 'object') return false;
+        const row = request as { origin?: unknown; path?: unknown };
+        return String(row.origin) === origin && row.path === '/v1/diagnostics/report';
+      };
+      // Observe only transport metadata. Never inspect headers, capability, scope or body.
+      // A diagnostics-channel subscriber must never throw into the observed execution.
+      subscribe('undici:request:headers', (message) => {
+        try {
+          const row = message as { request?: unknown; response?: { statusCode?: unknown } };
+          const status = row?.response?.statusCode;
+          if (
+            owned(row?.request) &&
+            observed.length < 10 &&
+            typeof status === 'number' &&
+            Number.isInteger(status) &&
+            status >= 100 &&
+            status <= 599
+          )
+            observed.push({ status });
+        } catch {
+          // Observation cannot alter the request outcome.
+        }
+      });
+      subscribe('undici:request:error', (message) => {
+        try {
+          const row = message as {
+            request?: unknown;
+            error?: { name?: unknown; code?: unknown };
+          };
+          if (!owned(row?.request) || observed.length >= 10) return;
+          const name = String(row.error?.name);
+          const code = String(row.error?.code);
+          observed.push({
+            errorName: ['Error', 'TypeError', 'RangeError', 'AbortError', 'TimeoutError'].includes(
+              name,
+            )
+              ? name
+              : 'unknown',
+            errorCode: /^[A-Z0-9_]{1,64}$/.test(code) ? code : 'unknown',
+          });
+        } catch {
+          // Observation cannot alter the request outcome.
+        }
+      });
+    }, `http://127.0.0.1:${fixture.backendPort}`);
     await expect
       .poll(
         async () => {
@@ -283,7 +344,7 @@ export async function sendContextTokenMessage(page: Page, message: string) {
   // disables the composer; Electron also does not reliably settle Response.finished().
 }
 
-const dbScript = `
+const dbScript = String.raw`
 import { readFileSync } from 'node:fs';
 import { openDatabase } from './packages/db/dist/database.js';
 import { upsertWorkingMemoryArtifact } from './packages/db/dist/repositories/workingMemory.js';
@@ -306,7 +367,7 @@ try {
       upsertWorkingMemoryArtifact(db, { sessionId:input.sessionId, projectId:input.projectId,
         currentGoal:'CT_GOAL_CANARY', activeTask:'CT_TASK_CANARY', decisions:['CT_DECISION_CANARY'],
         blockers:['CT_BLOCKER_CANARY'], importantFiles:['CT_FILE_CANARY'], nextAction:'Continue current task',
-        summary:'Goal: CT_GOAL_CANARY\\nTask: CT_TASK_CANARY\\nDecision: CT_DECISION_CANARY\\nBlocker: CT_BLOCKER_CANARY\\nFile: CT_FILE_CANARY', });
+        summary:'Goal: CT_GOAL_CANARY\nTask: CT_TASK_CANARY\nDecision: CT_DECISION_CANARY\nBlocker: CT_BLOCKER_CANARY\nFile: CT_FILE_CANARY', });
     })();
   }
   console.log(JSON.stringify({
@@ -335,6 +396,50 @@ export function snapshotContextTokenDb(
       maxBuffer: 2_000_000,
     }),
   ) as ContextTokenSnapshot;
+}
+
+/** Read the live owned SQLite/WAL without changing the collector or reading event content. */
+export function snapshotContextTokenDiagnosticStore(
+  fixture: ContextTokenFixture,
+  sessionId: string,
+) {
+  return JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        String.raw`
+import { readFileSync } from 'node:fs';
+import Database from './packages/db/node_modules/better-sqlite3/lib/index.js';
+const input = JSON.parse(readFileSync(0, 'utf8'));
+const db = new Database(input.path, { readonly: true, fileMustExist: true });
+try {
+  console.log(JSON.stringify({
+    total: db.prepare('SELECT count(*) AS count FROM diagnostic_events').get().count,
+    selectedSession: db.prepare('SELECT count(*) AS count FROM diagnostic_events WHERE session_id=?').get(input.sessionId).count,
+    firstRequestId: db.prepare('SELECT request_id FROM diagnostic_events ORDER BY sequence LIMIT 1').get()?.request_id,
+    metadata: db.prepare("SELECT key,value FROM diagnostic_meta WHERE key IN ('dropped','conflicts','pruned','last_ack','open')").all(),
+  }));
+} finally { db.close(); }
+`,
+      ],
+      {
+        cwd: contextTokenRepoRoot,
+        input: JSON.stringify({
+          path: join(fixture.runtimeDir, 'data', 'diagnostics.sqlite'),
+          sessionId,
+        }),
+        encoding: 'utf8',
+        maxBuffer: 4096,
+      },
+    ),
+  ) as {
+    total: number;
+    selectedSession: number;
+    firstRequestId?: string;
+    metadata: Array<{ key: string; value: string }>;
+  };
 }
 
 export function assertContextTokenWire(
@@ -486,6 +591,7 @@ export async function recordContextTokenEvidence(
         limits: [
           'External deterministic HTTP provider and native Save As destination double; real managed desktop/BFF/API/SQLite/policy/tool dispatch and disposable file effects.',
           'Synthetic provider usage, not real provider billing/quality/tokenization/capacity; cap serialization is verified, live cap enforcement is not.',
+          'The SDK fetch guard is configured for participating Node children; blanket Electron-main network isolation is not claimed.',
           'Explicit configured input14000; does not establish default8000 profile usability.',
         ],
       },

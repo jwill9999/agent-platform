@@ -19,6 +19,7 @@ import {
   sendContextTokenMessage,
   selectContextTokenModel,
   snapshotContextTokenDb,
+  snapshotContextTokenDiagnosticStore,
   type ContextTokenFixture,
 } from './support/contextTokenFixture.js';
 import {
@@ -69,6 +70,24 @@ async function journey(info: TestInfo, name: string, run: (ctx: Journey) => Prom
           });
           return { status: response.status, body: (await response.json()) as unknown };
         }, ctx.sessionId);
+        const live = snapshotContextTokenDiagnosticStore(ctx.fixture, ctx.sessionId);
+        ctx.evidence.liveDiagnosticStore = live;
+        if (live.firstRequestId) {
+          // A persisted ingress scope exposes live collector health through the existing
+          // protected BFF when the required session scope is unavailable. Diagnosis only.
+          ctx.evidence.diagnosticIngressProbe = await ctx.page.evaluate(async (requestId) => {
+            const response = await fetch('/api/diagnostics/report', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ scope: { requestId } }),
+              signal: AbortSignal.timeout(10_000),
+            });
+            const body = (await response.json()) as unknown;
+            if (!response.ok) return { status: response.status };
+            const report = body as { coverage?: unknown };
+            return { status: response.status, coverage: report.coverage };
+          }, live.firstRequestId);
+        }
       } catch (probeError) {
         ctx.evidence.diagnosticBffProbe = {
           error: probeError instanceof Error ? probeError.message.slice(0, 500) : 'probe_failed',
@@ -77,6 +96,24 @@ async function journey(info: TestInfo, name: string, run: (ctx: Journey) => Prom
     }
   } finally {
     if (fixture) {
+      if (ctx && !ctx.page.isClosed()) {
+        try {
+          ctx.evidence.nativeReportTransport = await ctx.app.evaluate(
+            () =>
+              (
+                globalThis as typeof globalThis & {
+                  __contextTokenNativeTransport?: Array<{
+                    status?: number;
+                    errorName?: string;
+                    errorCode?: string;
+                  }>;
+                }
+              ).__contextTokenNativeTransport ?? [],
+          );
+        } catch (error) {
+          failures.push(error);
+        }
+      }
       try {
         if (ctx?.sessionId) ctx.evidence.finalDb = snapshotContextTokenDb(fixture, ctx.sessionId);
       } catch (error) {
