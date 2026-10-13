@@ -1,6 +1,6 @@
 # Context and token optimisation implementation — 13 October 2026
 
-Implementation checkpoint: runtime `b4559f7c` is committed; verification continues on
+Implementation checkpoint: runtime `b4559f7c` and verification `3cdfd571` are pushed; work continues on
 `task/context-token-verification`. [Actual results](docs/reviews/context-token-optimisation-results.md)
 record browser success, API247 passing tests, unresolved native export and the owner input-default
 decision. No implementation merge or staging promotion is authorized or claimed.
@@ -15,17 +15,19 @@ Current chain: `feature/context-token-optimisation` → `task/context-token-plan
 staging `d199ad01`. No dependency or provider upgrade, paid call or distribution work is included.
 
 The shared provider projection, output cap, full-history API assembly and strict V1 decision metadata
-are implemented locally. Initial core 703 tests, focused contracts/diagnostic tests and API regressions
-passed. Critic CP01/CP02 required explicit handling of older pending approval groups and delayed
-approval results; repairs have focused tests, with final review and connected verification pending.
-These are intermediate results, not feature completion or hosted qualification.
+are implemented and source-reviewed. CP01/CP02 approval-provenance findings are fixed. Normal pre-push
+build/typecheck/cycles and affected tests pass, including harness707, API247 and workflow-control1141
+with77 existing optional skips. Original failed attempts remain recorded. The browser journey passed
+with independent per-request estimates, atomic tool groups, real file effects, denial, overflow and
+recovery assertions. Native export and complete Electron qualification remain pending. These are
+intermediate results, not feature completion or hosted qualification.
 
 One material decision is pending: complete schema counting makes seeded Personal Assistant/Coding
 requests approximately 8,353/8,374 tokens, above the approved default's effective 7,200. The owner has
 been asked about a 16,000 absent/new default, preserving saved budgets and output2048. Do not assume
 approval or silently remove tools. Current code retains8000. Continue independent tests while waiting.
 
-Next verify real Docker Project Chat and standalone Electron success, overflow/recovery, approval
+Next finish standalone Electron success, overflow/recovery, approval
 exactly-once effects and restart/export. Review actual V1 success/failure reports, finish the CT-T01–13
 map, source review, documentation/readbacks and exact-head quality/CI before final acceptance.
 [Plan](docs/planning/context-token-optimisation-mvp.md),

@@ -7,13 +7,99 @@ import { join, resolve } from 'node:path';
 type WireRequest = {
   model: string;
   max_tokens?: number;
+  tools: Array<{
+    type: string;
+    function: { name: string; description?: string; parameters: unknown };
+  }>;
+
   messages: Array<{
     role: string;
     content?: unknown;
     tool_call_id?: string;
-    tool_calls?: unknown[];
+    tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
   }>;
 };
+// Independently reconstruct the counted message/schema envelope from captured OpenAI
+// wire JSON. Installed @ai-sdk/openai serializes call args and tool results as JSON
+// strings and omits result tool names, so reverse only those documented wire shapes.
+// This is the MVP character estimate, not a provider tokenizer or reported usage.
+function inspectWireBudget(wire: WireRequest) {
+  const names = new Map<string, string>();
+  const outstanding = new Set<string>();
+  const messages: unknown[] = [];
+  let pairedResults = 0;
+  for (const message of wire.messages) {
+    if (message.role === 'tool') {
+      const id = message.tool_call_id!;
+      expect(outstanding.has(id), 'Tool result must match one pending call').toBe(true);
+      expect(typeof message.content).toBe('string');
+      outstanding.delete(id);
+      pairedResults += 1;
+      messages.push({
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: id,
+            toolName: names.get(id),
+            result: JSON.parse(message.content as string),
+          },
+        ],
+      });
+      continue;
+    }
+    expect(outstanding.size, 'All results must precede the next non-tool message').toBe(0);
+    const calls = message.tool_calls ?? [];
+    if (!calls.length) {
+      expect(typeof message.content).toBe('string');
+      messages.push({ role: message.role, content: message.content });
+      continue;
+    }
+    expect(message.role).toBe('assistant');
+    const content: unknown[] = message.content ? [{ type: 'text', text: message.content }] : [];
+    for (const call of calls) {
+      expect(call.type).toBe('function');
+      expect(call.id).not.toBe('');
+      expect(names.has(call.id), 'Call IDs must be unique within the request').toBe(false);
+      names.set(call.id, call.function.name);
+      outstanding.add(call.id);
+      content.push({
+        type: 'tool-call',
+        toolCallId: call.id,
+        toolName: call.function.name,
+        args: JSON.parse(call.function.arguments),
+      });
+    }
+    messages.push({ role: 'assistant', content });
+  }
+  expect(outstanding.size, 'Provider request must not contain an incomplete tool group').toBe(0);
+  expect(pairedResults).toBe(names.size);
+  expect(wire.tools.some((tool) => tool.function.name === 'sys_read_file')).toBe(true);
+  expect(wire.tools.some((tool) => tool.function.name === 'sys_write_file')).toBe(true);
+  const tools = wire.tools.map((tool) => {
+    expect(tool.type).toBe('function');
+    return {
+      name: tool.function.name,
+      description: tool.function.description ?? '',
+      parameters: tool.function.parameters,
+    };
+  });
+  const countedCharacters = JSON.stringify({ messages, tools }).length;
+  const estimatedInputTokens = Math.ceil(countedCharacters / 4);
+  expect(estimatedInputTokens).toBeLessThanOrEqual(12600);
+  expect(wire.max_tokens).toBe(2048);
+  return {
+    countedCharacters,
+    estimatedInputTokens,
+    configuredInputTokens: 14000,
+    effectiveInputTokens: 12600,
+    pairedResults,
+    toolSchemaCount: tools.length,
+    actualWireCharacters: JSON.stringify(wire).length,
+    countBasis:
+      'serialized_request_chars_v1: ceil(JSON.stringify({messages,tools}).length/4), SDK wire JSON args/results decoded; approximate, not actual provider token usage',
+  };
+}
 type Audit = { toolName: string; status: string; argsJson: string; resultJson?: string };
 type StoredMessage = { id: string; role: string; content: string; toolCallId?: string };
 test.use({ actionTimeout: 10_000 });
@@ -276,6 +362,15 @@ test('Docker Project Chat budgets history and tool loops, rejects overflow, and 
       body: await page.screenshot(),
       contentType: 'image/png',
     });
+    // Cover every initial/reasoning iteration, including denial and recovery requests.
+    const wireBudgets = requests.map(inspectWireBudget);
+    expect(new Set(wireBudgets.map((row) => row.toolSchemaCount)).size).toBe(1);
+    const wireBudgetPath = test.info().outputPath('context-browser-wire-budgets.json');
+    writeFileSync(wireBudgetPath, JSON.stringify(wireBudgets, null, 2));
+    await test.info().attach('context-browser-wire-budgets', {
+      path: wireBudgetPath,
+      contentType: 'application/json',
+    });
     const final = saved(sessionId);
     expect(final.slice(0, before.length)).toEqual(before);
     expect(final.filter((m) => m.toolCallId === 'context-browser-read')).toHaveLength(1);
@@ -286,6 +381,7 @@ test('Docker Project Chat budgets history and tool loops, rejects overflow, and 
             'deterministic loopback protocol; real Docker browser/BFF/API/SQLite/tool read',
           sessionId,
           requestBytes: requests.map((r) => JSON.stringify(r).length),
+          wireBudgets,
           outputCaps: requests.map((r) => r.max_tokens),
           historyRowsBefore: before.length,
           historyRowsAfter: final.length,
