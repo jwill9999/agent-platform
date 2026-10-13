@@ -279,6 +279,41 @@ The owner has now accepted the reviewed changes and authorized PR314's merge int
 feature destination after all current checks and findings clear, including routine repairs. No
 staging/main promotion or paused-work integration is inferred.
 
+## Final hosted diagnostic-export fixture repair
+
+At `1ef391d3`, actual Sonar analysis reports zero open issues and every quality condition passes.
+CodeQL and review threads are clear. Hosted verification and browser jobs pass; browser reports30
+passed and one existing context-environment skip, distinct from the dedicated local31-case pass.
+Electron reports54 passed and one failed diagnostic-export test, including its normal retry.
+
+The fixture treated textarea editability as submission readiness. During restoration the app allows
+editing but correctly refuses submission. An instrumented reproduction retained one empty Personal
+session, zero messages/events and a native404 response in21ms. The hosted screenshot likewise shows
+an empty conversation. `diagnostic-export-empty-session-diagnosis.json` binds this evidence. It does
+not establish a slow connection, a flush timeout or the cause of the earlier two-event preparation
+failure; that separate sample remains open in the observability follow-up.
+
+The bounded fixture correction waits for session readiness before filling, enabled Send before
+Enter, and the actual deterministic completed reply before export in Electron and browser. All
+original assertions and timeouts remain. Removing the redundant explicit CI environment property
+preserves the existing process environment while satisfying strict TypeScript. Scoped typecheck,
+lint and formatting pass; the actual focused journey passes1/1 in30.9seconds, including native and
+browser exports, cancellation, failure/partial handling and restart. Independent source review
+approved the exact fixture hash `4b6e64a7`; new exact-head hosted qualification remains mandatory.
+
+`diagnostic-export-repair-receipt.json` (SHA-256
+`a930048ddb1f5063ac73cf4a630eaa883bc502c730461644b2196d7cc0454986`) binds the fixture and420
+unchanged build artifacts. All34 original assertions remain in order, with seven additive controls.
+Three full V1 reports each contain five events, durable verified coverage and zero dropped/pending
+or truncated data. The backend-unavailable partial report has zero events and explicitly reports
+non-durable, unverified coverage. Tested private-data canaries are absent from all four reports.
+
+Source review also identified an unproven initial null-to-bound session draft-remount concern.
+The independent critic confirmed that CR-R3 covers same-session refusal, while this separate edge
+needs a controlled reproduction. It is recorded in
+[the investigation task](../tasks/agent-platform-initial-session-draft.md); no product change or
+confirmed defect is claimed for it here.
+
 ## Publication and completion boundary
 
 Planning publication is complete at `34d6397b`: five full mirrors/readbacks, normal hooks and Dolt

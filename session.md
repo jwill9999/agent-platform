@@ -64,10 +64,26 @@ capture passed the original assertions and both complete exports. The original f
 unexplained and retained for diagnostics follow-up; no timeout or assertion changed. Temporary
 instrumentation is removed. The earlier green badge alone did not clear the findings gate.
 
-Next: finish final evidence review and source-bound publication for that helper correction, then
-qualify all new exact-head PR314 pipelines and actual review/Sonar findings before the
-owner-authorized feature merge. Beads remains in progress through that integration gate. No merge,
-task closure or staging readiness is claimed at this checkpoint.
+The helper correction and three complete changed mirrors were verified at `1ef391d3`. Exact-head
+Sonar now reports zero open issues and all quality conditions pass; review threads and CodeQL are
+clear. Hosted verification and browser jobs passed (browser30passed, one existing environment-only
+context skip), but Electron54passed/one diagnostic-export fixture failed twice. Its textarea-enabled
+check submitted during restoration, when drafting is allowed but Send is correctly refused. A
+focused instrumented reproduction found one empty session, zero messages/events and a native404
+response in21ms. This explains the local reproduction and is consistent with the hosted empty
+conversation; it does not establish the hosted transport response or explain the earlier two-event
+preparation sample.
+
+The fixture now waits for session readiness before drafting, enabled Send before submission and the
+actual deterministic reply before exporting. All original export/privacy/failure assertions and
+timeouts remain; application code is unchanged. The focused Electron/browser/export/restart journey
+passes1/1 in30.9seconds; fresh hosted qualification is required. A separate unproven initial-session
+draft-remount concern is recorded in `agent-platform-initial-session-draft` for controlled investigation,
+not silently included in this same-session fix.
+
+Next: finish source-bound publication and qualify all new exact-head PR314 pipelines and review
+findings, then perform the owner-authorized feature merge. Beads remains in progress through that
+integration gate. No merge, task closure or staging readiness is claimed at this checkpoint.
 Primary and paused snapshots match the planning-final preservation record, including its one prior
 authorized Beads status append; retain all separate refs and unrelated services. Earlier handoffs
 below are historical, including the superseded planning-only authorization.

@@ -53,7 +53,6 @@ test('local diagnostics export connects real browser, BFF, API, SQLite and nativ
         ]),
         AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: 'Deterministic diagnostic journey complete.',
         SECRETS_MASTER_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
-        CI: process.env.CI,
       },
     };
     app = await electron.launch(launchOptions);
@@ -64,14 +63,21 @@ test('local diagnostics export connects real browser, BFF, API, SQLite and nativ
     await page.getByRole('link', { name: /^Chat/ }).click();
     const input = page.getByPlaceholder(/Send a message/);
     await expect(input).toBeEnabled();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Press Enter to send, Shift+Enter for new line' }),
+    ).toBeVisible();
     await input.fill('PRIVATE_PROMPT_CANARY must not enter the diagnostic export');
+    await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled();
     await input.press('Enter');
     const exportButton = page.getByRole('button', {
       name: 'Export diagnostic report',
       exact: true,
     });
     await expect(exportButton).toBeVisible();
-    // Wait for the main chat request to settle, not merely for a visible export control.
+    // Editable restoration drafts do not establish admission; require the actual completed reply.
+    await expect(
+      page.getByText('Deterministic diagnostic journey complete.', { exact: true }),
+    ).toBeVisible();
     await expect(input).toBeEnabled({ timeout: 30000 });
     await exportButton.click();
     await expect(page.getByRole('status').filter({ hasText: 'Export cancelled' })).toBeVisible();
@@ -99,8 +105,15 @@ test('local diagnostics export connects real browser, BFF, API, SQLite and nativ
     await web.getByRole('link', { name: /^Chat/ }).click();
     const webInput = web.getByPlaceholder(/Send a message/);
     await expect(webInput).toBeEnabled();
+    await expect(
+      web.getByRole('status').filter({ hasText: 'Press Enter to send, Shift+Enter for new line' }),
+    ).toBeVisible();
     await webInput.fill('BROWSER_PROMPT_CANARY');
+    await expect(web.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled();
     await webInput.press('Enter');
+    await expect(
+      web.getByText('Deterministic diagnostic journey complete.', { exact: true }),
+    ).toBeVisible();
     await expect(webInput).toBeEnabled({ timeout: 30000 });
     const downloaded = web.waitForEvent('download');
     await web.getByRole('button', { name: 'Export diagnostic report', exact: true }).click();
@@ -170,6 +183,7 @@ test('local diagnostics export connects real browser, BFF, API, SQLite and nativ
       })
       .toBe(true);
     await input.fill('NO_BACKEND_CANARY');
+    await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled();
     await input.press('Enter');
     await expect(
       page.getByText(
