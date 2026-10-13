@@ -1,7 +1,7 @@
 # GitHub read responsiveness — bounded local MVP plan
 
-Status: proposed v2, planning only; owner review required before implementation.
-Date: 14 October 2026. Owning Beads bug: `agent-platform-d185` (P2, planning in progress).
+Status: owner-approved v2; implementation and verification in progress.
+Date: 14 October 2026. Owning Beads bug: `agent-platform-d185` (P2, in progress).
 
 ## Outcome and stopping point
 
@@ -10,10 +10,11 @@ GitHub checks or pull requests. Stop when the two read paths are bounded and non
 identity and failure behavior are preserved, and connected browser/Electron evidence proves the
 improvement. This is one bug fix with three implementation slices, not a new Git platform.
 
-## Evidence and limits
+## Baseline evidence and limits
 
 Baseline: staging `1e4bd7af30b092cc9a2d795e9c022ebfd5212176`, the delivered reply fix.
-The separate handoff PR319 at `161ebfd3` remains separate; no dependency or merge is assumed.
+The separate handoff PR319 at `161ebfd3` merged into its own feature at `749dba13` on 14 October
+local time. It remains independent; staging is still `1e4bd7af` at this implementation refresh.
 
 - [projectsRouter](../../apps/api/src/infrastructure/http/v1/projectsRouter.ts): `ghValue` and
   `ghSuccess` use synchronous child execution with a 10-second timeout per command. Checks call
@@ -36,7 +37,7 @@ The separate handoff PR319 at `161ebfd3` remains separate; no dependency or merg
 
 ## Requirements
 
-| ID    | Proposed behavior                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ID    | Approved behavior                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | GR-R1 | Both checks and open-PR GET paths use asynchronous subprocess reads, including version/auth and their local Git identity reads. No synchronous subprocess remains in these two request chains.                                                                                                                                                                                                                                                     |
 | GR-R2 | One 10-second wall-clock deadline per read operation, covering metadata, version/auth, query/fallback and final identity check; never reset per command. Combined stdout/stderr is capped at 1 MiB per child. At most four read operations run concurrently per API process; excess requests return the existing unavailable shape with a safe busy reason, without a queue. No cache or automatic retry.                                          |
@@ -103,5 +104,7 @@ finding and a bounded alternative instead of expanding silently. One diagnosed u
 reasonable for an external/transient failure; recurring failure requires evidence-backed repair or
 explicit blocker, never raised timeouts, skipped required checks or endless reruns.
 
-Current authority is planning only. Product tests below are planned, not passed. Implementation,
-owner acceptance, feature merge and staging promotion remain distinct gates.
+Current owner authority covers implementation and the task-to-feature merge after actual current-head
+pipelines pass and review findings resolve. Completed local tests and remaining hosted delivery gates
+are recorded in the [review/results](../reviews/github-read-responsiveness.md). Protected staging
+promotion remains separate; no main promotion or paused orchestration integration is authorized.

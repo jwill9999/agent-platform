@@ -1,6 +1,6 @@
 # GitHub read responsiveness — verification contract
 
-Status: proposed v2, not execution results. Task owner for every case and final integration:
+Status: owner-approved v2 verification contract; execution results are recorded in the linked review. Task owner for every case and final integration:
 `agent-platform-d185` implementer. [Requirements](../planning/github-read-responsiveness.md) and
 [task](../tasks/agent-platform-d185.md); [findings/results](../reviews/github-read-responsiveness.md).
 
@@ -67,4 +67,5 @@ No credential-bearing environment dumps or raw real provider payloads. Failed or
 evidence blocks completion. Report pass/fail/skip/blocked/not-run separately; live GitHub/provider
 compatibility remains untested by doubles. Do not infer a historical stall's sole cause from success.
 
-Planning validation covers documents/links/source traceability only. No GR-T case has run yet.
+The original planning checkpoint covered documents/links/source traceability only. Actual GR-T
+results, retained first failures, source hashes and coverage limits are recorded in the linked review.

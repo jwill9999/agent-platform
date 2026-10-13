@@ -1,3 +1,33 @@
+# Session handoff — d185 implementation, 14 October 2026
+
+The owner approved the bounded GitHub-read responsiveness plan and implementation using Beads,
+the implementation skill, independent critique, browser/Electron/diagnostic checks and task PR merge
+only after actual current-head pipelines pass and review comments resolve.
+
+- Active Beads: `agent-platform-d185`, in progress. Runtime branch
+  `task/github-read-responsiveness`, followed by `task/github-read-verification`; destination
+  `feature/github-read-responsiveness`. Planning source `d105afce` remains retained.
+- Implemented async bounded checks/PR-list reads, captured/rechecked identity, read-only cancellation,
+  and safe post-create enrichment. Existing write operations/security policies remain intact.
+- Local API/helper/macOS/Linux and managed Chromium/Electron evidence is recorded in
+  [the review/results record](docs/reviews/github-read-responsiveness.md). Baseline blocking reproduced;
+  fixed probes completed before held child release. Docker and full API regression pass. All three fresh trace-safe managed journeys and four existing context/reply fixture regressions
+  pass. Full archive credential checks pass; publication and hosted qualification remain pending. Runtime source is pushed at `b0b05939`; no feature merge is claimed yet.
+- Diagnostic follow-up `agent-platform-9wqs` records existing approval-resume lineage that leaves
+  honest prior-process unfinished warnings after restart. Effects, audit/message persistence and
+  diagnostic retention pass independently; no automatic replay or hidden warning was introduced.
+- Paused PR283/orchestration refs and dirty primary/unrelated worktrees stay separate. PR319 is an
+  independent documentation handoff, not this task's prerequisite. No main or staging promotion is
+  authorized by this implementation handoff; staging requires the separate protected delivery grant.
+
+Canonical plan: [bounded d185 plan](docs/planning/github-read-responsiveness.md).
+Task and requirements: [d185](docs/tasks/agent-platform-d185.md).
+Verification: [GR-T01–GR-T10](docs/testing/github-read-responsiveness.md).
+Full source-bound mirrors/readbacks and Beads sync are required at delivery. The previous planning
+and completed-feature handoffs are retained verbatim below as historical records.
+
+---
+
 <!-- markdownlint-disable MD025 MD024 MD029 MD013 -->
 
 # Current handoff — GitHub read responsiveness planning, 14 October 2026

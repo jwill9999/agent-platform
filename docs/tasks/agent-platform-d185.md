@@ -3,7 +3,7 @@
 **Beads issue:** `agent-platform-d185`  
 **Spec file:** `docs/tasks/agent-platform-d185.md`  
 **Parent epic:** none; discovered from the closed context/token optimisation task.  
-**Status:** proposed v2; planning only, awaiting owner implementation approval.
+**Status:** owner-approved v2; implementation and verification in progress.
 
 ## Task requirements
 
@@ -21,11 +21,14 @@ If a true new blocker appears, link it in Beads and this specification before ch
 
 ## Implementation plan and Git workflow
 
-After owner approval, chain `task/github-read-responsiveness` from pushed
+The owner approved implementation, independent review, agreed tests and guarded task PR merge on
+14 October. Chain `task/github-read-responsiveness` from pushed
 `task/github-read-responsiveness-plan`, then `task/github-read-verification`. Their integration
 branch is `feature/github-read-responsiveness`, based on staging1e4bd7af. Refresh refs and rehearse
 changed bases before implementation/integration; preserve both documentation histories if PR319
-lands separately. No merge or deletion is authorized by this plan.
+lands separately. The subsequent owner instruction authorizes the task-to-feature PR merge only after all actual
+current-head pipelines pass and review comments resolve. This does not authorize main promotion or
+paused-work integration. Staging promotion remains separate.
 
 Follow the three slices and bounded source areas in the plan. Preserve write helpers; update every
 read caller including post-create enrichment. Use normal hooks and independent review. The final
@@ -49,7 +52,7 @@ Feature: Work continues while GitHub reads are slow
 
   Scenario: Chat and diagnostics remain usable during a slow read
     Given checks and pull requests have reached a held child-ready marker
-    When I send a Project message that performs an allowed synthetic tool action
+    When I submit or approve a prepared Project tool action and its chat continuation
     Then the reply and tool effect complete before either held read is released
     And I can export a safe report with the correlated durable events
     And releasing the reads displays checks for the correct repository and branch
@@ -64,7 +67,7 @@ Feature: Work continues while GitHub reads are slow
     Given slow GitHub reads and a tool approval request
     When I deny or cancel the agent action
     Then no prohibited file effect is present after the run settles
-    And the diagnostic report records the correct terminal state
+    And the diagnostic report records the observed decision and any remaining lineage warning
 ```
 
 ## Definition of done and pre-close sign-off
@@ -81,5 +84,5 @@ Feature: Work continues while GitHub reads are slow
   separately granted merge authority. No production/main/distribution completion inferred.
 - At closure read back Beads as closed and verify Dolt push; preserve dirty/paused work and refs.
 
-Planning sign-off is recorded in the [review](../reviews/github-read-responsiveness.md). All product
-verification and implementation sign-off are **not run / not granted** at this planning checkpoint.
+Planning sign-off is recorded in the [review](../reviews/github-read-responsiveness.md). Current implementation results and remaining gates are recorded there separately from the original
+planning checkpoint.

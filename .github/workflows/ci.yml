@@ -143,7 +143,7 @@ jobs:
         run: make workspace-init
 
       - name: Start API + web (compose profile services)
-        run: docker compose --profile services up -d --build
+        run: docker compose -f docker-compose.yml -f docker-compose.github-read-e2e.yml --profile services up -d --build
 
       - name: Wait for API
         run: |

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import type { Agent, DiagnosticReport, SessionRecord } from '@agent-platform/contracts';
 import { DiagnosticReportSchema } from '@agent-platform/contracts';
 import { getOpenPort, seedDesktopDatabase } from './runtime.js';
+import { fixtureEnvironment } from './fixtureEnvironment.js';
 import {
   CONTEXT_TOKEN_MODEL,
   type ContextTokenProviderRequest,
@@ -51,6 +52,10 @@ export async function createContextTokenFixture(
   mkdirSync(parent, { recursive: true });
   const root = mkdtempSync(join(parent, 'case-'));
   const runtimeDir = join(root, 'runtime');
+  const baseEnvironment = fixtureEnvironment(root, process.execPath, process.env);
+  for (const key of ['HOME', 'TMPDIR', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME', 'XDG_DATA_HOME']) {
+    mkdirSync(baseEnvironment[key]!, { recursive: true });
+  }
   const projectDir = join(root, 'context-token-project');
   mkdirSync(projectDir);
   writeFileSync(join(projectDir, 'README.md'), '# Disposable context-token project\n');
@@ -100,10 +105,7 @@ export async function createContextTokenFixture(
     cwd: desktopDir,
     args: ['.', `--user-data-dir=${join(root, 'profile')}`],
     env: {
-      ...process.env,
-      LANGCHAIN_TRACING_V2: 'false',
-      LANGSMITH_TRACING: 'false',
-      LANGSMITH_TRACING_V2: 'false',
+      ...baseEnvironment,
       AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
       AGENT_PLATFORM_DESKTOP_BACKEND_PORT: String(backendPort),
       AGENT_PLATFORM_DESKTOP_NODE_PATH: process.execPath,

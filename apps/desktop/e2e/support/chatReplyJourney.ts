@@ -107,6 +107,7 @@ export async function replyJourney(
   info: TestInfo,
   mode: ReplyJourney['mode'],
   run: (ctx: ReplyJourney) => Promise<void>,
+  prepare?: (fixture: ContextTokenFixture) => Promise<void> | void,
 ) {
   const failures: unknown[] = [];
   const progress = createReplyProgress(info, mode, failures);
@@ -123,6 +124,7 @@ export async function replyJourney(
   try {
     progress('fixture-create');
     fixture = await createContextTokenFixture(provider);
+    await prepare?.(fixture);
     const reportPaths = ['success', 'failure', 'approval'].map((name) =>
       join(fixture!.root, `${name}.json`),
     );
