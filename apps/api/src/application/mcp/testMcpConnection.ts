@@ -35,10 +35,9 @@ export async function testMcpConnection(db: DrizzleDb, id: string, signal?: Abor
       await session.close().catch(() => {});
     }
   } catch (error) {
+    const failureStage = stage === 'configuration' ? 'connect' : stage;
     const safe =
-      error instanceof McpConfigurationError
-        ? error
-        : safeMcpFailure(error, stage === 'configuration' ? 'connect' : stage);
+      error instanceof McpConfigurationError ? error : safeMcpFailure(error, failureStage);
     return {
       status: 'error' as const,
       code: safe.code,

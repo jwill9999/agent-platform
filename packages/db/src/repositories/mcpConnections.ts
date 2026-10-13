@@ -224,23 +224,16 @@ function removeRef(
   ownedSecret(db, id, group, name, ref);
   db.delete(schema.secretRefs).where(eq(schema.secretRefs.id, ref)).run();
 }
-function save(
+function applyCredentialChanges(
   db: DrizzleDb,
   id: string,
-  slug: string,
-  body: McpServerCreateBody,
-  previous?: Row,
+  input: McpServerCreateBody,
+  refs: References,
+  changes: McpServerCreateBody['credentials'],
   key?: Buffer,
-): McpServer {
-  const validated = McpServerCreateBodySchema.safeParse(body);
-  if (!validated.success) invalid();
-  const input = validated.data;
-  if (previous && !metadataReadableForReplacement(previous)) invalid();
-  const old = previous && stored(previous);
-  const refs: References = old ? structuredClone(old.refs) : { env: {}, headers: {} };
-  const changes = previous && !old ? legacyCredentials(previous) : {};
+): void {
   for (const group of groups) {
-    const merged = { ...changes[group], ...input.credentials?.[group] };
+    const merged = { ...changes?.[group], ...input.credentials?.[group] };
     for (const [name, value] of Object.entries(merged)) {
       removeRef(db, id, group, name, refs[group][name]);
       if (value === null) {
@@ -260,6 +253,23 @@ function save(
     const incompatible = input.transport === 'stdio' ? group === 'headers' : group === 'env';
     if (incompatible && Object.keys(refs[group]).length) invalid();
   }
+}
+function save(
+  db: DrizzleDb,
+  id: string,
+  slug: string,
+  body: McpServerCreateBody,
+  previous?: Row,
+  key?: Buffer,
+): McpServer {
+  const validated = McpServerCreateBodySchema.safeParse(body);
+  if (!validated.success) invalid();
+  const input = validated.data;
+  if (previous && !metadataReadableForReplacement(previous)) invalid();
+  const old = previous && stored(previous);
+  const refs: References = old ? structuredClone(old.refs) : { env: {}, headers: {} };
+  const changes = previous && !old ? legacyCredentials(previous) : {};
+  applyCredentialChanges(db, id, input, refs, changes, key);
   const credentialNames = {
     env: Object.fromEntries(Object.keys(refs.env).map((name) => [name, ''])),
     headers: Object.fromEntries(Object.keys(refs.headers).map((name) => [name, ''])),
@@ -388,6 +398,29 @@ export function deleteMcpServer(db: DrizzleDb, id: string): boolean {
     return true;
   });
 }
+function resolveCredentials(
+  db: DrizzleDb,
+  id: string,
+  config: StoredConfig,
+  key?: Buffer,
+): Record<CredentialGroup, Record<string, string>> {
+  const values: Record<CredentialGroup, Record<string, string>> = { env: {}, headers: {} };
+  for (const group of groups)
+    for (const [name, ref] of Object.entries(config.refs[group])) {
+      if (!ref) invalid();
+      ownedSecret(db, id, group, name, ref);
+      try {
+        values[group][name] = getSecretUtf8(db, ref, masterKey(key));
+      } catch (error) {
+        if (error instanceof McpConfigurationError) throw error;
+        throw new McpConfigurationError(
+          'MCP_SECRET_DECRYPTION_FAILED',
+          'MCP credentials could not be decrypted. Restore the correct key or replace the credentials.',
+        );
+      }
+    }
+  return values;
+}
 /** Single Test/chat boundary. No connection is attempted until migration/validation/decryption completes. */
 export function resolveMcpConnection(
   db: DrizzleDb,
@@ -405,21 +438,7 @@ export function resolveMcpConnection(
       row = getRow(tx, row.id)!;
       config = stored(row)!;
     }
-    const values: Record<CredentialGroup, Record<string, string>> = { env: {}, headers: {} };
-    for (const group of groups)
-      for (const [name, ref] of Object.entries(config.refs[group])) {
-        if (!ref) invalid();
-        ownedSecret(tx, row.id, group, name, ref);
-        try {
-          values[group][name] = getSecretUtf8(tx, ref, masterKey(key));
-        } catch (error) {
-          if (error instanceof McpConfigurationError) throw error;
-          throw new McpConfigurationError(
-            'MCP_SECRET_DECRYPTION_FAILED',
-            'MCP credentials could not be decrypted. Restore the correct key or replace the credentials.',
-          );
-        }
-      }
+    const values = resolveCredentials(tx, row.id, config, key);
     const checked = McpCredentialChangesSchema.safeParse(values);
     if (!checked.success) invalid();
     return { ...publicMcpServer(row), ...parsed.data, env: values.env, headers: values.headers };

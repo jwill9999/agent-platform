@@ -162,7 +162,7 @@ export function McpDashboard() {
       {error && <Feedback error>{error}</Feedback>}
       {notice && <Feedback>{notice}</Feedback>}
       <div className="flex-1 overflow-y-auto p-6 space-y-3">
-        {loading && <p role="status">Loading servers…</p>}
+        {loading && <output className="block">Loading servers…</output>}
         {!loading && filtered.length === 0 && (
           <p className="text-muted-foreground">
             No MCP servers found. Add a server or change your search.
@@ -600,16 +600,16 @@ export function McpEditor({
         >
           <McpTrustNotice />
           {server.needsReconfiguration && (
-            <p role="status">
+            <output className="block">
               This server needs reconfiguration before it can connect. Replace unsupported settings
               or re-enter missing credentials.
-            </p>
+            </output>
           )}
           {dirty && (
-            <p role="status" className="text-sm">
+            <output className="block text-sm">
               Unsaved changes. Save first, then test the new configuration. Earlier test results do
               not apply.
-            </p>
+            </output>
           )}
           <div className="space-y-2">
             <Label htmlFor="mcp-name">Name</Label>
@@ -824,11 +824,10 @@ function CredentialEditor({
 export function McpTestResultPanel({ result }: Readonly<{ result: McpTestResult }>) {
   const successful = result.status === 'ok';
   return (
-    <div
-      role="status"
-      className={`border rounded-lg p-4 space-y-2 ${successful ? 'border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-destructive/30 bg-destructive/5'}`}
+    <output
+      className={`block border rounded-lg p-4 space-y-2 ${successful ? 'border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-destructive/30 bg-destructive/5'}`}
     >
-      <div className="flex items-center gap-2">
+      <span className="flex items-center gap-2">
         {successful ? (
           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
         ) : (
@@ -838,33 +837,35 @@ export function McpTestResultPanel({ result }: Readonly<{ result: McpTestResult 
           {successful ? 'Connected; discovery completed' : 'Connection failed'}
         </span>
         <span className="text-xs text-muted-foreground">{result.latencyMs}ms</span>
-      </div>
+      </span>
       {successful ? (
         <>
-          <p>
+          <span className="block">
             {result.discoveredCount} discovered · {result.eligibleCount} eligible tools
-          </p>
-          <p className="text-sm text-muted-foreground">
+          </span>
+          <span className="block text-sm text-muted-foreground">
             Discovery does not grant permission. Tool use still follows the agent’s approval policy
             and context limits.
-          </p>
+          </span>
           {result.rejections?.map((item) => (
-            <p key={item.category} className="text-sm">
+            <span key={item.category} className="block text-sm">
               {item.category}: {item.count} rejected
-            </p>
+            </span>
           ))}
         </>
       ) : (
         <>
-          <p className="text-sm">{result.error}</p>
-          <p className="text-sm">{[result.stage, result.code].filter(Boolean).join(' · ')}</p>
-          {result.retryGuidance && <p className="text-sm">{result.retryGuidance}</p>}
+          <span className="block text-sm">{result.error}</span>
+          <span className="block text-sm">
+            {[result.stage, result.code].filter(Boolean).join(' · ')}
+          </span>
+          {result.retryGuidance && <span className="block text-sm">{result.retryGuidance}</span>}
         </>
       )}
-      <p className="text-xs text-muted-foreground">
+      <span className="block text-xs text-muted-foreground">
         Tested {result.testedAt} · configuration revision {result.configurationRevision}. Changes
         require another test.
-      </p>
-    </div>
+      </span>
+    </output>
   );
 }

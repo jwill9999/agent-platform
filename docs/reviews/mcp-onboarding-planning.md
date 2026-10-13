@@ -149,3 +149,28 @@ the earlier failed push remains retained. This affected-package gate is distinct
 and exact-head hosted checks also remain delivery gates. Final owner acceptance and authorized feature
 merge remain separate. No setup or product decision is currently required from the owner.
 No task closure or staging readiness is claimed.
+
+### PR312 publication and hosted quality repair
+
+[PR312](https://github.com/jwill9999/agent-platform/pull/312) targets `feature/mcp-onboarding`.
+All seven complete verification-branch documentation mirrors were published and read back at
+`a2b80f44842cce2847dd071e6a0c40b9c534eddf`; `publication-a2b80f44.json` records body, revision,
+hash and destination verification, independently approved. Earlier publication requirements
+above describe their respective checkpoints. Subsequent changed documents require fresh readbacks.
+
+The first hosted Sonar quality gate passed, but detailed inspection found 16 open maintainability
+findings. These were repaired rather than dismissed: equivalent contract predicates, smaller
+credential and approval helpers, semantic status outputs, explicit branches, synchronous Express
+handlers and an equivalent raw fixture string. No security policy, timeout or assertion was weakened.
+Focused verification passed **174 tests**: 27 contract/database, 34 web, 93 harness and 20 API.
+Build/typecheck, scoped lint/format and diff checks passed. An exhaustive 1,114,112-code-point
+comparison verifies contract predicate equivalence, including lone surrogates. The generated
+upstream program remains byte-identical at 501 bytes; eight fixture-response and nine denial-code
+cases preserve behavior. Independent review approved all ten frozen source files with no findings.
+The three `pr312-*-sonar-*.json` receipts retain source and test bindings.
+
+Fresh exact-head hosted qualification is still required after this repair. Sourcery skipped PR312
+because its diff exceeds the 150,000-character review limit; this is a review limitation, not a pass.
+Independent source review remains recorded. The feature-targeted packaged VM skip does not qualify
+a future staging promotion. Full staging security analysis and actual packaged VM execution are
+separate future gates. No owner acceptance, merge or staging readiness is claimed here.

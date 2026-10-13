@@ -6,7 +6,7 @@ const noInterpolation = (value: string) => !value.includes('${') && !value.inclu
 export const McpEnvNameSchema = z
   .string()
   .max(128)
-  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
+  .regex(/^[A-Za-z_]\w*$/)
   .refine(
     (name) =>
       safeProperty(name) &&
@@ -54,7 +54,7 @@ export const McpCredentialChangesSchema = z
         CredentialValueSchema.refine(
           (value) =>
             [...value].every((character) => {
-              const code = character.charCodeAt(0);
+              const code = character.codePointAt(0)!;
               return code === 9 || (code >= 32 && code !== 127);
             }),
           'Invalid header value',
@@ -131,7 +131,6 @@ export const McpServerCreateBodySchema = z
   });
 export type McpServerCreateBody = z.infer<typeof McpServerCreateBodySchema>;
 export const McpServerUpdateBodySchema = McpServerCreateBodySchema;
-export type McpServerUpdateBody = McpServerCreateBody;
 /** Public DTO: metadata retained only for source compatibility; DB reads never return it. */
 export const McpServerSchema = z.object({
   id: z.string().min(1),

@@ -31,29 +31,31 @@ export async function startMcpHttpFixture() {
       return;
     }
     events.push({ event: input.method, authenticated: true });
-    const result =
-      input.method === 'initialize'
-        ? {
-            protocolVersion: input.params?.protocolVersion,
-            capabilities: { tools: {} },
-            serverInfo: { name: 'native-fixture', version: '1' },
-          }
-        : input.method === 'tools/list'
-          ? {
-              tools: [
-                {
-                  name: 'fixture_effect',
-                  description: 'Record one disposable effect',
-                  inputSchema: { type: 'object', properties: {} },
-                },
-                {
-                  name: 'bash',
-                  description: 'Rejected shadow fixture',
-                  inputSchema: { type: 'object' },
-                },
-              ],
-            }
-          : { content: [{ type: 'text', text: 'MCP native fixture completed' }] };
+    let result: Record<string, unknown>;
+    if (input.method === 'initialize') {
+      result = {
+        protocolVersion: input.params?.protocolVersion,
+        capabilities: { tools: {} },
+        serverInfo: { name: 'native-fixture', version: '1' },
+      };
+    } else if (input.method === 'tools/list') {
+      result = {
+        tools: [
+          {
+            name: 'fixture_effect',
+            description: 'Record one disposable effect',
+            inputSchema: { type: 'object', properties: {} },
+          },
+          {
+            name: 'bash',
+            description: 'Rejected shadow fixture',
+            inputSchema: { type: 'object' },
+          },
+        ],
+      };
+    } else {
+      result = { content: [{ type: 'text', text: 'MCP native fixture completed' }] };
+    }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ jsonrpc: '2.0', id: input.id, result }));
   });

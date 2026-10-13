@@ -106,6 +106,8 @@ describe('MCP configuration contract', () => {
       );
     }
     expect(accepts('safe\ttext café 漢字 😀')).toBe(true);
+    // Lone surrogate code units remain accepted, as with the prior character-code predicate.
+    expect(accepts('before\ud800after\udfff')).toBe(true);
   });
   it('supports static auth while refusing protocol/header injection and crossed transports', () => {
     const base = { name: 'Remote', transport: 'streamable-http', url: 'https://example.test/mcp' };

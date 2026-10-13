@@ -1381,12 +1381,9 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       const toolMetadata = resolveToolMetadata(safeCall, ctx);
       const actionPolicy = executionPolicyDecision(ctx, safeCall, toolMetadata);
       if (actionPolicy?.state === 'denied') {
-        const denialCode =
-          parseToolId(safeCall.name).kind === 'mcp'
-            ? 'MCP_POLICY_DENIED'
-            : safeCall.name === 'sys_bash'
-              ? 'COMMAND_POLICY_DENIED'
-              : 'WORKSPACE_WRITE_POLICY_DENIED';
+        let denialCode = 'WORKSPACE_WRITE_POLICY_DENIED';
+        if (parseToolId(safeCall.name).kind === 'mcp') denialCode = 'MCP_POLICY_DENIED';
+        else if (safeCall.name === 'sys_bash') denialCode = 'COMMAND_POLICY_DENIED';
         const output: Output = {
           type: 'error',
           code: denialCode,

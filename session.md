@@ -25,7 +25,16 @@ repeated at this fixture-only delta. Runtime source is committed at `ab98c705`; 
 repair is committed and pushed at `4769f41c`. Its normal build, typecheck, cycle and seven-package
 test gates passed: 1,715 tests, including 276 API tests after the final teardown repair.
 `implementation-push-qualified.json` binds the exact tip and terminal log. Final fixture critique
-is approved. Publication and hosted checks remain pending; no final acceptance or merge is claimed.
+is approved. All seven full documentation mirrors at `a2b80f44` have verified body/revision/hash
+and destination readbacks, independently approved. [PR312](https://github.com/jwill9999/agent-platform/pull/312)
+is open into `feature/mcp-onboarding`; no final acceptance or merge is claimed.
+
+Detailed hosted Sonar inspection found 16 maintainability findings despite a passing quality gate.
+All are addressed by a bounded ten-file repair with independent approval and 174 focused tests
+passed. Credential/approval/error behavior is preserved; exhaustive Unicode equivalence and
+byte-identical generated upstream code are verified. No rules, assertions or timeouts were weakened.
+Fresh exact-head hosted checks and detailed findings inspection must qualify the repaired source.
+Sourcery skipped the oversized diff; independent review is recorded, not a claimed hosted review pass.
 
 See the [approved plan](docs/planning/mcp-onboarding-mvp.md),
 [task specification](docs/tasks/agent-platform-mcp-onboarding.md),
@@ -34,8 +43,9 @@ See the [approved plan](docs/planning/mcp-onboarding-mvp.md),
 Evidence and source hashes are under `/Users/letuscode/.codex/mcp-onboarding-plan-20261013`.
 Current evidence binds source/artifacts and actual durable V1 waiting/success/failure reports,
 with no reported loss. Implementation and final fixture source review are approved; the connection
-tip passed normal push qualification. Complete full Notion readbacks, push the verification
-documentation chain and finish exact-head hosted gates/reviews before reporting merge readiness. Model fixtures are deterministic;
+tip passed normal push qualification. Publish the changed repair handoff/results with complete
+source-bound readbacks, then finish exact-head hosted gates/reviews before reporting merge readiness.
+The earlier seven full mirrors are complete. Model fixtures are deterministic;
 source-tree desktop success does not establish checkout-free release qualification.
 
 Preserve the dirty primary checkout, paused thirteen-path checkout, PR283 and all retained

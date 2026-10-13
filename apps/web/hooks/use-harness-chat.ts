@@ -147,6 +147,19 @@ export function mcpApprovalHaltMessage(event: ToolTraceEvent): string | null {
   return null;
 }
 
+async function mcpApprovalHaltFromResponse(response: Response): Promise<string | null> {
+  const failure: unknown = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  if (!isRecord(failure) || !isRecord(failure.error)) return null;
+  return mcpApprovalHaltMessage({
+    type: 'error',
+    code: typeof failure.error.code === 'string' ? failure.error.code : undefined,
+    message: '',
+  });
+}
+
 const BLOCKING_APPROVAL_STATUSES = new Set<ApprovalCardStatus>([
   'pending',
   'approving',
@@ -817,17 +830,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           body: JSON.stringify({ approvalRequestId }),
         });
         if (!res.ok) {
-          const failure = await res
-            .clone()
-            .json()
-            .catch(() => null);
-          if (isRecord(failure) && isRecord(failure.error)) {
-            mcpHaltMessage = mcpApprovalHaltMessage({
-              type: 'error',
-              code: typeof failure.error.code === 'string' ? failure.error.code : undefined,
-              message: '',
-            });
-          }
+          mcpHaltMessage = await mcpApprovalHaltFromResponse(res);
           throw new Error(await parseErrorResponse(res));
         }
 
@@ -866,18 +869,8 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           delete next[assistantId];
           return next;
         });
-        setToolEventsByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
-        setWorkspaceEventsByMessage((prev) => {
-          if (!(assistantId in prev)) return prev;
-          const next = { ...prev };
-          delete next[assistantId];
-          return next;
-        });
+        setToolEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
+        setWorkspaceEventsByMessage((prev) => removeMessageEntry(prev, assistantId));
       } finally {
         setStatus('ready');
       }

@@ -65,16 +65,13 @@ export function createMcpServersRouter(db: DrizzleDb): Router {
       res.status(201).json({ data: mutation(() => createMcpServer(db, body)) });
     }),
   );
-  router.post(
-    '/import',
-    asyncHandler(async (req, res) => {
-      const body = parseConfiguration(
-        z.object({ servers: z.array(McpServerCreateBodySchema).min(1).max(100) }).strict(),
-        req.body,
-      );
-      res.status(201).json({ data: mutation(() => importMcpServers(db, body.servers)) });
-    }),
-  );
+  router.post('/import', (req, res) => {
+    const body = parseConfiguration(
+      z.object({ servers: z.array(McpServerCreateBodySchema).min(1).max(100) }).strict(),
+      req.body,
+    );
+    res.status(201).json({ data: mutation(() => importMcpServers(db, body.servers)) });
+  });
   router.put(
     '/:idOrSlug',
     asyncHandler(async (req, res) => {
@@ -86,16 +83,11 @@ export function createMcpServersRouter(db: DrizzleDb): Router {
       res.json({ data: updated });
     }),
   );
-  router.post(
-    '/:idOrSlug/duplicate',
-    asyncHandler(async (req, res) => {
-      const duplicate = mutation(() =>
-        duplicateMcpServer(db, requireParam(req.params, 'idOrSlug')),
-      );
-      if (!duplicate) throw new HttpError(404, 'NOT_FOUND', 'MCP server not found');
-      res.status(201).json({ data: duplicate });
-    }),
-  );
+  router.post('/:idOrSlug/duplicate', (req, res) => {
+    const duplicate = mutation(() => duplicateMcpServer(db, requireParam(req.params, 'idOrSlug')));
+    if (!duplicate) throw new HttpError(404, 'NOT_FOUND', 'MCP server not found');
+    res.status(201).json({ data: duplicate });
+  });
   router.delete(
     '/:idOrSlug',
     asyncHandler(async (req, res) => {

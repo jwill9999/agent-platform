@@ -24,13 +24,13 @@ import {
   type ContextTokenProviderReply,
 } from './support/contextTokenProvider.js';
 
-const HTTP_REFERENCE_PROGRAM = `
+const HTTP_REFERENCE_PROGRAM = String.raw`
 import process from 'node:process';
 import {pathToFileURL} from 'node:url';
 import {dirname,join} from 'node:path';
 const {createApp}=await import(pathToFileURL(join(dirname(process.argv[1]),'transports/streamableHttp.js')).href);
 const {app,shutdown}=createApp();
-const server=app.listen(0,'127.0.0.1',()=>process.stdout.write('REFERENCE_READY:'+String(server.address().port)+'\\n'));
+const server=app.listen(0,'127.0.0.1',()=>process.stdout.write('REFERENCE_READY:'+String(server.address().port)+'\n'));
 process.on('SIGTERM',async()=>{await shutdown();server.closeAllConnections();server.close(()=>process.exit(0));});
 `;
 
