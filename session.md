@@ -1,3 +1,63 @@
+# Current handoff — retained CI evidence for reply qualification, 13 October 2026
+
+The owner-authorized staging promotion remains in progress in Beads `agent-platform-sizx`.
+PR316 delivered the reviewed readiness and serial-CI correction into the feature at `98efcd6c`,
+with all nine executed checks passing, a clean55-case desktop run and completed benchmark.
+Its tree exactly matches reviewed `226fc1a4`. PR315 still targets staging `21191673`; it is not merged.
+The new-head full scan completed actual analysis with no findings; Sonar/CodeQL are clear,
+all19 actual packaged-VM tests passed, and the unchanged fifteen-package inventory passed3005 tests
+with77 existing optional skips. Allnine benchmark samples passed the original20ms/2ms limits.
+
+The new-head desktop badge nevertheless contained54 passes and one flaky diagnostics shutdown case:
+after SIGTERM to the proven direct API child, the health probe did not reject within five seconds.
+A bounded unchanged instrumented local run passed1/1: unique owned listener verified, health request
+rejected in1ms, old child exited, and partial-export/privacy/restart durability assertions passed.
+Temporary probes were removed. The original Linux cause and missing shutdown-log/trace evidence
+remain open follow-ups; no graceful-shutdown bug or infrastructure cause is established.
+The critic approved one unchanged hosted desktop rerun. That shutdown case passed, but the rerun
+contained a different first-attempt120-second timeout in the Chromium restoration/reply journey.
+There will be no further unchanged rerun.
+
+Source review found a concrete evidence gap: workflow uploads conditioned on `failure()` discard
+first-attempt artifacts when Playwright retries make the final job green. The new task branch
+`task/chat-reply-ci-evidence` starts from actual feature `98efcd6c` and retains both existing Electron
+artifact paths on every terminal outcome. Reply journeys retain their existing manual tracing and
+now record safe incremental stage progress beginning before fixture startup/initial restoration,
+so a timeout can identify the outstanding stage even when tracing has not started. Product runtime,
+assertions, deadlines, test inventory and security controls remain unchanged. The observed timeout's
+cause is still unknown; this evidence correction does not claim to fix a product defect.
+
+The progress helper passed the original Chromium journey 1/1 with real success/failure diagnostic
+reports and bounded writer controls. Independent review, normal hooks and both complete Notion
+mirror readbacks were completed at `73230965`, published in PR317. Its nine executed check badges
+were green, including Sonar with zero open issues, but desktop job `115469956272` reported 51 passes
+and four flaky cases. The retained results ZIP's SHA-256 is
+`2c009e960a77b1a5214a7ccabf0b51cb9b843b6f7fe1ece48da80b8caebde803`; digest and every member CRC
+were verified. All four failures waited for the initial project-session binding response. Three
+reply progress records stop before scenario execution, and their option interactions failed while
+the persisted session still belonged to the default agent. No pre-binding trace exists.
+
+Source review identifies a readiness gap: an enabled textarea does not establish completed initial
+binding, whose session-key change can remount the agent selector. Independent critique approved
+waiting for actual readiness before initial selection and after alternate binding, and observing
+selection/response failures together. Real UI transitions, exact response and persisted-agent checks,
+all deadlines and product behavior remain unchanged. The controlled regression reproduced the old
+helper race and passed with the correction; the alternate binding control also passed. All nine
+original affected journeys passed without retries, failures or skips. Independent source/control
+review approved the fix; detailed evidence is recorded in the verification document. This does not
+prove the exact hosted cause.
+
+Next: finish and independently review this bounded fixture correction in PR317, update both full
+source-bound mirrors, and qualify its exact-head feature checks with clean desktop execution.
+After its guarded feature merge, PR315 needs fresh full scan, actual packaged VM, clean desktop and
+all protected checks/reviews. Only after verified protected staging delivery may the five delivered
+chat-reply branches be recovery-protected and removed. No staging completion is claimed here.
+Paused PR283/orchestration branches, dirty primary/paused checkouts and main remain untouched.
+All preceding handoffs below are historical; current actual receipts and delivery state are in Beads
+and `/Users/letuscode/.codex/chat-reply-implementation-20261013`.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — disappearing reply staging qualification, 13 October 2026
 
 PR314 merged into `feature/chat-reply-reliability` at `60b6e36c` after all nine executed

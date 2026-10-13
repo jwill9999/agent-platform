@@ -298,6 +298,17 @@ export async function createContextTokenAgent(
   });
 }
 
+async function expectContextTokenSessionReady(page: Page) {
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Press Enter to send, Shift+Enter for new line' }),
+  ).toBeVisible();
+}
+
+async function selectContextTokenAgent(page: Page, name: string) {
+  await page.getByRole('combobox', { name: 'Active agent' }).click();
+  await page.getByRole('option', { name, exact: true }).click();
+}
+
 export async function openContextTokenProject(
   page: Page,
   fixture: ContextTokenFixture,
@@ -307,6 +318,8 @@ export async function openContextTokenProject(
   await page.getByRole('button', { name: 'Open folder', exact: true }).click();
   await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
   await expect(page.getByPlaceholder('Ask about this Project...')).toBeEnabled();
+  // An editable draft can precede the initial binding that remounts the agent selector.
+  await expectContextTokenSessionReady(page);
   const selector = page.getByRole('combobox', { name: 'Active agent' });
   // A freshly seeded Personal assistant is already selected after opening a Project.
   // Use a real alternate UI selection first so the requested agent has an observable
@@ -317,27 +330,29 @@ export async function openContextTokenProject(
         candidate.id !== agent.id && ['default-agent', 'coding'].includes(candidate.slug),
     );
     if (!alternate) throw new Error('Seeded alternate agent is unavailable');
-    const alternateBinding = page.waitForResponse(
+    const [alternateBinding] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/v1/sessions/project') &&
+          response.request().method() === 'POST' &&
+          response.request().postDataJSON()?.agentId === alternate.id,
+      ),
+      selectContextTokenAgent(page, alternate.name),
+    ]);
+    expect(alternateBinding.ok()).toBe(true);
+    await expect(selector).toContainText(alternate.name);
+    await expectContextTokenSessionReady(page);
+  }
+  const [bound] = await Promise.all([
+    page.waitForResponse(
       (response) =>
         response.url().endsWith('/api/v1/sessions/project') &&
         response.request().method() === 'POST' &&
-        response.request().postDataJSON()?.agentId === alternate.id,
-    );
-    await selector.click();
-    await page.getByRole('option', { name: alternate.name, exact: true }).click();
-    expect((await alternateBinding).ok()).toBe(true);
-    await expect(selector).toContainText(alternate.name);
-  }
-  const binding = page.waitForResponse(
-    (response) =>
-      response.url().endsWith('/api/v1/sessions/project') &&
-      response.request().method() === 'POST' &&
-      response.request().postDataJSON()?.agentId === agent.id,
-  );
-  await selector.click();
-  await page.getByRole('option', { name: agent.name, exact: true }).click();
+        response.request().postDataJSON()?.agentId === agent.id,
+    ),
+    selectContextTokenAgent(page, agent.name),
+  ]);
   await expect(selector).toContainText(agent.name);
-  const bound = await binding;
   expect(bound.ok()).toBe(true);
   const session = (
     (await bound.json()) as {

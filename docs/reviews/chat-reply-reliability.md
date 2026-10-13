@@ -413,3 +413,112 @@ explicit:404,404 and418 events. The maximum enqueue p95 was0.006666ms. Existing 
 and worker source remained unchanged. Local execution fits the existing30-minute job budget, but
 actual hosted duration and all new-head gates still require qualification. Full logs, source/test
 inventory and measurements are retained in the `pr315-serial-` evidence files.
+
+## Refreshed staging evidence and retry artifact retention
+
+PR316 merged at `98efcd6c` after allnine executed checks passed on `226fc1a4`; feature Electron
+passed55/55 without flaky retries, and benchmark `completed=true`. The feature tree and staging
+rehearsal equal the reviewed source. PR315's fresh ordinary scan38442728388/job115453155522 performed
+actual analysis with no findings. Download ZIP SHA-256
+`ad12d8da3d25057895e99ecf7bcd053c01f78bf1aea6a930f4948105a19546e9` and all member/proof/SARIF
+bindings were independently verified. Sonar has zero open issues, scoped CodeQL is clear. Actual VM
+job115453157185 passed19 tests; ZIP SHA-256
+`77d86642bcb79f192d74f21c5ae8fa3489f153fe82f0bbb8fccf4d6f00c4c96f` binds the verified signature,
+ready VM, manifests and tested host-path/secret non-exposure. These are CI development checks,
+not release signing/notarization; scanner built-in omissions remain disclosed.
+
+The hosted serial inventory passed3005 tests with77 existing optional skips in15 packages. The
+physical test file completed in28.066seconds, retaining its original deadlines. Benchmark artifact
+SHA-256 `1a082876f8798c7f7e28262107f9688896b73b71c0825990f20e179a9198d486` has `completed=true`
+and allnine samples under the original20ms/2ms limits. Actual logs and source-bound receipts remain
+in the `pr315-*-98ef` evidence files. Passing these gates does not erase the desktop observations.
+
+Desktop job115453157230 passed54 cases and retried one diagnostics-export case: its health probe did
+not observe connection refusal within5000ms after SIGTERM to the proven owned API child. No hosted
+trace was uploaded because the final job was green. The unchanged instrumented local case passed
+1/1 first attempt in7.9seconds, with unique owned listener before signal, first health refusal in1ms,
+old PID subsequently gone and the expected deliberately restarted child. All original partial-export,
+privacy and durable-history assertions passed. Shutdown logs were unavailable at the probed location;
+no absence-of-logging claim or exact Linux failure cause follows. Temporary instrumentation was removed
+and source restored exactly. Receipt `pr315-shutdown-probe-receipt.json` SHA-256
+`a2d19d412e258ec99ad53270c0360643455f0213aa124d3e385ea936420f6056` records this bounded evidence.
+
+The independent critic approved one unchanged hosted desktop-job rerun, requiring a clean result.
+Job115460532545 passed the shutdown case but reported54 passes and a different first-attempt120-second
+timeout in CR-T01/02/06/07 Chromium restoration. Its log supplies no awaited-stage stack, and again
+failure-only uploads lost first-attempt evidence. The exact cause remains unknown. No further
+unchanged rerun is authorized by this diagnostic disposition; existing14 green check badges do not
+qualify this desktop result. Both observations are retained in the open observability epic.
+
+Independent source critique approved a bounded evidence correction: always upload the two existing
+Electron report/results paths, retaining their existing contents and retention policy, and record
+safe incremental fixture-stage progress before startup/restoration/scenario/export/cleanup waits.
+Manual tracing ownership remains unchanged. This changes test observability, not application
+behavior, test assertions, deadlines, retry policy or scanner rules. Fresh source review, focused
+verification, full documentation readbacks and hosted checks remain required. Later actual results
+are recorded below and in Beads; old-head successes do not qualify a changed head.
+
+Focused verification of the final progress helper passed the original Chromium restoration journey
+1/1 in10.6seconds without retries or skips. Its37 safe progress records end with completed journey,
+process cleanup and provider cleanup; both actual V1 diagnostic reports are schema-valid, and all
+existing success/failure/correlation/privacy assertions passed. Two source-backed controls passed
+for the128-entry bound/omission reporting and write-failure handling without cleanup interruption.
+Strict TypeScript, lint, formatting and diff checks pass. Receipt `ci-evidence-helper-receipt.json`
+SHA-256 `38a95fdf26a43b624a9b011dbab2b42f4b6543bd3cb6d52f6b2a7250b57e439f` binds source,
+artifacts and420 unchanged production build files. No original hosted cause is claimed.
+
+## Retained first-attempt evidence and initial binding correction
+
+PR317 at `73230965` completed all nine executed checks, including actual Sonar clearance with zero
+open issues. Verify passed 3005 tests with 77 existing optional skips, and the benchmark completed
+all nine samples within the original bounds. Desktop job `115469956272` nevertheless reported
+51 passed and four flaky cases: CR-T06 Chromium, CR-T04 Electron, CR-T06 Electron and MCP native
+stdio onboarding. All first attempts timed out at the shared project-binding response waiter.
+The newly retained artifact `11839792238` is 473,890,220 bytes, with verified ZIP SHA-256
+`2c009e960a77b1a5214a7ccabf0b51cb9b843b6f7fe1ece48da80b8caebde803` and valid CRC for every member.
+
+The three reply progress records stop at initial project binding before browser/scenario startup;
+provider calls are zero, the option locator is missing or detached, and the saved database contains
+only the default-agent Project session. Manual traces begin later, so none proves the original
+menu-closure cause. An enabled textarea allows the fixture to open the selector before the initial
+binding changes the Chat key. This source-backed race is the repair target; slow networking and a
+product defect are not established by these observations.
+
+Critic findings CR-Q04 and CR-Q05 require actual readiness before initial selection and after the
+alternate binding, plus jointly observed response/action failures. The approved correction retains
+real UI agent selection, exact POST-response matching and independent persisted-agent checks;
+no timeout, retry policy, application handler or assertion is relaxed. The controlled regression
+must distinguish scheduling evidence from proof of the original hosted failure. Final source and
+test results follow below; a green badge containing flaky retries does not qualify promotion.
+
+The independent critic approved the final helper (SHA-256
+`ed422bf4f53049bd14f2fec676b09254e4d8216f74cb1ff7453e29eb05a96f5a`) and the archived complete
+control source (`pr317-binding-control-final.ts`, SHA-256
+`990f75f19904eddcae46d74ee9ab2f2fbf61ce41259b7030f73c30dbc903077c`). The control holds the actual
+default binding response unchanged and delays only the fixture's option click across the resulting
+Chat remount. The original helper attempts selection before default readiness and times out at its
+original 30-second deadline. Its expected-failure control passing is not a product-success result.
+The corrected helper waits for actual readiness, selects the requested agent and verifies the
+persisted binding; the real-app control passed 1/1 in 5.2 seconds. An additional alternate-path
+control verified successful Coding → Personal → Coding responses, persisted target binding and zero
+provider calls, passing 1/1 in 4.9 seconds. Its first setup attempt lacked the fixture model and
+failed during later model selection; that setup failure is retained separately. Temporary control
+code is archived outside the repository and removed from the delivered source. This demonstrates
+a fixture race under controlled scheduling, without claiming the definitive hosted cause.
+
+The final uninstrumented helper then passed all nine original affected journeys in 1.3 minutes,
+with no retries, failures or skips: the four formerly flaky cases and all five context/token cases.
+The matrix includes fresh default-agent and Coding sessions, real multi-tool history, context-limit
+refusal and approval/restart/replay denial. The first failed control setup is retained; it does not
+count toward this clean nine-case result. Source-aware review and the existing quality checks remain
+separate from fresh hosted qualification. Detailed command, source hashes and diagnostic report
+readbacks are recorded in the external binding receipt and Beads.
+
+The diagnostic checkpoint read back 11 unique actual V1 exports: schema-valid, durable and verified,
+with zero dropped or pending events, no truncation and matching session correlation. Original
+privacy, request and effect assertions passed; an additional fixture-canary scan was clear. All 420
+production build files and the four checked runtime-source hashes remain unchanged. Strict
+TypeScript, lint, formatting and diff checks passed. Receipt `pr317-binding-repair-receipt.json`
+SHA-256 `f070036d0a1669f4fdd32039dcf5fc2fd35bf2dba2587303e844143e339c06ea` binds the frozen helper,
+71 artifact hashes and control results. This qualifies the bounded local fixture correction;
+PR317 and then PR315 still require new exact-head hosted checks and review before merging.

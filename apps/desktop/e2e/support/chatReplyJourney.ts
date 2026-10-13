@@ -35,14 +35,83 @@ export type ReplyJourney = {
   snapshots: () => Record<string, unknown>;
   nextReport: number;
   reportPaths: string[];
+  progress: ReplyProgress;
 };
+
+type ReplyProgressPhase =
+  | 'provider-start'
+  | 'fixture-create'
+  | 'app-launch'
+  | 'first-window'
+  | 'agent-create'
+  | 'project-binding'
+  | 'browser-launch'
+  | 'browser-page'
+  | 'initial-navigation'
+  | 'initial-restoration'
+  | 'trace-start'
+  | 'scenario'
+  | 'journey'
+  | 'cleanup-barriers'
+  | 'cleanup-snapshot'
+  | 'cleanup-capture'
+  | 'cleanup-screenshot'
+  | 'cleanup-trace'
+  | 'cleanup-evidence'
+  | 'cleanup-processes'
+  | 'cleanup-artifacts'
+  | 'cleanup-provider'
+  | 'export-native'
+  | 'export-click'
+  | 'export-download'
+  | 'export-save'
+  | 'export-validate';
+type ReplyProgress = (
+  phase: ReplyProgressPhase,
+  outcome?: 'started' | 'completed' | 'failed',
+) => void;
+
+/** Persist before each phase so an outer timeout cannot erase the last owned wait. */
+function createReplyProgress(
+  info: TestInfo,
+  mode: ReplyJourney['mode'],
+  failures: unknown[],
+): ReplyProgress {
+  const startedAt = Date.now();
+  const rows: Array<{
+    phase: ReplyProgressPhase;
+    outcome: 'started' | 'completed' | 'failed';
+    elapsedMs: number;
+  }> = [];
+  let sequence = 0;
+  let writeFailed = false;
+  return (phase, outcome = 'started') => {
+    rows.push({ phase, outcome, elapsedMs: Date.now() - startedAt });
+    if (rows.length > 128) rows.shift();
+    sequence += 1;
+    // Only fixed phase names, timing and mode: no request/response contents or credentials.
+    try {
+      writeFileSync(
+        info.outputPath('reply-progress.json'),
+        JSON.stringify({ mode, sequence, omitted: sequence - rows.length, rows }, null, 2),
+      );
+    } catch {
+      // Evidence failure must fail the journey without preventing independent owned cleanup.
+      if (!writeFailed) failures.push(new Error('Reply progress metadata could not be persisted'));
+      writeFailed = true;
+    }
+  };
+}
 
 export async function replyJourney(
   info: TestInfo,
   mode: ReplyJourney['mode'],
   run: (ctx: ReplyJourney) => Promise<void>,
 ) {
+  const failures: unknown[] = [];
+  const progress = createReplyProgress(info, mode, failures);
   const replies: ControlledReply[] = [];
+  progress('provider-start');
   const provider = await startChatReplyProvider(replies);
   let fixture: ContextTokenFixture | undefined;
   let app: ElectronApplication | undefined;
@@ -51,22 +120,30 @@ export async function replyJourney(
   let ctx: ReplyJourney | undefined;
   let traced = false;
   let passed = false;
-  const failures: unknown[] = [];
   try {
+    progress('fixture-create');
     fixture = await createContextTokenFixture(provider);
     const reportPaths = ['success', 'failure', 'approval'].map((name) =>
       join(fixture!.root, `${name}.json`),
     );
+    progress('app-launch');
     app = await launchContextTokenFixture(fixture, reportPaths);
+    progress('first-window');
     const native = await app.firstWindow();
+    progress('agent-create');
     const agent = await createContextTokenAgent(fixture);
+    progress('project-binding');
     const session = await openContextTokenProject(native, fixture, agent);
     if (mode === 'chromium') {
+      progress('browser-launch');
       browser = await chromium.launch();
+      progress('browser-page');
       page = await browser.newPage();
+      progress('initial-navigation');
       await page.goto(
         `http://127.0.0.1:${fixture.rendererPort}/?projectId=${session.projectId}&sessionId=${session.id}`,
       );
+      progress('initial-restoration');
       // Finish this initial restoration before a scenario installs one-shot read barriers.
       await expect(
         page
@@ -74,6 +151,7 @@ export async function replyJourney(
           .filter({ hasText: 'Press Enter to send, Shift+Enter for new line' }),
       ).toBeVisible();
     } else page = native;
+    progress('trace-start');
     await page.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
     traced = true;
     const { posts, responses } = observeReplyTraffic(page);
@@ -92,19 +170,23 @@ export async function replyJourney(
       responses,
       nextReport: 0,
       reportPaths,
+      progress,
       snapshots: () => ({ sourceSession: snapshotContextTokenDb(fixture!, session.id) }),
     };
+    progress('scenario');
     await run(ctx);
+    progress('scenario', 'completed');
     expect(provider.requests).toHaveLength(replies.length);
     expect(provider.errors).toEqual([]);
     passed = true;
   } catch (error) {
     failures.push(error);
+    progress('journey', 'failed');
   } finally {
     await finishReplyJourney(
       info,
       mode,
-      { fixture, app, browser, page, ctx, traced, passed },
+      { fixture, app, browser, page, ctx, traced, passed, progress },
       replies,
       provider,
       failures,
@@ -172,6 +254,7 @@ type ReplyResources = {
   ctx: ReplyJourney | undefined;
   traced: boolean;
   passed: boolean;
+  progress: ReplyProgress;
 };
 
 async function settleReplyCleanup(
@@ -190,13 +273,18 @@ async function finishReplyContext(
   replies: ControlledReply[],
   failures: unknown[],
 ) {
+  ctx.progress('cleanup-barriers');
+  const failureCount = failures.length;
   await settleReplyCleanup(
     ctx.cleanup.map((close) => close()),
     failures,
   );
+  ctx.progress('cleanup-barriers', failures.length === failureCount ? 'completed' : 'failed');
   for (const reply of replies) reply.gate?.release();
   try {
+    ctx.progress('cleanup-snapshot');
     ctx.evidence.finalDb = ctx.snapshots();
+    ctx.progress('cleanup-snapshot', 'completed');
   } catch (error) {
     failures.push(error);
   }
@@ -209,7 +297,7 @@ async function captureReplyEvidence(
   resources: ReplyResources,
   failures: unknown[],
 ) {
-  const { ctx, page, passed, traced } = resources;
+  const { ctx, page, passed, traced, progress } = resources;
   try {
     const evidence = {
       ...ctx?.evidence,
@@ -220,9 +308,14 @@ async function captureReplyEvidence(
       responses: ctx?.responses,
     };
     if (page && !page.isClosed()) {
+      progress('cleanup-screenshot');
       await page.screenshot({ path: info.outputPath('reply-ui.png') });
-      if (traced) await page.context().tracing.stop({ path: info.outputPath('reply-trace.zip') });
+      if (traced) {
+        progress('cleanup-trace');
+        await page.context().tracing.stop({ path: info.outputPath('reply-trace.zip') });
+      }
     }
+    progress('cleanup-evidence');
     await recordContextTokenEvidence(
       info,
       fixture,
@@ -277,18 +370,27 @@ async function finishReplyJourney(
   provider: Awaited<ReturnType<typeof startChatReplyProvider>>,
   failures: unknown[],
 ) {
-  const { ctx, fixture, browser, app } = resources;
+  const { ctx, fixture, browser, app, progress } = resources;
   if (ctx) await finishReplyContext(ctx, replies, failures);
   if (fixture) {
+    progress('cleanup-capture');
     await captureReplyEvidence(info, mode, fixture, resources, failures);
+    progress('cleanup-processes');
+    const failureCount = failures.length;
     await settleReplyCleanup([browser?.close(), app?.close()], failures);
+    progress('cleanup-processes', failures.length === failureCount ? 'completed' : 'failed');
+    progress('cleanup-artifacts');
     preserveReplyArtifacts(info, fixture, ctx, failures);
   }
   try {
+    progress('cleanup-provider');
     await provider.close();
+    progress('cleanup-provider', 'completed');
   } catch (error) {
     failures.push(error);
+    progress('cleanup-provider', 'failed');
   }
+  progress('journey', failures.length ? 'failed' : 'completed');
 }
 
 export const replyInput = (page: Page) => page.getByPlaceholder('Ask about this Project...');
@@ -355,12 +457,17 @@ export async function exportReplyReport(
   const destination =
     ctx.mode === 'electron' ? ctx.reportPaths[ctx.nextReport++]! : join(ctx.fixture.root, filename);
   let report;
-  if (ctx.mode === 'electron')
+  if (ctx.mode === 'electron') {
+    ctx.progress('export-native');
     report = await exportContextTokenReport(ctx.page, destination, forbidden);
-  else {
+  } else {
     const download = ctx.page.waitForEvent('download');
+    ctx.progress('export-click');
     await ctx.page.getByRole('button', { name: 'Export diagnostic report', exact: true }).click();
-    await (await download).saveAs(destination);
+    ctx.progress('export-download');
+    const downloaded = await download;
+    ctx.progress('export-save');
+    await downloaded.saveAs(destination);
     const raw = readFileSync(destination, 'utf8');
     for (const value of [...forbidden, CONTEXT_PROVIDER_KEY]) expect(raw).not.toContain(value);
     report = DiagnosticReportSchema.parse(JSON.parse(raw));
@@ -372,6 +479,7 @@ export async function exportReplyReport(
       truncated: false,
     });
   }
+  ctx.progress('export-validate');
   expect('sessionId' in report.scope).toBe(true);
   if (!('sessionId' in report.scope)) throw new Error('Expected session-scoped diagnostic report');
   expect(report.scope.sessionId).toBe(sessionId);
@@ -385,5 +493,6 @@ export async function exportReplyReport(
     expect(report.events.some((row) => row.event.requestId === response.requestId)).toBe(true);
   }
   ctx.evidence[filename] = report;
+  ctx.progress('export-validate', 'completed');
   return report;
 }
