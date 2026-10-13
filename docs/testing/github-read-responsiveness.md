@@ -14,7 +14,7 @@ SQLite databases and ports, network-denied fake gh executable selected via exist
 and deterministic loopback model/provider. No user repositories, tokens, chats or paid calls.
 
 Browser runs use an isolated Docker stack with a test-only mounted executable configured at API
-startup, real BFF/API/persistence and actual UI. Its normal API_PROXY_URL=http://api:3000
+startup, real BFF/API/persistence and actual UI. Its normal `API_PROXY_URL=http://api:3000`
 topology must continue denying diagnostics export with403; it cannot prove successful V1 export.
 Use the existing managed-loopback Chromium path in
 `apps/desktop/e2e/support/chatReplyJourney.ts`/`contextTokenFixture.ts` for the separate required

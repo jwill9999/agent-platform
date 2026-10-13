@@ -135,3 +135,21 @@ observations in `managed-safe-diagnostics-review.json`; all five fresh reports h
 counts and health flags, and the restart warning remains visible. The exact verification commit and
 source hashes are bound in the publication and delivery receipts. Hosted checks, owner-authorized feature merge, complete mirrors and task closure remain
 pending; no staging readiness or distribution qualification is claimed.
+
+## Hosted qualification repairs
+
+PR320 at `17269698` opened into `feature/github-read-responsiveness` after the local
+review, normal hooks and all five full source-bound Notion readbacks passed. Sourcery skipped because
+the cumulative diff exceeds its 150,000-character limit; this is a disclosed limitation, not approval.
+The source-aware independent review remains recorded.
+
+- **GR-H01:** hosted Lychee treated the Docker-only API origin in the verification contract as a
+  public link. Format that configuration value as code; no link-check exclusion or runtime change.
+- **GR-H02:** hosted Sonar reported S8707/S8705 on marker-path arguments in the static subprocess
+  test fixture. The repaired fixture accepts exactly one enum mode, writes only fixed leaf names
+  exclusively in its owned working directory, and spawns descendants with static arguments. Eleven
+  focused helper tests and five Linux controls pass, including malicious path rejection, literal
+  working-directory characters, descendant/peer cleanup and the unchanged total deadline. Runtime
+  helper and product behavior are unchanged; fresh hosted Sonar qualification remains required.
+  Evidence: `../github-read-implementation-20261014/linux-process-sonar/`. No finding was dismissed
+  or suppressed.

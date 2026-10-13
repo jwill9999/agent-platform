@@ -165,13 +165,30 @@ describe('bounded GitHub read subprocesses', () => {
     expect(alive(Number(readFileSync(marker, 'utf8')))).toBe(false);
   }, 12_000);
 
+  it('rejects marker path arguments and unknown modes before creating fixture files', async () => {
+    const operation = acquire();
+    const directory = root();
+    const outside = join(root(), 'must-not-exist');
+    expect(
+      await operation.run(process.execPath, [groupFixture, 'parent', outside], directory),
+    ).toBeUndefined();
+    expect(operation.failureReason).toBe('process_failed');
+    expect(existsSync(outside)).toBe(false);
+    expect(existsSync(join(directory, 'parent'))).toBe(false);
+    expect(
+      await operation.run(process.execPath, [groupFixture, '../outside'], directory),
+    ).toBeUndefined();
+    expect(existsSync(join(directory, 'parent'))).toBe(false);
+    expect(existsSync(join(directory, 'descendant'))).toBe(false);
+  });
+
   it.skipIf(process.platform === 'win32')(
     'kills a TERM-resistant owned descendant with inherited pipes without killing a peer',
     async () => {
       const caller = new AbortController();
       const operation = acquire(caller.signal);
       const peer = acquire();
-      const directory = root();
+      const directory = mkdtempSync(join(root(), 'literal-\'"; $()\n-'));
       const descendantPid = join(directory, 'descendant');
       const parentPid = join(directory, 'parent');
       const peerPid = join(directory, 'peer');
@@ -180,11 +197,7 @@ describe('bounded GitHub read subprocesses', () => {
         'require("node:fs").writeFileSync(process.argv[1], String(process.pid)); setInterval(() => {}, 1000)',
         [peerPid],
       );
-      const childRun = operation.run(
-        process.execPath,
-        [groupFixture, 'parent', parentPid, descendantPid],
-        directory,
-      );
+      const childRun = operation.run(process.execPath, [groupFixture, 'parent'], directory);
       await Promise.all([ready(descendantPid), ready(peerPid)]);
       const start = performance.now();
       caller.abort();
@@ -203,11 +216,12 @@ describe('bounded GitHub read subprocesses', () => {
     'cleans descendants when a successful leader exits leaving inherited pipes open',
     async () => {
       const operation = acquire();
-      const marker = join(root(), 'descendant');
+      const directory = root();
+      const marker = join(directory, 'descendant');
       const result = await operation.run(
         process.execPath,
-        [groupFixture, 'exiting-parent', join(root(), 'parent'), marker],
-        tmpdir(),
+        [groupFixture, 'exiting-parent'],
+        directory,
       );
       expect(result).toBe('done');
       expect(alive(Number(readFileSync(marker, 'utf8')))).toBe(false);
