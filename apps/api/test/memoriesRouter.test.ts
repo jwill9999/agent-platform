@@ -1,3 +1,4 @@
+import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -10,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 import { createMemoriesRouter } from '../src/infrastructure/http/v1/memoriesRouter.js';
 
-function buildTestApp() {
+async function buildTestApp() {
   const tmpDir = mkdtempSync(path.join(tmpdir(), 'memories-router-test-'));
   const { db, sqlite } = openDatabase(path.join(tmpDir, 'test.sqlite'));
   const app = express();
@@ -18,14 +19,14 @@ function buildTestApp() {
   app.use(express.json());
   app.use('/v1/memories', createMemoriesRouter(db));
   app.use(errorMiddleware);
-  return { app, db, sqlite, tmpDir };
+  return { app: await listenLoopback(app), db, sqlite, tmpDir };
 }
 
 describe('memoriesRouter', () => {
-  let ctx: ReturnType<typeof buildTestApp>;
+  let ctx: Awaited<ReturnType<typeof buildTestApp>>;
 
-  beforeEach(() => {
-    ctx = buildTestApp();
+  beforeEach(async () => {
+    ctx = await buildTestApp();
     createMemory(
       ctx.db,
       {
@@ -43,9 +44,13 @@ describe('memoriesRouter', () => {
     );
   });
 
-  afterEach(() => {
-    closeDatabase(ctx.sqlite);
-    rmSync(ctx.tmpDir, { recursive: true, force: true });
+  afterEach(async () => {
+    try {
+      await closeLoopback(ctx.app);
+    } finally {
+      closeDatabase(ctx.sqlite);
+      rmSync(ctx.tmpDir, { recursive: true, force: true });
+    }
   });
 
   it('lists, exports, updates, and reviews memories', async () => {

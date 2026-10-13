@@ -174,3 +174,10 @@ export type {
 export { admitProviderContext, estimateProviderInput } from './providerContext.js';
 export type { ProviderAdmission } from './providerContext.js';
 export type { ContextHalt } from './graphState.js';
+
+export { validateMcpTools } from './security/mcpTrustGuard.js';
+export {
+  mcpToolRevision,
+  sameMcpApprovalBinding,
+  type McpApprovalBinding,
+} from './security/mcpApproval.js';

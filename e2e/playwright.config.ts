@@ -17,6 +17,20 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: process.env.CI ? 'off' : 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], ...ciBrowserChannel } }],
+  projects: [
+    {
+      name: 'chromium',
+      testIgnore: /mcp-(onboarding|chat)\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },
+    },
+    {
+      name: 'mcp-onboarding',
+      testMatch: /mcp-(onboarding|chat)\.spec\.ts/,
+      dependencies: ['chromium'],
+      fullyParallel: false,
+      workers: 1,
+      use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },
+    },
+  ],
   metadata: { apiURL },
 });

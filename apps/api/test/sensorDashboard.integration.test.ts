@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import type { Server } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -9,6 +10,7 @@ import type { Application } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/infrastructure/http/createApp.js';
+import { closeLoopback, listenLoopback } from './support/loopbackServer.js';
 
 function createSeededApp(dirs: string[]): {
   app: Application;
@@ -40,9 +42,11 @@ describe('session sensor dashboard endpoint', () => {
 
   it('exposes active profile, providers, findings, runtime limits, and retry guidance', async () => {
     const { app, sqlite, observabilityStore } = createSeededApp(dirs);
+    let server: Server | undefined;
 
     try {
-      const sessionRes = await request(app)
+      server = await listenLoopback(app);
+      const sessionRes = await request(server)
         .post('/v1/sessions')
         .send({ agentId: CODING_AGENT_ID })
         .expect(201);
@@ -188,7 +192,7 @@ describe('session sensor dashboard endpoint', () => {
         ],
       });
 
-      const res = await request(app).get(`/v1/sessions/${sessionId}/sensors`).expect(200);
+      const res = await request(server).get(`/v1/sessions/${sessionId}/sensors`).expect(200);
 
       expect(res.body.data.activeAgentProfile).toBe('coding');
       expect(res.body.data.codingSensorsRequired).toBe(true);
@@ -213,12 +217,16 @@ describe('session sensor dashboard endpoint', () => {
         expect.objectContaining({ provider: 'github', state: 'auth_required' }),
       );
 
-      const retryRes = await request(app)
+      const retryRes = await request(server)
         .post(`/v1/sessions/${sessionId}/sensors/retry`)
         .expect(200);
       expect(retryRes.body.data.sessionId).toBe(sessionId);
     } finally {
-      sqlite.close();
+      try {
+        if (server) await closeLoopback(server);
+      } finally {
+        sqlite.close();
+      }
     }
   });
 });

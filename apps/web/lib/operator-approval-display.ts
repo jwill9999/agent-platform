@@ -30,6 +30,7 @@ const STATUS_LABELS: Record<ApprovalCardState['status'], string> = {
   expired: 'Expired',
   executed: 'Approved action completed',
   failed: 'Approval action failed',
+  not_completed: 'Action needs attention',
 };
 
 function technicalPayload(approval: ApprovalCardState): OperatorApprovalDisplay['details'] {
@@ -88,7 +89,7 @@ function titleForStatus(status: ApprovalCardState['status'], action: string): st
   if (status === 'approved') return `${action} approved`;
   if (status === 'rejected') return `${action} denied`;
   if (status === 'expired') return `${action} expired`;
-  if (status === 'failed') return `${action} needs attention`;
+  if (status === 'failed' || status === 'not_completed') return `${action} needs attention`;
   if (status === 'approving') return `Approving ${action.toLowerCase()}`;
   if (status === 'rejecting') return `Denying ${action.toLowerCase()}`;
   return `Approval required to ${action.toLowerCase()}`;

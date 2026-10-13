@@ -1,3 +1,4 @@
+import type { McpApprovalBinding } from './security/mcpApproval.js';
 import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
 
 // ---------------------------------------------------------------------------
@@ -29,6 +30,8 @@ export type ToolCallIntent = {
   name: string;
   args: Record<string, unknown>;
   approvalGranted?: boolean;
+  /** Internal durable approval identity; never authority supplied by a model. */
+  mcpBinding?: McpApprovalBinding;
 };
 
 export type LlmTextOutput = {

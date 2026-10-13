@@ -22,7 +22,10 @@ const mockOpen = vi.mocked(openMcpSession);
 function createMockSession(): McpSession {
   return {
     listContractTools: vi.fn(async () => []),
-    callToolAsOutput: vi.fn(async () => ({ type: 'text' as const, content: 'ok' })),
+    callToolAsOutput: vi.fn(async () => ({
+      output: { type: 'text' as const, content: 'ok' },
+      images: [],
+    })),
     close: vi.fn(async () => {}),
   };
 }
@@ -70,7 +73,8 @@ describe('McpSessionManager', () => {
       expect(results[1]).toEqual({
         serverId: 'srv-2',
         status: 'failed',
-        error: 'Connection refused',
+        error:
+          'MCP connection failed. Check the executable or Streamable HTTP endpoint and server availability.',
       });
 
       expect(manager.getSession('srv-1')).toBe(session1);

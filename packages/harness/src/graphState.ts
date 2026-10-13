@@ -26,6 +26,9 @@ export type ContextHalt = {
   code: 'CONTEXT_BUDGET_EXCEEDED' | 'CONTEXT_INVALID_HISTORY' | 'MODEL_OUTPUT_INCOMPLETE';
 };
 
+/** Terminal MCP failure, distinct from a successful pause awaiting human approval. */
+export type McpHalt = { code: 'MCP_APPROVAL_STALE' | 'MCP_OUTCOME_UNKNOWN' };
+
 /** Graph execution mode: ReAct (LLM↔tool loop) or plan (plan-execute). */
 export type GraphMode = 'react' | 'plan';
 
@@ -62,6 +65,7 @@ export const HarnessState = Annotation.Root({
   approvalToolCallIds: Annotation<string[] | undefined>(),
   pendingApprovalToolCallIds: Annotation<string[] | undefined>(),
   contextHalt: Annotation<ContextHalt | null | undefined>(),
+  mcpHalt: Annotation<McpHalt | null | undefined>(),
 
   // -- ReAct loop tracking (task n0l.3) --
   /** Number of LLM reasoning steps in the current ReAct loop. */

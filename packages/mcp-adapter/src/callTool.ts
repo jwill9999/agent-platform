@@ -89,9 +89,11 @@ export function callToolResultToOutput(
   const r = result as CallToolResultLike;
   const toolId = `${mcpServerId}:${mcpToolName}`;
   if (r.isError) {
-    const summarized = summarizeToolContent(r.content);
-    const msg = typeof summarized === 'string' ? summarized : 'MCP tool returned isError';
-    return { type: 'error', code: 'MCP_TOOL_ERROR', message: msg };
+    return {
+      type: 'error',
+      code: 'MCP_TOOL_ERROR',
+      message: 'The MCP server reported a tool error. Inspect the server before retrying.',
+    };
   }
   const data = r.structuredContent ?? summarizeToolContent(r.content);
   return { type: 'tool_result', toolId, data };

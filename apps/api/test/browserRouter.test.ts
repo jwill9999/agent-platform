@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 import { createBrowserRouter } from '../src/infrastructure/http/v1/browserRouter.js';
+import { closeLoopback, listenLoopback } from './support/loopbackServer.js';
 
 function buildTestApp(workspaceRoot: string) {
   const app = express();
@@ -43,21 +45,26 @@ function writeArtifact(workspaceRoot: string, sessionId: string, id: string) {
 
 describe('browserRouter', () => {
   let workspaceRoot: string;
-  let app: ReturnType<typeof buildTestApp>;
+  let server: Server | undefined;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     workspaceRoot = mkdtempSync(join(tmpdir(), 'agent-platform-browser-api-'));
-    app = buildTestApp(workspaceRoot);
+    server = await listenLoopback(buildTestApp(workspaceRoot));
   });
 
-  afterEach(() => {
-    rmSync(workspaceRoot, { recursive: true, force: true });
+  afterEach(async () => {
+    try {
+      if (server) await closeLoopback(server);
+    } finally {
+      server = undefined;
+      rmSync(workspaceRoot, { recursive: true, force: true });
+    }
   });
 
   it('lists browser artifact metadata grouped by session', async () => {
     writeArtifact(workspaceRoot, 'browser-session-1', 'artifact-1');
 
-    const res = await request(app).get('/v1/browser/artifacts').expect(200);
+    const res = await request(server!).get('/v1/browser/artifacts').expect(200);
 
     expect(res.body.data.totalArtifacts).toBe(1);
     expect(res.body.data.sessions[0]).toMatchObject({
@@ -76,7 +83,7 @@ describe('browserRouter', () => {
     writeArtifact(workspaceRoot, 'browser-session-1', 'artifact-1');
     writeArtifact(workspaceRoot, 'browser-session-2', 'artifact-2');
 
-    const res = await request(app)
+    const res = await request(server!)
       .get('/v1/browser/artifacts')
       .query({ sessionId: 'browser-session-2' })
       .expect(200);
@@ -88,18 +95,18 @@ describe('browserRouter', () => {
   it('downloads browser artifacts and blocks metadata or traversal downloads', async () => {
     writeArtifact(workspaceRoot, 'browser-session-1', 'artifact-1');
 
-    const res = await request(app)
+    const res = await request(server!)
       .get('/v1/browser/artifacts/download')
       .query({ path: '.agent-platform/browser/browser-session-1/artifact-1.png' })
       .expect(200);
 
     expect(Buffer.from(res.body as Buffer).toString('utf8')).toBe('png');
 
-    await request(app)
+    await request(server!)
       .get('/v1/browser/artifacts/download')
       .query({ path: '.agent-platform/browser/browser-session-1/artifact-1.png.json' })
       .expect(403);
-    await request(app)
+    await request(server!)
       .get('/v1/browser/artifacts/download')
       .query({ path: '../secret.txt' })
       .expect(403);
@@ -108,7 +115,7 @@ describe('browserRouter', () => {
   it('serves image artifacts inline for chat previews', async () => {
     writeArtifact(workspaceRoot, 'browser-session-1', 'artifact-1');
 
-    const res = await request(app)
+    const res = await request(server!)
       .get('/v1/browser/artifacts/download')
       .query({
         path: '.agent-platform/browser/browser-session-1/artifact-1.png',

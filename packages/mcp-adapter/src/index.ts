@@ -1,4 +1,4 @@
-export { McpAdapterError } from './errors.js';
+export { McpAdapterError, safeMcpFailure, type McpFailureStage } from './errors.js';
 export { getConnectTimeoutMs, getRequestTimeoutMs } from './env.js';
 export { mcpToolToContractTool, type McpToolDescriptor } from './mapTools.js';
 export { createTransportForMcpServer } from './transport.js';
@@ -13,6 +13,7 @@ export {
   listContractToolsFromClient,
   rewriteFileArgs,
   type McpSession,
+  type McpOperationOptions,
   type McpToolResult,
 } from './session.js';
 export { McpSessionManager, type McpSessionOpenResult } from './manager.js';

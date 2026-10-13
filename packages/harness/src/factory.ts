@@ -1,15 +1,28 @@
-import type { Agent, McpServer, Skill, Tool as ContractTool } from '@agent-platform/contracts';
+import type {
+  Agent,
+  ResolvedMcpConnection,
+  Skill,
+  Tool as ContractTool,
+} from '@agent-platform/contracts';
 import { SYSTEM_TOOLS } from './systemTools.js';
 import type { DrizzleDb } from '@agent-platform/db';
-import { loadAgentById, getMcpServer, getSkill, getTool } from '@agent-platform/db';
+import {
+  loadAgentById,
+  resolveMcpConnection,
+  getMcpServer,
+  getSkill,
+  getTool,
+} from '@agent-platform/db';
 import { createLogger } from '@agent-platform/logger';
-import { McpSessionManager } from '@agent-platform/mcp-adapter';
+import { McpSessionManager, safeMcpFailure } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import { resolveEffectivePluginHooks } from '@agent-platform/plugin-session';
 import { getSecurityReinforcement } from './security/injectionGuard.js';
 import { validateMcpTools } from './security/mcpTrustGuard.js';
+
+import { mcpToolRevision, type McpApprovalBinding } from './security/mcpApproval.js';
 
 const log = createLogger('harness');
 
@@ -28,6 +41,8 @@ export type AgentContext = {
   skills: Skill[];
   tools: ContractTool[];
   mcpManager: McpSessionManager;
+  mcpApprovalBindings?: ReadonlyMap<string, McpApprovalBinding>;
+  isMcpBindingCurrent?: (binding: McpApprovalBinding) => boolean;
   pluginDispatcher: PluginDispatcher;
   modelConfig: ModelConfig;
 };
@@ -39,6 +54,7 @@ export type BuildAgentContextOptions = {
   userPlugins?: readonly RegisteredPlugin[];
   /** Override default model config instead of reading from agent or env. */
   modelConfig?: ModelConfig;
+  signal?: AbortSignal;
 };
 
 // ---------------------------------------------------------------------------
@@ -128,13 +144,21 @@ function loadAllowedTools(db: DrizzleDb, ids: readonly string[]): ContractTool[]
   return ids.map((id) => getTool(db, id)).filter((t): t is ContractTool => t != null);
 }
 
-function loadAllowedMcpConfigs(db: DrizzleDb, ids: readonly string[]): McpServer[] {
-  return ids.map((id) => getMcpServer(db, id)).filter((m): m is McpServer => m != null);
+function loadAllowedMcpConfigs(db: DrizzleDb, ids: readonly string[]): ResolvedMcpConnection[] {
+  const configs: ResolvedMcpConnection[] = [];
+  for (const id of new Set(ids)) {
+    try {
+      configs.push(resolveMcpConnection(db, id));
+    } catch {
+      log.warn('MCP connection unavailable; review its configuration', { serverId: id });
+    }
+  }
+  return configs;
 }
 
 async function discoverMcpTools(
   manager: McpSessionManager,
-  configs: McpServer[],
+  configs: ResolvedMcpConnection[],
 ): Promise<ContractTool[]> {
   const tools: ContractTool[] = [];
   for (const config of configs) {
@@ -155,8 +179,10 @@ async function discoverMcpTools(
       }
       tools.push(...validation.safe);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      log.warn('Tool discovery failed', { serverId: config.id, error: message });
+      log.warn('Tool discovery failed', {
+        serverId: config.id,
+        code: safeMcpFailure(err, 'discovery').code,
+      });
     }
   }
   return tools;
@@ -188,9 +214,27 @@ export async function buildAgentContext(
   const mcpConfigs = loadAllowedMcpConfigs(db, agent.allowedMcpServerIds);
 
   const mcpManager = new McpSessionManager();
-  await mcpManager.openSessions(mcpConfigs);
+  await mcpManager.openSessions(mcpConfigs, { signal: options.signal });
 
   const mcpTools = await discoverMcpTools(mcpManager, mcpConfigs);
+  const mcpApprovalBindings = new Map<string, McpApprovalBinding>();
+  for (const config of mcpConfigs) {
+    for (const tool of mcpTools.filter((item) => item.id.startsWith(`${config.id}:`))) {
+      mcpApprovalBindings.set(tool.id, {
+        serverId: config.id,
+        configurationRevision: config.configurationRevision ?? 0,
+        toolRevision: mcpToolRevision(tool),
+      });
+    }
+  }
+  const isMcpBindingCurrent = (binding: McpApprovalBinding): boolean => {
+    const current = getMcpServer(db, binding.serverId);
+    return (
+      !!loadAgentById(db, agentId)?.allowedMcpServerIds.includes(binding.serverId) &&
+      current?.configurationRevision === binding.configurationRevision &&
+      !current.needsReconfiguration
+    );
+  };
   const allTools = [...SYSTEM_TOOLS, ...registryTools, ...mcpTools];
 
   const systemPrompt = buildAugmentedPrompt(agent.systemPrompt, skills, allTools);
@@ -210,6 +254,8 @@ export async function buildAgentContext(
     skills,
     tools: allTools,
     mcpManager,
+    mcpApprovalBindings,
+    isMcpBindingCurrent,
     pluginDispatcher,
     modelConfig,
   };

@@ -1,3 +1,102 @@
+# Current handoff — MCP onboarding implementation, 13 October 2026
+
+The owner approved the bounded MCP onboarding plan at `f75fba7d` and instructed completion
+of the epic's concrete tasks. Canonical Beads `agent-platform-mcp-onboarding` remains in progress;
+its broader capability-registry parent remains open. Current branch is
+`task/mcp-onboarding-verification`, from pushed connection tip `4769f41c`, which contains runtime
+implementation `ab98c705` and planning `f75fba7d` under `feature/mcp-onboarding` at staging `26e90126`.
+The owner authorized finishing documentation mirrors, the cumulative PR and hosted checks/reviews
+to merge readiness. Merging is not authorized by this instruction; final acceptance remains separate.
+
+Shared configuration/encrypted credentials, Test/chat parity, safe connection lifecycle,
+configuration-bound approval and the onboarding UI are implemented. Independent review repaired
+malformed legacy state, pre-stream cleanup, repeated ownership and truthful terminal failure
+diagnostics. The corrected approval card now reports uncertain actions truthfully. Final browser
+7/7, source-tree desktop 3/3 and upstream reference 2/2 journeys passed. The critic-requested
+context-budget refusal case passes. Full local regression: 2,958 passed/77 existing optional skips/zero
+failures at one fork; earlier four-fork lease/timeouts are retained. Typecheck/lint/format pass.
+A later push hook exposed an API fixture failure. An owned-server probe proved the IPv4/wildcard
+collision hazard; the original 400 responder remains unknown. The test-only repair now binds
+23 fixtures explicitly and API verification passed 276 tests, zero failures or skips, before
+a final critic-requested session-chat teardown-order repair. That repair passed 39 focused
+tests with tracing disabled and independent review.
+Original assertions, runtime behavior and timeouts are unchanged. The 2,958-test full run was not
+repeated at this fixture-only delta. Runtime source is committed at `ab98c705`; the reviewed fixture
+repair is committed and pushed at `4769f41c`. Its normal build, typecheck, cycle and seven-package
+test gates passed: 1,715 tests, including 276 API tests after the final teardown repair.
+`implementation-push-qualified.json` binds the exact tip and terminal log. Final fixture critique
+is approved. All seven full documentation mirrors at `a2b80f44` have verified body/revision/hash
+and destination readbacks, independently approved. [PR312](https://github.com/jwill9999/agent-platform/pull/312)
+is open into `feature/mcp-onboarding`; no final acceptance or merge is claimed.
+
+Detailed hosted Sonar inspection found 16 maintainability findings despite a passing quality gate.
+All are addressed by a bounded ten-file repair with independent approval and 174 focused tests
+passed. Credential/approval/error behavior is preserved; exhaustive Unicode equivalence and
+byte-identical generated upstream code are verified. No rules, assertions or timeouts were weakened.
+Fresh exact-head hosted checks and detailed findings inspection must qualify the repaired source.
+Sourcery skipped the oversized diff; independent review is recorded, not a claimed hosted review pass.
+The first repair at `9466d609` cleared 15 findings, leaving one callback-complexity issue.
+A second small helper extraction preserves the identical expression and passes 34 focused web
+tests plus typecheck/lint/format. Fresh hosted analysis must establish final clearance. The prior
+repair's normal push passed 1,634 affected tests and its two changed mirrors are read back;
+this follow-up requires its own source-bound publication and checks.
+
+See the [approved plan](docs/planning/mcp-onboarding-mvp.md),
+[task specification](docs/tasks/agent-platform-mcp-onboarding.md),
+[verification map](docs/testing/mcp-onboarding-mvp.md) and
+[actual execution results](docs/reviews/mcp-onboarding-planning.md).
+Evidence and source hashes are under `/Users/letuscode/.codex/mcp-onboarding-plan-20261013`.
+Current evidence binds source/artifacts and actual durable V1 waiting/success/failure reports,
+with no reported loss. Implementation and final fixture source review are approved; the connection
+tip passed normal push qualification. Publish the changed repair handoff/results with complete
+source-bound readbacks, then finish exact-head hosted gates/reviews before reporting merge readiness.
+The earlier seven full mirrors are complete. Model fixtures are deterministic;
+source-tree desktop success does not establish checkout-free release qualification.
+
+Preserve the dirty primary checkout, paused thirteen-path checkout, PR283 and all retained
+orchestration refs. Existing unrelated Docker stacks remain untouched. Only the dedicated
+`mcp-onboarding` Compose project and disposable native fixtures are owned by this task.
+No installer, OAuth, marketplace, paid call, distribution, main promotion or orchestration
+resumption is included. The complete earlier handoff follows as historical evidence.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — MCP onboarding planning, 13 October 2026
+
+The owner selected reliable MCP onboarding as the next local-MVP investigation. This is
+**planning only**: present the reviewed scope and briefing for agreement before implementation.
+Canonical Beads task `agent-platform-mcp-onboarding` is P1/in progress under
+`agent-platform-capability-registry`; the broader epic remains open.
+
+## Current baseline and next discussion
+
+PR308 and its staging promotion [PR311](https://github.com/jwill9999/agent-platform/pull/311)
+are complete. Staging is `26e90126a1987b1dc6e689438b471fe5ed932235`, tree
+`a7a737cdc3d76fd5aa5a69038ab90914c6ebd661`. All 14 executed promotion checks and 19 packaged
+VM tests passed, with no unresolved comments. Sourcery's size skip was disclosed alongside
+independent review. The two delivered handoff branches were removed with recovery tags retained;
+`agent-platform-o0rt` is closed and synced. Earlier pending PR308 instructions below are historical.
+
+The current planning branch is `task/mcp-onboarding-plan`, from `feature/mcp-onboarding` at
+that staging baseline. See the [briefing and manifest](docs/planning/mcp-onboarding-mvp.md),
+[task spec](docs/tasks/agent-platform-mcp-onboarding.md),
+[verification map](docs/testing/mcp-onboarding-mvp.md) and
+[critique/results](docs/reviews/mcp-onboarding-planning.md).
+
+Recommended scope: trusted preinstalled stdio servers and Streamable HTTP, safe credential
+storage, consistent import/test/chat behavior and real permitted/denied tool journeys.
+No universal installer, OAuth, marketplace, new dashboard or arbitrary-server VM isolation.
+Source investigation found the URL import transport mismatch and ignored env/header settings.
+Product tests are planned, not passed. The independent critic approved the corrected plan with no remaining findings. Publication
+receipts establish planning delivery only; owner agreement is still needed before implementation.
+
+Preserve main, paused PR283 and all four retained orchestration branches, dirty primary and
+paused checkouts. Beads journal updates are authorized task bookkeeping, not an unchanged
+whole-primary-diff claim. No distribution, paid calls or orchestration resumption is authorized.
+The complete previous handoff is retained below for provenance, not as current instructions.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — context MVP delivered, 13 October 2026
 
 **Verified development baseline:** `staging` at `66ae2cce73332a35da103c26f7ab9f97a6372fa9`.

@@ -1,11 +1,12 @@
 import { mkdtempSync, rmSync } from 'node:fs';
-import type { IncomingMessage } from 'node:http';
+import type { IncomingMessage, Server } from 'node:http';
+import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
+
 import os from 'node:os';
 import path from 'node:path';
 
 import { closeDatabase, DEFAULT_AGENT_ID, openDatabase, runSeed } from '@agent-platform/db';
 import request from 'supertest';
-import type { Application } from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const harnessMockState = {
@@ -128,7 +129,7 @@ function restoreChatEnv(snap: Map<string, string | undefined>) {
 }
 
 async function createSeededApp(dirs: string[]): Promise<{
-  app: Application;
+  app: Server;
   sqlite: ReturnType<typeof openDatabase>['sqlite'];
 }> {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-observability-'));
@@ -140,7 +141,7 @@ async function createSeededApp(dirs: string[]): Promise<{
   vi.resetModules();
   const { createApp } = await import('../src/infrastructure/http/createApp.js');
 
-  return { app: createApp({ db }), sqlite };
+  return { app: await listenLoopback(createApp({ db })), sqlite };
 }
 
 function parseNdjson(body: string): Array<Record<string, unknown>> {
@@ -250,7 +251,11 @@ describe('observability tools (integration)', () => {
       expect(JSON.stringify(recentErrors?.data?.records)).not.toContain(missingPath);
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      try {
+        await closeLoopback(app);
+      } finally {
+        closeDatabase(sqlite);
+      }
     }
   });
 });

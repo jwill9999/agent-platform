@@ -3,8 +3,6 @@ import { randomUUID } from 'node:crypto';
 import type {
   Agent,
   AgentCreateBody,
-  McpServer,
-  McpServerCreateBody,
   ProjectMode,
   SessionRecord,
   Skill,
@@ -18,8 +16,6 @@ import type { DrizzleDb } from '../database.js';
 import { wrapConstraintError } from '../errors.js';
 import {
   loadAgentById,
-  mcpRowToContract,
-  mcpToRow,
   sessionRowToContract,
   skillRowToContract,
   skillToRow,
@@ -150,56 +146,13 @@ export function deleteTool(db: DrizzleDb, idOrSlug: string): boolean {
 // MCP Servers
 // ---------------------------------------------------------------------------
 
-export function listMcpServers(db: DrizzleDb): McpServer[] {
-  return db
-    .select()
-    .from(schema.mcpServers)
-    .all()
-    .map((row) => mcpRowToContract(row));
-}
-
-export function getMcpServer(db: DrizzleDb, idOrSlug: string): McpServer | undefined {
-  const cond = isUuid(idOrSlug)
-    ? eq(schema.mcpServers.id, idOrSlug)
-    : or(eq(schema.mcpServers.id, idOrSlug), eq(schema.mcpServers.slug, idOrSlug));
-  const row = db.select().from(schema.mcpServers).where(cond).get();
-  return row ? mcpRowToContract(row) : undefined;
-}
-
-export function createMcpServer(db: DrizzleDb, body: McpServerCreateBody): McpServer {
-  const id = randomUUID();
-  const slug = slugify(body.name);
-  const server: McpServer = { ...body, id, slug };
-  const row = mcpToRow(server);
-  db.insert(schema.mcpServers).values(row).run();
-  return server;
-}
-
-export function upsertMcpServer(db: DrizzleDb, m: McpServer): void {
-  const row = mcpToRow(m);
-  db.insert(schema.mcpServers)
-    .values(row)
-    .onConflictDoUpdate({
-      target: schema.mcpServers.id,
-      set: {
-        name: row.name,
-        slug: row.slug,
-        transport: row.transport,
-        command: row.command,
-        argsJson: row.argsJson,
-        url: row.url,
-        metadataJson: row.metadataJson,
-      },
-    })
-    .run();
-}
-
-export function deleteMcpServer(db: DrizzleDb, idOrSlug: string): boolean {
-  const existing = getMcpServer(db, idOrSlug);
-  if (!existing) return false;
-  const r = db.delete(schema.mcpServers).where(eq(schema.mcpServers.id, existing.id)).run();
-  return r.changes > 0;
-}
+export {
+  listMcpServers,
+  getMcpServer,
+  createMcpServer,
+  upsertMcpServer,
+  deleteMcpServer,
+} from './mcpConnections.js';
 
 // ---------------------------------------------------------------------------
 // Agents

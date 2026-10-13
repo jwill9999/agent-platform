@@ -1,28 +1,38 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import type { Server } from 'node:http';
+import { listenLoopback, closeLoopbacks } from './support/loopbackServer.js';
+
 import express from 'express';
 import request from 'supertest';
 
 import { createDynamicRateLimiter } from '../src/infrastructure/http/dynamicRateLimiter.js';
 
-function buildApp(max = 3) {
+const servers: Server[] = [];
+afterEach(async () => {
+  await closeLoopbacks(servers.splice(0));
+});
+
+async function buildApp(max = 3) {
   const limiter = createDynamicRateLimiter();
   limiter.reconfigure({ windowMs: 60_000, max });
   const app = express();
   app.use(limiter.middleware);
   app.get('/test', (_req, res) => res.json({ ok: true }));
-  return { app, limiter };
+  const server = await listenLoopback(app);
+  servers.push(server);
+  return { app: server, limiter };
 }
 
 describe('dynamicRateLimiter', () => {
   it('allows requests under the limit', async () => {
-    const { app } = buildApp();
+    const { app } = await buildApp();
     const res = await request(app).get('/test');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
   });
 
   it('includes standard rate-limit headers', async () => {
-    const { app } = buildApp();
+    const { app } = await buildApp();
     const res = await request(app).get('/test');
     const headerKeys = Object.keys(res.headers).map((k) => k.toLowerCase());
     const hasRateHeaders = headerKeys.some((k) => k.startsWith('ratelimit'));
@@ -31,7 +41,7 @@ describe('dynamicRateLimiter', () => {
   });
 
   it('returns 429 with standard error shape when limit is exceeded', async () => {
-    const { app } = buildApp(3);
+    const { app } = await buildApp(3);
     await request(app).get('/test');
     await request(app).get('/test');
     await request(app).get('/test');
@@ -47,7 +57,7 @@ describe('dynamicRateLimiter', () => {
   });
 
   it('reconfigure changes the active limit', async () => {
-    const { app, limiter } = buildApp(2);
+    const { app, limiter } = await buildApp(2);
     // Use 2 of 2 allowed
     await request(app).get('/test');
     await request(app).get('/test');
@@ -61,7 +71,7 @@ describe('dynamicRateLimiter', () => {
   });
 
   it('getConfig returns current configuration', async () => {
-    const { limiter } = buildApp(5);
+    const { limiter } = await buildApp(5);
     expect(limiter.getConfig()).toEqual({ windowMs: 60_000, max: 5 });
 
     limiter.reconfigure({ windowMs: 30_000, max: 50 });

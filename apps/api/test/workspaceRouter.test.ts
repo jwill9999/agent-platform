@@ -1,3 +1,4 @@
+import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
 import { mkdtempSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,27 +10,31 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 import { createWorkspaceRouter } from '../src/infrastructure/http/v1/workspaceRouter.js';
 
-function buildTestApp(workspaceRoot: string) {
+async function buildTestApp(workspaceRoot: string) {
   const app = express();
   app.use('/v1/workspace', createWorkspaceRouter({ workspaceRoot }));
   app.use(errorMiddleware);
-  return app;
+  return listenLoopback(app);
 }
 
 describe('workspaceRouter', () => {
   let workspaceRoot: string;
   let outsideRoot: string;
-  let app: ReturnType<typeof buildTestApp>;
+  let app: Awaited<ReturnType<typeof buildTestApp>>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     workspaceRoot = mkdtempSync(join(tmpdir(), 'agent-platform-workspace-api-'));
     outsideRoot = mkdtempSync(join(tmpdir(), 'agent-platform-workspace-outside-'));
-    app = buildTestApp(workspaceRoot);
+    app = await buildTestApp(workspaceRoot);
   });
 
-  afterEach(() => {
-    rmSync(workspaceRoot, { recursive: true, force: true });
-    rmSync(outsideRoot, { recursive: true, force: true });
+  afterEach(async () => {
+    try {
+      await closeLoopback(app);
+    } finally {
+      rmSync(workspaceRoot, { recursive: true, force: true });
+      rmSync(outsideRoot, { recursive: true, force: true });
+    }
   });
 
   it('lists workspace files grouped by managed area', async () => {

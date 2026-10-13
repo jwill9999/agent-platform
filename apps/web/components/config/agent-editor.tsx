@@ -1,7 +1,15 @@
 'use client';
 
+import { McpTrustNotice } from './mcp-trust-notice';
+
 import { useCallback, useEffect, useState } from 'react';
-import type { Agent, AgentCreateBody, ModelConfig, Skill, McpServer } from '@agent-platform/contracts';
+import type {
+  Agent,
+  AgentCreateBody,
+  ModelConfig,
+  Skill,
+  McpServer,
+} from '@agent-platform/contracts';
 import { apiGet, apiPost, apiPut, apiPath, ApiRequestError } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,13 +79,16 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const toggleArrayItem = useCallback((key: 'selectedSkillIds' | 'selectedMcpServerIds', id: string) => {
-    setForm((prev) => {
-      const current = prev[key];
-      const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
-      return { ...prev, [key]: next };
-    });
-  }, []);
+  const toggleArrayItem = useCallback(
+    (key: 'selectedSkillIds' | 'selectedMcpServerIds', id: string) => {
+      setForm((prev) => {
+        const current = prev[key];
+        const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+        return { ...prev, [key]: next };
+      });
+    },
+    [],
+  );
 
   const handleSave = useCallback(async () => {
     setError(null);
@@ -142,7 +153,12 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
             {agent ? `Editing ${agent.name}` : 'Create a new AI agent'}
           </p>
         </div>
-        <Button onClick={() => { handleSave(); }} disabled={saving}>
+        <Button
+          onClick={() => {
+            handleSave();
+          }}
+          disabled={saving}
+        >
           {saving ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
@@ -222,7 +238,9 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
               {selectedConfig && (
                 <p className="text-xs text-muted-foreground">
                   Using saved config — provider/model free-form fields below are ignored.
-                  {selectedConfig.hasApiKey ? ' API key is stored securely.' : ' No API key stored; uses env vars.'}
+                  {selectedConfig.hasApiKey
+                    ? ' API key is stored securely.'
+                    : ' No API key stored; uses env vars.'}
                 </p>
               )}
             </div>
@@ -290,7 +308,9 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
                   min={1}
                   max={10}
                   value={form.maxParallelTasks}
-                  onChange={(e) => setField('maxParallelTasks', Number.parseInt(e.target.value, 10) || 2)}
+                  onChange={(e) =>
+                    setField('maxParallelTasks', Number.parseInt(e.target.value, 10) || 2)
+                  }
                 />
               </div>
 
@@ -302,7 +322,9 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
                   min={1000}
                   step={1000}
                   value={form.timeoutMs}
-                  onChange={(e) => setField('timeoutMs', Number.parseInt(e.target.value, 10) || 60_000)}
+                  onChange={(e) =>
+                    setField('timeoutMs', Number.parseInt(e.target.value, 10) || 60_000)
+                  }
                 />
               </div>
             </div>
@@ -339,6 +361,11 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
           {mcpServers.length > 0 && (
             <section className="space-y-4">
               <h2 className="text-lg font-medium text-foreground">MCP Servers</h2>
+              <McpTrustNotice />
+              <p className="text-sm text-muted-foreground">
+                Assigning a server allows future chats to connect to it. Tool use still follows the
+                agent’s approval policy. Changes affect new requests.
+              </p>
               <div className="space-y-2">
                 {mcpServers.map((server) => (
                   <label
@@ -350,11 +377,18 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
                       type="checkbox"
                       className="h-4 w-4 rounded border-input"
                       checked={form.selectedMcpServerIds.includes(server.id)}
+                      disabled={
+                        server.needsReconfiguration &&
+                        !form.selectedMcpServerIds.includes(server.id)
+                      }
                       onChange={() => toggleArrayItem('selectedMcpServerIds', server.id)}
                     />
                     <div>
                       <p className="text-sm font-medium text-foreground">{server.name}</p>
-                      <p className="text-xs text-muted-foreground">{server.transport}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {server.transport}
+                        {server.needsReconfiguration ? ' — needs reconfiguration before use' : ''}
+                      </p>
                     </div>
                   </label>
                 ))}

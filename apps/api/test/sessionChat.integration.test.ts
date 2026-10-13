@@ -18,7 +18,8 @@ import {
 } from '@agent-platform/db';
 import type { NativeToolExecutor } from '@agent-platform/harness';
 import request from 'supertest';
-import type { Application } from 'express';
+import type { Server } from 'node:http';
+import { listenLoopback, closeLoopback, closeLoopbacks } from './support/loopbackServer.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { restoreChatEnv, snapshotChatEnv } from './support/chatEnv.js';
@@ -88,6 +89,8 @@ const INIT_SLASH_HELP_TEXT = [
   '- State: May update Project setup.',
 ].join('\n');
 
+const servers: Server[] = [];
+
 async function createSeededApp(
   dirs: string[],
   options: {
@@ -97,7 +100,7 @@ async function createSeededApp(
     systemToolExecutorFactory?: () => NativeToolExecutor;
   } = {},
 ): Promise<{
-  app: Application;
+  app: Server;
   db: ReturnType<typeof openDatabase>['db'];
   sqlite: ReturnType<typeof openDatabase>['sqlite'];
 }> {
@@ -125,8 +128,8 @@ async function createSeededApp(
       totalTokensUsed: (state.totalTokensUsed ?? 0) + 2,
     };
   };
-  return {
-    app: createApp({
+  const app = await listenLoopback(
+    createApp({
       db,
       ...(options.mockLlm
         ? {
@@ -141,9 +144,17 @@ async function createSeededApp(
           }
         : {}),
     }),
-    db,
-    sqlite,
-  };
+  );
+  servers.push(app);
+  return { app, db, sqlite };
+}
+
+async function closeFixture(app: Server, sqlite: ReturnType<typeof openDatabase>['sqlite']) {
+  try {
+    await closeLoopback(app);
+  } finally {
+    closeDatabase(sqlite);
+  }
 }
 
 function mockToolCallStream(toolName: string, args: Record<string, unknown>) {
@@ -210,7 +221,7 @@ function createChatProject(
 }
 
 async function createProjectSession(
-  app: Application,
+  app: Server,
   db: TestDb,
   options: Parameters<typeof createChatProject>[1],
 ): Promise<string> {
@@ -255,7 +266,7 @@ async function withMockChatApp(
     await callback(ctx);
   } finally {
     restoreChatEnv(envSnap);
-    closeDatabase(ctx.sqlite);
+    await closeFixture(ctx.app, ctx.sqlite);
   }
 }
 
@@ -271,14 +282,14 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function createDefaultSession(app: Application): Promise<string> {
+async function createDefaultSession(app: Server): Promise<string> {
   const sessionRes = await request(app).post('/v1/sessions').send({ agentId: DEFAULT_AGENT_ID });
   expect(sessionRes.status).toBe(201);
   return sessionRes.body.data.id;
 }
 
 async function expectHandledSlashMessage(
-  app: Application,
+  app: Server,
   db: TestDb,
   sessionId: string,
   message: string,
@@ -313,7 +324,7 @@ async function expectHandledSlashMessage(
 }
 
 async function createPendingToolApproval(
-  app: Application,
+  app: Server,
   sessionId: string,
   toolName = 'sys_bash',
   args?: Record<string, unknown>,
@@ -371,18 +382,22 @@ function getLastChatPromptState(): ChatPromptState {
 describe('POST /v1/chat (session-aware)', () => {
   const dirs: string[] = [];
 
-  afterEach(() => {
-    mockStreamText.mockReset();
-    mockGenerateText.mockReset();
-    mockToolCalls.mockReset();
-    for (const d of dirs) {
-      try {
-        rmSync(d, { recursive: true, force: true });
-      } catch {
-        /* ignore */
+  afterEach(async () => {
+    try {
+      await closeLoopbacks(servers.splice(0));
+    } finally {
+      mockStreamText.mockReset();
+      mockGenerateText.mockReset();
+      mockToolCalls.mockReset();
+      for (const d of dirs) {
+        try {
+          rmSync(d, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
       }
+      dirs.length = 0;
     }
-    dirs.length = 0;
   });
 
   it('returns 400 for invalid request body', async () => {
@@ -391,7 +406,7 @@ describe('POST /v1/chat (session-aware)', () => {
       const res = await request(app).post(CHAT_ENDPOINT).send({ bad: 'body' }).expect(400);
       expect(res.body.error?.code).toBe('VALIDATION_ERROR');
     } finally {
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -408,7 +423,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(res.body.error?.message).toContain('Session');
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -429,7 +444,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(res.body.error?.code).toBe('MISSING_KEY');
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -490,7 +505,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(mockToolCalls).not.toHaveBeenCalled();
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -781,7 +796,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(res.body.error?.message).toContain('Agent');
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -821,7 +836,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(evaluatorPrompts).not.toContain('Return JSON only matching {"criteria"');
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -857,7 +872,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(userMsg.sessionId).toBe(sessionId);
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -888,7 +903,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(res.text).not.toContain(openAiKey);
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -928,7 +943,7 @@ describe('POST /v1/chat (session-aware)', () => {
       await expectToolExecutionCount(db, sessionId, 'success', 0);
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -960,7 +975,7 @@ describe('POST /v1/chat (session-aware)', () => {
       });
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -992,7 +1007,7 @@ describe('POST /v1/chat (session-aware)', () => {
       await expectToolExecutionCount(db, sessionId, 'success', 0);
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1039,7 +1054,7 @@ describe('POST /v1/chat (session-aware)', () => {
       await expectToolExecutionCount(db, sessionId, 'success', 1);
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1086,7 +1101,7 @@ describe('POST /v1/chat (session-aware)', () => {
       });
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1181,7 +1196,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(executorFactoryCalls).toBe(2);
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1227,7 +1242,7 @@ describe('POST /v1/chat (session-aware)', () => {
       restoreChatEnv(envSnap);
       if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;
       else process.env.SECRETS_MASTER_KEY = previousMasterKey;
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1539,7 +1554,7 @@ describe('POST /v1/chat (session-aware)', () => {
       restoreChatEnv(envSnap);
       if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;
       else process.env.SECRETS_MASTER_KEY = previousMasterKey;
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1583,7 +1598,7 @@ describe('POST /v1/chat (session-aware)', () => {
       restoreChatEnv(envSnap);
       if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;
       else process.env.SECRETS_MASTER_KEY = previousMasterKey;
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
   it('persists inspectable working memory and includes it on later turns', async () => {
@@ -1628,7 +1643,7 @@ describe('POST /v1/chat (session-aware)', () => {
       );
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1687,7 +1702,7 @@ describe('POST /v1/chat (session-aware)', () => {
       );
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1727,7 +1742,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(JSON.stringify(memoryRes.body.data)).not.toContain(rawPayload);
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1762,7 +1777,7 @@ describe('POST /v1/chat (session-aware)', () => {
       });
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1785,7 +1800,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(followUpState.messages?.some((message) => message.toolCalls?.length)).toBe(true);
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 
@@ -1834,7 +1849,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(toolMessage?.content).toContain('APPROVAL_REJECTED');
     } finally {
       restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
+      await closeFixture(app, sqlite);
     }
   });
 });
