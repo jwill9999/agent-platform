@@ -1,3 +1,80 @@
+# Current handoff — diagnostics V1 delivered, 13 October 2026
+
+**Verified baseline:** `staging` at `d199ad0172dfe016490533444d5b7c46733c8f4d`.
+**Current documentation task:** `agent-platform-o0rt`.
+Beads is authoritative for live task status; the recommendations below are for owner discussion,
+not a newly selected implementation task. This handoff is being published on `task/post-v1-handoff`;
+its own delivery status belongs in Beads and its PR, separately from the already merged baseline.
+
+## Delivered and verified
+
+- [PR303](https://github.com/jwill9999/agent-platform/pull/303) delivered diagnostics V1 to staging
+  at `50cc8727d4afcf3c07d6480da77d84d6d0ec2402`. V1 is closed in Beads. The local report/export
+  foundation is available; this does not complete the wider observability roadmap.
+- [PR307](https://github.com/jwill9999/agent-platform/pull/307) delivered diagnostic review
+  checkpoints to staging at `d199ad0172dfe016490533444d5b7c46733c8f4d` on 13 October.
+  The checkpoint task is closed. Its final Beads evidence records all 15 executed checks passed,
+  actual packaged VM and full security analyses, and zero unresolved review comments.
+  Sourcery's budget-related skip is disclosed; it is not a passed independent review.
+- The feature-implementation skill now calls for safe diagnostic reports after meaningful
+  agent-run E2E testing and before completion, with facts separated from hypotheses and findings
+  fixed within scope or linked to Beads. Documentation-only work records not applicable.
+- The iMessage configuration repair was followed by a successful test send and owner-confirmed
+  receipt. Tool availability in any new Codex session must still be checked before sending.
+
+## Remaining work and boundaries
+
+- `agent-platform-electron-release.diagnostics-export` remains open: checkout-free export from
+  the released artifact belongs to release qualification, as agreed, not a reopened V1 task.
+- `agent-platform-harness-v5` retains the local macOS HTTP test-isolation finding. Matching explicit
+  loopback binding is a proposed bounded repair; no source fix or V5 completion is claimed.
+- Larger dashboards, external tracing and accounts remain future work. No new product feature
+  has been selected or started by this handoff update.
+- PR283 remains paused and separate. Retained orchestration branches are
+  `feature/harness-backlog-review`, `task/harness-readiness-reconciliation`,
+  `task/pilot-active-budget` and `task/test-runner-offline-adapter`. Preserve these and all dirty or
+  unrelated checkouts. No orchestration resumption, main promotion or release is authorized here.
+
+## Recommended next discussion
+
+**First product task: `agent-platform-context-optimisation` (P1).** It targets long-session
+reliability, avoidable token use and latency across everyday agent work. Beads records a historical
+Project Chat TPM failure with large tool outputs; this is recorded evidence, not a new reproduction.
+The memory prerequisites `.2` and `.4` are closed. Current staging already builds approximate
+windowed context and injects working memory: extend that foundation rather than rebuilding it.
+In `packages/harness/src/contextBuilder.ts`, required system/user messages can exceed the configured
+budget and still be returned. Audit enforcement at every provider-call boundary and tool-result
+replay before choosing the smallest repair. The historical failure's exact present-day cause is
+not established by this inspection.
+
+Proposed first slice for planning: reproduce oversized-history/tool-output cases, define bounded
+input and output allowances, preserve essential task/approval context and tool-call pairing,
+handle an oversized required input explicitly, and compare short/long journeys using V1 reports.
+Agree measurable success criteria before implementation; do not promise a token saving percentage
+or add a new summarisation service, dashboard or framework migration by default. The existing spec
+still says P2 and has older timing language; reconcile it with live P1 Beads when this task is selected.
+
+**Next alternatives:** Git workflow UI (`agent-platform-ii1`) for daily delivery usability, then
+local run visibility (`agent-platform-harness-v4.local`) if hands-on use shows reports are insufficient.
+Audit existing delivered Git work before selecting a child: `agent-platform-0ra` already records
+implemented code despite remaining in progress. The local visibility task still depends on Stop
+and recovery tasks; it is not an immediately unblocked dashboard ticket. Historical review-gate
+records need explicit scoped reconciliation, not revival of paused orchestration controls.
+
+Before relying on local macOS API qualification, take the small HTTP fixture-isolation repair
+recorded under V5. Treat that as enabling QA work, not expansion into the whole V5 programme.
+If the owner instead prioritises distributing the app now, move release qualification (including
+checkout-free diagnostic export) ahead of new functionality. No backlog priorities or dependencies
+were changed by this recommendation.
+
+## Historical handoffs
+
+Everything below is preserved verbatim from the prior staging handoff for provenance. Pending
+PR303/PR307 integration instructions below are superseded by the verified delivery above and must
+not be repeated as current work. Follow live Beads and current refs for subsequent delivery.
+
+<!-- markdownlint-disable MD025 -->
+
 # Diagnostic review checkpoints — 13 October 2026
 
 This branch contains the owner-requested contributor skill update, tracked in
