@@ -1,3 +1,17 @@
+# Current handoff — Git delivery MVP planning, 14 October 2026
+
+The owner requested a bounded plan and independent critic review before implementing the next feature. Scope: manual selected-file commit/publish/PR delivery and the same operations through existing Project Chat, with per-operation approvals and an optional remembered Activity/Git panel. Future CLI/voice, automatic merge, conflict-resolver expansion, distribution and paused orchestration remain excluded.
+
+Planning task: `agent-platform-git-delivery-plan`, parent existing `agent-platform-ii1`. [Full plan and manifest](docs/planning/git-delivery-mvp.md), [verification](docs/testing/git-delivery-mvp.md), [critique](docs/reviews/git-delivery-mvp-plan-review.md). Reuse existing `4hm`/`0ra`; new chat tools and bounded verification tasks supplement, not replace, broader `7vf`. Runtime implementation has not begun. Final owner review is required after planning/documentation completion.
+
+Planning checkout starts from qualified staging `2a848b9a`. Prior delivery continues separately through PR324 for d185; a green hosted desktop job contained one retry caused by duplicate API/renderer fixture ports, so merge is held for a bounded repair and fresh qualification. Refresh this planning chain from actual qualified staging before implementation and recheck source changes. Preserve original session history below exactly. Docker engine was unreachable at planning inspection; existing dev runner was online/busy with PR324 at inspection. Planning has no paid model calls or product test execution.
+
+Independent planning critique approved the corrected contract with no remaining findings. It covers exact permission precedence, literal paths/full-index review, approval binding, bounded receipt lifecycle/recovery, migration and composed browser/Electron diagnostics tests. Owner review remains pending; implementation has not started. Publication/validation receipts are recorded in the planning Beads task when completed.
+
+<!-- markdownlint-disable MD025 -->
+
+## Earlier handoff (retained verbatim)
+
 # Current handoff — qualify the desktop lifecycle repair before staging, 14 October 2026
 
 The owner authorized merging both completed features into protected staging after all actual
