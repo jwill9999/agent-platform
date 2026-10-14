@@ -15,6 +15,7 @@ import { get } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { ownDesktopChild } from './ownedDesktopChild.js';
 import type { DesktopRuntimePaths } from './runtimePaths.js';
 
 export type DesktopBackendMode = 'disabled' | 'managed';
@@ -48,6 +49,8 @@ interface StartDesktopBackendOptions {
   timeoutMs?: number;
   maxLogBytes?: number;
   secretsMasterKeyB64?: string;
+  signal?: AbortSignal;
+  onPhase?: (phase: 'assets-before' | 'assets-after' | 'backend-spawn' | 'backend-ready') => void;
 }
 
 export interface DesktopBackendEnvironment {
@@ -208,7 +211,10 @@ export async function startDesktopBackend({
   timeoutMs = 15_000,
   maxLogBytes = defaultMaxLogBytes,
   secretsMasterKeyB64,
+  signal,
+  onPhase,
 }: StartDesktopBackendOptions): Promise<DesktopBackendHandle> {
+  signal?.throwIfAborted();
   if (!desktopBackendAvailable(paths)) {
     throw new Error(
       `Desktop backend build was not found at ${paths.apiEntry}. Run pnpm --filter @agent-platform/api... build first.`,
@@ -216,7 +222,10 @@ export async function startDesktopBackend({
   }
 
   mkdirSync(dirname(paths.stdoutLog), { recursive: true });
+  onPhase?.('assets-before');
   ensurePackagedMacosVmAssets(paths, env);
+  onPhase?.('assets-after');
+  signal?.throwIfAborted();
   rotateLogIfNeeded(paths.stdoutLog, maxLogBytes);
   rotateLogIfNeeded(paths.stderrLog, maxLogBytes);
 
@@ -228,20 +237,19 @@ export async function startDesktopBackend({
     port: env.AGENT_PLATFORM_DESKTOP_BACKEND_PORT ?? String(defaultBackendPort),
     secretsMasterKeyB64,
   });
-  let processError: Error | undefined;
-  child.once('error', (error: Error) => {
-    processError = error;
-  });
+  onPhase?.('backend-spawn');
   const stdout = createWriteStream(paths.stdoutLog, { flags: 'w' });
   const stderr = createWriteStream(paths.stderrLog, { flags: 'w' });
-
+  const owned = ownDesktopChild(child, [stdout, stderr]);
   child.stdout?.pipe(stdout);
   child.stderr?.pipe(stderr);
 
   try {
-    await waitForBackendReady(`${url}/health/ready`, timeoutMs, child, () => processError);
+    await waitForBackendReady(`${url}/health/ready`, timeoutMs, child, owned.processError, signal);
+    signal?.throwIfAborted();
+    onPhase?.('backend-ready');
   } catch (error) {
-    await stopDesktopChild(child, stdout, stderr);
+    await owned.stop();
     throw error;
   }
 
@@ -252,7 +260,7 @@ export async function startDesktopBackend({
       stdout: paths.stdoutLog,
       stderr: paths.stderrLog,
     },
-    stop: () => stopDesktopChild(child, stdout, stderr),
+    stop: owned.stop,
   };
 }
 
@@ -444,32 +452,35 @@ function spawnBackendProcess({
 export async function waitForBackendReady(
   readyUrl: string,
   timeoutMs: number,
-  child: Pick<ChildProcess, 'exitCode'>,
+  child: Pick<ChildProcess, 'exitCode'> & Partial<Pick<ChildProcess, 'signalCode'>>,
   getProcessError?: () => Error | undefined,
+  signal?: AbortSignal,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
+    signal?.throwIfAborted();
     const processError = getProcessError?.();
     if (processError) {
       throw new Error(`Desktop backend failed to start: ${processError.message}`);
     }
 
-    if (child.exitCode !== null) {
+    if (child.exitCode !== null || child.signalCode != null) {
       throw new Error(`Desktop backend exited before becoming ready with code ${child.exitCode}.`);
     }
 
-    if (await canReachReadyEndpoint(readyUrl)) {
+    if (await canReachReadyEndpoint(readyUrl, signal)) {
+      signal?.throwIfAborted();
       return;
     }
 
-    await delay(250);
+    await delay(250, undefined, { signal });
   }
 
   throw new Error(`Timed out waiting for desktop backend at ${readyUrl}.`);
 }
 
-function canReachReadyEndpoint(url: string): Promise<boolean> {
+function canReachReadyEndpoint(url: string, signal?: AbortSignal): Promise<boolean> {
   return new Promise((resolveReachable) => {
     let settled = false;
     const resolveOnce = (reachable: boolean): void => {
@@ -481,7 +492,7 @@ function canReachReadyEndpoint(url: string): Promise<boolean> {
       resolveReachable(reachable);
     };
 
-    const request = get(url, (response) => {
+    const request = get(url, { signal }, (response) => {
       response.resume();
       resolveOnce(response.statusCode === 200);
     });
@@ -504,36 +515,4 @@ function rotateLogIfNeeded(logPath: string, maxLogBytes: number): void {
   if (statSync(logPath).size > maxLogBytes) {
     rmSync(logPath, { force: true });
   }
-}
-
-function stopDesktopChild(
-  child: ChildProcess,
-  stdout: NodeJS.WritableStream,
-  stderr: NodeJS.WritableStream,
-): Promise<void> {
-  const closeLogs = (): void => {
-    stdout.end();
-    stderr.end();
-  };
-
-  if (child.exitCode !== null || child.killed) {
-    closeLogs();
-    return Promise.resolve();
-  }
-
-  return new Promise((resolveStopped) => {
-    const timeout = setTimeout(() => {
-      child.kill('SIGKILL');
-      closeLogs();
-      resolveStopped();
-    }, 2_000);
-
-    child.once('exit', () => {
-      clearTimeout(timeout);
-      closeLogs();
-      resolveStopped();
-    });
-
-    child.kill('SIGTERM');
-  });
 }

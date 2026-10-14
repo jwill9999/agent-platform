@@ -3,6 +3,20 @@ import { constants } from 'node:os';
 
 const MAX_RESPONSE_BYTES = 16 * 1024;
 const MAX_STDERR_BYTES = 64 * 1024;
+const STARTUP_PREFIX = 'AGENT_PLATFORM_STARTUP ';
+const phases = new Set([
+  'startup-begin',
+  'assets-before',
+  'assets-after',
+  'backend-spawn',
+  'backend-ready',
+  'renderer-start',
+  'renderer-ready',
+  'window-ready',
+  'cancel',
+  'stop-confirmed',
+  'stop-failed',
+]);
 const startupCodes = new Set([
   'ENOSPC',
   'EACCES',
@@ -67,6 +81,43 @@ export function createStartupEvidence(backendPort: number, rendererPort: number)
   let stderrBytes = 0;
   let stderrTruncated = false;
   let stderrTail = '';
+  let phaseTail = '';
+  let oversizedPhaseLine = false;
+  let phasesTruncated = false;
+  const phaseEvents: Array<{ phase: string; elapsedMs: number }> = [];
+  function inspectPhases(text: string) {
+    const lines = (phaseTail + text).split('\n');
+    phaseTail = lines.pop() ?? '';
+    for (const line of lines) {
+      if (oversizedPhaseLine) {
+        oversizedPhaseLine = false;
+        continue;
+      }
+      if (line.length > 512 || !line.startsWith(STARTUP_PREFIX)) continue;
+      try {
+        const event = record(JSON.parse(line.slice(STARTUP_PREFIX.length)));
+        if (!event || Object.keys(event).sort().join(',') !== 'elapsedMs,phase') continue;
+        if (typeof event.phase !== 'string' || !phases.has(event.phase)) continue;
+        if (
+          typeof event.elapsedMs !== 'number' ||
+          !Number.isFinite(event.elapsedMs) ||
+          event.elapsedMs < 0
+        )
+          continue;
+        if (phaseEvents.length === 64) {
+          phasesTruncated = true;
+          continue;
+        }
+        phaseEvents.push({ phase: event.phase, elapsedMs: event.elapsedMs });
+      } catch {
+        // Untrusted stderr is projected into fixed phase/timing fields only.
+      }
+    }
+    if (phaseTail.length > 512) {
+      phaseTail = '';
+      oversizedPhaseLine = true;
+    }
+  }
   const stderrCodes = new Set<string>();
   let process: Pick<ChildProcess, 'exitCode' | 'signalCode'> | undefined;
   let last: {
@@ -85,12 +136,21 @@ export function createStartupEvidence(backendPort: number, rendererPort: number)
         if (bytes.byteLength > remaining) stderrTruncated = true;
         if (remaining <= 0) return;
         const text = stderrTail + bytes.subarray(0, remaining).toString('utf8');
+        inspectPhases(bytes.subarray(0, remaining).toString('utf8'));
         stderrBytes += Math.min(bytes.byteLength, remaining);
         for (const match of text.matchAll(/\bcode:\s*['"]([A-Z]+)['"]/g)) {
           if (startupCodes.has(match[1]!)) stderrCodes.add(match[1]!);
         }
         stderrTail = text.slice(-64);
       });
+    },
+    shutdownConfirmed() {
+      return (
+        !stderrTruncated &&
+        !phasesTruncated &&
+        phaseEvents.some((event) => event.phase === 'stop-confirmed') &&
+        !phaseEvents.some((event) => event.phase === 'stop-failed')
+      );
     },
     async probe(remainingMs = 5_000): Promise<boolean> {
       attempts++;
@@ -129,6 +189,8 @@ export function createStartupEvidence(backendPort: number, rendererPort: number)
         attempts,
         elapsedMs: Math.round(performance.now() - startedAt),
         ...last,
+        phases: phaseEvents.map((event) => ({ ...event })),
+        phasesTruncated,
         stderr: {
           codes: [...stderrCodes],
           inspectedBytes: stderrBytes,

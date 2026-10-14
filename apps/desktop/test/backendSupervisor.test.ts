@@ -23,6 +23,7 @@ import {
   resolveDesktopBackendNodePath,
   resolveDesktopBackendMode,
   waitForBackendReady,
+  startDesktopBackend,
 } from '../src/main/backendSupervisor.js';
 import type { DesktopRuntimePaths } from '../src/main/runtimePaths.js';
 
@@ -394,5 +395,59 @@ describe('desktop backend supervisor helpers', () => {
     await expect(
       waitForBackendReady(readyUrl, 1_000, { exitCode: null }, () => new Error('spawn ENOENT')),
     ).rejects.toThrow('Desktop backend failed to start: spawn ENOENT');
+  });
+});
+
+describe('managed backend startup cleanup', () => {
+  it('cancels an actual child during readiness without publishing a handle', async () => {
+    const root = makeTempRepo();
+    const paths = getDesktopBackendPaths(root, makeRuntimePaths(root));
+    mkdirSync(join(root, 'apps/api/dist'), { recursive: true });
+    writeFileSync(paths.apiEntry, 'setInterval(() => {}, 1000);');
+    const controller = new AbortController();
+    const phases: string[] = [];
+    await expect(
+      startDesktopBackend({
+        paths,
+        nodePath: process.execPath,
+        env: {
+          AGENT_PLATFORM_COMMAND_RUNNER: 'disabled',
+          AGENT_PLATFORM_DESKTOP_BACKEND_PORT: '0',
+        },
+        signal: controller.signal,
+        onPhase: (phase) => {
+          phases.push(phase);
+          if (phase === 'backend-spawn') controller.abort();
+        },
+      }),
+    ).rejects.toHaveProperty('name', 'AbortError');
+    expect(phases).toEqual(['assets-before', 'assets-after', 'backend-spawn']);
+  });
+
+  it('cleans up missing executable and early signal-only exit', async () => {
+    const root = makeTempRepo();
+    const paths = getDesktopBackendPaths(root, makeRuntimePaths(root));
+    mkdirSync(join(root, 'apps/api/dist'), { recursive: true });
+    writeFileSync(paths.apiEntry, "process.kill(process.pid, 'SIGTERM');");
+    await expect(
+      startDesktopBackend({
+        paths,
+        nodePath: join(root, 'missing-node'),
+        env: {
+          AGENT_PLATFORM_COMMAND_RUNNER: 'disabled',
+          AGENT_PLATFORM_DESKTOP_BACKEND_PORT: '0',
+        },
+      }),
+    ).rejects.toThrow('failed to start');
+    await expect(
+      startDesktopBackend({
+        paths,
+        nodePath: process.execPath,
+        env: {
+          AGENT_PLATFORM_COMMAND_RUNNER: 'disabled',
+          AGENT_PLATFORM_DESKTOP_BACKEND_PORT: '0',
+        },
+      }),
+    ).rejects.toThrow('exited before becoming ready');
   });
 });

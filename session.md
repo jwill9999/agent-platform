@@ -1,3 +1,48 @@
+# Current handoff — qualify the desktop lifecycle repair before staging, 14 October 2026
+
+The owner authorized merging both completed features into protected staging after all actual
+checks and review findings clear, followed by recovery-protected cleanup. PR283 and the four
+paused orchestration branches remain separate; main and unrelated dirty checkouts are preserved.
+
+PR319 delivered the local-MVP handoff into `feature/local-mvp-handoff` at `749dba13`.
+PR320 delivered d185 into `feature/github-read-responsiveness` at `0affcda2`; d185 remains closed
+for its completed feature scope. Neither promotion is complete. Protected PR321 currently targets
+staging `1e4bd7af` with the handoff source. Both ordinary security scans, Sonar, CodeQL, browser,
+Electron and diagnostic benchmarks passed, but its actual 19-case packaged VM suite reported
+**11 passes, five failures and three flaky results**. PR321 must not merge on that result.
+The failed startup/cleanup evidence is retained; no failure is waived or relabeled as success.
+
+The bounded prerequisite [desktop lifecycle repair](docs/tasks/agent-platform-desktop-startup-lifecycle.md)
+is in progress on `task/desktop-startup-lifecycle`, based on the actual handoff feature.
+Independent critique approved owning pending startup, cancelling and joining it on quit, guarding
+late publication, and confirming child close plus log completion before app exit. Fixture cleanup
+now requires bounded, safe shutdown evidence. The original startup timeout's sole cause remains
+unproven: synchronous asset preparation and host resource pressure are possible contributors.
+Readiness deadlines, security policy, real VM assertions and asset-copy behavior are unchanged.
+
+Local verification passed all 174 desktop unit tests and all 19 signed-runtime packaged VM
+journeys on their first attempts (zero skips or retries, 8.4 minutes), plus the separate previously
+failing direct-write Block case. Production API/renderer/desktop builds, desktop lint/typecheck,
+direct Markdown and formatting pass. Independent final source, full-suite evidence and diagnostic review approved the repair with no
+actionable findings. Ten safe reports are durable/verified with zero pending/dropped events and
+no truncation; existing lineage limitations remain tracked separately. Full publication/readback
+receipts are recorded in Beads and the evidence directory. All new hosted qualification and both
+staging merges remain pending.
+These local results do not establish the original startup timeout's sole cause.
+
+Next: finish and deliver the reviewed repair into the existing handoff feature, then requalify
+PR321 with genuine full scans, clean connected tests and all current protections/reviews. Only
+then merge the actual qualified staging revision into a reviewed d185 integration task, preserving
+both handoff histories and the new lifecycle source, and qualify its separate staging promotion.
+`agent-platform-local-mvp-promotion` owns the final staging verification and branch cleanup.
+Keep the d185 diagnostic/navigation/export follow-ups open; they are outside this lifecycle repair.
+
+Evidence: `/Users/letuscode/.codex/local-mvp-promotion-20261014`, including independently verified
+`critic-pr321/independent-qualification-failed-vm.json`. Beads is authoritative for current status;
+all previous handoffs below are retained historical context, not new approval or launch gates.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — reply fix delivered; next local MVP priority, 13 October 2026
 
 ## Completed development baseline

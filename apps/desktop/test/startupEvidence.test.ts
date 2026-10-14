@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { PassThrough } from 'node:stream';
 import { afterEach, expect, it } from 'vitest';
 
 import {
@@ -185,4 +186,71 @@ it('defers attachment failure until real caller resources are released without r
   expect(heartbeatCount).toBe(countAfterCleanup);
   expect(attached).toBe(false);
   expect(await attemptStartupEvidenceAttachment(async () => {})).toBe(true);
+});
+
+function phaseFixture() {
+  const stderr = new PassThrough();
+  const evidence = createStartupEvidence(4310, 4321);
+  evidence.observeProcess({ exitCode: null, signalCode: null, stderr });
+  const emit = (event: unknown) =>
+    stderr.write(`AGENT_PLATFORM_STARTUP ${JSON.stringify(event)}\n`);
+  return { stderr, evidence, emit };
+}
+
+it('joins fragmented safe phase records and requires explicit shutdown confirmation', () => {
+  const { stderr, evidence, emit } = phaseFixture();
+  expect(evidence.shutdownConfirmed()).toBe(false);
+  stderr.write('AGENT_PLATFORM_STAR');
+  stderr.write('TUP {"phase":"backend-ready","elapsedMs":12}\n');
+  emit({ phase: 'cancel', elapsedMs: 13 });
+  expect(evidence.shutdownConfirmed()).toBe(false);
+  emit({ phase: 'stop-confirmed', elapsedMs: 15 });
+  expect(evidence.shutdownConfirmed()).toBe(true);
+  expect(evidence.snapshot().phases).toEqual([
+    { phase: 'backend-ready', elapsedMs: 12 },
+    { phase: 'cancel', elapsedMs: 13 },
+    { phase: 'stop-confirmed', elapsedMs: 15 },
+  ]);
+  evidence.snapshot().phases[0]!.phase = 'mutated';
+  expect(evidence.snapshot().phases[0]!.phase).toBe('backend-ready');
+  emit({ phase: 'stop-failed', elapsedMs: 16 });
+  expect(evidence.shutdownConfirmed()).toBe(false);
+});
+
+it('rejects extra fields, raw text, invalid phases and malformed timings', () => {
+  const { stderr, evidence, emit } = phaseFixture();
+  emit({ phase: 'stop-confirmed', elapsedMs: 1, error: 'secret-canary' });
+  emit({ phase: 'secret-canary', elapsedMs: 1 });
+  emit({ phase: 'stop-confirmed', elapsedMs: -1 });
+  emit({ phase: 'stop-confirmed', elapsedMs: '1' });
+  emit({ phase: 'stop-confirmed', elapsedMs: null });
+  stderr.write('AGENT_PLATFORM_STARTUP {"phase":"stop-confirmed","elapsedMs":1e999}\n');
+  stderr.write('prefix AGENT_PLATFORM_STARTUP {"phase":"stop-confirmed","elapsedMs":1}\n');
+  stderr.write('AGENT_PLATFORM_STARTUP invalid secret-canary\n');
+  expect(evidence.snapshot().phases).toEqual([]);
+  expect(evidence.shutdownConfirmed()).toBe(false);
+  expect(JSON.stringify(evidence.snapshot())).not.toContain('secret-canary');
+});
+
+it('discards oversized phase lines including a misleading fragmented suffix', () => {
+  const { stderr, evidence, emit } = phaseFixture();
+  stderr.write('x'.repeat(600));
+  emit({ phase: 'stop-confirmed', elapsedMs: 1 });
+  expect(evidence.shutdownConfirmed()).toBe(false);
+  emit({ phase: 'cancel', elapsedMs: 2 });
+  expect(evidence.snapshot().phases).toEqual([{ phase: 'cancel', elapsedMs: 2 }]);
+});
+
+it('fails shutdown confirmation closed when phase or stderr capture was truncated', () => {
+  const first = phaseFixture();
+  first.emit({ phase: 'stop-confirmed', elapsedMs: 0 });
+  for (let index = 1; index <= 64; index++) first.emit({ phase: 'cancel', elapsedMs: index });
+  expect(first.evidence.snapshot().phases).toHaveLength(64);
+  expect(first.evidence.snapshot().phasesTruncated).toBe(true);
+  expect(first.evidence.shutdownConfirmed()).toBe(false);
+  const second = phaseFixture();
+  second.emit({ phase: 'stop-confirmed', elapsedMs: 0 });
+  second.stderr.write('x'.repeat(70_000));
+  expect(second.evidence.snapshot().stderr.truncated).toBe(true);
+  expect(second.evidence.shutdownConfirmed()).toBe(false);
 });
