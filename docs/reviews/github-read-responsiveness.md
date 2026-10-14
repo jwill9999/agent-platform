@@ -153,3 +153,19 @@ The source-aware independent review remains recorded.
   helper and product behavior are unchanged; fresh hosted Sonar qualification remains required.
   Evidence: `../github-read-implementation-20261014/linux-process-sonar/`. No finding was dismissed
   or suppressed.
+
+- **GR-H03 / `agent-platform-b5y4`:** the initial hosted Electron suite at `17269698`
+  recorded 57 first-pass tests and one retry, not a clean pass. In the Project-access navigation
+  test, Personal Chat appeared after selecting Chat, then the Project composer returned and
+  persisted through the five-second assertion. Trace and screenshot corroborate the reversion.
+  Page, sidebar and this test are unchanged from staging, but the root cause and relationship to
+  changed read timing remain unproven. Event/URL ordering is a hypothesis requiring deterministic
+  reproduction. The independent critic approved a separate discovered-from investigation,
+  conditional on all 58 Electron tests passing on the final head without retries; recurrence
+  blocks this delivery. Evidence: `hosted-project-navigation-diagnosis.json` and the retained
+  hosted artifact with SHA-256 `94b53de2e559bef4dab41930c41aae91ac74467563f5d57b2482bff71b492f6d`.
+
+The `6f53fe74` repair revision passed hosted Lychee and Sonar with zero open issues. Its remaining
+CI was still running when this finding was recorded. Final current-head workflows, complete test
+results, reviews, source/tree identity and merge evidence must be checked and recorded in the task's
+delivery receipt before closure; prior green checks or a retry do not qualify a changed revision.
