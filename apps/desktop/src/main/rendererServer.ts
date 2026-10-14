@@ -181,7 +181,11 @@ async function waitForHttp(
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 
-  while (Date.now() < deadline) {
+  // Each attempt completes before scheduling its successor; never overlap health probes.
+  async function attempt(): Promise<void> {
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for standalone renderer at ${url}.`);
+    }
     signal?.throwIfAborted();
     if (processError()) throw processError();
     if (child.exitCode !== null || child.signalCode !== null) {
@@ -195,9 +199,10 @@ async function waitForHttp(
     }
 
     await delay(250, undefined, { signal });
+    return attempt();
   }
 
-  throw new Error(`Timed out waiting for standalone renderer at ${url}.`);
+  return attempt();
 }
 
 function canReachHttp(url: string, signal?: AbortSignal): Promise<boolean> {

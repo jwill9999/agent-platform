@@ -125,3 +125,22 @@ claim to resolve that follow-up. Deterministic providers do not qualify live-mod
 The final independent receipt is `critic-pr321/lifecycle-final-local-qualification.json`. Full
 publication/readback and eventual delivery receipts are recorded in Beads and the evidence directory.
 Fresh hosted qualification and staging delivery remain pending; no staging qualification is claimed.
+
+## Hosted quality repair
+
+PR322 at `f9934ee6` reported six actionable Sonar findings: phase-parser complexity and key sorting,
+two readiness-loop awaits, an unnecessary Set conversion and a truthiness-only array search.
+The bounded correction extracts strict phase parsing, checks exact own fields without sorting,
+uses sequential asynchronous readiness attempts with the original captured deadline, passes the
+pending Set directly and uses a boolean log-error search. Probe calls never overlap; cancellation,
+child-exit checks, cleanup bounds and original readiness predicates remain unchanged. No finding
+was suppressed and no quality rule, test timeout or security policy was weakened.
+
+Affected verification and fresh hosted qualification are recorded separately from the original
+19-case local pass. The original failed Sonar result remains retained; it cannot qualify delivery.
+The correction passes 55 focused tests, desktop build/typecheck/lint and two connected Electron journeys
+using the signed runtime (real-VM approved shell command and pre-execution direct-write Block),
+both on their first attempt without skips in
+52.741 seconds. Independent review approved all eight changed source/test files. The new controls
+verify sequential probes, deadline expiry, cancellation and actual renderer listener release.
+Evidence: `lifecycle-sonar-unit.log`, `lifecycle-sonar-vm-results.json` and `lifecycle-sonar-vm.log`.

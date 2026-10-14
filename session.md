@@ -30,6 +30,16 @@ receipts are recorded in Beads and the evidence directory. All new hosted qualif
 staging merges remain pending.
 These local results do not establish the original startup timeout's sole cause.
 
+PR322's first pushed source `f9934ee6` then failed Sonar on six maintainability findings.
+The scoped repair preserves strict phase parsing and sequential, cancellable readiness while
+removing the flagged complexity, sorting and collection patterns. No rule suppression or timeout
+increase is used. The earlier local 19-case pass is retained separately from this repair's affected
+verification; fresh exact-head hosted qualification remains mandatory before either staging merge.
+All eight changed source/test files passed independent review. The correction passes 55 focused
+tests and two connected Electron journeys using the signed runtime (real-VM approved shell command
+and pre-execution direct-write Block), both first attempt with zero skips, plus desktop
+build/typecheck/lint. Full fresh hosted gates remain pending.
+
 Next: finish and deliver the reviewed repair into the existing handoff feature, then requalify
 PR321 with genuine full scans, clean connected tests and all current protections/reviews. Only
 then merge the actual qualified staging revision into a reviewed d185 integration task, preserving

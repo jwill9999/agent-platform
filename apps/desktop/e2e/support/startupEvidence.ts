@@ -40,6 +40,26 @@ function status(value: unknown): string | undefined {
   return typeof value === 'string' && statuses.has(value) ? value : undefined;
 }
 
+function parsePhase(line: string): { phase: string; elapsedMs: number } | undefined {
+  if (line.length > 512 || !line.startsWith(STARTUP_PREFIX)) return undefined;
+  try {
+    const event = record(JSON.parse(line.slice(STARTUP_PREFIX.length)));
+    if (!event || Object.keys(event).length !== 2) return undefined;
+    if (!Object.hasOwn(event, 'phase') || !Object.hasOwn(event, 'elapsedMs')) return undefined;
+    if (typeof event.phase !== 'string' || !phases.has(event.phase)) return undefined;
+    if (
+      typeof event.elapsedMs !== 'number' ||
+      !Number.isFinite(event.elapsedMs) ||
+      event.elapsedMs < 0
+    )
+      return undefined;
+    return { phase: event.phase, elapsedMs: event.elapsedMs };
+  } catch {
+    // Untrusted stderr is projected into fixed phase/timing fields only.
+    return undefined;
+  }
+}
+
 function projectHealth(value: unknown) {
   const body = record(value);
   const checks = record(body?.checks);
@@ -93,25 +113,13 @@ export function createStartupEvidence(backendPort: number, rendererPort: number)
         oversizedPhaseLine = false;
         continue;
       }
-      if (line.length > 512 || !line.startsWith(STARTUP_PREFIX)) continue;
-      try {
-        const event = record(JSON.parse(line.slice(STARTUP_PREFIX.length)));
-        if (!event || Object.keys(event).sort().join(',') !== 'elapsedMs,phase') continue;
-        if (typeof event.phase !== 'string' || !phases.has(event.phase)) continue;
-        if (
-          typeof event.elapsedMs !== 'number' ||
-          !Number.isFinite(event.elapsedMs) ||
-          event.elapsedMs < 0
-        )
-          continue;
-        if (phaseEvents.length === 64) {
-          phasesTruncated = true;
-          continue;
-        }
-        phaseEvents.push({ phase: event.phase, elapsedMs: event.elapsedMs });
-      } catch {
-        // Untrusted stderr is projected into fixed phase/timing fields only.
+      const event = parsePhase(line);
+      if (!event) continue;
+      if (phaseEvents.length === 64) {
+        phasesTruncated = true;
+        continue;
       }
+      phaseEvents.push(event);
     }
     if (phaseTail.length > 512) {
       phaseTail = '';

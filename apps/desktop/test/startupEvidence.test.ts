@@ -224,6 +224,9 @@ it('rejects extra fields, raw text, invalid phases and malformed timings', () =>
   emit({ phase: 'stop-confirmed', elapsedMs: -1 });
   emit({ phase: 'stop-confirmed', elapsedMs: '1' });
   emit({ phase: 'stop-confirmed', elapsedMs: null });
+  emit({ phase: 'stop-confirmed', other: 1 });
+  emit({ other: 'stop-confirmed', elapsedMs: 1 });
+  stderr.write('AGENT_PLATFORM_STARTUP {"__proto__":{"phase":"stop-confirmed"},"elapsedMs":1}\n');
   stderr.write('AGENT_PLATFORM_STARTUP {"phase":"stop-confirmed","elapsedMs":1e999}\n');
   stderr.write('prefix AGENT_PLATFORM_STARTUP {"phase":"stop-confirmed","elapsedMs":1}\n');
   stderr.write('AGENT_PLATFORM_STARTUP invalid secret-canary\n');

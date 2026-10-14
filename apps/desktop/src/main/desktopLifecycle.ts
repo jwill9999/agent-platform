@@ -56,7 +56,7 @@ export class DesktopLifecycle {
   }
 
   private async joinAndStop(): Promise<void> {
-    await Promise.allSettled([...this.pending]);
+    await Promise.allSettled(this.pending);
     const results = await Promise.allSettled([...this.handles].map((handle) => handle.stop()));
     const failure = results.find((result) => result.status === 'rejected');
     if (failure?.status === 'rejected') throw failure.reason;

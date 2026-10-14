@@ -451,3 +451,47 @@ describe('managed backend startup cleanup', () => {
     ).rejects.toThrow('exited before becoming ready');
   });
 });
+
+describe('sequential backend readiness attempts', () => {
+  it('waits for each probe before retrying and eventually accepts readiness', async () => {
+    let active = 0;
+    let maximumActive = 0;
+    let probes = 0;
+    const server = createServer((_request, response) => {
+      probes += 1;
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      setTimeout(() => {
+        response.writeHead(probes < 3 ? 503 : 200);
+        response.end();
+        active -= 1;
+      }, 15);
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Expected TCP listener.');
+    await waitForBackendReady(`http://127.0.0.1:${address.port}`, 2_000, { exitCode: null });
+    expect(probes).toBe(3);
+    expect(maximumActive).toBe(1);
+  });
+
+  it('retains the original deadline and cancels a pending retry', async () => {
+    const url = await startReadyServer(503);
+    await expect(waitForBackendReady(url, 1, { exitCode: null })).rejects.toThrow('Timed out');
+    const controller = new AbortController();
+    const pending = waitForBackendReady(
+      url,
+      2_000,
+      { exitCode: null },
+      undefined,
+      controller.signal,
+    );
+    const cancel = setTimeout(() => controller.abort(), 25);
+    try {
+      await expect(pending).rejects.toHaveProperty('name', 'AbortError');
+    } finally {
+      clearTimeout(cancel);
+    }
+  });
+});

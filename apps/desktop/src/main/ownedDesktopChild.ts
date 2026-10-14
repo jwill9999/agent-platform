@@ -66,8 +66,7 @@ export function ownDesktopChild(
             if (!log.writableEnded && !log.destroyed) log.end();
           }
           const errors = await Promise.all(logResults);
-          const error = errors.find(Boolean);
-          if (error)
+          if (errors.some(Boolean))
             throw new DesktopChildShutdownError(
               'Desktop child log completion failed; retain diagnostics.',
             );

@@ -458,7 +458,11 @@ export async function waitForBackendReady(
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 
-  while (Date.now() < deadline) {
+  // Each attempt completes before scheduling its successor; never overlap health probes.
+  async function attempt(): Promise<void> {
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for desktop backend at ${readyUrl}.`);
+    }
     signal?.throwIfAborted();
     const processError = getProcessError?.();
     if (processError) {
@@ -475,9 +479,10 @@ export async function waitForBackendReady(
     }
 
     await delay(250, undefined, { signal });
+    return attempt();
   }
 
-  throw new Error(`Timed out waiting for desktop backend at ${readyUrl}.`);
+  return attempt();
 }
 
 function canReachReadyEndpoint(url: string, signal?: AbortSignal): Promise<boolean> {
