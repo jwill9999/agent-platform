@@ -1,3 +1,22 @@
+## Current handoff: desktop fixture port repair — 14 October 2026
+
+The d185 staging promotion PR324 is blocked by an independently confirmed first-attempt Electron
+fixture collision despite its retry-green check. API and renderer both received port 41185.
+`task/desktop-fixture-ports` repairs that allocation on feature head `4e5b3405`; the bounded task is
+[agent-platform-desktop-fixture-ports](docs/tasks/agent-platform-desktop-fixture-ports.md).
+
+The repair reserves both loopback ports together before releasing them. Focused unit tests,
+typecheck and lint pass. The original failed connected Electron case passed without retry, and
+approve/reject journeys passed with four complete safe diagnostic exports. Independent source,
+evidence and documentation review approved the repair without findings. Publication and new
+hosted qualification remain pending. No runtime timeouts or retries are increased. The parent
+`agent-platform-local-mvp-promotion` remains in progress; do not merge PR324 from stale green checks.
+
+Git delivery planning is active in its own separate worktree/branches and must be preserved.
+PR283 and paused orchestration work remain separate. The preceding complete handoff follows.
+
+---
+
 # Current handoff — local MVP staging consolidation, 14 October 2026
 
 The owner authorized both completed features to be promoted into protected staging after all
