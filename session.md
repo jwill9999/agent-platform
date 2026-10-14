@@ -1,3 +1,129 @@
+# Current handoff — qualify the desktop lifecycle repair before staging, 14 October 2026
+
+The owner authorized merging both completed features into protected staging after all actual
+checks and review findings clear, followed by recovery-protected cleanup. PR283 and the four
+paused orchestration branches remain separate; main and unrelated dirty checkouts are preserved.
+
+PR319 delivered the local-MVP handoff into `feature/local-mvp-handoff` at `749dba13`.
+PR320 delivered d185 into `feature/github-read-responsiveness` at `0affcda2`; d185 remains closed
+for its completed feature scope. Neither promotion is complete. Protected PR321 currently targets
+staging `1e4bd7af` with the handoff source. Both ordinary security scans, Sonar, CodeQL, browser,
+Electron and diagnostic benchmarks passed, but its actual 19-case packaged VM suite reported
+**11 passes, five failures and three flaky results**. PR321 must not merge on that result.
+The failed startup/cleanup evidence is retained; no failure is waived or relabeled as success.
+
+The bounded prerequisite [desktop lifecycle repair](docs/tasks/agent-platform-desktop-startup-lifecycle.md)
+is in progress on `task/desktop-startup-lifecycle`, based on the actual handoff feature.
+Independent critique approved owning pending startup, cancelling and joining it on quit, guarding
+late publication, and confirming child close plus log completion before app exit. Fixture cleanup
+now requires bounded, safe shutdown evidence. The original startup timeout's sole cause remains
+unproven: synchronous asset preparation and host resource pressure are possible contributors.
+Readiness deadlines, security policy, real VM assertions and asset-copy behavior are unchanged.
+
+Local verification passed all 174 desktop unit tests and all 19 signed-runtime packaged VM
+journeys on their first attempts (zero skips or retries, 8.4 minutes), plus the separate previously
+failing direct-write Block case. Production API/renderer/desktop builds, desktop lint/typecheck,
+direct Markdown and formatting pass. Independent final source, full-suite evidence and diagnostic review approved the repair with no
+actionable findings. Ten safe reports are durable/verified with zero pending/dropped events and
+no truncation; existing lineage limitations remain tracked separately. Full publication/readback
+receipts are recorded in Beads and the evidence directory. All new hosted qualification and both
+staging merges remain pending.
+These local results do not establish the original startup timeout's sole cause.
+
+PR322's first pushed source `f9934ee6` then failed Sonar on six maintainability findings.
+The scoped repair preserves strict phase parsing and sequential, cancellable readiness while
+removing the flagged complexity, sorting and collection patterns. No rule suppression or timeout
+increase is used. The earlier local 19-case pass is retained separately from this repair's affected
+verification; fresh exact-head hosted qualification remains mandatory before either staging merge.
+All eight changed source/test files passed independent review. The correction passes 55 focused
+tests and two connected Electron journeys using the signed runtime (real-VM approved shell command
+and pre-execution direct-write Block), both first attempt with zero skips, plus desktop
+build/typecheck/lint. Full fresh hosted gates remain pending.
+
+Next: finish and deliver the reviewed repair into the existing handoff feature, then requalify
+PR321 with genuine full scans, clean connected tests and all current protections/reviews. Only
+then merge the actual qualified staging revision into a reviewed d185 integration task, preserving
+both handoff histories and the new lifecycle source, and qualify its separate staging promotion.
+`agent-platform-local-mvp-promotion` owns the final staging verification and branch cleanup.
+Keep the d185 diagnostic/navigation/export follow-ups open; they are outside this lifecycle repair.
+
+Evidence: `/Users/letuscode/.codex/local-mvp-promotion-20261014`, including independently verified
+`critic-pr321/independent-qualification-failed-vm.json`. Beads is authoritative for current status;
+all previous handoffs below are retained historical context, not new approval or launch gates.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — reply fix delivered; next local MVP priority, 13 October 2026
+
+## Completed development baseline
+
+[PR315](https://github.com/jwill9999/agent-platform/pull/315) merged into protected `staging`
+at `1e4bd7af30b092cc9a2d795e9c022ebfd5212176`. Its tree
+`229d777b5056ff56f753e9fe9cfdfea82b4b2664` matches reviewed feature head `a9bcb302`.
+All 15 executed checks passed, with no unresolved review threads or blocking reviews.
+Electron passed 55 tests without flaky retries; the actual packaged macOS VM suite passed 19.
+Browser passed 30 with one existing environment-dependent skip; the 15-package verification
+passed 3,005 tests with 77 existing optional skips. Both full security scans completed actual
+analysis; Sonar reported zero open issues and scoped CodeQL had no open alerts.
+The nine-sample diagnostics benchmark passed unchanged 20ms/2ms bounds.
+Independent source and evidence review approved delivery. Sourcery's optional size/budget skip
+and ordinary scanner coverage limitations remain disclosed in the verification record.
+
+`agent-platform-sizx` and `agent-platform-diagnostic-export-file-read` are closed and Dolt-synced.
+Six delivered chat-reply local/remote branches were removed after seven recovery tags were pushed
+and read back. Main and the four paused orchestration remote branches remain unchanged; PR283
+remains open as a draft. Primary and paused dirty checkouts were preserved, including the explicitly
+recorded Beads status-journal appends. Staging is the local development baseline, not a distribution
+release; checkout-free export, signing/notarization and wider distribution architecture remain phase two.
+
+Final receipts: `/Users/letuscode/.codex/chat-reply-implementation-20261013/pr315-completion.json`,
+`pr315-staging-merge.json`, `pr315-delivered-branch-cleanup.json`, and
+`pr315-final-closure-preservation.json` in the same directory. Durable implementation evidence:
+[reply verification](docs/reviews/chat-reply-reliability.md).
+
+## Recommended next discussion
+
+The owner requested a backlog review and recommendation, not another implementation launch.
+Beads remains authoritative; the following is a dated recommendation, not a second task tracker.
+
+1. **Recommend first: `agent-platform-d185` — keep the API responsive during GitHub checks.**
+   Current staging still uses synchronous GitHub CLI calls in the Project checks/PR read paths.
+   Existing evidence records GitHub checks taking 1.47–5.35 seconds and a separate Personal-session
+   creation completing after 4.44 seconds amid Project requests. A fixture with its own local Git
+   root avoided unintended live-remote coupling. These observations support the responsiveness
+   investigation, but do not prove the sole cause of every historical timeout.
+   A bounded next plan should cover asynchronous, time/output-bounded read-side GitHub operations,
+   preserve repository/ref identity and credential/process validation, and prove chat, health and
+   diagnostic export remain responsive during slow/unavailable checks. Inventory adjacent PR reads
+   before agreeing scope; do not expand this into a rewrite of all Git operations or UI.
+2. **Then `agent-platform-est0` — make keyless Ollama selection work consistently.**
+   The API accepts default Ollama configurations without keys, but an explicit chat model selection
+   still rejects every configuration without `hasApiKey`. This is a small local-model usability win;
+   keyed providers must retain credential validation. No provider installation or product fix ran here.
+3. **Next larger feature: `agent-platform-ii1` — complete the everyday Git workflow.**
+   Reconcile delivered code with older tickets, then select one useful commit → push → PR slice.
+   `agent-platform-0ra` already records an implementation commit and a stale dependency hold;
+   `agent-platform-4hm` remains open. Do not assume either needs rewriting from its status alone.
+
+The direct-file policy ticket also retains an old pre-merge note despite PR271 being merged and its
+merge commit being an ancestor of current staging. Reconcile acceptance/delivery separately before
+changing its status; this review does not establish a new permission defect or close that task.
+Existing observability/export and initial-session-draft follow-ups remain open. No broad backlog
+reprioritization, release activation, paid calls or paused prototype resumption occurred.
+
+## This documentation delivery
+
+Tracking: [agent-platform-local-mvp-handoff](docs/tasks/agent-platform-local-mvp-handoff.md).
+The update is on `task/local-mvp-handoff`, based on `feature/local-mvp-handoff` at the verified staging
+commit above. It needs its own reviewed documentation integration; the previous reply-feature merge
+does not contain this later handoff. Publication/check outcomes and current delivery state are recorded
+in Beads and `/Users/letuscode/.codex/local-mvp-handoff-20261013`.
+
+Everything below is retained historical context. Its pending work and earlier authorization wording
+are superseded by the current handoff and live Beads; do not repeat completed reply deliveries.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — complete diagnostic reads before staging, 13 October 2026
 
 PR317 has merged into `feature/chat-reply-reliability` at `f5fdb464`, tree `efc52d6b`,
