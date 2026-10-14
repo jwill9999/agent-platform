@@ -1,6 +1,7 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 
 test.use({ trace: 'on' });
 const apiURL = process.env.API_URL ?? 'http://127.0.0.1:3000';
@@ -17,6 +18,18 @@ test('Docker Project reviews local Git delivery, rejects stale index and remembe
   request,
 }, testInfo) => {
   test.setTimeout(120_000);
+  let rateLimitRemaining = Number.POSITIVE_INFINITY;
+  let rateLimitResetAt = 0;
+  page.on('response', (response) => {
+    if (!response.url().includes('/api/v1/')) return;
+    const header = response.headers()['ratelimit'];
+    const remaining = header?.match(/remaining=(\d+)/)?.[1];
+    const reset = header?.match(/reset=(\d+)/)?.[1];
+    if (remaining !== undefined && reset !== undefined) {
+      rateLimitRemaining = Number(remaining);
+      rateLimitResetAt = Date.now() + Number(reset) * 1000;
+    }
+  });
   // Never discover or modify an arbitrary local user's running stack.
   const container =
     process.env.GIT_DELIVERY_API_CONTAINER ??
@@ -144,6 +157,17 @@ test('Docker Project reviews local Git delivery, rejects stale index and remembe
       .getByRole('button', { name: 'Review unstage' })
       .click();
     await confirm(panel, 'Unstage selected files');
+    // This dense fixture performs many human review flows within seconds. Respect the real
+    // server's advertised request budget before the next phase instead of changing its policy.
+    if (rateLimitRemaining < 80) {
+      const resetWaitMs = Math.max(0, rateLimitResetAt - Date.now()) + 100;
+      expect(resetWaitMs).toBeLessThanOrEqual(61_000);
+      await testInfo.attach('request-budget-pacing', {
+        body: JSON.stringify({ remaining: rateLimitRemaining, resetWaitMs }),
+        contentType: 'application/json',
+      });
+      await delay(resetWaitMs);
+    }
     await panel.getByPlaceholder('Commit message').fill('test: reviewed local delivery');
     await panel.getByRole('button', { name: 'Review commit', exact: true }).click();
     const commitReview = panel.getByRole('region', { name: 'Commit reviewed files', exact: true });
@@ -270,10 +294,13 @@ test('Docker Project reviews local Git delivery, rejects stale index and remembe
     if (primaryError && cleanupErrors.length)
       throw new AggregateError(
         [primaryError, ...cleanupErrors],
-        'Git delivery journey and cleanup failed',
+        `Git delivery journey and cleanup failed:\n${[primaryError, ...cleanupErrors].map((error) => (error instanceof Error ? error.message : String(error))).join('\n')}`,
       );
     if (primaryError) throw primaryError;
     if (cleanupErrors.length)
-      throw new AggregateError(cleanupErrors, 'Owned Git delivery cleanup failed');
+      throw new AggregateError(
+        cleanupErrors,
+        `Owned Git delivery cleanup failed:\n${cleanupErrors.map((error) => (error instanceof Error ? error.message : String(error))).join('\n')}`,
+      );
   }
 });
