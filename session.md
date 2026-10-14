@@ -1,3 +1,31 @@
+## Current handoff: diagnostics fixture readiness — 14 October 2026
+
+PR325 is merged into `feature/github-read-responsiveness` at `5d938b98`, completing the
+independently reviewed port repair after all nine executed feature checks passed. Its full
+source-bound documentation mirrors and Beads close/readback/sync are complete. The older
+pending statements below are retained historical snapshots.
+
+PR324 at that new head passed full scans, actual packaged VM (19 first-attempt cases), Electron
+(58 first-attempt cases), browser (31 passes and one existing prerequisite skip) and other quality
+checks, but verify failed a restart report read and one benchmark comparison. No staging merge or
+cleanup has occurred; staging remains `2a848b9a`. Original failures and independent qualification
+receipts are retained under `/Users/letuscode/.codex/local-mvp-promotion-20261014`.
+
+The bounded [diagnostics fixture readiness repair](docs/tasks/agent-platform-diagnostics-fixture-readiness.md)
+waits for storage readiness through the authenticated list endpoint before the existing single
+report assertions. Actual restart tests and the unchanged benchmark pass locally; independent source, evidence and
+documentation review approved the bounded repair without findings. Full mirrors and new hosted
+qualification remain pending. Runtime deadlines, benchmark
+limits and report assertions are unchanged. The original 503 cause and benchmark scheduling
+hypothesis are not represented as proven. Do not merge using stale successful checks.
+
+The parent `agent-platform-local-mvp-promotion` stays in progress. Owner-approved Git delivery MVP
+implementation is active in its separate worktree/branches; preserve it during any cleanup.
+Main, PR283, paused orchestration and unrelated dirty work remain separate. All following handoffs
+are complete dated historical snapshots, superseded by this header and live Beads/evidence.
+
+---
+
 ## Current handoff: desktop fixture port repair — 14 October 2026
 
 The d185 staging promotion PR324 is blocked by an independently confirmed first-attempt Electron
