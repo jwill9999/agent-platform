@@ -1,0 +1,7 @@
+# Isolated connected-test stack only; no shared API environment mutation.
+services:
+  api:
+    environment:
+      AGENT_PLATFORM_GH_BINARY: /opt/github-read-fixture/github-read-cli.mjs
+    volumes:
+      - ./e2e/support/github-read-cli.mjs:/opt/github-read-fixture/github-read-cli.mjs:ro

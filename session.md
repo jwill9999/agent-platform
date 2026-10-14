@@ -1,3 +1,76 @@
+# Session handoff — d185 implementation, 14 October 2026
+
+The owner approved the bounded GitHub-read responsiveness plan and implementation using Beads,
+the implementation skill, independent critique, browser/Electron/diagnostic checks and task PR merge
+only after actual current-head pipelines pass and review comments resolve.
+
+- Active Beads: `agent-platform-d185`, in progress. Runtime branch
+  `task/github-read-responsiveness`, followed by `task/github-read-verification`; destination
+  `feature/github-read-responsiveness`. Planning source `d105afce` remains retained.
+- Implemented async bounded checks/PR-list reads, captured/rechecked identity, read-only cancellation,
+  and safe post-create enrichment. Existing write operations/security policies remain intact.
+- Local API/helper/macOS/Linux and managed Chromium/Electron evidence is recorded in
+  [the review/results record](docs/reviews/github-read-responsiveness.md). Baseline blocking reproduced;
+  fixed probes completed before held child release. Docker and full API regression pass. All three fresh trace-safe managed journeys and four existing context/reply fixture regressions
+  pass. Full archive credential checks pass. Runtime source is pushed at `b0b05939`; no feature merge is claimed yet.
+- PR320 is open into the feature. Five full Notion mirrors were verified at `17269698`, with
+  changed-document readbacks at `6f53fe74` and `e9f7e5a8`. Hosted link/fixture findings GR-H01/H02
+  are repaired and Sonar/Lychee pass. GR-H03 tracks a Project navigation reversion separately as
+  `agent-platform-b5y4`; its cause and relationship to changed read timing are unproven. Final
+  Electron qualification requires all 58 tests passing without retries. GR-H04 fixes the Docker
+  journey's disabled Refresh sequencing after both hosted attempts correctly failed the
+  before-release assertion. Source review approves the bounded tab-navigation repair; fresh local
+  Docker verification passes first attempt in 4.7 seconds with preserved overlap proof. Final hosted
+  verification, updated mirrors and preservation remain required before merge.
+- GR-H05 identified a PR-create test that triggered overlapping reads before loading completed.
+  The fixture now awaits visible readiness and actual request completion; all three affected
+  Electron Git workflow tests pass first attempt. Rapid navigation can still meet the approved
+  four-read limit and show a temporary busy response. `agent-platform-lowe` tracks cancellation
+  of obsolete UI reads separately; no concurrency limit or deadline was relaxed.
+- GR-H06 records an intermittent failed diagnostic export in the existing Chromium reply journey
+  at `26754446`: 57 Electron passes plus one retry despite a green badge. `agent-platform-odgi`
+  retains the incident; its cause remains unknown. Safe response/download observation now passes
+  a focused real-export and controlled503 proof, including listener cleanup and safe error metadata. This is fixture containment,
+  not a claimed runtime fix. Final delivery still requires all 58 Electron tests passing first
+  attempt, alongside current browser, diagnostics, quality and review gates.
+- Diagnostic follow-up `agent-platform-9wqs` records existing approval-resume lineage that leaves
+  honest prior-process unfinished warnings after restart. Effects, audit/message persistence and
+  diagnostic retention pass independently; no automatic replay or hidden warning was introduced.
+- Paused PR283/orchestration refs and dirty primary/unrelated worktrees stay separate. PR319 is an
+  independent documentation handoff, not this task's prerequisite. No main or staging promotion is
+  authorized by this implementation handoff; staging requires the separate protected delivery grant.
+
+Canonical plan: [bounded d185 plan](docs/planning/github-read-responsiveness.md).
+Task and requirements: [d185](docs/tasks/agent-platform-d185.md).
+Verification: [GR-T01–GR-T10](docs/testing/github-read-responsiveness.md).
+Full source-bound mirrors/readbacks and Beads sync are required at delivery. The previous planning
+and completed-feature handoffs are retained verbatim below as historical records.
+
+---
+
+<!-- markdownlint-disable MD025 MD024 MD029 MD013 -->
+
+# Current handoff — GitHub read responsiveness planning, 14 October 2026
+
+The owner selected `agent-platform-d185` for planning only, with independent critique before
+implementation. The [bounded plan](docs/planning/github-read-responsiveness.md),
+[task spec](docs/tasks/agent-platform-d185.md), [verification contract](docs/testing/github-read-responsiveness.md)
+and [review record](docs/reviews/github-read-responsiveness.md) define the current proposal.
+No implementation or merge is authorized yet; product verification has not run.
+
+The reply fix is already delivered in staging `1e4bd7af30b092cc9a2d795e9c022ebfd5212176` via PR315.
+The later general handoff update is separately pushed at161ebfd3 in PR319, not incorporated by this
+planning branch. Preserve that history on eventual integration; no dependency on its pending merge.
+Planning branches are feature/github-read-responsiveness → task/github-read-responsiveness-plan
+from actual staging1e4bd7af. Existing paused orchestration and unrelated worktrees remain untouched.
+
+Proposed scope: async/bounded checks and PR-list reads, caller/identity safety and actual concurrent
+chat/diagnostic evidence. Git writes, broader workflow UI, dashboards, distribution and paused
+orchestration are excluded. The plan and critic record carry current status; all historical
+implementation-ready/pending-merge wording below belongs to its own dated delivery, not d185.
+
+## Retained previous handoff
+
 # Current handoff — complete diagnostic reads before staging, 13 October 2026
 
 PR317 has merged into `feature/chat-reply-reliability` at `f5fdb464`, tree `efc52d6b`,
