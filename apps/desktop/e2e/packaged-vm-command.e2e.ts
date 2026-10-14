@@ -840,14 +840,20 @@ async function cleanupFixtureResources(
 
 async function closeVmFixtureApp(fixture: VmFixture, app?: ElectronApplication): Promise<void> {
   const info = test.info();
-  const attached = await attemptStartupEvidenceAttachment(() =>
-    info.attach('startup-evidence', {
-      body: Buffer.from(JSON.stringify(fixture.startup.snapshot(), null, 2)),
-      contentType: 'application/json',
-    }),
-  );
-  if (!attached) failedStartupAttachments.add(info);
-  await app?.close();
+  try {
+    await app?.close();
+    if (app && !fixture.startup.shutdownConfirmed()) {
+      throw new Error('Managed desktop shutdown unverified; fixture retained');
+    }
+  } finally {
+    const attached = await attemptStartupEvidenceAttachment(() =>
+      info.attach('startup-evidence', {
+        body: Buffer.from(JSON.stringify(fixture.startup.snapshot(), null, 2)),
+        contentType: 'application/json',
+      }),
+    );
+    if (!attached) failedStartupAttachments.add(info);
+  }
 }
 
 async function configureJourneyModel(fixture: VmFixture): Promise<void> {

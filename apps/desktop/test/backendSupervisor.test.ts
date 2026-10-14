@@ -23,6 +23,7 @@ import {
   resolveDesktopBackendNodePath,
   resolveDesktopBackendMode,
   waitForBackendReady,
+  startDesktopBackend,
 } from '../src/main/backendSupervisor.js';
 import type { DesktopRuntimePaths } from '../src/main/runtimePaths.js';
 
@@ -394,5 +395,103 @@ describe('desktop backend supervisor helpers', () => {
     await expect(
       waitForBackendReady(readyUrl, 1_000, { exitCode: null }, () => new Error('spawn ENOENT')),
     ).rejects.toThrow('Desktop backend failed to start: spawn ENOENT');
+  });
+});
+
+describe('managed backend startup cleanup', () => {
+  it('cancels an actual child during readiness without publishing a handle', async () => {
+    const root = makeTempRepo();
+    const paths = getDesktopBackendPaths(root, makeRuntimePaths(root));
+    mkdirSync(join(root, 'apps/api/dist'), { recursive: true });
+    writeFileSync(paths.apiEntry, 'setInterval(() => {}, 1000);');
+    const controller = new AbortController();
+    const phases: string[] = [];
+    await expect(
+      startDesktopBackend({
+        paths,
+        nodePath: process.execPath,
+        env: {
+          AGENT_PLATFORM_COMMAND_RUNNER: 'disabled',
+          AGENT_PLATFORM_DESKTOP_BACKEND_PORT: '0',
+        },
+        signal: controller.signal,
+        onPhase: (phase) => {
+          phases.push(phase);
+          if (phase === 'backend-spawn') controller.abort();
+        },
+      }),
+    ).rejects.toHaveProperty('name', 'AbortError');
+    expect(phases).toEqual(['assets-before', 'assets-after', 'backend-spawn']);
+  });
+
+  it('cleans up missing executable and early signal-only exit', async () => {
+    const root = makeTempRepo();
+    const paths = getDesktopBackendPaths(root, makeRuntimePaths(root));
+    mkdirSync(join(root, 'apps/api/dist'), { recursive: true });
+    writeFileSync(paths.apiEntry, "process.kill(process.pid, 'SIGTERM');");
+    await expect(
+      startDesktopBackend({
+        paths,
+        nodePath: join(root, 'missing-node'),
+        env: {
+          AGENT_PLATFORM_COMMAND_RUNNER: 'disabled',
+          AGENT_PLATFORM_DESKTOP_BACKEND_PORT: '0',
+        },
+      }),
+    ).rejects.toThrow('failed to start');
+    await expect(
+      startDesktopBackend({
+        paths,
+        nodePath: process.execPath,
+        env: {
+          AGENT_PLATFORM_COMMAND_RUNNER: 'disabled',
+          AGENT_PLATFORM_DESKTOP_BACKEND_PORT: '0',
+        },
+      }),
+    ).rejects.toThrow('exited before becoming ready');
+  });
+});
+
+describe('sequential backend readiness attempts', () => {
+  it('waits for each probe before retrying and eventually accepts readiness', async () => {
+    let active = 0;
+    let maximumActive = 0;
+    let probes = 0;
+    const server = createServer((_request, response) => {
+      probes += 1;
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      setTimeout(() => {
+        response.writeHead(probes < 3 ? 503 : 200);
+        response.end();
+        active -= 1;
+      }, 15);
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Expected TCP listener.');
+    await waitForBackendReady(`http://127.0.0.1:${address.port}`, 2_000, { exitCode: null });
+    expect(probes).toBe(3);
+    expect(maximumActive).toBe(1);
+  });
+
+  it('retains the original deadline and cancels a pending retry', async () => {
+    const url = await startReadyServer(503);
+    await expect(waitForBackendReady(url, 1, { exitCode: null })).rejects.toThrow('Timed out');
+    const controller = new AbortController();
+    const pending = waitForBackendReady(
+      url,
+      2_000,
+      { exitCode: null },
+      undefined,
+      controller.signal,
+    );
+    const cancel = setTimeout(() => controller.abort(), 25);
+    try {
+      await expect(pending).rejects.toHaveProperty('name', 'AbortError');
+    } finally {
+      clearTimeout(cancel);
+    }
   });
 });
