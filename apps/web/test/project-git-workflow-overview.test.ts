@@ -7,6 +7,8 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  withCompleteGitIndex,
+  selectedGitChangePaths,
   defaultRepositoryName,
   deriveGitPullRequestCreateState,
   deriveGitPublishState,
@@ -895,5 +897,34 @@ describe('Git panel loading and diff guards', () => {
         },
       }),
     ).toBe(true);
+  });
+});
+
+describe('complete index and literal rename review', () => {
+  it('exposes Commit and overview guidance when only a filtered path is staged', () => {
+    const full = withCompleteGitIndex(cleanStatus, 1);
+    expect(deriveGitWorkflowTabs({ status: full })).toContainEqual({
+      id: 'commit',
+      label: 'Commit',
+      badge: 1,
+    });
+    expect(deriveGitWorkflowOverview({ status: full }).primaryAction?.tab).toBe('commit');
+    expect(full.workingTree.total).toBe(0);
+    expect(cleanStatus.workingTree.staged).toBe(0);
+  });
+  it('reviews both literal endpoints of a rename without expanding ordinary paths', () => {
+    const renamed = {
+      path: 'new\nname.txt',
+      originalPath: 'old name.txt',
+      status: 'renamed' as const,
+      indexStatus: 'R',
+      worktreeStatus: ' ',
+      staged: true,
+      unstaged: false,
+    };
+    expect(selectedGitChangePaths(renamed)).toEqual(['old name.txt', 'new\nname.txt']);
+    expect(selectedGitChangePaths({ ...renamed, originalPath: renamed.path })).toEqual([
+      'new\nname.txt',
+    ]);
   });
 });

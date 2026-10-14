@@ -445,7 +445,7 @@ describe('projectsRouter', () => {
     });
   });
 
-  it('lists changed files, returns diffs, and stages/unstages Project Git changes', async () => {
+  it('lists changed files and diffs but rejects legacy unreviewed Git mutations', async () => {
     const repoDir = path.join(tmpDir, 'desktop-git-changes-repo');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
     execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
@@ -516,59 +516,30 @@ describe('projectsRouter', () => {
     expect(untrackedDiff.body.data.diff).toContain('--- /dev/null');
     expect(untrackedDiff.body.data.diff).toContain('+untracked');
 
-    const staged = await request(app)
-      .post(`/v1/projects/${projectId}/git/stage`)
-      .send({ paths: ['README.md'] })
-      .expect(200);
-    expect(staged.body.data.files).toEqual(
-      expect.arrayContaining([expect.objectContaining({ path: 'README.md', staged: true })]),
-    );
-
-    const unstaged = await request(app)
-      .post(`/v1/projects/${projectId}/git/unstage`)
-      .send({ paths: ['README.md'] })
-      .expect(200);
-    expect(unstaged.body.data.files).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ path: 'README.md', staged: false, unstaged: true }),
-      ]),
-    );
-
-    const stageAll = await request(app)
-      .post(`/v1/projects/${projectId}/git/stage`)
-      .send({ all: true })
-      .expect(200);
-    expect(stageAll.body.data.workingTree.staged).toBe(3);
+    for (const [route, body] of [
+      ['stage', { paths: ['README.md'] }],
+      ['unstage', { paths: ['README.md'] }],
+      ['stage', { all: true }],
+      ['commit', { message: 'unreviewed mutation' }],
+    ] as const) {
+      const response = await request(app)
+        .post(`/v1/projects/${projectId}/git/${route}`)
+        .send(body)
+        .expect(410);
+      expect(response.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
+    }
     expect(
-      execFileSync(GIT_BINARY, ['status', '--porcelain=v1', '--', '.agent-platform'], {
+      execFileSync(GIT_BINARY, ['diff', '--cached', '--name-only'], {
         cwd: repoDir,
         encoding: 'utf8',
       }).trim(),
-    ).toBe('?? .agent-platform/');
-
-    const committed = await request(app)
-      .post(`/v1/projects/${projectId}/git/commit`)
-      .send({ message: 'update project docs' })
-      .expect(200);
-
-    expect(committed.body.data).toMatchObject({
-      available: true,
-      clean: true,
-      recentCommit: expect.objectContaining({
-        subject: 'update project docs',
-        authorName: 'Test User',
-      }),
-      workingTree: expect.objectContaining({
-        total: 0,
-        staged: 0,
-      }),
-    });
+    ).toBe('');
     expect(
       execFileSync(GIT_BINARY, ['log', '-1', '--format=%s'], {
         cwd: repoDir,
         encoding: 'utf8',
       }).trim(),
-    ).toBe('update project docs');
+    ).toBe('initial');
   });
 
   it('stashes selected Project Git files and validates repository-relative paths', async () => {

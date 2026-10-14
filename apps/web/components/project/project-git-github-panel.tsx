@@ -33,6 +33,8 @@ import {
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { GitDeliveryReceiptControl } from './git-delivery-receipt';
+import { useGitDelivery } from '@/lib/useGitDelivery';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -582,6 +584,23 @@ function getNoGithubRemoteOverview(status: ProjectGitStatusResult): GitWorkflowO
       'This repository has no GitHub remote configured, so pull requests and GitHub checks are unavailable.',
     tone: 'neutral',
   };
+}
+
+export function withCompleteGitIndex(
+  status: ProjectGitStatusResult,
+  stagedCount: number,
+): ProjectGitStatusResult {
+  return {
+    ...status,
+    clean: status.clean && stagedCount === 0,
+    workingTree: { ...status.workingTree, staged: stagedCount },
+  };
+}
+
+export function selectedGitChangePaths(file: ProjectGitChangedFile): string[] {
+  return file.originalPath && file.originalPath !== file.path
+    ? [file.originalPath, file.path]
+    : [file.path];
 }
 
 export function deriveGitWorkflowOverview({
@@ -2393,6 +2412,7 @@ export function ProjectGitHubPanel({
   isStartingProjectInstructions = false,
   onStartProjectInstructions,
 }: ProjectGitHubPanelProps) {
+  const delivery = useGitDelivery(projectId);
   const [open, setOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
   const [preferredTab, setPreferredTab] = useState<PanelTab | null>(null);
@@ -2700,6 +2720,7 @@ export function ProjectGitHubPanel({
 
   const refreshGitViews = useCallback(async () => {
     await Promise.all([
+      delivery.refresh(),
       loadStatus(),
       loadChanges(),
       activeTab === 'prs' || activeTab === 'overview' ? loadPullRequests() : null,
@@ -2709,6 +2730,7 @@ export function ProjectGitHubPanel({
   }, [
     activeTab,
     conflictResolverOpen,
+    delivery.refresh,
     loadChanges,
     loadChecks,
     loadConflicts,
@@ -2719,60 +2741,25 @@ export function ProjectGitHubPanel({
 
   const stagePaths = useCallback(
     async (paths: string[] | 'all') => {
-      if (!projectId) return;
-      setActionPending(paths === 'all' ? 'stage-all' : `stage:${paths.join('\0')}`);
-      try {
-        const next = await apiPost<ProjectGitChangesResult>(
-          apiPath('projects', projectId, 'git', 'stage'),
-          paths === 'all' ? { all: true } : { paths },
-        );
-        setChanges(next ?? null);
-        setChangesProjectId(projectId);
-        setSelectedChange((current) =>
-          current && next
-            ? (next.files.find((file) => file.path === current.path) ?? null)
-            : current,
-        );
-        if (paths !== 'all') setSelectedDiffMode('staged');
-        setChangesError(null);
-        await loadStatus();
-      } catch (cause) {
-        setChangesError(cause instanceof ApiRequestError ? cause.message : 'Failed to stage file.');
-      } finally {
-        setActionPending(null);
-      }
+      if (!projectId || changesProjectId !== projectId) return;
+      const selected =
+        paths === 'all'
+          ? (changes?.files
+              .filter((file) => file.unstaged || file.status === 'untracked')
+              .flatMap(selectedGitChangePaths) ?? [])
+          : paths;
+      if (selected.length === 0) return;
+      await delivery.prepare({ kind: 'stage', mode: 'stage', paths: selected });
     },
-    [loadStatus, projectId],
+    [changes, changesProjectId, delivery.prepare, projectId],
   );
 
   const unstagePaths = useCallback(
     async (paths: string[]) => {
-      if (!projectId) return;
-      setActionPending(`unstage:${paths.join('\0')}`);
-      try {
-        const next = await apiPost<ProjectGitChangesResult>(
-          apiPath('projects', projectId, 'git', 'unstage'),
-          { paths },
-        );
-        setChanges(next ?? null);
-        setChangesProjectId(projectId);
-        setSelectedChange((current) =>
-          current && next
-            ? (next.files.find((file) => file.path === current.path) ?? null)
-            : current,
-        );
-        setSelectedDiffMode('unstaged');
-        setChangesError(null);
-        await loadStatus();
-      } catch (cause) {
-        setChangesError(
-          cause instanceof ApiRequestError ? cause.message : 'Failed to unstage file.',
-        );
-      } finally {
-        setActionPending(null);
-      }
+      if (!projectId || paths.length === 0) return;
+      await delivery.prepare({ kind: 'stage', mode: 'unstage', paths });
     },
-    [loadStatus, projectId],
+    [delivery.prepare, projectId],
   );
 
   const stashPaths = useCallback(
@@ -2807,40 +2794,32 @@ export function ProjectGitHubPanel({
   );
 
   const commitStagedChanges = useCallback(async () => {
-    if (!projectId) return;
-    const message = commitMessage.trim();
-    if (!message) {
-      setChangesError('Enter a commit message before committing staged changes.');
-      return;
-    }
-    setActionPending('commit');
-    try {
-      const nextStatus = await apiPost<ProjectGitStatusResult>(
-        apiPath('projects', projectId, 'git', 'commit'),
-        { message },
-      );
-      setStatus(nextStatus ?? null);
-      setStatusProjectId(projectId);
-      setCommitMessage('');
-      setCommitSuccess(
-        nextStatus?.recentCommit
-          ? `Committed ${shortSha(nextStatus.recentCommit.sha)}: ${nextStatus.recentCommit.subject}`
-          : 'Commit completed.',
-      );
-      setPushSuccess(null);
-      setPreferredTab('push');
-      setActiveTab('push');
-      setSelectedChange(null);
-      setDiff(null);
-      setSelectedDiffMode('unstaged');
-      setChangesError(null);
-      await loadChanges();
-    } catch (cause) {
-      setChangesError(cause instanceof ApiRequestError ? cause.message : 'Failed to commit files.');
-    } finally {
-      setActionPending(null);
-    }
-  }, [commitMessage, loadChanges, projectId]);
+    if (!projectId || !commitMessage.trim() || delivery.stagedPaths.length === 0) return;
+    await delivery.prepare({
+      kind: 'commit',
+      message: commitMessage.trim(),
+      paths: delivery.stagedPaths,
+    });
+  }, [commitMessage, delivery.prepare, delivery.stagedPaths, projectId]);
+
+  const executeDelivery = useCallback(
+    async (id: string) => {
+      const receipt = await delivery.perform(id, 'execute');
+      if (!receipt) return;
+      if (receipt?.state === 'succeeded' && receipt.action.kind === 'commit') {
+        setCommitMessage('');
+        setCommitSuccess(
+          `Committed ${receipt.result?.commitSha ?? 'reviewed changes'}: ${receipt.action.message}`,
+        );
+        setPreferredTab('push');
+        setActiveTab('push');
+        setSelectedChange(null);
+        setDiff(null);
+      }
+      await refreshGitViews();
+    },
+    [delivery.perform, refreshGitViews],
+  );
 
   const pushCurrentBranch = useCallback(async () => {
     if (!projectId) return;
@@ -3182,8 +3161,12 @@ export function ProjectGitHubPanel({
   const currentChecks = checksProjectId === projectId ? checks : null;
   const currentPullRequests = pullRequestsProjectId === projectId ? pullRequests : null;
   const currentBranches = branchesProjectId === projectId ? branches : null;
+  const workflowStatus = useMemo(
+    () => withCompleteGitIndex(currentStatus, delivery.stagedPaths.length),
+    [currentStatus, delivery.stagedPaths.length],
+  );
   const workflowOverview = deriveGitWorkflowOverview({
-    status: currentStatus,
+    status: workflowStatus,
     pullRequests: currentPullRequests,
     checks: currentChecks,
   });
@@ -3233,12 +3216,12 @@ export function ProjectGitHubPanel({
   const tabs = useMemo(
     () =>
       deriveGitWorkflowTabs({
-        status: currentStatus,
+        status: workflowStatus,
         pullRequests: currentPullRequests,
         checks: currentChecks,
         pushSuccess,
       }),
-    [currentChecks, currentPullRequests, currentStatus, pushSuccess],
+    [currentChecks, currentPullRequests, workflowStatus, pushSuccess],
   );
   const conflictFiles = conflicts?.files ?? [];
   const unresolvedConflictFiles = conflictFiles.filter((file) => !file.resolved);
@@ -3464,6 +3447,58 @@ export function ProjectGitHubPanel({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 text-sm">
+              {delivery.error && <p role="alert">{delivery.error}</p>}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={delivery.pending}
+                onClick={() => runAsyncAction(delivery.refresh)}
+              >
+                Refresh Git operations
+              </Button>
+              {delivery.operations.length > 0 && (
+                <label>
+                  Git operation
+                  <select
+                    aria-label="Git operation"
+                    value={delivery.selected?.id ?? ''}
+                    onChange={(event) => delivery.select(event.target.value)}
+                  >
+                    {delivery.operations.map((operation) => (
+                      <option key={operation.id} value={operation.id}>
+                        {operation.action.kind} — {operation.state} — {operation.id.slice(0, 8)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {delivery.selected && (
+                <GitDeliveryReceiptControl
+                  receipt={delivery.selected}
+                  nowMs={Date.now()}
+                  pending={delivery.pending}
+                  unverified={delivery.unverifiedIds.includes(delivery.selected.id)}
+                  onConfirm={(id) => runAsyncAction(() => executeDelivery(id))}
+                  onCancel={(id) =>
+                    runAsyncAction(async () => {
+                      await delivery.perform(id, 'cancel');
+                    })
+                  }
+                  onReconcile={(id) =>
+                    runAsyncAction(async () => {
+                      await delivery.perform(id, 'reconcile');
+                      await refreshGitViews();
+                    })
+                  }
+                  onAcknowledge={(id) =>
+                    runAsyncAction(async () => {
+                      await delivery.perform(id, 'acknowledge');
+                    })
+                  }
+                  onDelete={(id) => runAsyncAction(() => delivery.remove(id))}
+                />
+              )}
+
               {error && (
                 <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   {error}
@@ -3791,7 +3826,9 @@ export function ProjectGitHubPanel({
                               type="button"
                               size="sm"
                               onClick={() =>
-                                runAsyncAction(() => stagePaths([selectedChange.path]))
+                                runAsyncAction(() =>
+                                  stagePaths(selectedGitChangePaths(selectedChange)),
+                                )
                               }
                               disabled={actionPending !== null}
                             >
@@ -3821,7 +3858,9 @@ export function ProjectGitHubPanel({
                               size="sm"
                               variant="outline"
                               onClick={() =>
-                                runAsyncAction(() => unstagePaths([selectedChange.path]))
+                                runAsyncAction(() =>
+                                  unstagePaths(selectedGitChangePaths(selectedChange)),
+                                )
                               }
                               disabled={actionPending !== null}
                             >
@@ -3854,10 +3893,28 @@ export function ProjectGitHubPanel({
               {!statusLoading && currentStatus.available && activeTab === 'commit' && (
                 <GitCard title="Commit">
                   <div className="space-y-3">
+                    <div>
+                      <strong>Complete staged index</strong>
+                      <ul aria-label="Complete staged index">
+                        {delivery.stagedPaths.map((path) => (
+                          <li key={path} className="whitespace-pre-wrap break-all">
+                            {path}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              disabled={delivery.pending}
+                              onClick={() => runAsyncAction(() => unstagePaths([path]))}
+                            >
+                              Review unstage
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                     {changesLoading && (
                       <div className="text-xs text-muted-foreground">Loading staged files...</div>
                     )}
-                    {stagedFiles.length === 0 && (
+                    {delivery.stagedPaths.length === 0 && (
                       <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
                         No staged files are ready to commit. Go back to Changes to choose files.
                       </div>
@@ -3895,7 +3952,11 @@ export function ProjectGitHubPanel({
                         value={commitMessage}
                         onChange={(event) => setCommitMessage(event.target.value)}
                         placeholder="Commit message"
-                        disabled={stagedFiles.length === 0 || actionPending !== null}
+                        disabled={
+                          delivery.stagedPaths.length === 0 ||
+                          actionPending !== null ||
+                          delivery.pending
+                        }
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' && !event.shiftKey) {
                             event.preventDefault();
@@ -3907,13 +3968,14 @@ export function ProjectGitHubPanel({
                         type="button"
                         size="sm"
                         disabled={
-                          stagedFiles.length === 0 ||
+                          delivery.stagedPaths.length === 0 ||
                           actionPending !== null ||
+                          delivery.pending ||
                           commitMessage.trim().length === 0
                         }
                         onClick={() => runAsyncAction(commitStagedChanges)}
                       >
-                        {actionPending === 'commit' ? 'Committing...' : 'Commit'}
+                        {delivery.pending ? 'Preparing review...' : 'Review commit'}
                       </Button>
                     </div>
                     {stagedFiles.length > 0 && (
@@ -3923,7 +3985,7 @@ export function ProjectGitHubPanel({
                           size="sm"
                           variant="ghost"
                           onClick={() => setActiveTab('changes')}
-                          disabled={actionPending !== null}
+                          disabled={actionPending !== null || delivery.pending}
                         >
                           Back to changes
                         </Button>

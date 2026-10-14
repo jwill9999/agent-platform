@@ -23,7 +23,10 @@ test.describe('Electron Project Git workflow panel', () => {
 
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, 'README.md'), '# Workflow Project\n');
-    execFileSync(GIT_BINARY, ['init', '-b', 'main'], { cwd: projectDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'feature/local-delivery'], {
+      cwd: projectDir,
+      stdio: 'ignore',
+    });
     execFileSync(GIT_BINARY, ['config', 'user.email', 'e2e@example.com'], {
       cwd: projectDir,
       stdio: 'ignore',
@@ -39,9 +42,10 @@ test.describe('Electron Project Git workflow panel', () => {
     try {
       app = await electron.launch({
         cwd: desktopDir,
-        args: ['.'],
+        args: ['.', `--user-data-dir=${join(tempRoot, 'user-data')}`],
         env: {
           ...process.env,
+          OLLAMA_BASE_URL: 'http://127.0.0.1:9/v1',
           AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
           AGENT_PLATFORM_DESKTOP_BACKEND_PORT: String(backendPort),
           AGENT_PLATFORM_DESKTOP_NODE_PATH: process.execPath,
@@ -55,7 +59,29 @@ test.describe('Electron Project Git workflow panel', () => {
       });
 
       const page = await app.firstWindow();
+      // /init is handled locally, but the composer requires a selected model configuration.
+      // An unreachable loopback Ollama target prevents accidental external provider calls.
+      const configured = await page.request.post(
+        `http://127.0.0.1:${backendPort}/v1/model-configs`,
+        {
+          data: { name: 'Local Git UI fixture', provider: 'ollama', model: 'git-ui-fixture' },
+        },
+      );
+      expect(configured.ok()).toBe(true);
+      await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
+      await page.reload();
       await openProject(page);
+      const input = page.getByPlaceholder('Ask about this Project...');
+      await expect(input).toBeEnabled();
+      await input.fill('/init');
+      await input.press('Enter');
+      await page.getByRole('button', { name: 'Approve instructions' }).click();
+      await expect(page.getByText('Project instructions approved').last()).toBeVisible();
+      execFileSync(GIT_BINARY, ['add', '--', 'AGENTS.md'], { cwd: projectDir, stdio: 'ignore' });
+      execFileSync(GIT_BINARY, ['commit', '-m', 'fixture: approved Project instructions'], {
+        cwd: projectDir,
+        stdio: 'ignore',
+      });
 
       await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
@@ -86,6 +112,19 @@ test.describe('Electron Project Git workflow panel', () => {
           .filter({ hasText: 'Changed in Git E2E' }),
       ).toBeVisible();
       await gitPanel.getByRole('button', { name: 'Stage all' }).click();
+      const stageReview = gitPanel.getByRole('region', {
+        name: 'Stage selected files',
+        exact: true,
+      });
+      await expect(stageReview.getByRole('status')).toHaveText('Status: prepared');
+      expect(
+        execFileSync(GIT_BINARY, ['diff', '--cached', '--name-only'], {
+          cwd: projectDir,
+          encoding: 'utf8',
+        }).trim(),
+      ).toBe('');
+      await stageReview.getByRole('button', { name: 'Confirm Git operation' }).click();
+      await expect(stageReview.getByRole('status')).toHaveText('Status: succeeded');
       await expect(gitPanel.getByRole('button', { name: 'Continue to commit' })).toBeVisible({
         timeout: 10_000,
       });
@@ -95,7 +134,34 @@ test.describe('Electron Project Git workflow panel', () => {
       await gitPanel.getByRole('button', { name: 'Continue to commit' }).click();
       await expect(gitPanel.getByText('Commit staged changes')).toBeVisible();
       await gitPanel.getByPlaceholder('Commit message').fill('test: add workflow scratch file');
-      await gitPanel.getByRole('button', { name: 'Commit', exact: true }).click();
+      const reviewedHead = execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], {
+        cwd: projectDir,
+        encoding: 'utf8',
+      }).trim();
+      await gitPanel.getByRole('button', { name: 'Review commit', exact: true }).click();
+      const commitReview = gitPanel.getByRole('region', {
+        name: 'Commit reviewed files',
+        exact: true,
+      });
+      await expect(commitReview.getByRole('list', { name: 'Reviewed files' })).toHaveText(
+        'README.mdscratch.txt',
+      );
+      expect(
+        execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], {
+          cwd: projectDir,
+          encoding: 'utf8',
+        }).trim(),
+      ).toBe(reviewedHead);
+      await commitReview.getByRole('button', { name: 'Confirm Git operation' }).click();
+      await expect(commitReview.getByRole('status')).toHaveText('Status: succeeded');
+      expect(
+        execFileSync(GIT_BINARY, ['show', '--format=', '--name-only', 'HEAD'], {
+          cwd: projectDir,
+          encoding: 'utf8',
+        })
+          .trim()
+          .split('\n'),
+      ).toEqual(['README.md', 'scratch.txt']);
 
       await expect(gitPanel.getByRole('button', { name: 'Commit' })).toHaveCount(0, {
         timeout: 10_000,
@@ -103,6 +169,7 @@ test.describe('Electron Project Git workflow panel', () => {
       await expect(gitPanel.getByRole('button', { name: 'Publish' })).toBeVisible({
         timeout: 10_000,
       });
+      await gitPanel.getByRole('button', { name: 'Publish', exact: true }).click();
       await expect(
         gitPanel.getByText(/^Committed .*test: add workflow scratch file$/).first(),
       ).toBeVisible();

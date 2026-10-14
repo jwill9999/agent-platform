@@ -5,7 +5,6 @@ import {
   ProjectDesktopRegistrationResultSchema,
   ProjectBranchCheckoutBodySchema,
   ProjectBranchListResultSchema,
-  ProjectGitCommitBodySchema,
   ProjectGitCreatePullRequestBodySchema,
   ProjectGitCreatePullRequestResultSchema,
   ProjectGitConflictFileResultSchema,
@@ -21,7 +20,6 @@ import {
   ProjectGitChangesResultSchema,
   ProjectGitFileDiffResultSchema,
   ProjectGitPullRequestsResultSchema,
-  ProjectGitStageBodySchema,
   ProjectGitStashBodySchema,
   ProjectGitStatusResultSchema,
   ProjectFileReadResultSchema,
@@ -51,7 +49,6 @@ import {
   type ProjectGitCheckRun,
   type ProjectGitCheckStatus,
   type ProjectGitChecksSummary,
-  type ProjectGitCommitBody,
   type ProjectGitCreatePullRequestBody,
   type ProjectGitConflictFile,
   type ProjectGitConflictHunk,
@@ -65,7 +62,6 @@ import {
   type ProjectGitPullRequestReviewDecision,
   type ProjectGitPullRequestState,
   type ProjectGitPullRequestSummary,
-  type ProjectGitStageBody,
   type ProjectGitStashBody,
   type ProjectGitWorkingTreeSummary,
   ProjectUpdateBodySchema,
@@ -85,6 +81,7 @@ import {
 import type { DrizzleDb } from '@agent-platform/db';
 import { PathJail } from '@agent-platform/harness';
 import { Router } from 'express';
+import { createGitDeliveryRouter } from '../../../interfaces/http/v1/gitDeliveryRouter.js';
 import type { Request } from 'express';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -1135,30 +1132,8 @@ function projectGitFileDiff(project: ProjectRecord, rawPath: unknown, rawMode: u
   });
 }
 
-function gitPathArgs(body: ProjectGitStageBody): string[] {
-  if (body.all) return ['.'];
-  return (body.paths ?? []).map(validateGitRelativePath);
-}
-
 function gitSelectedPathArgs(body: ProjectGitStashBody): string[] {
   return body.paths.map(validateGitRelativePath);
-}
-
-function stageProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
-  const body = parseBody(ProjectGitStageBodySchema, rawBody);
-  const repositoryRoot = repositoryRootForBranchOperations(project);
-  gitOutput(
-    repositoryRoot,
-    body.all ? ['add', '-A', ...GIT_USER_PATHS] : ['add', '-A', '--', ...gitPathArgs(body)],
-  );
-  return projectGitChanges(project);
-}
-
-function unstageProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
-  const body = parseBody(ProjectGitStageBodySchema, rawBody);
-  const repositoryRoot = repositoryRootForBranchOperations(project);
-  gitOutput(repositoryRoot, ['restore', '--staged', '--', ...gitPathArgs(body)]);
-  return projectGitChanges(project);
 }
 
 function stashProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
@@ -1175,22 +1150,6 @@ function stashProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
     ...paths,
   ]);
   return projectGitChanges(project);
-}
-
-function commitProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
-  const body: ProjectGitCommitBody = parseBody(ProjectGitCommitBodySchema, rawBody);
-  const repositoryRoot = repositoryRootForBranchOperations(project);
-  const stagedOutput = gitRawOutput(repositoryRoot, [
-    'diff',
-    '--cached',
-    '--name-only',
-    ...GIT_USER_PATHS,
-  ]);
-  if (stagedOutput.trim() === '') {
-    throw new HttpError(409, 'PROJECT_GIT_NOTHING_STAGED', 'Stage changes before committing.');
-  }
-  gitOutput(repositoryRoot, ['commit', '-m', body.message]);
-  return projectGitStatus(project);
 }
 
 function pushProjectGitBranch(project: ProjectRecord) {
@@ -3168,6 +3127,7 @@ function answerProjectOnboardingQuestion(db: DrizzleDb, id: string, body: unknow
 
 export function createProjectsRouter(db: DrizzleDb): Router {
   const router = Router();
+  router.use('/:projectId/git/delivery', createGitDeliveryRouter(db));
 
   router.get(
     '/',
@@ -3275,19 +3235,27 @@ export function createProjectsRouter(db: DrizzleDb): Router {
 
   router.post(
     '/:id/git/stage',
-    asyncHandler(async (req, res) => {
+    asyncHandler(async (req) => {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
-      res.json({ data: stageProjectGitChanges(project, req.body) });
+      throw new HttpError(
+        410,
+        'PROJECT_GIT_PREPARE_REQUIRED',
+        'Review a prepared operation at /v1/projects/:projectId/git/delivery, then confirm its receipt before executing.',
+      );
     }),
   );
 
   router.post(
     '/:id/git/unstage',
-    asyncHandler(async (req, res) => {
+    asyncHandler(async (req) => {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
-      res.json({ data: unstageProjectGitChanges(project, req.body) });
+      throw new HttpError(
+        410,
+        'PROJECT_GIT_PREPARE_REQUIRED',
+        'Review a prepared operation at /v1/projects/:projectId/git/delivery, then confirm its receipt before executing.',
+      );
     }),
   );
 
@@ -3302,10 +3270,14 @@ export function createProjectsRouter(db: DrizzleDb): Router {
 
   router.post(
     '/:id/git/commit',
-    asyncHandler(async (req, res) => {
+    asyncHandler(async (req) => {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
-      res.json({ data: commitProjectGitChanges(project, req.body) });
+      throw new HttpError(
+        410,
+        'PROJECT_GIT_PREPARE_REQUIRED',
+        'Review a prepared operation at /v1/projects/:projectId/git/delivery, then confirm its receipt before executing.',
+      );
     }),
   );
 

@@ -6,13 +6,17 @@
 
 **Parent epic:** `agent-platform-ii1` — Git workflow UI and in-app web explorer
 
-Status: proposed bounded plan; owner review before implementation. [Feature plan](../planning/git-delivery-mvp.md), [verification](../testing/git-delivery-mvp.md), [review](../reviews/git-delivery-mvp-plan-review.md).
+Status: owner-approved bounded implementation, 14 October 2026; actual task progress remains in Beads. [Feature plan](../planning/git-delivery-mvp.md), [verification](../testing/git-delivery-mvp.md), [review](../reviews/git-delivery-mvp-plan-review.md).
 
 ## Task requirements
 
 GD-R1–GD-R7. Run all final connected cases and quality gates on combined source; inspect actual diagnostic exports and independent Git/gh fixture effects. Resolve source-review findings, publish complete results/docs/session mirrors, open one tip PR to feature/git-delivery-mvp. No merge until applicable owner grant and all current-head gates clear; later feature-to-staging qualification separate and explicit.
 
 For reused IDs4hm/0ra this becomes the canonical bounded specification; historical `agent-platform-git-workflow-ui-3.md`/`-4.md` remain preserved evidence. No old task is auto-closed and broader epic work remains separately scoped.
+
+Historical sequencing (superseded by the next paragraph): the initial independently approved amendment permitted only additive isolated contracts/DB/service work and rail visibility before qualified d185 staging incorporation. Runtime endpoint/chat/approval integration and final connected qualification still wait for that exact baseline. Preliminary results do not close this task.
+
+The latest independently reviewed work-order refinement permits runtime integration on qualified `2a848b9a` without importing pending d185 code. Final actual qualified-staging incorporation, semantic conflict review and fresh connected gates remain mandatory before acceptance; this supersedes earlier preliminary-only sequencing wording.
 
 ## Dependency order
 
@@ -24,7 +28,7 @@ Beads hard blockers must match these links. Owner implementation approval is rec
 
 ## Implementation plan and Git workflow
 
-Actual planning branch exists; later task branches below are proposals. Worktree: `/Users/letuscode/.codex/worktrees/git-delivery-plan/agent-platform`. Parent `task/git-delivery-tools` → `task/git-delivery-verification`; integration `feature/git-delivery-mvp`, eventual protected staging only under actual grant. Never main. Planning refreshes from actual qualified d185 staging before implementation, preserving all documentation and paused branches.
+Actual planning branch exists; later task branches below are proposals. Worktree: `/Users/letuscode/.codex/worktrees/git-delivery-plan/agent-platform`. Parent `task/git-delivery-tools` → `task/git-delivery-verification`; integration `feature/git-delivery-mvp`, eventual protected staging only under actual grant. Never main. Final acceptance refreshes from actual qualified d185 staging, preserving all documentation and paused branches; the reviewed refinement permits runtime integration on the existing qualified baseline.
 
 Run all final connected cases and quality gates on combined source; inspect actual diagnostic exports and independent Git/gh fixture effects. Resolve source-review findings, publish complete results/docs/session mirrors, open one tip PR to feature/git-delivery-mvp. No merge until applicable owner grant and all current-head gates clear; later feature-to-staging qualification separate and explicit.
 
@@ -42,4 +46,4 @@ All required final tests pass with limitations stated; actual results/source/dia
 
 Before close: upstream tasks closed, applicable owner grant recorded, requirement/scenario matrix complete, actual failures repaired/reviewed, meaningful local gates and normal hooks pass, pushed exact source and full mirrors read back, session/Beads updated. For planning, product gates are not applicable; do not invent product test results. Intermediate closure does not certify final feature acceptance. Segment tip waits for its merged PR and exact-head hosted gates.
 
-Reviewer/owner: pending; no implementation acceptance inferred. After close, read back closed state and sync Dolt, recording actual completion. Missing required test/publication/merge evidence blocks applicable task completion.
+Owner implementation authorization recorded on 14 October; independent final source/quality review and final owner acceptance remain required. After close, read back closed state and sync Dolt, recording actual completion. Missing required test/publication/merge evidence blocks applicable task completion.
