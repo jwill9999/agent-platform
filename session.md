@@ -22,6 +22,11 @@ only after actual current-head pipelines pass and review comments resolve.
   before-release assertion. Source review approves the bounded tab-navigation repair; fresh local
   Docker verification passes first attempt in 4.7 seconds with preserved overlap proof. Final hosted
   verification, updated mirrors and preservation remain required before merge.
+- GR-H05 identified a PR-create test that triggered overlapping reads before loading completed.
+  The fixture now awaits visible readiness and actual request completion; all three affected
+  Electron Git workflow tests pass first attempt. Rapid navigation can still meet the approved
+  four-read limit and show a temporary busy response. `agent-platform-lowe` tracks cancellation
+  of obsolete UI reads separately; no concurrency limit or deadline was relaxed.
 - Diagnostic follow-up `agent-platform-9wqs` records existing approval-resume lineage that leaves
   honest prior-process unfinished warnings after restart. Effects, audit/message persistence and
   diagnostic retention pass independently; no automatic replay or hidden warning was introduced.

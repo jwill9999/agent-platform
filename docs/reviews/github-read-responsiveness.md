@@ -184,3 +184,18 @@ delivery receipt before closure; prior green checks or a retry do not qualify a 
   before overlap proof 835 ms after latest readiness. Cleanup is clean; receipt and artifact hashes
   are in `docker-hosted-repair-receipt.json`. Final hosted qualification is still required;
   original failed traces remain retained.
+
+- **GR-H05 / `agent-platform-lowe`:** the `6f53fe74` Electron suite had 57 passes and
+  one failed PR-create workflow; both attempts showed the new bounded-read busy response.
+  A real isolated reproduction captured eleven overlapping requests: seven busy responses, then
+  four original successes by 3.52 seconds, with all requests drained. Backend review confirmed
+  cleanup releases capacity before sending responses; no persistent slot leak was reproduced.
+  The happy-path test must await its actual initial Activity reads and explicit Git refresh before
+  triggering the next view load, preserving existing PR-create assertions, deadlines and no retries.
+  Rapid navigation can still visibly encounter transient busy responses under the approved
+  four-slot/no-queue policy. The fixture repair does not remove that product consequence;
+  `agent-platform-lowe` separately tracks cancellation of obsolete UI read consumers.
+  All three affected Electron Git workflow tests pass first attempt in 31.8 seconds, with retries
+  disabled (14.8 s workflow, 8.5 s merge, 7.8 s PR-create). Receipt and full log are retained as
+  `desktop-prcreate-repair-receipt.json` and `desktop-prcreate-repaired.log`. Final hosted
+  qualification remains required.
