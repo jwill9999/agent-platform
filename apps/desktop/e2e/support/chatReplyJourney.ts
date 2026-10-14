@@ -476,7 +476,8 @@ export async function exportReplyReport(
       path: '/api/diagnostics/report',
       outcome: 'pending',
     };
-    const attempts = (ctx.evidence.exportAttempts ??= []) as Array<Record<string, unknown>>;
+    ctx.evidence.exportAttempts ??= [];
+    const attempts = ctx.evidence.exportAttempts as Array<Record<string, unknown>>;
     attempts.push(attempt);
     const observed = observeDiagnosticDownload(ctx.page, attempt, startedAt);
     let downloaded;

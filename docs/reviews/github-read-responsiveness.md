@@ -233,3 +233,8 @@ export verification. The temporary proof is retained externally; original test a
 runtime source are unchanged. ESLint, scoped TypeScript, formatting and diff checks pass.
 Source hashes and raw evidence are in `cr-export-observer-qualification.json`. Final hosted
 qualification remains mandatory, including all58 first-pass Electron cases.
+
+- **GR-H07:** hosted Sonar at `ec2d4044` reported S1121 on the export observer's embedded
+  assignment despite a successful check badge. Split initialization into a standalone statement;
+  behavior, bounds and the qualified helper proof remain applicable. No suppression or runtime
+  change. Fresh exact-head Sonar findings and all delivery gates must clear before merge.
