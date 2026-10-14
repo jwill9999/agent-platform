@@ -1,3 +1,4 @@
+import { ownDesktopChild } from './ownedDesktopChild.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync } from 'node:fs';
@@ -27,6 +28,7 @@ interface StartStandaloneRendererOptions {
   electronPath: string;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 const defaultStandalonePort = 4301;
@@ -103,7 +105,9 @@ export async function startStandaloneRenderer({
   electronPath,
   env = process.env,
   timeoutMs = 15_000,
+  signal,
 }: StartStandaloneRendererOptions): Promise<StandaloneRendererHandle> {
+  signal?.throwIfAborted();
   if (!standaloneRendererAvailable(paths)) {
     throw new Error(
       `Next standalone renderer build was not found at ${paths.serverEntry}. Run pnpm --filter @agent-platform/web build first.`,
@@ -111,6 +115,7 @@ export async function startStandaloneRenderer({
   }
 
   ensureStandaloneRendererAssets(paths);
+  signal?.throwIfAborted();
 
   const port = env.AGENT_PLATFORM_DESKTOP_RENDERER_PORT ?? String(defaultStandalonePort);
   const hostname = '127.0.0.1';
@@ -123,16 +128,18 @@ export async function startStandaloneRenderer({
     port,
   });
 
+  const owned = ownDesktopChild(child);
   try {
-    await waitForHttp(url, timeoutMs, child);
+    await waitForHttp(url, timeoutMs, child, owned.processError, signal);
+    signal?.throwIfAborted();
   } catch (error) {
-    await stopChild(child);
+    await owned.stop();
     throw error;
   }
 
   return {
     url,
-    stop: () => stopChild(child),
+    stop: owned.stop,
   };
 }
 
@@ -165,27 +172,40 @@ function spawnStandaloneServer({
   });
 }
 
-async function waitForHttp(url: string, timeoutMs: number, child: ChildProcess): Promise<void> {
+async function waitForHttp(
+  url: string,
+  timeoutMs: number,
+  child: ChildProcess,
+  processError: () => Error | undefined,
+  signal?: AbortSignal,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) {
+  // Each attempt completes before scheduling its successor; never overlap health probes.
+  async function attempt(): Promise<void> {
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for standalone renderer at ${url}.`);
+    }
+    signal?.throwIfAborted();
+    if (processError()) throw processError();
+    if (child.exitCode !== null || child.signalCode !== null) {
       throw new Error(
         `Standalone renderer exited before becoming ready with code ${child.exitCode}.`,
       );
     }
 
-    if (await canReachHttp(url)) {
+    if (await canReachHttp(url, signal)) {
       return;
     }
 
-    await delay(250);
+    await delay(250, undefined, { signal });
+    return attempt();
   }
 
-  throw new Error(`Timed out waiting for standalone renderer at ${url}.`);
+  return attempt();
 }
 
-function canReachHttp(url: string): Promise<boolean> {
+function canReachHttp(url: string, signal?: AbortSignal): Promise<boolean> {
   return new Promise((resolveReachable) => {
     let settled = false;
     const resolveOnce = (reachable: boolean): void => {
@@ -197,7 +217,7 @@ function canReachHttp(url: string): Promise<boolean> {
       resolveReachable(reachable);
     };
 
-    const request = get(url, (response) => {
+    const request = get(url, { signal }, (response) => {
       response.resume();
       resolveOnce((response.statusCode ?? 500) < 500);
     });
@@ -209,25 +229,5 @@ function canReachHttp(url: string): Promise<boolean> {
       request.destroy();
       resolveOnce(false);
     });
-  });
-}
-
-function stopChild(child: ChildProcess): Promise<void> {
-  if (child.exitCode !== null || child.killed) {
-    return Promise.resolve();
-  }
-
-  return new Promise((resolveStopped) => {
-    const timeout = setTimeout(() => {
-      child.kill('SIGKILL');
-      resolveStopped();
-    }, 2_000);
-
-    child.once('exit', () => {
-      clearTimeout(timeout);
-      resolveStopped();
-    });
-
-    child.kill('SIGTERM');
   });
 }
