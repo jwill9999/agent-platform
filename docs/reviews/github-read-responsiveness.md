@@ -199,3 +199,37 @@ delivery receipt before closure; prior green checks or a retry do not qualify a 
   disabled (14.8 s workflow, 8.5 s merge, 7.8 s PR-create). Receipt and full log are retained as
   `desktop-prcreate-repair-receipt.json` and `desktop-prcreate-repaired.log`. Final hosted
   qualification remains required.
+
+- **GR-H06 / `agent-platform-odgi`:** the `26754446` hosted Electron badge was green,
+  but its detail was 57 passes and one retry. The existing Chromium reply-restoration journey
+  completed its first export, then displayed a diagnostic export error after the expected provider
+  failure. No second download arrived; the test waited until its 120-second outer deadline.
+  The failed attempt retains progress, backend state and error context but no response status or
+  trace. Retry logs cannot establish the first failure's cause. HTTP, storage and browser causes,
+  including any relationship to changed Git-read timing, remain unproven. This is distinct from
+  the earlier completed-JSON file-read repair.
+  The critic approved bounded fixture containment: observe the existing export response and download,
+  retain only status, known error code and elapsed time, and fail early on a visible/non-success
+  export within a shared ten-second click/download budget. No extra request, retry, product timeout
+  change or report-validation relaxation is introduced. This improves evidence; it does not claim
+  to fix the underlying intermittent export failure. The linked bug remains open. A fresh full
+  58-test Electron run must pass first attempt before delivery; recurrence blocks completion and
+  requires investigation using same-attempt evidence.
+
+At `26754446`, all three new managed d185 journeys, the repaired Git workflow and the Docker browser
+journey passed first attempt. The full browser result was 31 passes and one expected separate
+Docker Project-context prerequisite skip (`agent-platform-lnbn`). The hosted diagnostics benchmark
+completed all nine samples; independently recalculated p95 values, archive/member hashes, healthy
+retention and honest locked-store drops passed (`pr320-2675-benchmark-receipt.json`). These are
+bounded component results, not merge qualification while the Electron retry remains unresolved.
+
+The GR-H06 observer passed a focused connected proof in 9.118 seconds without retries: real
+success/failure reports returned HTTP200 in 40/170 ms and passed existing schema/scope/privacy
+checks; a deliberately injected503 failed in81 ms with its allowlisted code, unchanged listener
+counts and arbitrary error-body canary excluded. The temporary proof selects the controlled model
+through the existing UI; an earlier local original-journey attempt instead selected a seeded model
+and failed before export with `MODEL_AUTH_FAILED`. That failed setup is retained, not counted as
+export verification. The temporary proof is retained externally; original test assertions and
+runtime source are unchanged. ESLint, scoped TypeScript, formatting and diff checks pass.
+Source hashes and raw evidence are in `cr-export-observer-qualification.json`. Final hosted
+qualification remains mandatory, including all58 first-pass Electron cases.

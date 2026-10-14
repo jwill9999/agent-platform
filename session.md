@@ -27,6 +27,12 @@ only after actual current-head pipelines pass and review comments resolve.
   Electron Git workflow tests pass first attempt. Rapid navigation can still meet the approved
   four-read limit and show a temporary busy response. `agent-platform-lowe` tracks cancellation
   of obsolete UI reads separately; no concurrency limit or deadline was relaxed.
+- GR-H06 records an intermittent failed diagnostic export in the existing Chromium reply journey
+  at `26754446`: 57 Electron passes plus one retry despite a green badge. `agent-platform-odgi`
+  retains the incident; its cause remains unknown. Safe response/download observation now passes
+  a focused real-export and controlled503 proof, including listener cleanup and safe error metadata. This is fixture containment,
+  not a claimed runtime fix. Final delivery still requires all 58 Electron tests passing first
+  attempt, alongside current browser, diagnostics, quality and review gates.
 - Diagnostic follow-up `agent-platform-9wqs` records existing approval-resume lineage that leaves
   honest prior-process unfinished warnings after restart. Effects, audit/message persistence and
   diagnostic retention pass independently; no automatic replay or hidden warning was introduced.
