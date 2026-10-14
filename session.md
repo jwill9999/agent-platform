@@ -1,3 +1,30 @@
+## Current handoff: diagnostics failure evidence — 14 October 2026
+
+PR326 at `93b13f47` passed the repaired process-restart and readiness-helper tests, but its verify
+job failed a different report read and the unchanged diagnostics benchmark. The exhausted-provider
+fixture already awaits storage readiness. Its 503 cause remains unknown; the benchmark retained six
+samples and failed with 37.408382 ms overhead against the unchanged 20 ms limit. Original failures
+are retained, with no blind rerun or claimed connection/performance diagnosis.
+
+The bounded [readiness repair spec](docs/tasks/agent-platform-diagnostics-fixture-readiness.md)
+now records a test-only failure-evidence addition: safe response code, storage health and original
+flush timing around the same single report request. Fourteen actual integration tests pass locally;
+two disposable expected-failure probes confirmed rejected/pending flush evidence without canary
+exposure. No runtime deadline, retry, benchmark threshold or content assertion changes.
+Independent source and documentation review approved this follow-up without actionable findings;
+refreshed source-bound mirrors and hosted qualification remain pending.
+
+The earlier `93b13f47` task/session mirrors are fully published and read back. Its independent
+runtime review confirms 58 first-attempt Electron cases, 31 browser passes with one existing skip,
+and 17 diagnostic artifacts; verify remains blocking. PR324 stays at `5d938b98` and staging remains
+`2a848b9a`. Neither repair nor promotion is merge-ready. Beads remains in progress.
+
+Preserve the separate active Git delivery MVP worktree/refs, main, PR283, paused orchestration and
+unrelated dirty work. The complete previous handoff follows as historical evidence; its pending
+publication statements are superseded by this header and live receipts.
+
+---
+
 ## Current handoff: diagnostics fixture readiness — 14 October 2026
 
 PR325 is merged into `feature/github-read-responsiveness` at `5d938b98`, completing the

@@ -2,7 +2,7 @@
 
 **Beads issue:** `agent-platform-diagnostics-fixture-readiness`  
 **Parent delivery:** `agent-platform-local-mvp-promotion`  
-**Status:** Independent source and local verification approved; hosted qualification pending.
+**Status:** Readiness repair approved; hosted verify failed additional checks; bounded failure evidence independently approved.
 
 ## Evidence and bounded scope
 
@@ -80,3 +80,34 @@ feature merge/tree verification and Beads close/readback/Dolt sync. The parent r
 protected staging delivery and preservation/cleanup complete. Local IDE Problems is unavailable;
 terminal quality checks plus actual hosted Sonar and CodeQL are required. Preserve main, PR283,
 paused orchestration, dirty unrelated work and the active Git delivery MVP branches/worktree.
+
+## Hosted qualification and bounded failure evidence
+
+PR326 at `93b13f472bd402d04260d99b3e4bfc50b9192c64` passed the repaired restart cases
+and all nine readiness-helper controls. Its verify job `116130007248` nevertheless failed:
+
+- The exhausted-provider-retry case in `diagnostics.integration.test.ts` returned 503 from its
+  single report read. This fixture already awaits storage readiness; the startup repair does not
+  explain this separate failure. The response body, store health and flush timing were unavailable.
+- The unchanged benchmark completed six samples before failing repetition two: healthy request p95
+  54.742748 ms minus disabled 17.334366 ms equals 37.408382 ms, above the existing 20 ms bound.
+  Enqueue p95 was 0.022634 ms and healthy event-loop p95 was 55.738367 ms. These observations do not
+  prove a cause or a performance fix. The raw artifact records `completed: false`.
+
+The owner-authorized follow-up adds test-only failure evidence to the exhausted-provider case.
+It still performs one report request and calls the original flush once with unchanged result/error
+propagation. The assertion includes allowlisted response code, safe before/after health, elapsed
+read time and whether flush was pending, resolved or rejected. It never includes raw response bodies
+or error strings. Production deadlines, benchmark bounds and all report-content assertions remain
+unchanged. This improves diagnosis; it is not represented as a fix for the unexplained 503.
+
+The actual integration suite passed all 14 cases locally. Two disposable, removed observation probes
+intentionally made flush reject immediately or after 400 ms. Both retained the expected failing 503
+assertion, distinguished rejected from pending flush, and did not expose the canary. These are expected
+failure controls, not additional passing product tests. Source, probe logs and prior hosted failures
+are retained in the promotion evidence directory. Independent source and documentation review approved this addition without actionable findings.
+Fresh exact-head qualification remains required.
+
+Independent review of the other PR326 runtime artifacts confirmed 58 first-attempt Electron cases,
+31 browser passes plus one existing prerequisite skip, and 17 diagnostic artifacts (16 durable with
+no loss, plus the intentional unavailable control). Those passes do not waive the failed verify job.

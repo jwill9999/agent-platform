@@ -362,7 +362,51 @@ describe('local diagnostic API with real SQLite', () => {
       .post('/v1/chat')
       .send({ sessionId: f.sessionId, message: canary })
       .expect(200);
-    const res = await f.report({ sessionId: f.sessionId }).expect(200);
+    // Preserve one report request and the production deadline. On failure retain only
+    // safe state/timing, so an HTTP 503 is diagnosable without exporting error strings.
+    const flush = f.store.flush.bind(f.store);
+    const flushEvidence: {
+      state: 'not_called' | 'pending' | 'resolved' | 'rejected';
+      startedAt?: number;
+      elapsedMs?: number;
+    } = { state: 'not_called' };
+    vi.spyOn(f.store, 'flush').mockImplementation(async () => {
+      flushEvidence.state = 'pending';
+      flushEvidence.startedAt = performance.now();
+      try {
+        const result = await flush();
+        flushEvidence.state = 'resolved';
+        return result;
+      } catch (error) {
+        flushEvidence.state = 'rejected';
+        throw error;
+      } finally {
+        flushEvidence.elapsedMs = performance.now() - flushEvidence.startedAt;
+      }
+    });
+    const beforeRead = f.store.health();
+    const startedAt = performance.now();
+    const res = await f.report({ sessionId: f.sessionId });
+    let responseCode = res.status === 200 ? 'success' : 'unexpected';
+    if (res.body?.error?.code === 'DIAGNOSTICS_UNAVAILABLE')
+      responseCode = 'DIAGNOSTICS_UNAVAILABLE';
+    const readEvidence = JSON.stringify({
+      status: res.status,
+      responseCode,
+      elapsedMs: performance.now() - startedAt,
+      beforeRead,
+      afterRead: f.store.health(),
+      flush: {
+        state: flushEvidence.state,
+        elapsedMs:
+          flushEvidence.elapsedMs ??
+          (flushEvidence.startedAt === undefined
+            ? null
+            : performance.now() - flushEvidence.startedAt),
+      },
+    });
+    expect(readEvidence).not.toContain(canary);
+    expect(res.status, readEvidence).toBe(200);
     const report = DiagnosticReportSchema.parse(res.body);
     const models = report.events.map((row) => row.event).filter((event) => event.phase === 'model');
     expect(
