@@ -12,11 +12,16 @@ only after actual current-head pipelines pass and review comments resolve.
 - Local API/helper/macOS/Linux and managed Chromium/Electron evidence is recorded in
   [the review/results record](docs/reviews/github-read-responsiveness.md). Baseline blocking reproduced;
   fixed probes completed before held child release. Docker and full API regression pass. All three fresh trace-safe managed journeys and four existing context/reply fixture regressions
-  pass. Full archive credential checks pass; publication and hosted qualification remain pending. Runtime source is pushed at `b0b05939`; no feature merge is claimed yet.
-- PR320 is open into the feature at reviewed `17269698`; all five full Notion mirrors were
-  verified at that revision. Hosted link/fixture findings GR-H01/H02 are repaired locally with
-  eleven helper tests and five Linux controls passing; the new revision must pass fresh hosted
-  checks before merge. Source-aware review and preservation remain required.
+  pass. Full archive credential checks pass. Runtime source is pushed at `b0b05939`; no feature merge is claimed yet.
+- PR320 is open into the feature. Five full Notion mirrors were verified at `17269698`, with
+  changed-document readbacks at `6f53fe74` and `e9f7e5a8`. Hosted link/fixture findings GR-H01/H02
+  are repaired and Sonar/Lychee pass. GR-H03 tracks a Project navigation reversion separately as
+  `agent-platform-b5y4`; its cause and relationship to changed read timing are unproven. Final
+  Electron qualification requires all 58 tests passing without retries. GR-H04 fixes the Docker
+  journey's disabled Refresh sequencing after both hosted attempts correctly failed the
+  before-release assertion. Source review approves the bounded tab-navigation repair; fresh local
+  Docker verification passes first attempt in 4.7 seconds with preserved overlap proof. Final hosted
+  verification, updated mirrors and preservation remain required before merge.
 - Diagnostic follow-up `agent-platform-9wqs` records existing approval-resume lineage that leaves
   honest prior-process unfinished warnings after restart. Effects, audit/message persistence and
   diagnostic retention pass independently; no automatic replay or hidden warning was introduced.

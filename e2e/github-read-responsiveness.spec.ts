@@ -216,7 +216,12 @@ try { const id=process.argv[1]; console.log(JSON.stringify({messages:sqlite.prep
     const card = page.getByTestId('approval-card');
     await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
     const refresh = page.getByRole('button', { name: 'Refresh Project activity', exact: true });
-    await expect(refresh).toBeEnabled();
+    // Settle the real alternate view before arming the hold. The automatic
+    // activity refresh after a tool proposal can disable Refresh before click.
+    await page.getByRole('tab', { name: 'Git & GitHub', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: 'Refresh Git state', exact: true }),
+    ).toBeEnabled();
     progress('tool-proposal-ready');
     configure('hold', 'held');
     const checksResponse = page.waitForResponse((r) =>
@@ -225,7 +230,7 @@ try { const id=process.argv[1]; console.log(JSON.stringify({messages:sqlite.prep
     const prsResponse = page.waitForResponse((r) =>
       r.url().endsWith(`/projects/${projectId}/github/pull-requests`),
     );
-    await refresh.click();
+    await page.getByRole('tab', { name: 'Activity', exact: true }).click();
     await expect
       .poll(
         () =>
@@ -236,6 +241,7 @@ try { const id=process.argv[1]; console.log(JSON.stringify({messages:sqlite.prep
           ),
       )
       .toEqual(new Set(['view', 'list']));
+    evidence.ready = { observedAt: Date.now(), events: events() };
     progress('github-children-held');
     const probes = [];
     for (const path of ['/health', `/v1/sessions/${sessionId}`]) {
@@ -358,6 +364,23 @@ try { const id=process.argv[1]; console.log(JSON.stringify({messages:sqlite.prep
     }
     await settle(() => exec(['rm', '-rf', root]));
   }
+  await test.info().attach('github-read-timing', {
+    body: Buffer.from(
+      JSON.stringify(
+        {
+          phases,
+          ready: evidence.ready,
+          heldWindowProved: phases.some(({ phase }) => phase === 'held-window-proved'),
+          primaryError: primary instanceof Error ? primary.message.slice(0, 2048) : undefined,
+          cleanupErrorCount: cleanup.length,
+        },
+        null,
+        2,
+      ),
+    ),
+    contentType: 'application/json',
+  });
+  if (primary && cleanup.length === 0) throw primary;
   if (primary || cleanup.length)
     throw new AggregateError(
       [...(primary ? [primary] : []), ...cleanup],

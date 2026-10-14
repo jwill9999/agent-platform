@@ -169,3 +169,18 @@ The `6f53fe74` repair revision passed hosted Lychee and Sonar with zero open iss
 CI was still running when this finding was recorded. Final current-head workflows, complete test
 results, reviews, source/tree identity and merge evidence must be checked and recorded in the task's
 delivery receipt before closure; prior green checks or a retry do not qualify a changed revision.
+
+- **GR-H04:** the `6f53fe74` hosted Docker browser run failed both attempts at the unchanged
+  before-release assertion. Traces show the Refresh click waiting on its disabled control for
+  8411/8436 ms while automatically started reads reached the fixture's eight-second safety expiry.
+  Health, tool effect and expected export denial succeeded afterward, which cannot prove overlap.
+  The fixture now settles the real Git panel before arming, then uses the Activity tab to initiate
+  held reads, matching the reviewed managed-journey repair GR-I04. The eight-second hold,
+  ten-second product deadline, child readiness/exit checks and effect/export assertions remain.
+  A bounded timing attachment and direct primary-error rethrow when cleanup succeeds preserve
+  useful failure evidence. Independent source review approves the exact fixture change. Fresh
+  Docker qualification passes first attempt in 4.7 seconds with retries disabled: health 3.12 ms,
+  session 2.63 ms, successful write and expected export403, both child kinds ready and no exit
+  before overlap proof 835 ms after latest readiness. Cleanup is clean; receipt and artifact hashes
+  are in `docker-hosted-repair-receipt.json`. Final hosted qualification is still required;
+  original failed traces remain retained.
