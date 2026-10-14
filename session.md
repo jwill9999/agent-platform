@@ -1,3 +1,58 @@
+## Current handoff: diagnostics failure evidence — 14 October 2026
+
+PR326 at `93b13f47` passed the repaired process-restart and readiness-helper tests, but its verify
+job failed a different report read and the unchanged diagnostics benchmark. The exhausted-provider
+fixture already awaits storage readiness. Its 503 cause remains unknown; the benchmark retained six
+samples and failed with 37.408382 ms overhead against the unchanged 20 ms limit. Original failures
+are retained, with no blind rerun or claimed connection/performance diagnosis.
+
+The bounded [readiness repair spec](docs/tasks/agent-platform-diagnostics-fixture-readiness.md)
+now records a test-only failure-evidence addition: safe response code, storage health and original
+flush timing around the same single report request. Fourteen actual integration tests pass locally;
+two disposable expected-failure probes confirmed rejected/pending flush evidence without canary
+exposure. No runtime deadline, retry, benchmark threshold or content assertion changes.
+Independent source and documentation review approved this follow-up without actionable findings;
+refreshed source-bound mirrors and hosted qualification remain pending.
+
+The earlier `93b13f47` task/session mirrors are fully published and read back. Its independent
+runtime review confirms 58 first-attempt Electron cases, 31 browser passes with one existing skip,
+and 17 diagnostic artifacts; verify remains blocking. PR324 stays at `5d938b98` and staging remains
+`2a848b9a`. Neither repair nor promotion is merge-ready. Beads remains in progress.
+
+Preserve the separate active Git delivery MVP worktree/refs, main, PR283, paused orchestration and
+unrelated dirty work. The complete previous handoff follows as historical evidence; its pending
+publication statements are superseded by this header and live receipts.
+
+---
+
+## Current handoff: diagnostics fixture readiness — 14 October 2026
+
+PR325 is merged into `feature/github-read-responsiveness` at `5d938b98`, completing the
+independently reviewed port repair after all nine executed feature checks passed. Its full
+source-bound documentation mirrors and Beads close/readback/sync are complete. The older
+pending statements below are retained historical snapshots.
+
+PR324 at that new head passed full scans, actual packaged VM (19 first-attempt cases), Electron
+(58 first-attempt cases), browser (31 passes and one existing prerequisite skip) and other quality
+checks, but verify failed a restart report read and one benchmark comparison. No staging merge or
+cleanup has occurred; staging remains `2a848b9a`. Original failures and independent qualification
+receipts are retained under `/Users/letuscode/.codex/local-mvp-promotion-20261014`.
+
+The bounded [diagnostics fixture readiness repair](docs/tasks/agent-platform-diagnostics-fixture-readiness.md)
+waits for storage readiness through the authenticated list endpoint before the existing single
+report assertions. Actual restart tests and the unchanged benchmark pass locally; independent source, evidence and
+documentation review approved the bounded repair without findings. Full mirrors and new hosted
+qualification remain pending. Runtime deadlines, benchmark
+limits and report assertions are unchanged. The original 503 cause and benchmark scheduling
+hypothesis are not represented as proven. Do not merge using stale successful checks.
+
+The parent `agent-platform-local-mvp-promotion` stays in progress. Owner-approved Git delivery MVP
+implementation is active in its separate worktree/branches; preserve it during any cleanup.
+Main, PR283, paused orchestration and unrelated dirty work remain separate. All following handoffs
+are complete dated historical snapshots, superseded by this header and live Beads/evidence.
+
+---
+
 ## Current handoff: desktop fixture port repair — 14 October 2026
 
 The d185 staging promotion PR324 is blocked by an independently confirmed first-attempt Electron
