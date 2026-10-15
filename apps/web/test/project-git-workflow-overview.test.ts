@@ -496,6 +496,38 @@ describe('deriveGitWorkflowTabs', () => {
     });
   });
 
+  it('does not let historical push success hide a newer commit or branch', () => {
+    const previousSuccess = 'Published the previous reviewed commit.';
+    expect(
+      deriveGitPublishState({
+        status: status({ clean: true, ahead: 0, behind: 0, upstreamState: 'active' }),
+        commitSuccess: null,
+        pushSuccess: previousSuccess,
+      }),
+    ).toMatchObject({ pushed: true });
+    expect(
+      deriveGitPublishState({
+        status: status({ clean: true, ahead: 1, behind: 0, upstreamState: 'active' }),
+        commitSuccess: 'Committed a second change.',
+        pushSuccess: previousSuccess,
+      }),
+    ).toMatchObject({ pushed: false, canPublish: true, actionLabel: 'Push' });
+    expect(
+      deriveGitPublishState({
+        status: status({
+          currentBranch: 'feature/another',
+          clean: true,
+          ahead: 0,
+          behind: 0,
+          upstreamState: 'none',
+          upstreamBranch: undefined,
+        }),
+        commitSuccess: null,
+        pushSuccess: previousSuccess,
+      }),
+    ).toMatchObject({ pushed: false, canPublish: true, actionLabel: 'Publish branch' });
+  });
+
   it('uses Publish tab state that disables push until divergent branches are pulled', () => {
     expect(
       deriveGitPublishState({

@@ -13,7 +13,24 @@ import { join } from 'node:path';
 import { URL } from 'node:url';
 
 /** Create a per-test external gh boundary; starts no processes and opens no ports. */
-export async function createGhLedgerFixture({ repository = 'fixture/project', ...failures } = {}) {
+export async function createGhLedgerFixture({
+  repository = 'fixture/project',
+  currentBranch,
+  ...failures
+} = {}) {
+  function checkedBranch(value) {
+    if (
+      value !== undefined &&
+      (typeof value !== 'string' ||
+        value.length === 0 ||
+        value.length > 255 ||
+        [...value].some(
+          (character) => character.charCodeAt(0) <= 32 || character.charCodeAt(0) === 127,
+        ))
+    )
+      throw new Error('Invalid fixture current branch');
+    return value;
+  }
   if (!/^[a-zA-Z0-9][\w.-]*\/[a-zA-Z0-9][\w.-]*$/.test(repository)) {
     throw new Error('Invalid fixture repository');
   }
@@ -25,7 +42,12 @@ export async function createGhLedgerFixture({ repository = 'fixture/project', ..
     }
     return values;
   }
-  let config = { version: 1, repository, ...checkedFailures(failures) };
+  let config = {
+    version: 1,
+    repository,
+    currentBranch: checkedBranch(currentBranch),
+    ...checkedFailures(failures),
+  };
   const directory = await mkdtemp(join(tmpdir(), 'git-delivery-gh-'));
   const executable = join(directory, 'gh');
   let closed = false;
@@ -38,6 +60,13 @@ export async function createGhLedgerFixture({ repository = 'fixture/project', ..
       throw error;
     }
     throw new Error('Await owned child completion before configuring or closing fixture');
+  }
+  async function updateConfig(next) {
+    await assertIdle();
+    const temporary = join(directory, 'config.tmp');
+    await writeFile(temporary, JSON.stringify(next), { mode: 0o600 });
+    await rename(temporary, join(directory, 'config.json'));
+    config = next;
   }
   try {
     await chmod(directory, 0o700);
@@ -63,11 +92,10 @@ export async function createGhLedgerFixture({ repository = 'fixture/project', ..
     },
     async setFailureModes(values) {
       const next = { ...config, ...checkedFailures(values) };
-      await assertIdle();
-      const temporary = join(directory, 'config.tmp');
-      await writeFile(temporary, JSON.stringify(next), { mode: 0o600 });
-      await rename(temporary, join(directory, 'config.json'));
-      config = next;
+      await updateConfig(next);
+    },
+    async setCurrentBranch(value) {
+      await updateConfig({ ...config, currentBranch: checkedBranch(value) });
     },
     async close() {
       if (closed) return;

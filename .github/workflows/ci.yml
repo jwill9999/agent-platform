@@ -115,6 +115,9 @@ jobs:
     needs: docker
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # Every compose command, including teardown, uses the same test-only boundary.
+      COMPOSE_FILE: docker-compose.yml:e2e/support/git-delivery/compose.yml
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

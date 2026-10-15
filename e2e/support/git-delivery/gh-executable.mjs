@@ -13,6 +13,55 @@ import { join, isAbsolute } from 'node:path';
 import process from 'node:process';
 
 const fields = 'number,url,headRefName,baseRefName,title,body,isDraft';
+const panelFields =
+  'number,title,state,url,headRefName,baseRefName,author,isDraft,reviewDecision,mergeable,createdAt,updatedAt,statusCheckRollup';
+const checkFields = 'number,url,statusCheckRollup';
+
+function exact(args, expected) {
+  return args.length === expected.length && args.every((arg, index) => arg === expected[index]);
+}
+
+function panelRead(args, repository) {
+  if (exact(args, ['--version'])) return { kind: 'version' };
+  if (exact(args, ['auth', 'status', '--hostname', 'github.com'])) return { kind: 'auth' };
+  if (exact(args, ['repo', 'view', repository, '--json', 'url'])) return { kind: 'repository' };
+  if (isCommitChecks(args, repository)) return { kind: 'commit-checks' };
+  return panelPrRead(args, repository);
+}
+
+function isCommitChecks(args, repository) {
+  if (args[0] !== 'api') return false;
+  const prefix = `repos/${repository}/commits/`;
+  const endpoint = args[1] ?? '';
+  const sha = endpoint.slice(prefix.length, -'/check-runs'.length);
+  return (
+    endpoint.startsWith(prefix) &&
+    /^[a-f0-9]{40}$/.test(sha) &&
+    exact(args, ['api', `${prefix}${sha}/check-runs`, '--jq', '.check_runs'])
+  );
+}
+
+function panelPrRead(args, repository) {
+  if (args[0] !== 'pr') return undefined;
+  if (args[1] === 'view') {
+    const input = options(args.slice(2), ['--repo', '--json']);
+    if (input['--repo'] === repository && input['--json'] === checkFields)
+      return { kind: 'pr-checks' };
+    throw new Error('Unexpected fixture query');
+  }
+  if (args[1] === 'list' && args.includes('--limit')) {
+    const input = options(args.slice(2), ['--repo', '--state', '--limit', '--json']);
+    if (
+      input['--repo'] === repository &&
+      input['--state'] === 'open' &&
+      input['--limit'] === '30' &&
+      input['--json'] === panelFields
+    )
+      return { kind: 'panel-list' };
+    throw new Error('Unexpected fixture query');
+  }
+  return undefined;
+}
 
 function options(args, required, optional = []) {
   const result = {};
@@ -37,6 +86,8 @@ function options(args, required, optional = []) {
 }
 
 function parse(args, repository) {
+  const read = panelRead(args, repository);
+  if (read) return read;
   if (args.length === 2 && args[0] === 'auth' && args[1] === 'status') return { kind: 'auth' };
   if (args[0] !== 'pr') throw new Error('Unsupported fixture command');
   const shared = ['--repo', '--head', '--base'];
@@ -59,7 +110,40 @@ function parse(args, repository) {
   return { kind, input };
 }
 
+function readResult(request, config, ledger) {
+  if (request.kind === 'version') return { code: 0, output: 'gh version 0.0.0 (owned fixture)\n' };
+  if (request.kind === 'repository')
+    return {
+      code: 0,
+      output: `${JSON.stringify({ url: `https://github.com/${config.repository}` })}\n`,
+    };
+  if (!['panel-list', 'pr-checks', 'commit-checks'].includes(request.kind)) return undefined;
+  if (config.enrichmentFailure && ledger.pullRequests.length > 0)
+    return { code: 1, error: 'Fixture PR query unavailable' };
+  if (request.kind === 'commit-checks') return { code: 0, output: '[]\n' };
+  if (request.kind === 'panel-list') {
+    const rows = ledger.pullRequests.slice(0, 30).map((pr) => ({
+      number: pr.number,
+      url: pr.url,
+      title: pr.title,
+      headRefName: pr.headRefName,
+      baseRefName: pr.baseRefName,
+      isDraft: pr.isDraft,
+      state: 'OPEN',
+      statusCheckRollup: [],
+    }));
+    return { code: 0, output: `${JSON.stringify(rows)}\n` };
+  }
+  const rows = ledger.pullRequests.filter((pr) => pr.headRefName === config.currentBranch);
+  if (rows.length !== 1)
+    return { code: 1, error: 'No unambiguous fixture pull request for branch' };
+  const { number, url } = rows[0];
+  return { code: 0, output: `${JSON.stringify({ number, url, statusCheckRollup: [] })}\n` };
+}
+
 function dispatch(request, config, ledger) {
+  const read = readResult(request, config, ledger);
+  if (read) return read;
   if (request.kind === 'auth') {
     return config.authFailure
       ? { code: 1, error: 'Fixture authentication unavailable' }

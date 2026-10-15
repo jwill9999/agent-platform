@@ -181,6 +181,14 @@ export function useGitDelivery(projectId: string | null) {
     [],
   );
   const currentView = view.projectId === projectId ? view : emptyView(projectId);
+  // Saved history is oldest-first. Surface unresolved uncertainty on reopening;
+  // otherwise show the newest operation, while preserving an explicit selection.
+  const defaultSelection = [...currentView.operations].sort(
+    (a, b) =>
+      Number(b.state === 'unknown' && b.acknowledgedAtMs === undefined) -
+        Number(a.state === 'unknown' && a.acknowledgedAtMs === undefined) ||
+      b.createdAtMs - a.createdAtMs,
+  )[0];
   return {
     ...currentView,
     pending,
@@ -191,7 +199,7 @@ export function useGitDelivery(projectId: string | null) {
     select,
     selected:
       currentView.operations.find((item) => item.id === currentView.selectedId) ??
-      currentView.operations[0] ??
+      defaultSelection ??
       null,
   };
 }

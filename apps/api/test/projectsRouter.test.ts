@@ -8,6 +8,7 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { createServer, type Server } from 'node:http';
@@ -384,10 +385,65 @@ describe('projectsRouter', () => {
       clean: true,
     });
 
-    const push = await request(app).post(`/v1/projects/${projectId}/git/push`).send({}).expect(409);
+    const push = await request(app).post(`/v1/projects/${projectId}/git/push`).send({}).expect(410);
     expect(push.body.error).toMatchObject({
-      code: 'PROJECT_GIT_UPSTREAM_MISSING',
+      code: 'PROJECT_GIT_PREPARE_REQUIRED',
     });
+  });
+
+  it('background Git reads preserve stale index bytes and an independently owned index lock', async () => {
+    const repoDir = path.join(tmpDir, 'read-only-status-repo');
+    const git = (...args: string[]) =>
+      execFileSync(GIT_BINARY, args, {
+        cwd: repoDir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim();
+    execFileSync(GIT_BINARY, ['init', '-b', 'feature/test', repoDir], { stdio: 'ignore' });
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test User');
+    const tracked = path.join(repoDir, 'README.md');
+    writeFileSync(tracked, 'retained content\n');
+    git('add', 'README.md');
+    git('commit', '-m', 'initial');
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Read-only status' })
+      .expect(201);
+    const id = registered.body.data.project.id;
+    const indexPath = path.join(repoDir, '.git', 'index');
+    const lockPath = path.join(repoDir, '.git', 'index.lock');
+    const head = git('rev-parse', 'HEAD');
+    const routes = [
+      'git/status',
+      'git/changes',
+      'git/conflicts',
+      'branches',
+      'git/diff?path=README.md&mode=unstaged',
+      'git/diff?path=README.md&mode=staged',
+    ];
+    for (const locked of [false, true]) {
+      // Same content, deliberately stale stat data: ordinary status would refresh the index.
+      utimesSync(tracked, new Date(1000), new Date(1000));
+      const before = readFileSync(indexPath);
+      if (locked) writeFileSync(lockPath, 'owned by another Git process\n');
+      for (const route of routes) {
+        const response = await request(app).get(`/v1/projects/${id}/${route}`).expect(200);
+        if (route === 'git/status' || route === 'git/changes')
+          expect(response.body.data.clean).toBe(true);
+        if (route === 'git/changes') expect(response.body.data.files).toEqual([]);
+        if (route === 'git/conflicts') expect(response.body.data.totalConflicts).toBe(0);
+        expect(readFileSync(indexPath), `index after ${route}, locked=${locked}`).toEqual(before);
+        expect(git('rev-parse', 'HEAD')).toBe(head);
+        if (locked) expect(readFileSync(lockPath, 'utf8')).toBe('owned by another Git process\n');
+        else expect(existsSync(lockPath)).toBe(false);
+      }
+    }
+    rmSync(lockPath);
+    const stale = readFileSync(indexPath);
+    git('status', '--porcelain=v1');
+    expect(readFileSync(indexPath)).not.toEqual(stale);
   });
 
   it('summarizes local Project Git status for the Git and GitHub panel', async () => {
@@ -649,7 +705,6 @@ fi
 if [ "$1" = "repo" ] && [ "$2" = "create" ]; then
   git init --bare "${remoteDir}" >/dev/null 2>&1
   git -C "$PWD" remote add origin "${remoteDir}"
-  git -C "$PWD" push -u origin main >/dev/null 2>&1
   echo "https://github.com/jwill9999/desktop-github-create-repo"
   exit 0
 fi
@@ -678,6 +733,19 @@ exit 1
       .send({ path: repoDir, name: 'Desktop GitHub Create Repo' })
       .expect(201);
 
+    await request(app)
+      .post(`/v1/projects/${registered.body.data.project.id}/git/github/create-repository`)
+      .send({
+        owner: 'jwill9999',
+        name: 'desktop-github-create-repo',
+        visibility: 'private',
+        pushCurrentBranch: true,
+      })
+      .expect(410);
+    expect(existsSync(ghLog)).toBe(false);
+    expect(execFileSync(GIT_BINARY, ['remote'], { cwd: repoDir, encoding: 'utf8' }).trim()).toBe(
+      '',
+    );
     const created = await request(app)
       .post(`/v1/projects/${registered.body.data.project.id}/git/github/create-repository`)
       .send({
@@ -685,18 +753,17 @@ exit 1
         name: 'desktop-github-create-repo',
         description: 'Created from AI Studio',
         visibility: 'private',
-        pushCurrentBranch: true,
+        pushCurrentBranch: false,
       })
       .expect(200);
 
     expect(created.body.data).toMatchObject({
       repositoryUrl: 'https://github.com/jwill9999/desktop-github-create-repo',
       remoteUrl: remoteDir,
-      pushed: true,
+      pushed: false,
       status: {
         currentBranch: 'main',
-        upstreamBranch: 'origin/main',
-        upstreamState: 'active',
+        upstreamState: 'none',
         ahead: 0,
       },
     });
@@ -826,7 +893,7 @@ exit 1
         owner: 'jwill9999',
         name: 'desktop-missing-gh',
         visibility: 'private',
-        pushCurrentBranch: true,
+        pushCurrentBranch: false,
       })
       .expect(409);
 
@@ -1142,7 +1209,7 @@ exit 1
     });
   });
 
-  it('creates a GitHub pull request for a published branch using the configured GitHub CLI binary', async () => {
+  it('requires a reviewed receipt instead of legacy PR creation even for a published branch', async () => {
     const repoDir = path.join(tmpDir, 'desktop-github-create-pr-repo');
     const bareRemoteDir = path.join(tmpDir, 'desktop-github-create-pr-remote.git');
     const ghBinary = path.join(tmpDir, 'fake-gh-create-pr');
@@ -1228,28 +1295,9 @@ exit 1
     const created = await request(app)
       .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
       .send({ title: 'Add PR creation flow', baseBranch: 'staging' })
-      .expect(200);
+      .expect(410);
 
-    expect(created.body.data).toMatchObject({
-      pullRequest: {
-        number: 43,
-        title: 'Add PR creation flow',
-        url: 'https://github.com/user/repo/pull/43',
-        headRefName: 'task/pr-flow',
-        baseRefName: 'staging',
-        currentBranch: true,
-      },
-      pullRequests: {
-        available: true,
-        pullRequests: [expect.objectContaining({ number: 43, currentBranch: true })],
-      },
-      checks: {
-        available: true,
-        scope: 'pull_request',
-        pullRequestNumber: 43,
-        summary: expect.objectContaining({ total: 1, inProgress: 1 }),
-      },
-    });
+    expect(created.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
   });
 
   it('rejects GitHub pull request creation without a GitHub remote', async () => {
@@ -1276,11 +1324,9 @@ exit 1
     const rejected = await request(app)
       .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
       .send({ title: 'Add PR creation flow' })
-      .expect(409);
+      .expect(410);
 
-    expect(rejected.body.error).toMatchObject({
-      code: 'PROJECT_GITHUB_REMOTE_REQUIRED',
-    });
+    expect(rejected.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
   });
 
   it('rejects GitHub pull request creation when gh is missing or unauthenticated', async () => {
@@ -1312,8 +1358,8 @@ exit 1
     const missingGh = await request(app)
       .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
       .send({ title: 'Add PR creation flow' })
-      .expect(409);
-    expect(missingGh.body.error).toMatchObject({ code: 'PROJECT_GITHUB_CLI_UNAVAILABLE' });
+      .expect(410);
+    expect(missingGh.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
 
     const ghBinary = path.join(tmpDir, 'fake-gh-create-pr-unauth');
     writeFileSync(
@@ -1335,8 +1381,8 @@ exit 1
     const unauthenticated = await request(app)
       .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
       .send({ title: 'Add PR creation flow' })
-      .expect(409);
-    expect(unauthenticated.body.error).toMatchObject({ code: 'PROJECT_GITHUB_AUTH_REQUIRED' });
+      .expect(410);
+    expect(unauthenticated.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
   });
 
   it('rejects GitHub pull request creation before the branch is published', async () => {
@@ -1386,11 +1432,9 @@ exit 1
     const rejected = await request(app)
       .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
       .send({ title: 'Add PR creation flow' })
-      .expect(409);
+      .expect(410);
 
-    expect(rejected.body.error).toMatchObject({
-      code: 'PROJECT_GIT_UPSTREAM_REQUIRED',
-    });
+    expect(rejected.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
   });
 
   it('blocks Project branch switching when the working tree is dirty', async () => {
@@ -1440,7 +1484,7 @@ exit 1
     ).toBe('main');
   });
 
-  it('pushes the current Project branch when an upstream is configured', async () => {
+  it('requires a reviewed push receipt even with an upstream configured', async () => {
     const remoteDir = path.join(tmpDir, 'desktop-push-remote.git');
     const repoDir = path.join(tmpDir, 'desktop-push-repo');
     execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
@@ -1484,16 +1528,13 @@ exit 1
     const pushed = await request(app)
       .post(`/v1/projects/${projectId}/git/push`)
       .send({})
-      .expect(200);
-    expect(pushed.body.data).toMatchObject({
-      currentBranch: 'main',
-      upstreamBranch: 'origin/main',
-      ahead: 0,
-      behind: 0,
-    });
+      .expect(410);
+    expect(pushed.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
+    const unchanged = await request(app).get(`/v1/projects/${projectId}/git/status`).expect(200);
+    expect(unchanged.body.data).toMatchObject({ ahead: 1, upstreamBranch: 'origin/main' });
   });
 
-  it('publishes the current Project branch and sets upstream when origin exists', async () => {
+  it('requires a reviewed publish receipt without changing upstream', async () => {
     const remoteDir = path.join(tmpDir, 'desktop-publish-remote.git');
     const repoDir = path.join(tmpDir, 'desktop-publish-repo');
     execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
@@ -1532,15 +1573,11 @@ exit 1
     const published = await request(app)
       .post(`/v1/projects/${projectId}/git/publish`)
       .send({})
-      .expect(200);
+      .expect(410);
 
-    expect(published.body.data).toMatchObject({
-      currentBranch: 'main',
-      upstreamBranch: 'origin/main',
-      upstreamState: 'active',
-      ahead: 0,
-      behind: 0,
-    });
+    expect(published.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
+    const unchanged = await request(app).get(`/v1/projects/${projectId}/git/status`).expect(200);
+    expect(unchanged.body.data).toMatchObject({ upstreamState: 'none' });
   });
 
   it('pulls remote commits for a clean behind Project branch', async () => {
@@ -1768,6 +1805,17 @@ exit 1
       'line one\ncurrent\nincoming\n',
     );
 
+    const mergeHeadBefore = execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], {
+      cwd: repoDir,
+      encoding: 'utf8',
+    }).trim();
+    await request(app)
+      .post(`/v1/projects/${projectId}/git/conflicts/commit`)
+      .send({ message: 'Merge remote changes', push: true })
+      .expect(410);
+    expect(
+      execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], { cwd: repoDir, encoding: 'utf8' }).trim(),
+    ).toBe(mergeHeadBefore);
     const committed = await request(app)
       .post(`/v1/projects/${projectId}/git/conflicts/commit`)
       .send({ message: 'Merge remote changes' })

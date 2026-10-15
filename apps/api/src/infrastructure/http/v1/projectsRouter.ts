@@ -5,8 +5,6 @@ import {
   ProjectDesktopRegistrationResultSchema,
   ProjectBranchCheckoutBodySchema,
   ProjectBranchListResultSchema,
-  ProjectGitCreatePullRequestBodySchema,
-  ProjectGitCreatePullRequestResultSchema,
   ProjectGitConflictFileResultSchema,
   ProjectGitConflictMarkResolvedBodySchema,
   ProjectGitConflictResolveBodySchema,
@@ -49,7 +47,6 @@ import {
   type ProjectGitCheckRun,
   type ProjectGitCheckStatus,
   type ProjectGitChecksSummary,
-  type ProjectGitCreatePullRequestBody,
   type ProjectGitConflictFile,
   type ProjectGitConflictHunk,
   type ProjectGitConflictMarkResolvedBody,
@@ -843,7 +840,13 @@ function projectBranchList(project: ProjectRecord): ProjectBranchListResult {
     '--format=%(refname:short)',
     'refs/heads',
   ]);
-  const clean = gitOutput(repositoryRoot, ['status', '--porcelain', ...GIT_USER_PATHS]) === '';
+  const clean =
+    gitOutput(repositoryRoot, [
+      '--no-optional-locks',
+      'status',
+      '--porcelain',
+      ...GIT_USER_PATHS,
+    ]) === '';
   const branchNames = branchOutput
     .split('\n')
     .map((branch) => branch.trim())
@@ -1024,10 +1027,25 @@ function parseNumstat(
 
 function enrichChangeStats(repositoryRoot: string, files: ProjectGitChangedFile[]) {
   const unstagedStats = parseNumstat(
-    gitValue(repositoryRoot, ['diff', '--numstat', ...GIT_USER_PATHS]) ?? '',
+    gitValue(repositoryRoot, [
+      '--no-optional-locks',
+      '-c',
+      'diff.autoRefreshIndex=false',
+      'diff',
+      '--numstat',
+      ...GIT_USER_PATHS,
+    ]) ?? '',
   );
   const stagedStats = parseNumstat(
-    gitValue(repositoryRoot, ['diff', '--cached', '--numstat', ...GIT_USER_PATHS]) ?? '',
+    gitValue(repositoryRoot, [
+      '--no-optional-locks',
+      '-c',
+      'diff.autoRefreshIndex=false',
+      'diff',
+      '--cached',
+      '--numstat',
+      ...GIT_USER_PATHS,
+    ]) ?? '',
   );
   return files.map((file) => {
     const stats = stagedStats.get(file.path) ?? unstagedStats.get(file.path);
@@ -1057,6 +1075,7 @@ function projectGitChanges(project: ProjectRecord) {
   if (!repositoryRoot) return unavailableGitChanges('Project is not a Git repository.');
 
   const statusOutput = gitRawOutput(repositoryRoot, [
+    '--no-optional-locks',
     'status',
     '--porcelain=v1',
     '-z',
@@ -1064,7 +1083,12 @@ function projectGitChanges(project: ProjectRecord) {
   ]);
   const files = enrichChangeStats(repositoryRoot, parseStatusZ(statusOutput));
   const workingTree = parseWorkingTree(
-    gitRawOutput(repositoryRoot, ['status', '--porcelain=v1', ...GIT_USER_PATHS]),
+    gitRawOutput(repositoryRoot, [
+      '--no-optional-locks',
+      'status',
+      '--porcelain=v1',
+      ...GIT_USER_PATHS,
+    ]),
   );
 
   return ProjectGitChangesResultSchema.parse({
@@ -1081,7 +1105,17 @@ function gitDiffOutput(
   mode: 'staged' | 'unstaged',
 ): string {
   const args =
-    mode === 'staged' ? ['diff', '--cached', '--', pathValue] : ['diff', '--', pathValue];
+    mode === 'staged'
+      ? [
+          '--no-optional-locks',
+          '-c',
+          'diff.autoRefreshIndex=false',
+          'diff',
+          '--cached',
+          '--',
+          pathValue,
+        ]
+      : ['--no-optional-locks', '-c', 'diff.autoRefreshIndex=false', 'diff', '--', pathValue];
   return gitRawOutput(repositoryRoot, args);
 }
 
@@ -1152,54 +1186,6 @@ function stashProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
   return projectGitChanges(project);
 }
 
-function pushProjectGitBranch(project: ProjectRecord) {
-  const repositoryRoot = repositoryRootForBranchOperations(project);
-  const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
-  if (!currentBranch) {
-    throw new HttpError(
-      409,
-      'PROJECT_BRANCH_DETACHED',
-      'Project is currently on a detached Git HEAD.',
-    );
-  }
-  const upstream = branchUpstreamState(repositoryRoot, currentBranch);
-  const upstreamBranch = upstream.upstreamBranch;
-  if (!upstreamBranch) {
-    throw new HttpError(
-      409,
-      'PROJECT_GIT_NO_UPSTREAM',
-      'This branch has no upstream. Push from the terminal with --set-upstream, or create a remote first.',
-    );
-  }
-  if (upstream.upstreamState === 'missing') {
-    throw new HttpError(
-      409,
-      'PROJECT_GIT_UPSTREAM_MISSING',
-      'This branch tracks an upstream that no longer exists. Publish the branch or unset the upstream from the terminal.',
-    );
-  }
-
-  try {
-    execFileSync(GIT_BINARY, ['-C', repositoryRoot, 'push'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 120000,
-    });
-  } catch (cause) {
-    const stderr =
-      cause && typeof cause === 'object' && 'stderr' in cause
-        ? String((cause as { stderr?: unknown }).stderr ?? '').trim()
-        : '';
-    throw new HttpError(
-      409,
-      'PROJECT_GIT_PUSH_FAILED',
-      stderr || 'Git push failed for this Project.',
-    );
-  }
-
-  return projectGitStatus(project);
-}
-
 function requireCurrentBranch(repositoryRoot: string) {
   const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
   if (!currentBranch) {
@@ -1210,39 +1196,6 @@ function requireCurrentBranch(repositoryRoot: string) {
     );
   }
   return currentBranch;
-}
-
-function publishProjectGitBranch(project: ProjectRecord) {
-  const repositoryRoot = repositoryRootForBranchOperations(project);
-  const currentBranch = requireCurrentBranch(repositoryRoot);
-  const originUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
-  if (!originUrl) {
-    throw new HttpError(
-      409,
-      'PROJECT_GIT_NO_REMOTE',
-      'This Project is not connected to GitHub yet. Add an origin remote or create a GitHub repository before publishing.',
-    );
-  }
-
-  try {
-    execFileSync(GIT_BINARY, ['-C', repositoryRoot, 'push', '-u', 'origin', currentBranch], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 120000,
-    });
-  } catch (cause) {
-    const stderr =
-      cause && typeof cause === 'object' && 'stderr' in cause
-        ? String((cause as { stderr?: unknown }).stderr ?? '').trim()
-        : '';
-    throw new HttpError(
-      409,
-      'PROJECT_GIT_PUBLISH_FAILED',
-      stderr || 'Git could not publish this Project branch.',
-    );
-  }
-
-  return projectGitStatus(project);
 }
 
 function requireGitHubCli(repositoryRoot: string) {
@@ -1342,6 +1295,12 @@ function createProjectGitHubRepository(project: ProjectRecord, rawBody: unknown)
     ProjectGitHubCreateRepositoryBodySchema,
     rawBody,
   );
+  if (body.pushCurrentBranch)
+    throw new HttpError(
+      410,
+      'PROJECT_GIT_PREPARE_REQUIRED',
+      'Create the repository without pushing, then review a separate publish operation.',
+    );
   const repositoryRoot = repositoryRootForBranchOperations(project);
   requireCurrentBranch(repositoryRoot);
   const existingOrigin = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
@@ -1366,7 +1325,6 @@ function createProjectGitHubRepository(project: ProjectRecord, rawBody: unknown)
     'origin',
   ];
   if (body.description) args.push('--description', body.description);
-  if (body.pushCurrentBranch) args.push('--push');
 
   const output = gitHubExec(
     repositoryRoot,
@@ -1486,7 +1444,7 @@ function projectGitConflictSummary(repositoryRoot: string): {
   files: ProjectGitConflictFile[];
 } {
   const conflictFiles = parseStatusZ(
-    gitRawOutput(repositoryRoot, ['status', '--porcelain=v1', '-z']),
+    gitRawOutput(repositoryRoot, ['--no-optional-locks', 'status', '--porcelain=v1', '-z']),
   ).filter((file) => file.status === 'conflict');
   const files = conflictFiles.map((file) => {
     const content = readFileSync(resolve(repositoryRoot, file.path), 'utf8');
@@ -1660,7 +1618,19 @@ function pullProjectGitRemoteChanges(project: ProjectRecord) {
 
 function commitProjectGitMergeResolution(project: ProjectRecord, rawBody: unknown) {
   const body: ProjectGitMergeCommitBody = parseBody(ProjectGitMergeCommitBodySchema, rawBody);
+  if (body.push)
+    throw new HttpError(
+      410,
+      'PROJECT_GIT_PREPARE_REQUIRED',
+      'Commit the resolved merge without pushing, then review a separate push operation.',
+    );
   const repositoryRoot = repositoryRootForBranchOperations(project);
+  if (!gitValue(repositoryRoot, ['rev-parse', '--verify', 'MERGE_HEAD']))
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_MERGE_REQUIRED',
+      'This endpoint only completes an existing merge. Review ordinary commits through Git delivery.',
+    );
   const conflicts = projectGitConflictSummary(repositoryRoot);
   if (conflicts.totalConflicts > 0) {
     throw new HttpError(
@@ -1678,21 +1648,6 @@ function commitProjectGitMergeResolution(project: ProjectRecord, rawBody: unknow
     );
   }
   gitOutput(repositoryRoot, ['commit', '-m', body.message]);
-  if (body.push) {
-    try {
-      execFileSync(GIT_BINARY, ['-C', repositoryRoot, 'push'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 120000,
-      });
-    } catch (cause) {
-      throw new HttpError(
-        409,
-        'PROJECT_GIT_PUSH_FAILED',
-        gitErrorMessage(cause) || 'Merge resolution committed, but push failed.',
-      );
-    }
-  }
   return projectGitStatus(project);
 }
 
@@ -1733,6 +1688,7 @@ function projectGitStatus(project: ProjectRecord) {
   }
 
   const statusOutput = gitOutput(repositoryRoot, [
+    '--no-optional-locks',
     'status',
     '--porcelain=v1',
     '--branch',
@@ -2237,119 +2193,6 @@ function parseGhPullRequests(
         checks: summarizePullRequestChecks(pullRequest.statusCheckRollup),
       },
     ];
-  });
-}
-
-function parseGhPullRequest(output: string, currentBranch: string | undefined) {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(output);
-  } catch {
-    const urlMatch = /https:\/\/github\.com\/[^/\s"']+\/[^/\s"']+\/pull\/(\d+)/i.exec(output);
-    if (urlMatch?.[0] && urlMatch[1]) {
-      return {
-        number: Number.parseInt(urlMatch[1], 10),
-        title: `Pull request #${urlMatch[1]}`,
-        state: 'open' as const,
-        url: urlMatch[0],
-        headRefName: currentBranch ?? 'branch',
-        baseRefName: 'main',
-        isDraft: false,
-        currentBranch: true,
-        checks: EMPTY_PR_CHECK_SUMMARY,
-      };
-    }
-    throw new HttpError(
-      502,
-      'PROJECT_GITHUB_PULL_REQUEST_CREATE_INVALID',
-      'GitHub pull request creation response was invalid.',
-    );
-  }
-  const pullRequests = parseGhPullRequests(JSON.stringify([parsed]), currentBranch);
-  const pullRequest = pullRequests[0];
-  if (!pullRequest) {
-    throw new HttpError(
-      502,
-      'PROJECT_GITHUB_PULL_REQUEST_CREATE_INVALID',
-      'GitHub pull request creation response was invalid.',
-    );
-  }
-  return pullRequest;
-}
-
-function createProjectGithubPullRequest(project: ProjectRecord, rawBody: unknown) {
-  const body: ProjectGitCreatePullRequestBody = parseBody(
-    ProjectGitCreatePullRequestBodySchema,
-    rawBody,
-  );
-  const repositoryRoot = repositoryRootForBranchOperations(project);
-  const currentBranch = requireCurrentBranch(repositoryRoot);
-  const remoteUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
-  const repositorySlug = githubRepositorySlug(remoteUrl);
-  if (!repositorySlug) {
-    throw new HttpError(
-      409,
-      'PROJECT_GITHUB_REMOTE_REQUIRED',
-      'Connect this Project to a GitHub repository before creating a pull request.',
-    );
-  }
-
-  requireGitHubCli(repositoryRoot);
-
-  const upstream = branchUpstreamState(repositoryRoot, currentBranch);
-  if (!upstream.upstreamBranch || upstream.upstreamState !== 'active') {
-    throw new HttpError(
-      409,
-      'PROJECT_GIT_UPSTREAM_REQUIRED',
-      'Publish this branch to GitHub before creating a pull request.',
-    );
-  }
-
-  const status = projectGitStatus(project);
-  if (status.available && status.ahead > 0) {
-    throw new HttpError(
-      409,
-      'PROJECT_GIT_UNPUBLISHED_COMMITS',
-      'Push local commits to GitHub before creating a pull request.',
-    );
-  }
-
-  const baseBranch = body.baseBranch ?? 'main';
-  const args = [
-    'pr',
-    'create',
-    '--repo',
-    repositorySlug,
-    '--title',
-    body.title,
-    '--base',
-    baseBranch,
-    '--head',
-    currentBranch,
-  ];
-  args.push('--body', body.body || `Created from AI Studio for ${currentBranch}.`);
-  if (body.draft) args.push('--draft');
-
-  const output = gitHubExec(
-    repositoryRoot,
-    args,
-    'PROJECT_GITHUB_PULL_REQUEST_CREATE_FAILED',
-    'GitHub pull request could not be created.',
-  );
-  const createdPullRequest = parseGhPullRequest(output, currentBranch);
-  const pullRequests = projectGithubPullRequests(project);
-  const refreshedPullRequest =
-    pullRequests.pullRequests.find(
-      (pullRequest) => pullRequest.number === createdPullRequest.number,
-    ) ??
-    pullRequests.pullRequests.find((pullRequest) => pullRequest.currentBranch) ??
-    createdPullRequest;
-  const checks = projectGitChecks(project);
-
-  return ProjectGitCreatePullRequestResultSchema.parse({
-    pullRequest: refreshedPullRequest,
-    pullRequests,
-    ...(checks.available ? { checks } : {}),
   });
 }
 
@@ -3283,19 +3126,27 @@ export function createProjectsRouter(db: DrizzleDb): Router {
 
   router.post(
     '/:id/git/push',
-    asyncHandler(async (req, res) => {
+    asyncHandler(async (req) => {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
-      res.json({ data: pushProjectGitBranch(project) });
+      throw new HttpError(
+        410,
+        'PROJECT_GIT_PREPARE_REQUIRED',
+        'Prepare and confirm this operation through Git delivery.',
+      );
     }),
   );
 
   router.post(
     '/:id/git/publish',
-    asyncHandler(async (req, res) => {
+    asyncHandler(async (req) => {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
-      res.json({ data: publishProjectGitBranch(project) });
+      throw new HttpError(
+        410,
+        'PROJECT_GIT_PREPARE_REQUIRED',
+        'Prepare and confirm this operation through Git delivery.',
+      );
     }),
   );
 
@@ -3400,10 +3251,14 @@ export function createProjectsRouter(db: DrizzleDb): Router {
 
   router.post(
     '/:id/github/pull-requests',
-    asyncHandler(async (req, res) => {
+    asyncHandler(async (req) => {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
-      res.json({ data: createProjectGithubPullRequest(project, req.body) });
+      throw new HttpError(
+        410,
+        'PROJECT_GIT_PREPARE_REQUIRED',
+        'Prepare and confirm this operation through Git delivery.',
+      );
     }),
   );
 

@@ -66,6 +66,25 @@ afterEach(async () => {
 });
 
 describe('Git delivery browser transport state', () => {
+  it('reopens unresolved outcomes ahead of old history and preserves explicit selection', async () => {
+    const cancelled = { ...receipt, state: 'cancelled' as const };
+    const unknown = { ...receipt, id: 'unknown', state: 'unknown' as const, createdAtMs: 2 };
+    const latest = { ...receipt, id: 'latest', state: 'succeeded' as const, createdAtMs: 3 };
+    let operations: GitDeliveryReceipt[] = [cancelled, unknown, latest];
+    transport.get.mockImplementation(async (path: string) =>
+      path.endsWith('/index') ? { paths: [] } : { operations },
+    );
+    await mount();
+    expect(current.selected?.id).toBe('unknown');
+    await act(async () => current.select(cancelled.id));
+    await act(async () => current.refresh());
+    expect(current.selected?.id).toBe(cancelled.id);
+    operations = [cancelled, { ...unknown, acknowledgedAtMs: 4 }, latest];
+    await mount('second');
+    await mount();
+    expect(current.selected?.id).toBe('latest');
+    expect(transport.post).not.toHaveBeenCalled();
+  });
   it('loads full index without mutations and separates preparation from confirmation', async () => {
     await mount();
     expect(current.stagedPaths).toEqual(['.agent-platform/staged.txt']);

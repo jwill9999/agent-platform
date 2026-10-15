@@ -1,0 +1,7 @@
+# Test-only external GitHub boundary. The serialized Git fixture creates/removes these
+# appuser-owned files; absent state fails closed. Never load this overlay in normal use.
+services:
+  api:
+    environment:
+      AGENT_PLATFORM_GH_BINARY: /tmp/agent-platform-git-delivery-boundary/gh
+      GIT_DELIVERY_GH_FIXTURE_DIR: /tmp/agent-platform-git-delivery-boundary/state

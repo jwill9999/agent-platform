@@ -6,8 +6,10 @@ import path from 'node:path';
 import type { GitDeliveryAction } from '@agent-platform/contracts';
 import { gitDeliveryEnvironment, runGitDeliveryCommand } from './process.js';
 import { GitDeliveryError } from './types.js';
+import type { GitDeliveryRemoteMaterial } from './remote.js';
 
 export interface GitDeliveryMaterial {
+  remote?: GitDeliveryRemoteMaterial;
   root: string;
   workspaceRoot: string;
   branch: string;
@@ -312,6 +314,7 @@ export function sameReviewedMaterial(a: GitDeliveryMaterial, b: GitDeliveryMater
     a.indexTree === b.indexTree &&
     a.indexEntries === b.indexEntries &&
     a.selectedFingerprint === b.selectedFingerprint &&
-    a.repositoryIdentity === b.repositoryIdentity
+    a.repositoryIdentity === b.repositoryIdentity &&
+    JSON.stringify(a.remote) === JSON.stringify(b.remote)
   );
 }

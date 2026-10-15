@@ -150,6 +150,43 @@ describe('Git delivery shared local service', () => {
     claimApprovalRequestForResume(opened.db, id, time);
     return id;
   }
+  it('can inspect and deny an owned prepared receipt when its repository disappears', async () => {
+    changedFile();
+    const { port } = chat();
+    const receipt = await port.prepare(action(), { toolCallId: 'missing-root' });
+    renameSync(repo, join(directory, 'moved-repository'));
+    expect((await port.get(receipt.id)).state).toBe('prepared');
+    expect((await port.cancel(receipt.id, 'denied')).state).toBe('denied');
+    expect((await port.cancel(receipt.id, 'cancelled')).state).toBe('denied');
+  });
+  it.each(['project', 'session', 'session-mode'] as const)(
+    'denies receipt inspection/cancellation after changed persisted %s ownership',
+    async (changed) => {
+      changedFile();
+      const { port, session } = chat();
+      const receipt = await port.prepare(action(), { toolCallId: 'ownership' });
+      if (changed === 'project')
+        opened.sqlite.prepare('DELETE FROM projects WHERE id = ?').run(projectId);
+      if (changed === 'session')
+        opened.sqlite.prepare('DELETE FROM sessions WHERE id = ?').run(session.id);
+      if (changed === 'session-mode')
+        opened.sqlite.prepare("UPDATE sessions SET mode = 'chat' WHERE id = ?").run(session.id);
+      await expect(port.get(receipt.id)).rejects.toBeDefined();
+      await expect(port.cancel(receipt.id, 'denied')).rejects.toBeDefined();
+      expect(getGitDeliveryOperation(opened.db, receipt.id)?.receipt.state).toBe('prepared');
+    },
+  );
+  it.each(['executing', 'unknown'] as const)(
+    'effect-free cancellation does not relabel %s after repository disappears',
+    async (state) => {
+      changedFile();
+      const { port } = chat();
+      const receipt = await port.prepare(action(), { toolCallId: 'no-relabel' });
+      transitionGitDeliveryOperation(opened.db, receipt.id, 'prepared', { ...receipt, state });
+      renameSync(repo, join(directory, 'moved-repository'));
+      expect((await port.cancel(receipt.id, 'denied')).state).toBe(state);
+    },
+  );
   it('creates a missing configured temporary parent without changing the reviewed real index', async () => {
     changedFile();
     const temporaryParent = join(directory, 'fresh-runtime', 'tmp', 'browser');

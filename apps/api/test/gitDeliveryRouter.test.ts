@@ -138,9 +138,9 @@ describe('production Git delivery HTTP routing', () => {
     expect(response.body.data).toBeUndefined();
     expect(readFileSync(join(repo, '.git', 'index'))).toEqual(original);
   });
-  it('disables all legacy local write endpoints even with forged confirmation', async () => {
+  it('disables legacy ordinary write endpoints even with forged confirmation', async () => {
     const oldBase = route.replace('/delivery', '');
-    for (const endpoint of ['stage', 'unstage', 'commit']) {
+    for (const endpoint of ['stage', 'unstage', 'commit', 'push', 'publish']) {
       const response = await request(url)
         .post(`${oldBase}/${endpoint}`)
         .send({ paths: ['file.txt'], message: 'no bypass', confirmed: true })
@@ -149,6 +149,18 @@ describe('production Git delivery HTTP routing', () => {
     }
     expect(git(repo, ['diff', '--cached', '--name-only'])).toBe('');
     expect(git(repo, ['log', '-1', '--format=%s'])).toBe('initial');
+  });
+  it('does not let the conflict commit route bypass ordinary commit review', async () => {
+    git(repo, ['add', '--', 'file.txt']);
+    const index = git(repo, ['write-tree']);
+    const head = git(repo, ['rev-parse', 'HEAD']);
+    const response = await request(url)
+      .post(`${route.replace('/delivery', '')}/conflicts/commit`)
+      .send({ message: 'bypass', push: false })
+      .expect(409);
+    expect(response.body.error.code).toBe('PROJECT_GIT_MERGE_REQUIRED');
+    expect(git(repo, ['write-tree'])).toBe(index);
+    expect(git(repo, ['rev-parse', 'HEAD'])).toBe(head);
   });
   it.each([
     { action: { ...stage, root: '/outside' } },

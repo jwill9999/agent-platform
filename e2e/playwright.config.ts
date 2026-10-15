@@ -20,7 +20,8 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: /(?:mcp-(?:onboarding|chat)|chat-reply-reliability)\.spec\.ts/,
+      testIgnore:
+        /(?:mcp-(?:onboarding|chat)|chat-reply-reliability|git-delivery-[a-z-]+)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },
     },
     {
@@ -36,6 +37,15 @@ export default defineConfig({
       name: 'mcp-onboarding',
       testMatch: /mcp-(onboarding|chat)\.spec\.ts/,
       dependencies: ['chat-reply'],
+      fullyParallel: false,
+      workers: 1,
+      use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },
+    },
+    {
+      // Owns the isolated API's external gh boundary; never run beside other journeys.
+      name: 'git-delivery',
+      testMatch: /git-delivery-[a-z-]+\.spec\.ts/,
+      dependencies: ['mcp-onboarding'],
       fullyParallel: false,
       workers: 1,
       use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },

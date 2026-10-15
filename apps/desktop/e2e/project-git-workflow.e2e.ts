@@ -1,11 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getOpenPort, seedDesktopDatabase } from './support/runtime.js';
+import { createGhLedgerFixture } from '../../../e2e/support/git-delivery/gh-ledger.mjs';
+import { createGitTransportFixture } from '../../../e2e/support/git-delivery/git-transport.mjs';
+import { runRemotePanelJourney } from '../../../e2e/support/git-delivery/panel-remote-journey.js';
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
@@ -311,10 +314,14 @@ test.describe('Electron Project Git workflow panel', () => {
         gitPanel
           .locator('section')
           .filter({ hasText: 'Push local commits' })
-          .getByRole('button', { name: 'Push' }),
+          .getByRole('button', { name: 'Push commits' }),
       ).toBeVisible({
         timeout: 10_000,
       });
+      await gitPanel.getByRole('button', { name: 'Push commits', exact: true }).click();
+      await expect(
+        gitPanel.getByRole('button', { name: 'Review push', exact: true }),
+      ).toBeVisible();
       await expect(gitPanel.getByText('2 local commits are ready to push.')).toBeVisible();
     } finally {
       await app?.close();
@@ -322,65 +329,50 @@ test.describe('Electron Project Git workflow panel', () => {
     }
   });
 
-  test('creates a pull request for a published feature branch from the PR tab', async () => {
-    const tempRoot = join(repoRoot, '.agent-platform', 'electron-git-e2e', String(Date.now()));
+  test('reviews publishing and reconciles a lost pull-request response', async ({
+    playwright,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    const tempRoot = join(repoRoot, '.agent-platform', 'electron-git-e2e', `remote-${Date.now()}`);
     const runtimeDir = join(tempRoot, 'runtime');
     const remoteDir = join(tempRoot, 'remote.git');
     const projectDir = join(tempRoot, 'client', 'pr-project');
-    const ghStatePath = join(tempRoot, 'fake-gh-state.json');
-    const ghBinary = join(tempRoot, 'fake-gh.js');
     const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
+    const branch = 'feature/reviewed-remote';
     const backendPort = await getOpenPort();
-    const rendererPort = await getOpenPort();
+    let rendererPort = await getOpenPort();
+    while (rendererPort === backendPort) rendererPort = await getOpenPort();
     let app: ElectronApplication | undefined;
-
-    mkdirSync(tempRoot, { recursive: true });
-    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
-    mkdirSync(projectDir, { recursive: true });
-    execFileSync(GIT_BINARY, ['init', '-b', 'main'], { cwd: projectDir, stdio: 'ignore' });
-    configureGitUser(projectDir);
-    writeFileSync(join(projectDir, 'README.md'), '# PR Project\n');
-    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: projectDir, stdio: 'ignore' });
-    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: projectDir, stdio: 'ignore' });
-    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
-      cwd: projectDir,
-      stdio: 'ignore',
-    });
-    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], {
-      cwd: projectDir,
-      stdio: 'ignore',
-    });
-    execFileSync(GIT_BINARY, ['checkout', '-b', 'task/e2e-pr'], {
-      cwd: projectDir,
-      stdio: 'ignore',
-    });
-    writeFileSync(join(projectDir, 'feature.txt'), 'feature work\n');
-    execFileSync(GIT_BINARY, ['add', 'feature.txt'], { cwd: projectDir, stdio: 'ignore' });
-    execFileSync(GIT_BINARY, ['commit', '-m', 'feat: add feature work'], {
-      cwd: projectDir,
-      stdio: 'ignore',
-    });
-    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'task/e2e-pr'], {
-      cwd: projectDir,
-      stdio: 'ignore',
-    });
-    execFileSync(
-      GIT_BINARY,
-      ['remote', 'set-url', 'origin', 'git@github.com:user/pr-project.git'],
-      {
-        cwd: projectDir,
-        stdio: 'ignore',
-      },
-    );
-    writeFakeGitHubCli(ghBinary, ghStatePath);
-    seedDesktopDatabase(sqlitePath);
-
+    let ghFixture: Awaited<ReturnType<typeof createGhLedgerFixture>> | undefined;
+    let transport: Awaited<ReturnType<typeof createGitTransportFixture>> | undefined;
+    const failures: unknown[] = [];
+    const git = (...args: string[]) =>
+      execFileSync(GIT_BINARY, ['-C', projectDir, ...args], { encoding: 'utf8' }).trim();
+    const remote = (...args: string[]) =>
+      execFileSync(GIT_BINARY, ['--git-dir', remoteDir, ...args], { encoding: 'utf8' }).trim();
     try {
-      app = await electron.launch({
+      mkdirSync(projectDir, { recursive: true });
+      execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+      execFileSync(GIT_BINARY, ['init', '-b', 'staging', projectDir], { stdio: 'ignore' });
+      configureGitUser(projectDir);
+      writeFileSync(join(projectDir, 'README.md'), '# Remote delivery fixture\n');
+      git('add', '--', 'README.md');
+      git('commit', '-m', 'fixture base');
+      transport = await createGitTransportFixture({ bareRoot: remoteDir });
+      git('config', 'core.sshCommand', transport.sshCommand);
+      git('config', 'ssh.variant', 'ssh');
+      git('remote', 'add', 'origin', transport.remoteUrl);
+      git('push', 'origin', 'HEAD:refs/heads/staging');
+      git('switch', '-c', branch);
+      ghFixture = await createGhLedgerFixture({ currentBranch: branch });
+      seedDesktopDatabase(sqlitePath);
+      app = await playwright._electron.launch({
         cwd: desktopDir,
-        args: ['.'],
+        args: ['.', `--user-data-dir=${join(tempRoot, 'user-data')}`],
         env: {
           ...process.env,
+          ...ghFixture.env,
+          OLLAMA_BASE_URL: 'http://127.0.0.1:9/v1',
           AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
           AGENT_PLATFORM_DESKTOP_BACKEND_PORT: String(backendPort),
           AGENT_PLATFORM_DESKTOP_NODE_PATH: process.execPath,
@@ -389,38 +381,88 @@ test.describe('Electron Project Git workflow panel', () => {
           AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
           AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
           AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
-          AGENT_PLATFORM_GH_BINARY: ghBinary,
+          AGENT_PLATFORM_GH_BINARY: ghFixture.executable,
           CI: process.env.CI,
         },
       });
-
       const page = await app.firstWindow();
+      const configured = await page.request.post(
+        `http://127.0.0.1:${backendPort}/v1/model-configs`,
+        {
+          data: {
+            name: 'Remote Git panel fixture',
+            provider: 'ollama',
+            model: 'git-panel-no-model-call',
+          },
+        },
+      );
+      expect(configured.ok()).toBe(true);
+      await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
+      await page.reload();
       await openProject(page);
-
-      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
-      const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
-      await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
-      await expect(gitPanel.getByRole('button', { name: 'PRs' })).toBeVisible({
-        timeout: 10_000,
+      const input = page.getByPlaceholder('Ask about this Project...');
+      await expect(input).toBeEnabled();
+      await input.fill('/init');
+      const send = page.getByRole('button', { name: 'Send message', exact: true });
+      await expect(send).toBeEnabled();
+      await send.click();
+      await page.getByRole('button', { name: 'Approve instructions' }).click();
+      await expect(page.getByText('Project instructions approved').last()).toBeVisible();
+      git('add', '--', 'AGENTS.md');
+      git('commit', '-m', 'fixture approved instructions');
+      writeFileSync(join(projectDir, 'feature.txt'), 'reviewed feature\n');
+      git('add', '--', 'feature.txt');
+      git('commit', '-m', 'fixture feature');
+      const github = ghFixture;
+      const result = await runRemotePanelJourney(
+        page,
+        {
+          git,
+          remote,
+          write: (path, value) => writeFileSync(join(projectDir, path), value),
+          ledger: () => github.readLedger(),
+          loseNextCreateResponse: () => github.setFailureModes({ loseCreateResponseOnce: true }),
+        },
+        branch,
+      );
+      await testInfo.attach('remote-delivery-result', {
+        body: JSON.stringify(result, null, 2),
+        contentType: 'application/json',
       });
-      await gitPanel.getByRole('button', { name: 'PRs' }).click();
-      await expect(gitPanel.getByText('Create a pull request')).toBeVisible({
-        timeout: 10_000,
+      await testInfo.attach('github-boundary-ledger', {
+        body: JSON.stringify(await github.readLedger(), null, 2),
+        contentType: 'application/json',
       });
-      await expect(gitPanel.getByRole('link', { name: /Open GitHub/ })).toBeVisible();
-
-      await gitPanel.getByRole('button', { name: 'Create pull request' }).click();
-
-      await expect(gitPanel.getByText('Created PR #17')).toBeVisible({ timeout: 10_000 });
-      await expect(gitPanel.getByText('#17', { exact: true })).toBeVisible();
-      await expect(gitPanel.getByRole('link', { name: /Open on GitHub/ })).toBeVisible();
-      await expect(gitPanel.getByRole('button', { name: /Checks/ })).toBeVisible({
-        timeout: 10_000,
-      });
-    } finally {
-      await app?.close();
-      rmSync(tempRoot, { recursive: true, force: true });
+    } catch (error) {
+      failures.push(error);
     }
+    try {
+      await app?.close();
+    } catch (error) {
+      failures.push(error);
+    }
+    try {
+      await ghFixture?.close();
+    } catch (error) {
+      failures.push(error);
+    }
+    try {
+      await transport?.close();
+    } catch (error) {
+      failures.push(error);
+    }
+    try {
+      rmSync(tempRoot, { recursive: true, force: true });
+    } catch (error) {
+      failures.push(error);
+    }
+    if (failures.length)
+      throw new AggregateError(
+        failures,
+        failures
+          .map((error) => (error instanceof Error ? error.message : String(error)))
+          .join('\n'),
+      );
   });
 });
 
@@ -440,42 +482,4 @@ async function openProject(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'Open folder' }).click();
   await expect(page.locator('[data-workspace-surface="project-chat"]')).toBeVisible();
-}
-
-function writeFakeGitHubCli(path: string, statePath: string): void {
-  writeFileSync(
-    path,
-    `#!/bin/sh
-STATE=${JSON.stringify(statePath)}
-PR='{"number":17,"title":"feat: add feature work","state":"OPEN","url":"https://github.com/user/pr-project/pull/17","headRefName":"task/e2e-pr","baseRefName":"main","author":{"login":"e2e-user"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"MERGEABLE","createdAt":"2026-05-22T10:00:00Z","updatedAt":"2026-05-22T10:00:00Z","statusCheckRollup":[{"databaseId":1,"name":"CI","workflowName":"CI","status":"COMPLETED","conclusion":"SUCCESS"}]}'
-if [ "$1" = "--version" ]; then
-  echo "gh version 2.0.0"
-  exit 0
-fi
-if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
-  echo "Logged in to github.com"
-  exit 0
-fi
-if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
-  if [ -f "$STATE" ]; then
-    echo "[$PR]"
-  else
-    echo "[]"
-  fi
-  exit 0
-fi
-if [ "$1" = "pr" ] && [ "$2" = "create" ]; then
-  echo "created" > "$STATE"
-  echo "$PR"
-  exit 0
-fi
-if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
-  echo '{"number":17,"url":"https://github.com/user/pr-project/pull/17","statusCheckRollup":[{"databaseId":1,"name":"CI","workflowName":"CI","status":"COMPLETED","conclusion":"SUCCESS"}]}'
-  exit 0
-fi
-echo "unexpected gh invocation: $*" >&2
-exit 1
-`,
-  );
-  chmodSync(path, 0o755);
 }
