@@ -1,3 +1,49 @@
+# Stop planning and durable monitoring handoff — 16 October 2026
+
+Current owner request is planning-only: review existing acknowledged Stop, obtain independent
+critique, then present a bounded plan before implementation. Subsequent owner refinements require
+shared harness capabilities for future voice/CLI clients, a focused audit of existing APIs, and
+persistent local evidence from ordinary use for later agent/owner reviews and Beads triage.
+
+Canonical plan: [shared Stop MVP](docs/planning/project-chat-stop-mvp.md). Verification:
+[S01–S14/M01–M06/Q01](docs/testing/project-chat-stop-mvp.md). Existing Stop task is
+`agent-platform-harness-r3.cancel`; planning task `agent-platform-project-chat-stop-plan`;
+source audit `agent-platform-harness-interface-audit`; queued durable capture
+`agent-platform-local-diagnostics-monitoring`; blocked owner trial `agent-platform-local-mvp-stress-review`.
+The audit/review/specs and actual planning checks are linked by the plan manifest.
+
+Staging remains cf5f04524c25c29635b0d84bda4e76282f28ddcb. Current documentation task
+`task/project-chat-stop-plan` chains from pushed 369ae334 on `task/post-git-handoff-review`,
+inside `feature/local-mvp-handoff-review`. PR332 is the earlier docs segment, not a Stop implementation.
+Future code feature/task branches are proposed only, to start from actual qualified staging after
+owner approval; no new product code, client, paid call, merge or production claim follows now.
+
+Source review confirms existing backend chat/approval/Git/MCP/context/diagnostic APIs are substantially
+shared; missing active logical-run discovery and durable Stop must be application-owned. Stop must
+bypass the execution mutex, fence every provider/tool/retry/resumed approval admission, preserve
+already-admitted effects and distinguish acknowledgement from confirmed termination. Diagnostics
+are observational, never authority. Current V1 already persists safe history; the separate monitoring
+task adds ordinary-use resource/queue capture, restart-safe review windows and visible coverage gaps.
+No external dashboard, broad tracing, SDK upgrade or scheduled daily agent has been activated.
+
+The owner trial is proposed after both Stop and durable monitoring are actually qualified: thirty
+minutes, disposable projects, at most two sessions/twenty requests, default zero paid spend. An
+agent must demonstrate review of a seeded issue from saved data without live observation first.
+Docker29.8.0 was reachable; host free space about13GiB is below proposed20GiB test reserve, so resource
+preflight remains a later execution requirement. No Stop or monitoring product tests have run.
+
+Distinct source-aware critic approved the corrected eight substantive files with zero actionable
+findings; STOP-C1–C10 dispositions belong to the linked review report. This is planning approval,
+not implementation authority or a runtime test result. All substantive
+planning documents require complete source-bound Notion publication/readback before handoff is done.
+Implementation and scoped Stop review-gate reconciliation await owner acceptance. Global review-gate,
+R3/recovery/dashboard scope, main, PR283/four paused refs and dirty unrelated work stay separate.
+
+The complete previous session body below is retained byte-for-byte; its dated permissions/states
+are historical. Live canonical Beads records supersede stale backlog statuses in those older notes.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — Git delivery complete, next local MVP priority under review
 
 Reviewed on 15 October 2026. Beads remains authoritative for task status and dependencies.
