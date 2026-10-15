@@ -168,3 +168,77 @@ renderer-child exit proof. Source and local review are approved within these lim
 gates/comments, complete mirrors and final owner acceptance remain pending. Sourcery's
 20,000-line retrieval-limit skip is disclosed, not an approval. See the
 [full result record](../testing/git-delivery-mvp.md#pr329-quality-repair-checkpoint--15-october-2026).
+
+## PR330 renderer readiness and Git selection repair — 15 October 2026
+
+PR329 is delivered to `feature/git-delivery-mvp` at `220a5dc0` after all nine executed
+exact-head checks and independent source/evidence review. The owner authorized guarded feature
+and staging merges after actual tests, protection checks and review findings clear, followed by
+recovery-protected cleanup. Protected staging PR330 still targets `4ffc5fc0`; it is held through
+this repair, with main and paused PR283/four orchestration branches separate.
+
+PR330 had fourteen green executed check conclusions at `220a5dc0`, but its actual Electron
+report was `ok:false`: sixty expected passes and one flaky local Git-panel case. Its first
+attempt failed at a single reload with `ERR_CONNECTION_REFUSED`; a retry passed. GD-E01 records
+that a retry-green job is insufficient clean qualification. The prior ordinary full Promptfoo
+analysis (seven batches), nineteen first-attempt packaged VM tests, browser journeys and raw
+nine-sample benchmark were independently qualified for that old source only. Sonar was OK with
+31 minor observations and no major/critical findings; scoped CodeQL was clear. Sourcery's
+oversized-diff skip is a limitation, not approval. None qualifies the future changed head.
+
+Two controlled actual Electron failure/control pairs established that reloading while initial
+renderer navigation remains pending can reject bootstrap and reclaim both services. Waiting
+for the exact owned renderer origin with `waitUntil: 'load'` before one real reload preserved
+healthy services. The old hosted trace cannot establish its historical cause. All three Git
+fixture launches now reuse that existing load boundary and paired-port allocator. Safe bounded
+startup/parent status is attached before cleanup; attachment errors preserve primary failures
+while independent owned cleanup runs (GD-F01). This metadata does not prove renderer-child
+health or expose child stderr, credentials, response bodies or session contents.
+
+The first repeated readiness run was eight passes and one divergent-pull failure, not nine
+passes: Refresh detached and the screenshot showed Activity. Two completed natural probe invocations passed five/five and three/three without reproducing
+that ordering. A separately interrupted invocation retained three completed passes, one interrupted
+case and six unrun cases (exit130); it is not a clean completed invocation. A separate controlled real session-response
+probe did prove a product defect: Git selected on the initial rail, then releasing the actual
+successful session POST remounted the session-keyed chat and reset the rail to Activity. Its
+final diagnostic lookup consumed the remaining test budget; that instrumentation limitation
+and the original failure remain retained. Attribution of the earlier eight/one failure remains
+inference, while the controlled post-click reset is observed evidence.
+
+Only the Activity/Git selection is lifted into project-scoped page state. It survives canonical
+binding and same-project session changes, resets immediately on project/Home changes, and
+rejects obsolete callbacks, including return to the same project. The rail is controlled by that
+one value. Chat keys/reset semantics, session/message/approval ownership and Git authorization
+remain intact. No visibility persistence, runtime startup handling, API policy or dependency
+changes are introduced. The divergent native fixture holds a real backend response until Git
+is selected, then verifies canonical binding and preserved Git selection/content before the
+original Refresh, pull, merge and push assertions. No synthetic successful session response,
+extra click retry, raised deadline or removed effect check qualifies the fix.
+
+Actual local qualification: 37 focused web tests pass, including deferred binding with the real
+page/rail and independently reset chat draft, same-project sessions, hide/show, Home/project
+reset and obsolete callbacks. Production web build, post-build typecheck, scoped lint/format and
+fixture TypeScript pass. Running typecheck concurrently with Next build initially encountered
+missing generated types; the sequential post-build run passed. Existing tool-discovery/lint
+failures and all diagnostic probe limitations are retained, not relabeled as product failures.
+All three actual native Git-panel journeys repeated three times pass 9/9, with retries disabled,
+zero flakes/skips, duration 134.047s. Nine decoded inline startup attachments
+have distinct ports, the owned page origin, a ready window and live parent before cleanup, with
+no observed cancellation/truncation. Seven source files have independent approval with exact
+hashes in `pr330-selection-source-review.json`.
+
+Evidence root: `/Users/letuscode/.codex/git-delivery-implementation-20261014`;
+`pr330-initial-load-repro/verification.json`, `pr330-initial-load-repro/divergent-read-probe/`
+(including `delayed-session/`), the retained eight/one run `pr330-readiness-native-nine-final/`,
+`pr330-selection-native-nine/results.json`, `pr330-selection-startup-attachments/`, and
+`pr330-view-ownership-tests.log`/`pr330-view-web-build.log`/`pr330-view-typecheck-final.log`.
+
+The task continues on `task/git-delivery-load-readiness` from the actual feature merge. Next are
+normal commit/push, complete four-document branch mirrors/readbacks, final independent review,
+and a repair PR to the existing feature. Its guarded merge must precede new PR330 exact-head
+full security analysis, actual packaged VM, clean browser/Electron and diagnostic evidence,
+benchmark, live protections and resolved reviews. Existing seven business-run V1 exports remain
+retained; this selection repair does not change event collection, and new hosted acceptance
+reports must confirm the actual application flow. Keep Beads verification in progress through
+verified staging delivery, preservation, delivered-branch cleanup and final sync. Broader ii1/7vf,
+P2 test-telemetry work, main and paused orchestration remain outside this delivery.

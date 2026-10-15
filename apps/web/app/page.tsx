@@ -41,6 +41,7 @@ import { ProjectBranchSelector } from '@/components/project/project-branch-selec
 import { ProjectEvidenceRail } from '@/components/project/project-evidence-rail';
 import { ProjectEvidenceToggle } from '@/components/project/project-evidence-toggle';
 import { useProjectEvidenceVisibility } from '@/lib/useProjectEvidenceVisibility';
+import { useProjectEvidenceView } from '@/lib/useProjectEvidenceView';
 import { ProjectTerminalDock } from '@/components/project/project-terminal-dock';
 import {
   ProjectWebViewPanel,
@@ -629,6 +630,9 @@ function ProjectChatHeader({
 export default function HomePage() {
   const [selectedMode, setSelectedMode] = useState<WorkspaceMode | null>(null);
   const [activeProject, setActiveProject] = useState<ProjectDesktopRecord | null>(null);
+  const projectEvidenceView = useProjectEvidenceView(
+    selectedMode === 'project-chat' ? (activeProject?.id ?? null) : null,
+  );
   const [projectTerminalOpen, setProjectTerminalOpen] = useState(false);
   const [projectWebViewMode, setProjectWebViewMode] = useState<ProjectWebViewMode>('docked');
   const {
@@ -1886,6 +1890,8 @@ export default function HomePage() {
                       <ProjectEvidenceRail
                         projectId={activeProject?.id ?? null}
                         sessionId={sessionId}
+                        view={projectEvidenceView.view}
+                        onViewChange={projectEvidenceView.setView}
                         profile={
                           projectOnboardingAssessmentFromMetadata(activeProject)?.profile ??
                           'unknown'

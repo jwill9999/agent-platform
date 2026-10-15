@@ -1,17 +1,15 @@
-import { expect, test } from '@playwright/test';
-import {
-  _electron as electron,
-  type ElectronApplication,
-  type Page,
-  type Request,
-  type Response,
-} from 'playwright';
+import { expect, test, type TestInfo } from '@playwright/test';
+import type { ElectronApplication, Page, Request, Response } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { getOpenPort, seedDesktopDatabase } from './support/runtime.js';
+import { getDesktopPorts, seedDesktopDatabase } from './support/runtime.js';
+import {
+  attemptStartupEvidenceAttachment,
+  createStartupEvidence,
+} from './support/startupEvidence.js';
 import { createGhLedgerFixture } from '../../../e2e/support/git-delivery/gh-ledger.mjs';
 import { createGitTransportFixture } from '../../../e2e/support/git-delivery/git-transport.mjs';
 import { runRemotePanelJourney } from '../../../e2e/support/git-delivery/panel-remote-journey.js';
@@ -21,14 +19,18 @@ const repoRoot = resolve(desktopDir, '../..');
 const GIT_BINARY = '/usr/bin/git';
 
 test.describe('Electron Project Git workflow panel', () => {
-  test('reveals only useful Git workflow steps as local changes move toward commit', async () => {
+  test('reveals only useful Git workflow steps as local changes move toward commit', async ({
+    playwright,
+  }, testInfo) => {
     const tempRoot = join(repoRoot, '.agent-platform', 'electron-git-e2e', String(Date.now()));
     const runtimeDir = join(tempRoot, 'runtime');
     const projectDir = join(tempRoot, 'client', 'workflow-project');
     const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
-    const backendPort = await getOpenPort();
-    const rendererPort = await getOpenPort();
+    const { backendPort, rendererPort } = await getDesktopPorts();
+    const startup = createStartupEvidence(backendPort, rendererPort);
+    const failures: unknown[] = [];
     let app: ElectronApplication | undefined;
+    let observedPage: Page | undefined;
 
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(join(projectDir, 'README.md'), '# Workflow Project\n');
@@ -49,7 +51,7 @@ test.describe('Electron Project Git workflow panel', () => {
     seedDesktopDatabase(sqlitePath);
 
     try {
-      app = await electron.launch({
+      app = await playwright._electron.launch({
         cwd: desktopDir,
         args: ['.', `--user-data-dir=${join(tempRoot, 'user-data')}`],
         env: {
@@ -67,7 +69,10 @@ test.describe('Electron Project Git workflow panel', () => {
         },
       });
 
+      startup.observeProcess(app.process());
       const page = await app.firstWindow();
+      observedPage = page;
+      await waitForOwnedRendererLoad(page, rendererPort);
       // /init is handled locally, but the composer requires a selected model configuration.
       // An unreachable loopback Ollama target prevents accidental external provider calls.
       const configured = await page.request.post(
@@ -211,13 +216,22 @@ test.describe('Electron Project Git workflow panel', () => {
       await expect(gitPanel.getByRole('button', { name: /Changes/ })).toHaveCount(0, {
         timeout: 10_000,
       });
-    } finally {
-      await app?.close();
-      rmSync(tempRoot, { recursive: true, force: true });
+    } catch (error) {
+      failures.push(error);
     }
+    if (!(await attachStartupBeforeCleanup(testInfo, startup, observedPage))) {
+      failures.push(new Error('Git panel startup evidence could not be attached.'));
+    }
+    await captureFailure(failures, async () => {
+      await app?.close();
+    });
+    await captureFailure(failures, () => rmSync(tempRoot, { recursive: true, force: true }));
+    throwFailures(failures);
   });
 
-  test('pulls divergent remote changes into the full-screen merge resolver', async () => {
+  test('pulls divergent remote changes into the full-screen merge resolver', async ({
+    playwright,
+  }, testInfo) => {
     const tempRoot = join(repoRoot, '.agent-platform', 'electron-git-e2e', String(Date.now()));
     const runtimeDir = join(tempRoot, 'runtime');
     const remoteDir = join(tempRoot, 'remote.git');
@@ -225,9 +239,18 @@ test.describe('Electron Project Git workflow panel', () => {
     const projectDir = join(tempRoot, 'client', 'conflict-project');
     const collaboratorDir = join(tempRoot, 'collaborator');
     const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
-    const backendPort = await getOpenPort();
-    const rendererPort = await getOpenPort();
+    const { backendPort, rendererPort } = await getDesktopPorts();
+    const startup = createStartupEvidence(backendPort, rendererPort);
+    const failures: unknown[] = [];
     let app: ElectronApplication | undefined;
+    let observedPage: Page | undefined;
+    let releaseProjectSession = () => {};
+    const projectSessionGate = new Promise<void>((resolveGate) => {
+      releaseProjectSession = resolveGate;
+    });
+    const bindingRoutes = new Set<Promise<void>>();
+    let bindingIntercepted = false;
+    let heldBindingStatus: number | undefined;
 
     mkdirSync(tempRoot, { recursive: true });
     execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
@@ -271,7 +294,7 @@ test.describe('Electron Project Git workflow panel', () => {
     seedDesktopDatabase(sqlitePath);
 
     try {
-      app = await electron.launch({
+      app = await playwright._electron.launch({
         cwd: desktopDir,
         args: ['.'],
         env: {
@@ -288,11 +311,47 @@ test.describe('Electron Project Git workflow panel', () => {
         },
       });
 
+      startup.observeProcess(app.process());
       const page = await app.firstWindow();
+      observedPage = page;
+      await waitForOwnedRendererLoad(page, rendererPort);
+      await page.route(`http://127.0.0.1:${rendererPort}/api/v1/sessions/project`, (route) => {
+        const binding = (async () => {
+          if (route.request().method() !== 'POST' || bindingIntercepted) {
+            await route.continue();
+            return;
+          }
+          bindingIntercepted = true;
+          const response = await route.fetch({ timeout: 10_000 });
+          heldBindingStatus = response.status();
+          await projectSessionGate;
+          await route.fulfill({ response });
+        })().catch(async (error) => {
+          failures.push(error);
+          await captureFailure(failures, () => route.abort());
+        });
+        bindingRoutes.add(binding);
+        void binding.then(() => bindingRoutes.delete(binding));
+        return binding;
+      });
       await openProject(page);
+      const canonicalSessionControl = page.getByRole('button', {
+        name: 'Export diagnostic report',
+        exact: true,
+      });
+      await expect(canonicalSessionControl).toHaveCount(0);
 
       await page.getByRole('tab', { name: 'Git & GitHub' }).click();
+      const gitTab = page.getByRole('tab', { name: 'Git & GitHub' });
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
+      await expect(gitTab).toHaveAttribute('aria-selected', 'true');
+      await expect(gitPanel).toBeVisible();
+      await expect.poll(() => heldBindingStatus).toBe(201);
+      // The real binding response used to remount Chat and reset this selection to Activity.
+      releaseProjectSession();
+      await expect(canonicalSessionControl).toBeVisible();
+      await expect(gitTab).toHaveAttribute('aria-selected', 'true');
+      await expect(gitPanel).toBeVisible();
       await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
       await expect(gitPanel.getByRole('button', { name: /Pull/ })).toBeVisible({
         timeout: 10_000,
@@ -335,10 +394,23 @@ test.describe('Electron Project Git workflow panel', () => {
         gitPanel.getByRole('button', { name: 'Review push', exact: true }),
       ).toBeVisible();
       await expect(gitPanel.getByText('2 local commits are ready to push.')).toBeVisible();
-    } finally {
-      await app?.close();
-      rmSync(tempRoot, { recursive: true, force: true });
+    } catch (error) {
+      failures.push(error);
     }
+    // Release a held response even when setup or an assertion fails, then settle its route
+    // before the existing process cleanup. Route failures join, rather than replace, the cause.
+    releaseProjectSession();
+    await captureFailure(failures, async () => {
+      await Promise.all(bindingRoutes);
+    });
+    if (!(await attachStartupBeforeCleanup(testInfo, startup, observedPage))) {
+      failures.push(new Error('Git panel startup evidence could not be attached.'));
+    }
+    await captureFailure(failures, async () => {
+      await app?.close();
+    });
+    await captureFailure(failures, () => rmSync(tempRoot, { recursive: true, force: true }));
+    throwFailures(failures);
   });
 
   test('reviews publishing and reconciles a lost pull-request response', async ({
@@ -351,12 +423,12 @@ test.describe('Electron Project Git workflow panel', () => {
     const projectDir = join(tempRoot, 'client', 'pr-project');
     const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
     const branch = 'feature/reviewed-remote';
-    const backendPort = await getOpenPort();
-    let rendererPort = await getOpenPort();
-    while (rendererPort === backendPort) rendererPort = await getOpenPort();
+    const { backendPort, rendererPort } = await getDesktopPorts();
+    const startup = createStartupEvidence(backendPort, rendererPort);
     let app: ElectronApplication | undefined;
     let observedPage: Page | undefined;
     const pendingReads = new Set<Request>();
+    let processState: ReturnType<ElectronApplication['process']> | undefined;
     const lifecycle: Array<{
       event: string;
       at: number;
@@ -441,8 +513,11 @@ test.describe('Electron Project Git workflow panel', () => {
           ...(process.env.CI === undefined ? {} : { CI: process.env.CI }),
         },
       });
+      processState = app.process();
+      startup.observeProcess(processState);
       const page = await app.firstWindow();
       observedPage = page;
+      await waitForOwnedRendererLoad(page, rendererPort);
       page.on('request', onRequest);
       page.on('response', onResponse);
       page.on('requestfinished', onFinished);
@@ -505,29 +580,35 @@ test.describe('Electron Project Git workflow panel', () => {
     observedPage?.off('response', onResponse);
     observedPage?.off('requestfinished', onFinished);
     observedPage?.off('requestfailed', onFailed);
-    const processState = app?.process();
-    await testInfo.attach('fixture-startup-state', {
-      body: Buffer.from(
-        JSON.stringify(
-          {
-            backendPort,
-            rendererPort,
-            pageOrigin: observedPage ? new URL(observedPage.url()).origin : null,
-            pageClosed: observedPage?.isClosed(),
-            processId: processState?.pid,
-            exitCode: processState?.exitCode,
-            signalCode: processState?.signalCode,
-          },
-          null,
-          2,
+    if (!(await attachStartupBeforeCleanup(testInfo, startup, observedPage))) {
+      failures.push(new Error('Git panel startup evidence could not be attached.'));
+    }
+    await captureFailure(failures, () =>
+      testInfo.attach('fixture-startup-state', {
+        body: Buffer.from(
+          JSON.stringify(
+            {
+              backendPort,
+              rendererPort,
+              pageOrigin: observedPage ? new URL(observedPage.url()).origin : null,
+              pageClosed: observedPage?.isClosed(),
+              processId: processState?.pid,
+              exitCode: processState?.exitCode,
+              signalCode: processState?.signalCode,
+            },
+            null,
+            2,
+          ),
         ),
-      ),
-      contentType: 'application/json',
-    });
-    await testInfo.attach('github-pr-create-read-lifecycle', {
-      body: Buffer.from(JSON.stringify(lifecycle, null, 2)),
-      contentType: 'application/json',
-    });
+        contentType: 'application/json',
+      }),
+    );
+    await captureFailure(failures, () =>
+      testInfo.attach('github-pr-create-read-lifecycle', {
+        body: Buffer.from(JSON.stringify(lifecycle, null, 2)),
+        contentType: 'application/json',
+      }),
+    );
     try {
       await app?.close();
     } catch (error) {
@@ -548,15 +629,61 @@ test.describe('Electron Project Git workflow panel', () => {
     } catch (error) {
       failures.push(error);
     }
-    if (failures.length)
-      throw new AggregateError(
-        failures,
-        failures
-          .map((error) => (error instanceof Error ? error.message : String(error)))
-          .join('\n'),
-      );
+    throwFailures(failures);
   });
 });
+
+async function waitForOwnedRendererLoad(page: Page, rendererPort: number): Promise<void> {
+  // firstWindow observes construction before main.ts finishes its initial loadURL.
+  // A visible SSR control alone does not authorize interrupting that navigation.
+  await page.waitForURL((url) => url.origin === `http://127.0.0.1:${rendererPort}`, {
+    waitUntil: 'load',
+    timeout: 30_000,
+  });
+}
+
+async function captureFailure(
+  failures: unknown[],
+  operation: () => void | Promise<void>,
+): Promise<void> {
+  try {
+    await operation();
+  } catch (error) {
+    failures.push(error);
+  }
+}
+
+function throwFailures(failures: unknown[]): void {
+  if (failures.length) {
+    throw new AggregateError(
+      failures,
+      failures.map((error) => (error instanceof Error ? error.message : String(error))).join('\n'),
+    );
+  }
+}
+
+async function attachStartupBeforeCleanup(
+  testInfo: TestInfo,
+  startup: ReturnType<typeof createStartupEvidence>,
+  page: Page | undefined,
+): Promise<boolean> {
+  return await attemptStartupEvidenceAttachment(async () => {
+    await testInfo.attach('fixture-startup-before-cleanup', {
+      body: Buffer.from(
+        JSON.stringify(
+          {
+            ...startup.snapshot(),
+            pageOrigin: page ? new URL(page.url()).origin : null,
+            pageClosed: page?.isClosed() ?? null,
+          },
+          null,
+          2,
+        ),
+      ),
+      contentType: 'application/json',
+    });
+  });
+}
 
 function configureGitUser(cwd: string): void {
   execFileSync(GIT_BINARY, ['config', 'user.email', 'e2e@example.com'], {
