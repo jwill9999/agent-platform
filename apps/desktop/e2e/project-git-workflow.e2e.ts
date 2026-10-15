@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
+import {
+  _electron as electron,
+  type ElectronApplication,
+  type Page,
+  type Request,
+  type Response,
+} from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -266,6 +272,49 @@ test.describe('Electron Project Git workflow panel', () => {
     const backendPort = await getOpenPort();
     const rendererPort = await getOpenPort();
     let app: ElectronApplication | undefined;
+    let observedPage: Page | undefined;
+    const pendingReads = new Set<Request>();
+    const lifecycle: Array<{
+      event: string;
+      at: number;
+      path?: string;
+      status?: number;
+      pending: number;
+    }> = [];
+    const record = (event: string, request?: Request, status?: number) => {
+      lifecycle.push({
+        event,
+        at: Date.now(),
+        ...(request ? { path: new URL(request.url()).pathname } : {}),
+        ...(status === undefined ? {} : { status }),
+        pending: pendingReads.size,
+      });
+    };
+    const onRequest = (request: Request) => {
+      if (!/\/(?:git\/checks|github\/pull-requests)$/u.test(new URL(request.url()).pathname))
+        return;
+      pendingReads.add(request);
+      record('request', request);
+    };
+    const onResponse = (response: Response) => {
+      if (pendingReads.has(response.request()))
+        record('response', response.request(), response.status());
+    };
+    const onFinished = (request: Request) => {
+      if (!pendingReads.delete(request)) return;
+      record('finished', request);
+    };
+    const onFailed = (request: Request) => {
+      if (!pendingReads.delete(request)) return;
+      record('failed', request);
+    };
+    const settleReads = async (page: Page, buttonName: string, phase: string) => {
+      await expect(page.getByRole('button', { name: buttonName, exact: true })).toBeEnabled({
+        timeout: 10_000,
+      });
+      await expect.poll(() => pendingReads.size, { timeout: 10_000 }).toBe(0);
+      record(phase);
+    };
 
     mkdirSync(tempRoot, { recursive: true });
     execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
@@ -328,11 +377,22 @@ test.describe('Electron Project Git workflow panel', () => {
       });
 
       const page = await app.firstWindow();
+      observedPage = page;
+      page.on('request', onRequest);
+      page.on('response', onResponse);
+      page.on('requestfinished', onFinished);
+      page.on('requestfailed', onFailed);
       await openProject(page);
+      // This PR-creation journey begins from loaded data. Activity can issue two
+      // read pairs while the Project session binds; let them finish before opening
+      // another view so this test does not intentionally saturate the four slots.
+      await settleReads(page, 'Refresh Project activity', 'activity-settled');
 
       await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
+      await settleReads(page, 'Refresh Git state', 'git-initial-settled');
       await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
+      await settleReads(page, 'Refresh Git state', 'manual-refresh-settled');
       await expect(gitPanel.getByRole('button', { name: 'PRs' })).toBeVisible({
         timeout: 10_000,
       });
@@ -351,6 +411,14 @@ test.describe('Electron Project Git workflow panel', () => {
         timeout: 10_000,
       });
     } finally {
+      observedPage?.off('request', onRequest);
+      observedPage?.off('response', onResponse);
+      observedPage?.off('requestfinished', onFinished);
+      observedPage?.off('requestfailed', onFailed);
+      await test.info().attach('github-pr-create-read-lifecycle', {
+        body: Buffer.from(JSON.stringify(lifecycle, null, 2)),
+        contentType: 'application/json',
+      });
       await app?.close();
       rmSync(tempRoot, { recursive: true, force: true });
     }

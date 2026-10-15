@@ -18,7 +18,7 @@ import { expect, test, type TestInfo } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 
 import { JOURNEY_CALL_ID, JOURNEY_MODEL, startJourneyProvider } from './support/providerJourney.js';
-import { getOpenPort } from './support/runtime.js';
+import { getDesktopPorts } from './support/runtime.js';
 import { attemptFixtureCleanup, releaseOwnedVmFixture } from './support/vmFixtureTeardown.js';
 import {
   attemptStartupEvidenceAttachment,
@@ -939,8 +939,7 @@ async function createVmFixture(options: { health: VmFixtureHealth }): Promise<Vm
   const evidenceDir = process.env.AGENT_PLATFORM_E2E_EVIDENCE_DIR;
   const projectDir = join(tempRoot, 'client', 'packaged-vm-project');
   const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
-  const backendPort = await getOpenPort();
-  const rendererPort = await getOpenPort();
+  const { backendPort, rendererPort } = await getDesktopPorts();
   const realPackagedResourcesDir =
     options.health === 'ready'
       ? process.env.AGENT_PLATFORM_E2E_PACKAGED_VM_RESOURCES_DIR

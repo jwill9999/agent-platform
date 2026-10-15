@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { DiagnosticReportSchema } from '@agent-platform/contracts';
 import { DEFAULT_AGENT_ID } from '@agent-platform/db';
 import { expect, it } from 'vitest';
+import { waitForDiagnosticReadiness } from './support/diagnosticReadiness.js';
 
 const apiRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const capability = 'b'.repeat(64);
@@ -74,16 +75,11 @@ it.each(['completed', 'approval-waiting'] as const)(
           LANGSMITH_TRACING_V2: 'false',
         },
       });
-      for (let attempt = 0; attempt < 100; attempt++) {
-        if (child.exitCode !== null) throw new Error('API fixture exited before readiness');
-        try {
-          if ((await fetch(`${origin}/health`)).ok) return;
-        } catch {
-          /* starting */
-        }
-        await delay(50);
-      }
-      throw new Error('API fixture did not become ready');
+      await waitForDiagnosticReadiness(
+        origin,
+        capability,
+        () => child!.exitCode !== null || child!.signalCode !== null,
+      );
     }
     async function post(path: string, body: unknown, privateRead = false) {
       const response = await fetch(`${origin}${path}`, {

@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -228,6 +229,72 @@ describe('desktop backend supervisor helpers', () => {
     expect(existsSync(join(runtimeRoot, 'data/vm/images/manifest.json'))).toBe(true);
   });
 
+  it('keeps packaged assets and both runtime copies independently writable', () => {
+    const repoRoot = makeTempRepo();
+    const firstRoot = join(repoRoot, 'first');
+    const first = getDesktopBackendPaths(repoRoot, makeRuntimePaths(firstRoot));
+    const second = {
+      ...getDesktopBackendPaths(repoRoot, makeRuntimePaths(join(repoRoot, 'second'))),
+      macosVmPackagedAssetsDir: first.macosVmPackagedAssetsDir,
+      macosVmPackagedHelperPath: first.macosVmPackagedHelperPath,
+    };
+    writePackagedMacosVmResources(first, firstRoot);
+    const source = join(first.macosVmPackagedAssetsDir, 'disk.img');
+    const firstImage = join(firstRoot, 'data/vm/images/disk.img');
+    const secondImage = join(repoRoot, 'second/data/vm/images/disk.img');
+    const initial = Buffer.from([0, 1, 255, 3]);
+    writeFileSync(source, initial);
+
+    ensurePackagedMacosVmAssets(first, {});
+    ensurePackagedMacosVmAssets(second, {});
+    for (const path of [source, firstImage, secondImage]) {
+      expect(readFileSync(path)).toEqual(initial);
+    }
+
+    writeFileSync(firstImage, 'first mutation');
+    expect(readFileSync(source)).toEqual(initial);
+    expect(readFileSync(secondImage)).toEqual(initial);
+    writeFileSync(source, 'source update');
+    expect(readFileSync(firstImage, 'utf8')).toBe('first mutation');
+    expect(readFileSync(secondImage)).toEqual(initial);
+    writeFileSync(secondImage, 'second mutation');
+    expect(readFileSync(source, 'utf8')).toBe('source update');
+    expect(readFileSync(firstImage, 'utf8')).toBe('first mutation');
+
+    ensurePackagedMacosVmAssets(first, {});
+    expect(readFileSync(firstImage, 'utf8')).toBe('source update');
+    expect(readFileSync(secondImage, 'utf8')).toBe('second mutation');
+  });
+
+  it('refuses an images directory symlink without writing outside the runtime', () => {
+    const repoRoot = makeTempRepo();
+    const runtimeRoot = join(repoRoot, 'runtime');
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
+    writePackagedMacosVmResources(paths, runtimeRoot);
+    const outside = join(repoRoot, 'outside');
+    mkdirSync(outside);
+    writeFileSync(join(outside, 'manifest.json'), 'outside contents');
+    mkdirSync(join(runtimeRoot, 'data/vm'), { recursive: true });
+    symlinkSync(outside, join(runtimeRoot, 'data/vm/images'));
+
+    expect(() => ensurePackagedMacosVmAssets(paths, {})).toThrow('symlinked');
+    expect(readFileSync(join(outside, 'manifest.json'), 'utf8')).toBe('outside contents');
+  });
+
+  it('propagates a packaged asset copy failure instead of accepting an incomplete runtime', () => {
+    const repoRoot = makeTempRepo();
+    const runtimeRoot = join(repoRoot, 'runtime');
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
+    writePackagedMacosVmResources(paths, runtimeRoot);
+    writeFileSync(join(paths.macosVmPackagedAssetsDir, 'disk.img'), 'packaged disk');
+    mkdirSync(join(runtimeRoot, 'data/vm/images/disk.img'), { recursive: true });
+
+    expect(() => ensurePackagedMacosVmAssets(paths, {})).toThrow();
+    expect(readFileSync(join(paths.macosVmPackagedAssetsDir, 'disk.img'), 'utf8')).toBe(
+      'packaged disk',
+    );
+  });
+
   it('repairs only app-owned macOS VM runtime state and preserves diagnostics', () => {
     const repoRoot = makeTempRepo();
     const runtimeRoot = join(repoRoot, 'runtime');
@@ -257,7 +324,9 @@ describe('desktop backend supervisor helpers', () => {
     ]);
     expect(existsSync(join(vmRuntimeDir, 'state'))).toBe(false);
     expect(existsSync(join(vmRuntimeDir, 'logs/last-error.log'))).toBe(true);
-    expect(existsSync(join(vmRuntimeDir, 'images/manifest.json'))).toBe(true);
+    expect(readFileSync(join(vmRuntimeDir, 'images/manifest.json'), 'utf8')).toBe(
+      readFileSync(join(paths.macosVmPackagedAssetsDir, 'manifest.json'), 'utf8'),
+    );
   });
 
   it('refuses to repair arbitrary or symlinked macOS VM runtime paths', () => {

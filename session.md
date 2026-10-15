@@ -1,3 +1,263 @@
+## Current handoff: diagnostic benchmark process isolation
+
+15 October: task `agent-platform-diagnostics-benchmark-isolation` is in progress on
+`task/diagnostics-benchmark-isolation`, from feature head `5a3e283f`. PR327 asset-copy delivery is
+merged and closed with complete publication/readback; protected PR324 is still unmerged.
+
+The fresh staging verify job fails only the unchanged diagnostic benchmark overhead limit;
+321 other API tests pass. The critic verified raw measurements and approved a bounded fresh-process
+CI experiment with safe CPU/GC observations. This does not establish the cause of the observed
+latency. Workload, assertions, deadlines and limits remain unchanged. The dedicated local command
+selects one test and passes all nine samples (maximum overhead 0.249750 ms; enqueue 0.013166 ms).
+Numeric CPU/GC/memory observations are retained without modifying pass criteria. Independent source,
+local evidence and documentation review approved without findings. Normal hooks, full mirrors and
+new hosted feature/staging qualification remain pending.
+
+The separate packaged-VM setup failure was confirmed ENOSPC. Reviewed byte-identical APFS clone
+replacement preserved every retained image/evidence byte. A guarded retry of only that failed job
+passes all 19 cases at CI38661857710 attempt2/job116189675009; actual job-temp cleanup left 13.36 GiB
+before asset preparation. Independent review verifies all 19 first attempts and shutdowns, 18 VM
+releases and ten complete clean diagnostic reports; all 104 retained files are hash-verified. That
+successful VM retry does not qualify or waive the failed benchmark.
+
+See [the bounded repair specification](docs/tasks/agent-platform-diagnostics-benchmark-isolation.md).
+Keep active Git delivery branches/worktree, main, PR283 and paused orchestration separate. Parent
+promotion remains in progress; no delivered-branch cleanup until actual protected staging succeeds.
+
+The complete previous handoff follows unchanged as historical context.
+
+---
+
+## Session: Private VM asset-copy repair — 15 October 2026
+
+Current task: `agent-platform-desktop-vm-asset-copy` on `task/desktop-vm-asset-copy`,
+from actual feature `c6a00dad3f80e772f4c1206c6e3a13adf16b6de3`.
+See [the bounded repair specification](docs/tasks/agent-platform-desktop-vm-asset-copy.md).
+
+PR326 is delivered and closed; PR324 remains unmerged. Its green hosted VM check concealed three
+first-attempt failures (16 passed, three flaky). Independent inspection of all 146 preserved files
+confirmed private asset copying consumed 15.094–20.720 seconds and verified shutdown/release, without
+establishing the underlying filesystem cause. No retry-green staging qualification is claimed.
+
+The repair prefers native macOS clonefile copying (existing Node behavior elsewhere) for each existing
+private runtime copy, with ordinary fallback;
+no cache sharing, hardlinks, deadline increases, benchmark changes or cleanup shortcuts. The critic
+approved the private-copy plan; the initial Node-only flag proved ineffective on macOS (`ENOSYS`).
+Fixed native `/bin/cp -cR` completes the disposable 4 GB probe in 0.00415 s; no performance guarantee is
+inferred. The first two local VM cases passed, while Block was interrupted by a confirmed five-minute
+host sleep. Its failure and fixture are retained. With the corrected native route and a task-lifetime
+awake assertion, the three affected cases and full 19-case real-VM suite pass without retries. All
+19 shutdowns, 18 applicable VM releases and ten complete diagnostic reports pass independent review;
+asset phases measure 3–75 ms. Supervisor unit tests (24), build/typecheck and scoped quality pass.
+The unchanged Darwin branch ran the full suite; final source restores exact prior non-Darwin options.
+
+Full branch-specific publication/readback and fresh hosted feature/staging qualification remain
+pending. Existing reports, prior unknown 503/benchmark failures and the complete historical handoff
+below remain retained. Parent promotion stays in progress; local success does not qualify PR324.
+
+Keep all active Git delivery MVP branches/worktree separate, along with main, paused PR283 and the four
+paused refs and dirty/unrelated checkouts. No branch cleanup before verified protected staging delivery.
+
+---
+
+## Current handoff: diagnostics failure evidence — 14 October 2026
+
+PR326 at `93b13f47` passed the repaired process-restart and readiness-helper tests, but its verify
+job failed a different report read and the unchanged diagnostics benchmark. The exhausted-provider
+fixture already awaits storage readiness. Its 503 cause remains unknown; the benchmark retained six
+samples and failed with 37.408382 ms overhead against the unchanged 20 ms limit. Original failures
+are retained, with no blind rerun or claimed connection/performance diagnosis.
+
+The bounded [readiness repair spec](docs/tasks/agent-platform-diagnostics-fixture-readiness.md)
+now records a test-only failure-evidence addition: safe response code, storage health and original
+flush timing around the same single report request. Fourteen actual integration tests pass locally;
+two disposable expected-failure probes confirmed rejected/pending flush evidence without canary
+exposure. No runtime deadline, retry, benchmark threshold or content assertion changes.
+Independent source and documentation review approved this follow-up without actionable findings;
+refreshed source-bound mirrors and hosted qualification remain pending.
+
+The earlier `93b13f47` task/session mirrors are fully published and read back. Its independent
+runtime review confirms 58 first-attempt Electron cases, 31 browser passes with one existing skip,
+and 17 diagnostic artifacts; verify remains blocking. PR324 stays at `5d938b98` and staging remains
+`2a848b9a`. Neither repair nor promotion is merge-ready. Beads remains in progress.
+
+Preserve the separate active Git delivery MVP worktree/refs, main, PR283, paused orchestration and
+unrelated dirty work. The complete previous handoff follows as historical evidence; its pending
+publication statements are superseded by this header and live receipts.
+
+---
+
+## Current handoff: diagnostics fixture readiness — 14 October 2026
+
+PR325 is merged into `feature/github-read-responsiveness` at `5d938b98`, completing the
+independently reviewed port repair after all nine executed feature checks passed. Its full
+source-bound documentation mirrors and Beads close/readback/sync are complete. The older
+pending statements below are retained historical snapshots.
+
+PR324 at that new head passed full scans, actual packaged VM (19 first-attempt cases), Electron
+(58 first-attempt cases), browser (31 passes and one existing prerequisite skip) and other quality
+checks, but verify failed a restart report read and one benchmark comparison. No staging merge or
+cleanup has occurred; staging remains `2a848b9a`. Original failures and independent qualification
+receipts are retained under `/Users/letuscode/.codex/local-mvp-promotion-20261014`.
+
+The bounded [diagnostics fixture readiness repair](docs/tasks/agent-platform-diagnostics-fixture-readiness.md)
+waits for storage readiness through the authenticated list endpoint before the existing single
+report assertions. Actual restart tests and the unchanged benchmark pass locally; independent source, evidence and
+documentation review approved the bounded repair without findings. Full mirrors and new hosted
+qualification remain pending. Runtime deadlines, benchmark
+limits and report assertions are unchanged. The original 503 cause and benchmark scheduling
+hypothesis are not represented as proven. Do not merge using stale successful checks.
+
+The parent `agent-platform-local-mvp-promotion` stays in progress. Owner-approved Git delivery MVP
+implementation is active in its separate worktree/branches; preserve it during any cleanup.
+Main, PR283, paused orchestration and unrelated dirty work remain separate. All following handoffs
+are complete dated historical snapshots, superseded by this header and live Beads/evidence.
+
+---
+
+## Current handoff: desktop fixture port repair — 14 October 2026
+
+The d185 staging promotion PR324 is blocked by an independently confirmed first-attempt Electron
+fixture collision despite its retry-green check. API and renderer both received port 41185.
+`task/desktop-fixture-ports` repairs that allocation on feature head `4e5b3405`; the bounded task is
+[agent-platform-desktop-fixture-ports](docs/tasks/agent-platform-desktop-fixture-ports.md).
+
+The repair reserves both loopback ports together before releasing them. Focused unit tests,
+typecheck and lint pass. The original failed connected Electron case passed without retry, and
+approve/reject journeys passed with four complete safe diagnostic exports. Independent source,
+evidence and documentation review approved the repair without findings. Publication and new
+hosted qualification remain pending. No runtime timeouts or retries are increased. The parent
+`agent-platform-local-mvp-promotion` remains in progress; do not merge PR324 from stale green checks.
+
+Git delivery planning is active in its own separate worktree/branches and must be preserved.
+PR283 and paused orchestration work remain separate. The preceding complete handoff follows.
+
+---
+
+# Current handoff — local MVP staging consolidation, 14 October 2026
+
+The owner authorized both completed features to be promoted into protected staging after all
+checks pass and review findings resolve, followed by cleanup of verified delivered branches.
+Main and paused PR283/orchestration remain separate.
+
+- The PR319 handoff and reviewed PR322 desktop startup/shutdown repair are delivered to staging
+  by PR321 at `2a848b9aa78a9e04534903a56ba2d1d56621fe62`.
+  Its fresh full security scans, actual packaged macOS VM, browser/desktop and live protection
+  checks passed before guarded squash. The complete dated handoff is retained below.
+- d185 is complete and closed for accepted feature delivery: PR320 merged into
+  `feature/github-read-responsiveness` at `0affcda2`. Its nine executed feature checks passed,
+  including 58 first-attempt Electron tests, 31 browser passes with one existing prerequisite
+  skip, and nine benchmark samples. Full mirrors and independent source/evidence review passed.
+- This task reconciles the actual staging ancestry with that feature, preserving the product tree
+  including confirmed desktop child shutdown, and both divergent session histories. The integration task PR and final d185 staging promotion
+  still require their own exact-head checks and resolved findings. No final staging delivery or
+  branch cleanup is claimed by this pre-merge checkpoint.
+- Promotion/cleanup is tracked in
+  [agent-platform-local-mvp-promotion](docs/tasks/agent-platform-local-mvp-promotion.md).
+  Actual merge, check, mirror and recovery/cleanup receipts are in Beads and
+  `/Users/letuscode/.codex/local-mvp-promotion-20261014`; refresh them before acting on this snapshot.
+- `agent-platform-9wqs`, `agent-platform-b5y4`, `agent-platform-lowe` and `agent-platform-odgi`
+  remain open for diagnostic lineage, navigation, obsolete Git reads and intermittent exports.
+  Existing incidents are retained; their unknown causes are not claimed fixed by d185 or promotion.
+- The first VM attempt on the repaired source encountered confirmed disk exhaustion. Its full
+  failure evidence was preserved, space became available, and the same source passed all 19 VM
+  cases on a fresh job attempt after restarting the offline runner. The initial failure remains
+  recorded; it is not treated as a network-speed issue or proof of a software fix.
+- The earlier PR322 diagnostics benchmark failure is retained under the existing visibility QA
+  follow-up `agent-platform-harness-v5`; its cause remains unproven. New qualifying runs must
+  complete all nine samples within the unchanged latency bounds. A later pass does not establish
+  a performance fix, and recording the evidence does not start deferred visibility work.
+- Sourcery's budget/size skips are disclosed, with independent source-aware review retained.
+  Feature-targeted VM skips never qualify staging. Connected model/GitHub fixtures are bounded
+  evidence; no paid provider calls, distribution or paused prototype work is part of this delivery.
+
+After verified final staging integration, recovery-protect and remove only delivered temporary
+branches. Preserve the four paused branches, PR283 draft state, main and unrelated dirty worktrees.
+Choose the next product priority with the owner from live Beads after consolidation; no new task
+implementation is selected here. All handoffs below are dated historical snapshots, including their
+then-pending work and earlier authority statements, and are superseded by this header and live Beads.
+
+---
+
+<!-- markdownlint-disable MD025 MD024 MD029 MD013 -->
+
+## Retained d185 handoff prefix
+
+# Session handoff — d185 implementation, 14 October 2026
+
+The owner approved the bounded GitHub-read responsiveness plan and implementation using Beads,
+the implementation skill, independent critique, browser/Electron/diagnostic checks and task PR merge
+only after actual current-head pipelines pass and review comments resolve.
+
+- Active Beads: `agent-platform-d185`, in progress. Runtime branch
+  `task/github-read-responsiveness`, followed by `task/github-read-verification`; destination
+  `feature/github-read-responsiveness`. Planning source `d105afce` remains retained.
+- Implemented async bounded checks/PR-list reads, captured/rechecked identity, read-only cancellation,
+  and safe post-create enrichment. Existing write operations/security policies remain intact.
+- Local API/helper/macOS/Linux and managed Chromium/Electron evidence is recorded in
+  [the review/results record](docs/reviews/github-read-responsiveness.md). Baseline blocking reproduced;
+  fixed probes completed before held child release. Docker and full API regression pass. All three fresh trace-safe managed journeys and four existing context/reply fixture regressions
+  pass. Full archive credential checks pass. Runtime source is pushed at `b0b05939`; no feature merge is claimed yet.
+- PR320 is open into the feature. Five full Notion mirrors were verified at `17269698`, with
+  changed-document readbacks at `6f53fe74` and `e9f7e5a8`. Hosted link/fixture findings GR-H01/H02
+  are repaired and Sonar/Lychee pass. GR-H03 tracks a Project navigation reversion separately as
+  `agent-platform-b5y4`; its cause and relationship to changed read timing are unproven. Final
+  Electron qualification requires all 58 tests passing without retries. GR-H04 fixes the Docker
+  journey's disabled Refresh sequencing after both hosted attempts correctly failed the
+  before-release assertion. Source review approves the bounded tab-navigation repair; fresh local
+  Docker verification passes first attempt in 4.7 seconds with preserved overlap proof. Final hosted
+  verification, updated mirrors and preservation remain required before merge.
+- GR-H05 identified a PR-create test that triggered overlapping reads before loading completed.
+  The fixture now awaits visible readiness and actual request completion; all three affected
+  Electron Git workflow tests pass first attempt. Rapid navigation can still meet the approved
+  four-read limit and show a temporary busy response. `agent-platform-lowe` tracks cancellation
+  of obsolete UI reads separately; no concurrency limit or deadline was relaxed.
+- GR-H06 records an intermittent failed diagnostic export in the existing Chromium reply journey
+  at `26754446`: 57 Electron passes plus one retry despite a green badge. `agent-platform-odgi`
+  retains the incident; its cause remains unknown. Safe response/download observation now passes
+  a focused real-export and controlled503 proof, including listener cleanup and safe error metadata. This is fixture containment,
+  not a claimed runtime fix. Final delivery still requires all 58 Electron tests passing first
+  attempt, alongside current browser, diagnostics, quality and review gates.
+- Diagnostic follow-up `agent-platform-9wqs` records existing approval-resume lineage that leaves
+  honest prior-process unfinished warnings after restart. Effects, audit/message persistence and
+  diagnostic retention pass independently; no automatic replay or hidden warning was introduced.
+- Paused PR283/orchestration refs and dirty primary/unrelated worktrees stay separate. PR319 is an
+  independent documentation handoff, not this task's prerequisite. No main or staging promotion is
+  authorized by this implementation handoff; staging requires the separate protected delivery grant.
+
+Canonical plan: [bounded d185 plan](docs/planning/github-read-responsiveness.md).
+Task and requirements: [d185](docs/tasks/agent-platform-d185.md).
+Verification: [GR-T01–GR-T10](docs/testing/github-read-responsiveness.md).
+Full source-bound mirrors/readbacks and Beads sync are required at delivery. The previous planning
+and completed-feature handoffs are retained verbatim below as historical records.
+
+---
+
+<!-- markdownlint-disable MD025 MD024 MD029 MD013 -->
+
+# Current handoff — GitHub read responsiveness planning, 14 October 2026
+
+The owner selected `agent-platform-d185` for planning only, with independent critique before
+implementation. The [bounded plan](docs/planning/github-read-responsiveness.md),
+[task spec](docs/tasks/agent-platform-d185.md), [verification contract](docs/testing/github-read-responsiveness.md)
+and [review record](docs/reviews/github-read-responsiveness.md) define the current proposal.
+No implementation or merge is authorized yet; product verification has not run.
+
+The reply fix is already delivered in staging `1e4bd7af30b092cc9a2d795e9c022ebfd5212176` via PR315.
+The later general handoff update is separately pushed at161ebfd3 in PR319, not incorporated by this
+planning branch. Preserve that history on eventual integration; no dependency on its pending merge.
+Planning branches are feature/github-read-responsiveness → task/github-read-responsiveness-plan
+from actual staging1e4bd7af. Existing paused orchestration and unrelated worktrees remain untouched.
+
+Proposed scope: async/bounded checks and PR-list reads, caller/identity safety and actual concurrent
+chat/diagnostic evidence. Git writes, broader workflow UI, dashboards, distribution and paused
+orchestration are excluded. The plan and critic record carry current status; all historical
+implementation-ready/pending-merge wording below belongs to its own dated delivery, not d185.
+
+## Retained previous handoff
+
+## Retained handoff and lifecycle delivery prefix
+
 # Current handoff — qualify the desktop lifecycle repair before staging, 14 October 2026
 
 The owner authorized merging both completed features into protected staging after all actual
@@ -123,6 +383,8 @@ Everything below is retained historical context. Its pending work and earlier au
 are superseded by the current handoff and live Beads; do not repeat completed reply deliveries.
 
 <!-- markdownlint-disable MD025 -->
+
+## Shared prior handoff history
 
 # Current handoff — complete diagnostic reads before staging, 13 October 2026
 
