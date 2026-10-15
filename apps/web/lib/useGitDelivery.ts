@@ -50,17 +50,17 @@ export function useGitDelivery(projectId: string | null) {
       return;
     const historyValue = history.status === 'fulfilled' ? history.value : undefined;
     const indexValue = index.status === 'fulfilled' ? index.value : undefined;
+    let error: string | null = null;
+    if (!historyValue) error = 'Could not load saved Git outcomes. Refresh before continuing.';
+    else if (!indexValue)
+      error = 'Could not read the current index. Saved Git outcomes remain available.';
     setView((previous) => ({
       ...previous,
       projectId,
       operations: historyValue?.operations ?? previous.operations,
       unverifiedIds: historyValue ? [] : previous.unverifiedIds,
       stagedPaths: indexValue?.paths ?? [],
-      error: !historyValue
-        ? 'Could not load saved Git outcomes. Refresh before continuing.'
-        : !indexValue
-          ? 'Could not read the current index. Saved Git outcomes remain available.'
-          : null,
+      error,
     }));
   }, [identity, path, projectId]);
   useEffect(() => {

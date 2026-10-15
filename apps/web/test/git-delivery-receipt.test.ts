@@ -93,7 +93,7 @@ describe('pure Git delivery receipt controls', () => {
   });
   it('does not offer another mutation while a saved response is unverified', async () => {
     await render(base, { unverified: true });
-    expect(container.querySelector('[role="status"]')?.textContent).toContain('unverified');
+    expect(container.querySelector('output')?.textContent).toContain('unverified');
     expect(container.querySelectorAll('button,input')).toHaveLength(0);
     for (const callback of Object.values(callbacks)) expect(callback).not.toHaveBeenCalled();
   });
@@ -108,7 +108,7 @@ describe('pure Git delivery receipt controls', () => {
   });
   it('keeps unknown uncertain and requires separate acknowledgement before recovery', async () => {
     await render({ ...base, state: 'unknown' });
-    expect(container.querySelector('[role="status"]')?.textContent).toContain('Outcome unknown');
+    expect(container.querySelector('output')?.textContent).toContain('Outcome unknown');
     expect(container.textContent).not.toContain('Confirm Git operation');
     expect(container.textContent).not.toContain('Delete closed record');
     expect(button('Acknowledge uncertain outcome').disabled).toBe(true);
@@ -120,7 +120,7 @@ describe('pure Git delivery receipt controls', () => {
     await click(button('Acknowledge uncertain outcome'));
     expect(callbacks.onAcknowledge).toHaveBeenCalledTimes(1);
     expect(callbacks.onAcknowledge).toHaveBeenCalledWith(base.id);
-    expect(container.querySelector('[role="status"]')?.textContent).toContain('unknown');
+    expect(container.querySelector('output')?.textContent).toContain('unknown');
   });
   it('requires deletion confirmation, resets it for a changed receipt, never retries', async () => {
     await render({ ...base, state: 'unknown', acknowledgedAtMs: 0 });

@@ -1,3 +1,38 @@
+# Current handoff — PR329 quality repairs, 15 October 2026
+
+PR329 remains open from `task/git-delivery-verification` into `feature/git-delivery-mvp`.
+Initial head `e0df35f1` passed build/Docker/docs/cycles/GitGuardian but failed hosted Sonar,
+browser discovery and Linux desktop checks. Independently reviewed repairs address complexity,
+Git-path ordering, fixture executable/directory safety, receipt rendering and test readiness.
+Node fixture controls now run after the CI build; browser discovery selects real `.spec.ts`
+journeys. Linux caffeinate invocation and the genuine Linux Hide panel baseline are corrected.
+No security rule, deadline, screenshot threshold or protection has been weakened.
+
+Local UI151/core76/harness114/API60 and Node fixture22 controls pass. Full quality gates passed;
+final synchronous approval-claim extraction has another passing API60 and API quality checks.
+Five Git browser cases pass, plus31 existing browser cases and one unchanged optional context
+prerequisite skip. Their Docker router predates the final synchronous extraction; final exact-head
+hosted browser evidence is still required. Native broad56passes/two wrong-cwd MCP failures are
+retained; correct desktop-cwd execution passes3MCP+3finalGit cases without retries, and final3panel
+cases pass separately. All61 scenarios have passing evidence across these distinct runs. This is
+not a claim that one broad invocation passed all61.
+
+Seven final native Git diagnostic reports passed final runtime-bound independent review; earlier
+seven-body approval remains retained. Success, denial and actual backend restart are covered,
+with `unfinishedPriorProcess=true` honestly retained on restarted unknown history and no replay.
+The initial remote renderer refusal remains unexplained; bounded startup metadata now aids any
+recurrence. Model/GitHub/SSH boundaries are deterministic, and managed node-double journeys do
+not qualify a protected real-VM or distribution release.
+
+Next is normal commit/push, complete changed-document mirrors/readbacks, fresh hosted Sonar and
+all exact-head CI/review gates. The verification Beads task remains in progress. No owner final
+acceptance, merge, staging readiness or broad-epic completion is claimed. Main, paused PR283/four
+branches, unrelated dirty checkouts and retained session history remain separate. Evidence is
+`/Users/letuscode/.codex/git-delivery-implementation-20261014`. All handoffs below are preserved
+historical checkpoints; their pending/opening statements do not override this current status.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current handoff — Git delivery verification, 15 October 2026
 
 The final task is `agent-platform-git-delivery-verification` on `task/git-delivery-verification`, chained from pushed `task/git-delivery-tools` at `093f7b963a7433fc68e4f0d8a006b48eea412ee0`. Its implementation tree is `3d172658ffcc645ddfe4c9a53312816e7c1dbc7d` and includes qualified staging `4ffc5fc0`. All39 reviewed files are byte-identical after normal hooks; cycles/build/typecheck and contracts128/DB147/desktop187/web366/harness745/API459 passed. No bypass or history rewrite was used; an attempted pull-rebase was aborted and exact clean source restored before normal push.

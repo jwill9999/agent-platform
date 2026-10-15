@@ -473,6 +473,31 @@ async function dispatchMcpTool(
   }
 }
 
+/** Only a private, exact resume binding grants Git execution authority. */
+function nativeDispatchOptions(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+  signal?: AbortSignal,
+): Parameters<NativeToolExecutor>[2] {
+  const authority = ctx.gitDeliveryApproval;
+  if (
+    isGitDeliveryTool(call.name) &&
+    authority &&
+    call.gitDeliveryBinding?.operationId === authority.operationId &&
+    call.id === authority.toolCallId
+  ) {
+    return {
+      gitDelivery: {
+        operationId: authority.operationId,
+        approvalRequestId: authority.approvalRequestId,
+      },
+      signal,
+    };
+  }
+  if (call.name === 'sys_bash' && call.approvalGranted === true) return { approvalGranted: true };
+  return undefined;
+}
+
 /** Dispatch a tool call to a native executor. */
 async function dispatchNativeTool(
   call: ToolCallIntent,
@@ -490,22 +515,7 @@ async function dispatchNativeTool(
     };
   }
   try {
-    const gitAuthority = ctx.gitDeliveryApproval;
-    const options =
-      isGitDeliveryTool(call.name) &&
-      gitAuthority &&
-      call.gitDeliveryBinding?.operationId === gitAuthority.operationId &&
-      call.id === gitAuthority.toolCallId
-        ? {
-            gitDelivery: {
-              operationId: gitAuthority.operationId,
-              approvalRequestId: gitAuthority.approvalRequestId,
-            },
-            signal,
-          }
-        : call.name === 'sys_bash' && call.approvalGranted === true
-          ? { approvalGranted: true }
-          : undefined;
+    const options = nativeDispatchOptions(call, ctx, signal);
     const result = options
       ? await ctx.nativeToolExecutor(call.name, call.args, options)
       : await ctx.nativeToolExecutor(call.name, call.args);
@@ -530,15 +540,40 @@ function isOutputOk(output: Output): boolean {
   return true;
 }
 
+function approvedForDispatch(call: ToolCallIntent, ctx: ToolDispatchContext): boolean {
+  if (isGitDeliveryTool(call.name)) {
+    return (
+      ctx.gitDeliveryApproval?.toolCallId === call.id &&
+      ctx.gitDeliveryApproval.operationId === call.gitDeliveryBinding?.operationId
+    );
+  }
+  return ctx.approvedToolCallIds?.has(call.id) ?? false;
+}
+
+async function jailSystemTool(call: ToolCallIntent, ctx: ToolDispatchContext) {
+  if (!isSystemTool(call.name)) return { call };
+  const result = await enforcePathJail(call, ctx);
+  if (result && 'output' in result) {
+    ctx.auditLog?.logDenied(
+      call.name,
+      call.args,
+      ctx.agent.id,
+      '',
+      result.output.type === 'error'
+        ? (result.output.message ?? 'Path access denied')
+        : 'Path access denied',
+    );
+    return { output: result.output };
+  }
+  return { call: result && 'args' in result ? { ...call, args: result.args } : call };
+}
+
 async function dispatchSingleTool(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
   options?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
-  const approvedForResume = isGitDeliveryTool(call.name)
-    ? ctx.gitDeliveryApproval?.toolCallId === call.id &&
-      ctx.gitDeliveryApproval.operationId === call.gitDeliveryBinding?.operationId
-    : (ctx.approvedToolCallIds?.has(call.id) ?? false);
+  const approvedForResume = approvedForDispatch(call, ctx);
   if (!approvedForResume && !isToolExecutionAllowed(ctx.agent, call.name)) {
     const output = buildCapabilityRecoveryOutput(call);
     ctx.auditLog?.logDenied(call.name, call.args, ctx.agent.id, '', 'Tool not in agent allowlist');
@@ -561,26 +596,10 @@ async function dispatchSingleTool(
     return { output, ok: false };
   }
 
-  // PathJail: enforce file-path constraints for system tools
-  let safeCall = call;
-  if (isSystemTool(call.name)) {
-    const pathResult = await enforcePathJail(call, ctx);
-    if (pathResult && 'output' in pathResult) {
-      ctx.auditLog?.logDenied(
-        call.name,
-        call.args,
-        ctx.agent.id,
-        '',
-        pathResult.output.type === 'error'
-          ? (pathResult.output.message ?? 'Path access denied')
-          : 'Path access denied',
-      );
-      return { output: pathResult.output, ok: false };
-    }
-    if (pathResult && 'args' in pathResult) {
-      safeCall = { ...call, args: pathResult.args };
-    }
-  }
+  // Path checks complete before MCP admission or any native dispatch.
+  const jailed = await jailSystemTool(call, ctx);
+  if (jailed.output) return { output: jailed.output, ok: false };
+  const safeCall = jailed.call;
 
   const parsed = parseToolId(safeCall.name);
   const denial = mcpAdmissionError(safeCall, ctx, approvedForResume);

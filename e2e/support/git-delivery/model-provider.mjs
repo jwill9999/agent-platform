@@ -1,6 +1,62 @@
 import { createServer } from 'node:http';
 import { Buffer } from 'node:buffer';
 
+function scriptedCalls(reply) {
+  if (reply.kind === 'tool') return [reply];
+  if (reply.kind === 'tools') return reply.calls;
+  return undefined;
+}
+
+function validateOfferedCall(body, call) {
+  if (
+    typeof call.id !== 'string' ||
+    !call.id ||
+    typeof call.name !== 'string' ||
+    !call.args ||
+    typeof call.args !== 'object' ||
+    Array.isArray(call.args) ||
+    !body.tools?.some((tool) => tool.type === 'function' && tool.function?.name === call.name)
+  ) {
+    throw new Error('Expected Git tool was not offered by the actual harness');
+  }
+}
+
+function validateScriptedReply(body, reply) {
+  for (const id of reply.requiredToolResults ?? []) {
+    if (!body.messages.some((message) => message.role === 'tool' && message.tool_call_id === id)) {
+      throw new Error('Expected actual tool result missing from model continuation');
+    }
+  }
+  const calls = scriptedCalls(reply);
+  if (!calls) {
+    if (reply.kind !== 'text') throw new Error('Unsupported scripted response');
+    return undefined;
+  }
+  if (
+    !Array.isArray(calls) ||
+    calls.length < 1 ||
+    calls.length > 8 ||
+    new Set(calls.map((call) => call.id)).size !== calls.length
+  ) {
+    throw new Error('Invalid scripted tool batch');
+  }
+  for (const call of calls) {
+    validateOfferedCall(body, call);
+  }
+  return calls;
+}
+
+async function readFixtureRequest(request) {
+  const parts = [];
+  let bytes = 0;
+  for await (const part of request) {
+    bytes += part.length;
+    if (bytes > 512_000) throw new Error('Request exceeds fixture byte bound');
+    parts.push(part);
+  }
+  return JSON.parse(Buffer.concat(parts).toString('utf8'));
+}
+
 /** Inert test boundary: real SDK HTTP, scripted replies, no external forwarding. */
 export async function startGitDeliveryProvider({ model, replies, port = 0 }) {
   if (!/^git-delivery-[a-zA-Z0-9-]+$/.test(model) || !Array.isArray(replies)) {
@@ -15,14 +71,7 @@ export async function startGitDeliveryProvider({ model, replies, port = 0 }) {
         if (request.method !== 'POST' || request.url !== '/v1/chat/completions') {
           throw new Error('Unexpected method or route');
         }
-        const parts = [];
-        let bytes = 0;
-        for await (const part of request) {
-          bytes += part.length;
-          if (bytes > 512_000) throw new Error('Request exceeds fixture byte bound');
-          parts.push(part);
-        }
-        const body = JSON.parse(Buffer.concat(parts).toString('utf8'));
+        const body = await readFixtureRequest(request);
         const reply = script[requests.length];
         if (
           !reply ||
@@ -32,40 +81,7 @@ export async function startGitDeliveryProvider({ model, replies, port = 0 }) {
         ) {
           throw new Error('Unexpected request count, model or streaming mode');
         }
-        for (const id of reply.requiredToolResults ?? []) {
-          if (
-            !body.messages.some((message) => message.role === 'tool' && message.tool_call_id === id)
-          ) {
-            throw new Error('Expected actual tool result missing from model continuation');
-          }
-        }
-        const calls =
-          reply.kind === 'tool' ? [reply] : reply.kind === 'tools' ? reply.calls : undefined;
-        if (calls) {
-          if (
-            !Array.isArray(calls) ||
-            calls.length < 1 ||
-            calls.length > 8 ||
-            new Set(calls.map((call) => call.id)).size !== calls.length
-          )
-            throw new Error('Invalid scripted tool batch');
-          for (const call of calls) {
-            if (
-              typeof call.id !== 'string' ||
-              !call.id ||
-              typeof call.name !== 'string' ||
-              !call.args ||
-              typeof call.args !== 'object' ||
-              Array.isArray(call.args) ||
-              !body.tools?.some(
-                (tool) => tool.type === 'function' && tool.function?.name === call.name,
-              )
-            )
-              throw new Error('Expected Git tool was not offered by the actual harness');
-          }
-        } else if (reply.kind !== 'text') {
-          throw new Error('Unsupported scripted response');
-        }
+        const calls = validateScriptedReply(body, reply);
         requests.push(body);
         response.writeHead(200, { 'content-type': 'text/event-stream' });
         const emit = (delta, finishReason, usage) =>

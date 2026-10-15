@@ -50,7 +50,7 @@ function panelPrRead(args, repository) {
       branch.length > 0 &&
       branch.length <= 255 &&
       ![...branch].some(
-        (character) => character.charCodeAt(0) <= 32 || character.charCodeAt(0) === 127,
+        (character) => character.codePointAt(0) <= 32 || character.codePointAt(0) === 127,
       ) &&
       exact(args, ['pr', 'view', '--repo', repository, '--json', checkFields, '--', branch])
     )
@@ -106,14 +106,11 @@ function parse(args, repository) {
   if (args[0] !== 'pr') throw new Error('Unsupported fixture command');
   const shared = ['--repo', '--head', '--base'];
   const kind = args[1];
-  const input =
-    kind === 'list'
-      ? options(args.slice(2), [...shared, '--state', '--json'])
-      : kind === 'create'
-        ? options(args.slice(2), [...shared, '--title', '--body'], ['--draft'])
-        : (() => {
-            throw new Error('Unsupported fixture command');
-          })();
+  let input;
+  if (kind === 'list') input = options(args.slice(2), [...shared, '--state', '--json']);
+  else if (kind === 'create')
+    input = options(args.slice(2), [...shared, '--title', '--body'], ['--draft']);
+  else throw new Error('Unsupported fixture command');
   if (input['--repo'] !== repository || !input['--head'] || !input['--base']) {
     throw new Error('Unexpected fixture repository or branch');
   }
@@ -129,7 +126,7 @@ function readResult(request, config, ledger) {
   if (request.kind === 'repository')
     return {
       code: 0,
-      output: `${JSON.stringify({ url: `https://github.com/${config.repository}` })}\n`,
+      output: JSON.stringify({ url: 'https://github.com/' + config.repository }) + '\n',
     };
   if (!['panel-list', 'pr-checks', 'commit-checks'].includes(request.kind)) return undefined;
   if (config.enrichmentFailure && ledger.pullRequests.length > 0)

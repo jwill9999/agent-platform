@@ -6,6 +6,8 @@ const ciBrowserChannel = process.env.CI ? { channel: 'chrome' as const } : {};
 
 export default defineConfig({
   testDir: '.',
+  // Browser journeys only; support/*.test.mjs are explicit Node fixture checks.
+  testMatch: '**/*.spec.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

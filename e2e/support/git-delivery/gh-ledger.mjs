@@ -12,25 +12,30 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { URL } from 'node:url';
 
-/** Create a per-test external gh boundary; starts no processes and opens no ports. */
+function checkedBranch(value) {
+  if (
+    value !== undefined &&
+    (typeof value !== 'string' ||
+      value.length === 0 ||
+      value.length > 255 ||
+      [...value].some(
+        (character) => character.codePointAt(0) <= 32 || character.codePointAt(0) === 127,
+      ))
+  )
+    throw new Error('Invalid fixture current branch');
+  return value;
+}
+
+/**
+ * Create a per-test external gh boundary; starts no processes and opens no ports.
+ * @param {{repository?: string, currentBranch?: string, authFailure?: boolean,
+ * enrichmentFailure?: boolean, loseCreateResponseOnce?: boolean}} options
+ */
 export async function createGhLedgerFixture({
   repository = 'fixture/project',
   currentBranch,
   ...failures
 } = {}) {
-  function checkedBranch(value) {
-    if (
-      value !== undefined &&
-      (typeof value !== 'string' ||
-        value.length === 0 ||
-        value.length > 255 ||
-        [...value].some(
-          (character) => character.charCodeAt(0) <= 32 || character.charCodeAt(0) === 127,
-        ))
-    )
-      throw new Error('Invalid fixture current branch');
-    return value;
-  }
   if (!/^[a-zA-Z0-9][\w.-]*\/[a-zA-Z0-9][\w.-]*$/.test(repository)) {
     throw new Error('Invalid fixture repository');
   }

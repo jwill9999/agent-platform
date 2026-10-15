@@ -47,6 +47,11 @@ import {
 } from '@agent-platform/db';
 import type { GitDeliveryAction, GitDeliveryReceipt } from '@agent-platform/contracts';
 import { createGitDeliveryService } from '../src/application/gitDelivery/index.js';
+import {
+  normaliseGitDeliveryPaths,
+  indexPaths,
+  selectedIndexEntries,
+} from '../src/application/gitDelivery/repository.js';
 import { runGitDeliveryCommand } from '../src/application/gitDelivery/process.js';
 
 const run = (root: string, args: string[]) =>
@@ -84,6 +89,29 @@ describe('Git delivery shared local service', () => {
     }).id;
     time = Date.now();
     service = createGitDeliveryService(opened.db, { now: () => time });
+  });
+  it('preserves ordinal path and index ordering through complete review and a real commit', async () => {
+    const paths = ['\ue000.txt', '😀.txt', 'Ω.txt', 'a.txt', 'Z.txt', '2.txt', '10.txt'];
+    const expected = ['10.txt', '2.txt', 'Z.txt', 'a.txt', 'Ω.txt', '😀.txt', '\ue000.txt'];
+    expect(normaliseGitDeliveryPaths([...paths, paths[0]!])).toEqual(expected);
+    const entries = paths.map((file) => `100644 ${'a'.repeat(40)} 0\t${file}`).join('\0');
+    expect(indexPaths(entries)).toEqual(expected);
+    expect(selectedIndexEntries(entries, paths).split('\0')).toEqual(
+      expected.map((file) => `100644 ${'a'.repeat(40)} 0\t${file}`),
+    );
+    for (const file of paths) writeFileSync(join(repo, file), `content:${file}\n`);
+    const panel = service.panel(projectId);
+    const stage = await panel.prepare({ kind: 'stage', mode: 'stage', paths });
+    expect(stage.action).toEqual({ kind: 'stage', mode: 'stage', paths: expected });
+    expect((await panel.execute(stage.id, { confirmed: true })).state).toBe('succeeded');
+    expect(await panel.stagedPaths()).toEqual(expected);
+    const commit = await panel.prepare({ kind: 'commit', paths, message: 'Ordinal review' });
+    expect(commit.review.paths).toEqual(expected);
+    const outcome = await panel.execute(commit.id, { confirmed: true });
+    expect(outcome.state).toBe('succeeded');
+    expect(run(repo, ['rev-parse', 'HEAD'])).toBe(outcome.result?.commitSha);
+    expect(run(repo, ['diff', '--cached', '--name-only'])).toBe('');
+    for (const file of paths) expect(run(repo, ['show', `HEAD:${file}`])).toBe(`content:${file}`);
   });
   afterEach(() => {
     pathReadHook.before = undefined;

@@ -15,11 +15,12 @@ export function ProjectEvidenceToggle({
   unavailableReason: string | null;
 }>) {
   const descriptionId = useId();
-  const label = unavailableReason
-    ? 'Activity and Git panel unavailable'
-    : visible
-      ? 'Hide activity and Git panel'
-      : 'Show activity and Git panel';
+  let label = visible ? 'Hide activity and Git panel' : 'Show activity and Git panel';
+  let text = visible ? 'Hide panel' : 'Show panel';
+  if (unavailableReason) {
+    label = 'Activity and Git panel unavailable';
+    text = 'Panel unavailable';
+  }
   const Icon = visible ? PanelRightClose : PanelRightOpen;
 
   return (
@@ -39,9 +40,7 @@ export function ProjectEvidenceToggle({
         }}
       >
         <Icon className="h-4 w-4" aria-hidden />
-        <span className="hidden sm:inline">
-          {unavailableReason ? 'Panel unavailable' : visible ? 'Hide panel' : 'Show panel'}
-        </span>
+        <span className="hidden sm:inline">{text}</span>
       </Button>
       {unavailableReason && (
         <span id={descriptionId} className="sr-only">

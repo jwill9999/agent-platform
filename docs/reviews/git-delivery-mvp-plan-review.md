@@ -142,3 +142,29 @@ The earlier required pull-with-rebase attempted to flatten retained staging inte
 Final local results: five Git browser cases qualified across distinct zero-retry runs; existing browser31pass with one unchanged optional context prerequisite skip;39 existing managed-app regressions across38 initial passes and one intentional Darwin screenshot rerun, plus three native Git chat cases. The reviewer inspected actual ledgers, traces, cleanup and seven V1 reports. Models and GitHub transport remain deterministic. Unknown restart's unfinished-prior-process flag and all earlier failed attempts remain explicit. The real Linux visual image and all exact-head hosted checks/review findings remain to qualify; no owner acceptance, merge, staging readiness or broad-epic completion is claimed.
 
 A separate P2 test-isolation finding records rejected LangSmith multipart uploads403 during both older and new API test execution. Existing shared-fork configuration lacks process-wide tracing isolation; inherited key presence alone is not a proven enabling cause, and asynchronous trace ownership is unknown. The actual required API suite nevertheless passed459 assertions. `agent-platform-test-telemetry-isolation` preserves the safe evidence and requires zero external upload attempts by default, with owned fake endpoints for explicit tracing tests. It is outside this MVP; no credentials/global settings were read or modified and no required result was waived.
+
+## PR329 quality repair review — 15 October 2026
+
+Independent reviewers approved the core ordinal-ordering/effect-tracking refactor, nine-file UI
+delta, root router/harness/provider refactors, private Docker boundary, genuine Linux baseline,
+GD-S01 synchronous claim helper and explicit after-build Node fixture job. No suppression, new
+scanner exclusion, protection change or deadline relaxation was used. Actual hosted Sonar must
+confirm that the initial17critical/24major findings are cleared; source approval is not a scan pass.
+
+The reviewed source receipts and test logs are under the established evidence directory:
+`pr329-repair-source-freeze.json`, `pr329-final-repair-source-freeze.json`,
+`pr329-core-source-review.json` and `pr329-ui-repair-source.json`. The final three native Git cases
+and three corrected-cwd MCP cases pass without retries. Independent inspection of seven final Git
+V1 bodies verifies durability/privacy/no loss, real same-DB restart and no replay, retaining
+`unfinishedPriorProcess=true` on recovered unknown history. All five Git browser cases and31existing
+browser passes have independent effect/trace review, with one optional context prerequisite skip.
+The Docker router predates GD-S01; final exact-head hosted browser remains mandatory.
+
+The broader native run's two stdio MCP failures are explained by the coordinator's wrong working
+directory and retained alongside the successful proper-cwd run. The local Project panel fixture's
+premature send readiness is corrected and its final three cases pass. The historical remote
+renderer refusal remains unexplained; bounded startup metadata is recorded without claiming
+renderer-child exit proof. Source and local review are approved within these limits; fresh hosted
+gates/comments, complete mirrors and final owner acceptance remain pending. Sourcery's
+20,000-line retrieval-limit skip is disclosed, not an approval. See the
+[full result record](../testing/git-delivery-mvp.md#pr329-quality-repair-checkpoint--15-october-2026).

@@ -1,3 +1,4 @@
+import { dockerFixtureBinary } from './docker-command.js';
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
@@ -17,7 +18,7 @@ export async function startDockerGitProvider(options: {
   const container = process.env.GIT_DELIVERY_API_CONTAINER;
   if (!container) throw new Error('Select an isolated GIT_DELIVERY_API_CONTAINER');
   const inspect = (format: string) =>
-    execFileSync('docker', ['inspect', '--format', format, container], {
+    execFileSync(dockerFixtureBinary(), ['inspect', '--format', format, container], {
       encoding: 'utf8',
       timeout: 10_000,
     }).trim();
@@ -63,7 +64,7 @@ try {
 }
 `;
   const child = spawn(
-    'docker',
+    dockerFixtureBinary(),
     [
       'exec',
       '-i',

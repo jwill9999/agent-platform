@@ -65,6 +65,13 @@ function ActionDetails({ action }: Readonly<{ action: GitDeliveryAction }>) {
   return null;
 }
 
+function receiptStatus(receipt: GitDeliveryReceipt, unverified: boolean, expired: boolean): string {
+  if (unverified) return 'Saved outcome unverified — refresh before continuing.';
+  if (receipt.state === 'unknown') return 'Outcome unknown — inspect before trying again.';
+  if (expired) return 'Review expired — prepare a new operation.';
+  return `Status: ${receipt.state}`;
+}
+
 function ReceiptControl({
   receipt,
   nowMs,
@@ -89,15 +96,7 @@ function ReceiptControl({
       <h3 id={titleId} className="font-semibold">
         {actionLabel(receipt.action)}
       </h3>
-      <p role="status">
-        {unverified
-          ? 'Saved outcome unverified — refresh before continuing.'
-          : unknown
-            ? 'Outcome unknown — inspect before trying again.'
-            : expired
-              ? 'Review expired — prepare a new operation.'
-              : `Status: ${receipt.state}`}
-      </p>
+      <output className="block">{receiptStatus(receipt, unverified, expired)}</output>
       <p className="break-all">
         <strong>Operation:</strong> {receipt.id}
       </p>
@@ -194,7 +193,7 @@ function ReceiptControl({
                     checked={ackConfirmed}
                     disabled={pending}
                     onChange={(event) => setAckConfirmed(event.target.checked)}
-                  />
+                  />{' '}
                   I have inspected the outcome and understand a fresh operation could duplicate the
                   effect.
                 </label>
@@ -219,7 +218,7 @@ function ReceiptControl({
               checked={deleteConfirmed}
               disabled={pending}
               onChange={(event) => setDeleteConfirmed(event.target.checked)}
-            />
+            />{' '}
             Delete this retained record. Its result will no longer be available; the old operation
             cannot execute again.
           </label>

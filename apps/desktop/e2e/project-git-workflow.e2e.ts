@@ -63,7 +63,7 @@ test.describe('Electron Project Git workflow panel', () => {
           AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
           AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
           AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
-          CI: process.env.CI,
+          ...(process.env.CI === undefined ? {} : { CI: process.env.CI }),
         },
       });
 
@@ -82,8 +82,14 @@ test.describe('Electron Project Git workflow panel', () => {
       await openProject(page);
       const input = page.getByPlaceholder('Ask about this Project...');
       await expect(input).toBeEnabled();
+      // The composer can mount before its Project session is bound.
+      await expect(
+        page.getByText('Press Enter to send, Shift+Enter for new line', { exact: true }),
+      ).toBeVisible();
       await input.fill('/init');
-      await input.press('Enter');
+      const send = page.getByRole('button', { name: 'Send message', exact: true });
+      await expect(send).toBeEnabled();
+      await send.click();
       await page.getByRole('button', { name: 'Approve instructions' }).click();
       await expect(page.getByText('Project instructions approved').last()).toBeVisible();
       execFileSync(GIT_BINARY, ['add', '--', 'AGENTS.md'], { cwd: projectDir, stdio: 'ignore' });
@@ -278,7 +284,7 @@ test.describe('Electron Project Git workflow panel', () => {
           AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
           AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
           AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
-          CI: process.env.CI,
+          ...(process.env.CI === undefined ? {} : { CI: process.env.CI }),
         },
       });
 
@@ -432,7 +438,7 @@ test.describe('Electron Project Git workflow panel', () => {
           AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
           AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
           AGENT_PLATFORM_GH_BINARY: ghFixture.executable,
-          CI: process.env.CI,
+          ...(process.env.CI === undefined ? {} : { CI: process.env.CI }),
         },
       });
       const page = await app.firstWindow();
@@ -457,6 +463,9 @@ test.describe('Electron Project Git workflow panel', () => {
       await openProject(page);
       const input = page.getByPlaceholder('Ask about this Project...');
       await expect(input).toBeEnabled();
+      await expect(
+        page.getByText('Press Enter to send, Shift+Enter for new line', { exact: true }),
+      ).toBeVisible();
       await input.fill('/init');
       const send = page.getByRole('button', { name: 'Send message', exact: true });
       await expect(send).toBeEnabled();
@@ -496,6 +505,25 @@ test.describe('Electron Project Git workflow panel', () => {
     observedPage?.off('response', onResponse);
     observedPage?.off('requestfinished', onFinished);
     observedPage?.off('requestfailed', onFailed);
+    const processState = app?.process();
+    await testInfo.attach('fixture-startup-state', {
+      body: Buffer.from(
+        JSON.stringify(
+          {
+            backendPort,
+            rendererPort,
+            pageOrigin: observedPage ? new URL(observedPage.url()).origin : null,
+            pageClosed: observedPage?.isClosed(),
+            processId: processState?.pid,
+            exitCode: processState?.exitCode,
+            signalCode: processState?.signalCode,
+          },
+          null,
+          2,
+        ),
+      ),
+      contentType: 'application/json',
+    });
     await testInfo.attach('github-pr-create-read-lifecycle', {
       body: Buffer.from(JSON.stringify(lifecycle, null, 2)),
       contentType: 'application/json',

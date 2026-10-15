@@ -114,6 +114,70 @@ export async function openGitChat(
   ).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Git & GitHub' })).toHaveCount(0);
 }
+function expectedGitState(scenario: GitChatScenario, index: number) {
+  if (scenario === 'denied') return 'denied';
+  if (scenario === 'unknown' && index === 3) return 'unknown';
+  return 'succeeded';
+}
+
+async function approveGitChatOperation(
+  options: Parameters<typeof runGitChatJourney>[0],
+  page: Page,
+  tool: (typeof gitChatTools)[number],
+  index: number,
+  initialHead: string,
+) {
+  const { api, boundary, projectId, sessionId, branch, scenario } = options;
+  const card = page.getByRole('region', { name: 'Git operation approval', exact: true }).last();
+  await expect(
+    card.getByRole('button', { name: 'Approve Git operation', exact: true }),
+  ).toBeEnabled();
+  const pending = await api<ApprovalRequest[]>(
+    `approval-requests?sessionId=${sessionId}&status=pending`,
+  );
+  expect(pending).toHaveLength(1);
+  const approval = pending[0]!;
+  expect(approval.toolName).toBe(tool);
+  const preview = JSON.parse(approval.argsJson).gitDeliveryReceipt as GitDeliveryReceipt;
+  expect(preview).toMatchObject({ projectId, sessionId, source: 'chat', state: 'prepared' });
+  await expect(card).toContainText(preview.id);
+  expect(
+    await api<GitDeliveryReceipt>(`projects/${projectId}/git/delivery/${preview.id}`),
+  ).toMatchObject({ state: 'prepared' });
+  if (index === 0) {
+    expect(boundary.git('diff', '--cached', '--name-only')).toBe('');
+    await options.waiting?.();
+  }
+  if (tool === 'sys_git_commit') {
+    await expect(card).toContainText(gitChatCommit);
+    expect(boundary.git('rev-parse', 'HEAD')).toBe(initialHead);
+  }
+  if (tool === 'sys_git_push')
+    expect(boundary.remote('for-each-ref', '--format=%(refname)', `refs/heads/${branch}`)).toBe('');
+  if (tool === 'sys_git_create_pull_request') {
+    await options.beforePr?.();
+    await expect(card).toContainText(gitChatTitle);
+    await expect(card).toContainText(gitChatBody);
+    await expect(card).toContainText('staging');
+    expect((await boundary.ledger()).pullRequests).toHaveLength(0);
+    if (scenario === 'unknown') await boundary.loseNextCreateResponse();
+  }
+  await card
+    .getByRole('button', {
+      name: scenario === 'denied' ? 'Deny Git operation' : 'Approve Git operation',
+      exact: true,
+    })
+    .click();
+  const expected = expectedGitState(scenario, index);
+  await expect
+    .poll(
+      async () =>
+        (await api<GitDeliveryReceipt>(`projects/${projectId}/git/delivery/${preview.id}`)).state,
+    )
+    .toBe(expected);
+  return api<GitDeliveryReceipt>(`projects/${projectId}/git/delivery/${preview.id}`);
+}
+
 export async function runGitChatJourney(options: {
   page: Page;
   api: GitChatApi;
@@ -126,7 +190,7 @@ export async function runGitChatJourney(options: {
   beforePr?: () => Promise<void>;
   restartBeforeRestore?: () => Promise<Page>;
 }) {
-  const { api, boundary, projectId, sessionId, branch, scenario } = options;
+  const { api, boundary, sessionId, branch, scenario } = options;
   let { page } = options;
   boundary.git('add', '--', 'AGENTS.md');
   boundary.git('commit', '-m', 'fixture approved instructions');
@@ -142,64 +206,9 @@ export async function runGitChatJourney(options: {
   const operations: GitDeliveryReceipt[] = [];
   const names = scenario === 'denied' ? gitChatTools.slice(0, 1) : gitChatTools;
   for (const [index, tool] of names.entries()) {
-    const card = page.getByRole('region', { name: 'Git operation approval', exact: true }).last();
-    await expect(
-      card.getByRole('button', { name: 'Approve Git operation', exact: true }),
-    ).toBeEnabled();
-    const pending = await api<ApprovalRequest[]>(
-      `approval-requests?sessionId=${sessionId}&status=pending`,
-    );
-    expect(pending).toHaveLength(1);
-    const approval = pending[0]!;
-    expect(approval.toolName).toBe(tool);
-    const preview = JSON.parse(approval.argsJson).gitDeliveryReceipt as GitDeliveryReceipt;
-    expect(preview).toMatchObject({ projectId, sessionId, source: 'chat', state: 'prepared' });
-    await expect(card).toContainText(preview.id);
-    expect(
-      await api<GitDeliveryReceipt>(`projects/${projectId}/git/delivery/${preview.id}`),
-    ).toMatchObject({ state: 'prepared' });
-    if (index === 0) {
-      expect(boundary.git('diff', '--cached', '--name-only')).toBe('');
-      await options.waiting?.();
-    }
-    if (tool === 'sys_git_commit') {
-      await expect(card).toContainText(gitChatCommit);
-      expect(boundary.git('rev-parse', 'HEAD')).toBe(initialHead);
-    }
-    if (tool === 'sys_git_push')
-      expect(boundary.remote('for-each-ref', '--format=%(refname)', `refs/heads/${branch}`)).toBe(
-        '',
-      );
-    if (tool === 'sys_git_create_pull_request') {
-      await options.beforePr?.();
-      await expect(card).toContainText(gitChatTitle);
-      await expect(card).toContainText(gitChatBody);
-      await expect(card).toContainText('staging');
-      expect((await boundary.ledger()).pullRequests).toHaveLength(0);
-      if (scenario === 'unknown') await boundary.loseNextCreateResponse();
-    }
-    await card
-      .getByRole('button', {
-        name: scenario === 'denied' ? 'Deny Git operation' : 'Approve Git operation',
-        exact: true,
-      })
-      .click();
-    const expected =
-      scenario === 'denied'
-        ? 'denied'
-        : scenario === 'unknown' && index === 3
-          ? 'unknown'
-          : 'succeeded';
-    await expect
-      .poll(
-        async () =>
-          (await api<GitDeliveryReceipt>(`projects/${projectId}/git/delivery/${preview.id}`)).state,
-      )
-      .toBe(expected);
-    operations.push(
-      await api<GitDeliveryReceipt>(`projects/${projectId}/git/delivery/${preview.id}`),
-    );
+    operations.push(await approveGitChatOperation(options, page, tool, index, initialHead));
   }
+
   if (scenario === 'denied') {
     await expect(
       page

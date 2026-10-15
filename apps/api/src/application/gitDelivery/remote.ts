@@ -264,7 +264,7 @@ function prIdentity(
 ): { pullRequestUrl: string; pullRequestNumber: number } | undefined {
   if (typeof raw !== 'string') return undefined;
   const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\/([1-9]\d*)$/.exec(raw.trim());
-  if (!match || match[1] !== slug || !Number.isSafeInteger(Number(match[2]))) return undefined;
+  if (match?.[1] !== slug || !Number.isSafeInteger(Number(match[2]))) return undefined;
   return { pullRequestUrl: raw.trim(), pullRequestNumber: Number(match[2]) };
 }
 export async function matchingPullRequest(

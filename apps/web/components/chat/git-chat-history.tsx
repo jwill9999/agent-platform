@@ -45,9 +45,9 @@ export function GitChatHistory(
   return (
     <section aria-label="Git reviews and retained outcomes" className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p role="status">
+        <output className="block">
           Git records {start + 1}–{end} of {entries.length}
-        </p>
+        </output>
         <Button
           type="button"
           variant="outline"
@@ -81,10 +81,9 @@ export function GitChatHistory(
           Latest Git records
         </Button>
       </div>
-      {entries
-        .slice(start, end)
-        .map(({ key, entry, receipt }) =>
-          entry ? (
+      {entries.slice(start, end).map(({ key, entry, receipt }) => {
+        if (entry)
+          return (
             <GitApprovalCard
               key={key}
               approval={entry.approval}
@@ -95,7 +94,9 @@ export function GitChatHistory(
               onReceiptChange={props.onReceiptChange}
               onReceiptDeleted={props.onReceiptDeleted}
             />
-          ) : receipt ? (
+          );
+        if (receipt)
+          return (
             <GitRecoveryCard
               key={key}
               recoveryReceipt={receipt}
@@ -103,8 +104,9 @@ export function GitChatHistory(
               projectId={props.projectId}
               sessionId={props.sessionId}
             />
-          ) : null,
-        )}
+          );
+        return null;
+      })}
     </section>
   );
 }

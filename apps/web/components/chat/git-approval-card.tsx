@@ -66,6 +66,63 @@ async function readSavedReceipt(path: string, signal: AbortSignal): Promise<unkn
   return envelope && typeof envelope === 'object' && 'data' in envelope ? envelope.data : undefined;
 }
 
+type RecoveryOperation = 'cancel' | 'reconcile' | 'acknowledge' | 'delete';
+
+async function deleteSavedReceipt(path: string, signal: AbortSignal): Promise<void> {
+  const response = await fetch(path, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmed: true }),
+    signal,
+  });
+  if (!response.ok) throw new Error('Closed receipt deletion unverified');
+}
+
+function requestSavedReceipt(
+  path: string,
+  recovery: Exclude<RecoveryOperation, 'delete'> | undefined,
+  signal: AbortSignal,
+): Promise<unknown> {
+  if (!recovery) return readSavedReceipt(path, signal);
+  const body = recovery === 'acknowledge' ? { confirmed: true } : {};
+  return apiPost<unknown>(`${path}/${recovery}`, body, { signal });
+}
+
+function parseCurrentReceipt(
+  value: unknown,
+  initial: GitDeliveryReceipt,
+  previous: GitDeliveryReceipt,
+): GitDeliveryReceipt {
+  const parsed = GitDeliveryReceiptSchema.safeParse(value);
+  if (
+    !parsed.success ||
+    gitReceiptBinding(parsed.data) !== gitReceiptBinding(initial) ||
+    !Number.isFinite(parsed.data.updatedAtMs) ||
+    parsed.data.updatedAtMs < previous.updatedAtMs
+  )
+    throw new Error('Invalid saved receipt');
+  return parsed.data;
+}
+
+function permitsRecovery(
+  operation: RecoveryOperation,
+  receipt: GitDeliveryReceipt,
+  approval: ApprovalCardState | undefined,
+): boolean {
+  switch (operation) {
+    case 'delete':
+      return (
+        receipt.state !== 'prepared' &&
+        receipt.state !== 'executing' &&
+        (receipt.state !== 'unknown' || receipt.acknowledgedAtMs !== undefined)
+      );
+    case 'cancel':
+      return receipt.state === 'prepared' && (!approval || approval.status === 'rejected');
+    default:
+      return receipt.state === 'unknown';
+  }
+}
+
 type View = {
   identity: object;
   receipt: GitDeliveryReceipt;
@@ -107,7 +164,7 @@ function BoundGitApprovalCard(props: BoundProps) {
     approval?.status === 'rejecting';
 
   const refresh = useCallback(
-    async (recovery?: 'cancel' | 'reconcile' | 'acknowledge' | 'delete') => {
+    async (recovery?: RecoveryOperation) => {
       if (
         !valid ||
         !initial ||
@@ -132,13 +189,7 @@ function BoundGitApprovalCard(props: BoundProps) {
       try {
         const path = apiPath('projects', projectId, 'git', 'delivery', initial.id);
         if (recovery === 'delete') {
-          const response = await fetch(path, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ confirmed: true }),
-            signal: controller.signal,
-          });
-          if (!response.ok) throw new Error('Closed receipt deletion unverified');
+          await deleteSavedReceipt(path, controller.signal);
           if (!current()) return;
           deletionConfirmed.current = true;
           onReceiptDeleted?.(lastReceipt.current ?? initial);
@@ -151,25 +202,12 @@ function BoundGitApprovalCard(props: BoundProps) {
           });
           return;
         }
-        const value = recovery
-          ? await apiPost<unknown>(
-              `${path}/${recovery}`,
-              recovery === 'acknowledge' ? { confirmed: true } : {},
-              { signal: controller.signal },
-            )
-          : await readSavedReceipt(path, controller.signal);
+        const value = await requestSavedReceipt(path, recovery, controller.signal);
         if (!current()) return;
-        const parsed = GitDeliveryReceiptSchema.safeParse(value);
-        if (
-          !parsed.success ||
-          gitReceiptBinding(parsed.data) !== gitReceiptBinding(initial) ||
-          !Number.isFinite(parsed.data.updatedAtMs) ||
-          parsed.data.updatedAtMs < (lastReceipt.current?.updatedAtMs ?? initial.updatedAtMs)
-        )
-          throw new Error('Invalid saved receipt');
-        lastReceipt.current = parsed.data;
-        onReceiptChange?.(parsed.data);
-        setView({ identity, receipt: parsed.data, verified: true, pending: false });
+        const saved = parseCurrentReceipt(value, initial, lastReceipt.current ?? initial);
+        lastReceipt.current = saved;
+        onReceiptChange?.(saved);
+        setView({ identity, receipt: saved, verified: true, pending: false });
       } catch {
         if (current())
           setView({
@@ -207,7 +245,7 @@ function BoundGitApprovalCard(props: BoundProps) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     function tick() {
       setNowMs(Date.now());
-      if (!receipt || receipt.state !== 'prepared') return;
+      if (receipt?.state !== 'prepared') return;
       const remaining = receipt.expiresAtMs - Date.now();
       if (remaining > 0) timer = setTimeout(tick, Math.min(remaining, 2_147_483_647));
     }
@@ -251,22 +289,9 @@ function BoundGitApprovalCard(props: BoundProps) {
       refuse();
     }
   }
-  function recover(operation: 'cancel' | 'reconcile' | 'acknowledge' | 'delete') {
-    if (!verified || busy || active.current !== identity) return;
-    if (!receipt) return;
-    const closed =
-      receipt.state !== 'prepared' &&
-      receipt.state !== 'executing' &&
-      (receipt.state !== 'unknown' || receipt.acknowledgedAtMs !== undefined);
-    if (
-      operation === 'delete'
-        ? !closed
-        : operation === 'cancel'
-          ? receipt.state !== 'prepared' ||
-            (approval !== undefined && approval.status !== 'rejected')
-          : receipt.state !== 'unknown'
-    )
-      return;
+  function recover(operation: RecoveryOperation) {
+    if (!verified || busy || active.current !== identity || !receipt) return;
+    if (!permitsRecovery(operation, receipt, approval)) return;
     void refresh(operation);
   }
 
@@ -281,61 +306,106 @@ function BoundGitApprovalCard(props: BoundProps) {
         <p>Approval unavailable; recovery only. This record cannot authorize execution.</p>
       )}
       {decisionError && <p role="alert">{decisionError}</p>}
-      {deleted ? (
-        <p role="status">
-          Retained Git record deleted. Its result is no longer available; this operation cannot
-          execute again.
-        </p>
-      ) : !valid || !receipt ? (
-        <p role="alert">
-          This Git review does not match the current Project, session or operation. Approval is
-          unavailable.
-        </p>
-      ) : (
-        <>
-          <GitDeliveryReceiptControl
-            receipt={receipt}
-            nowMs={nowMs}
-            pending={busy}
-            unverified={!verified}
-            onCancel={
-              !approval || approval.status === 'rejected' ? () => recover('cancel') : undefined
-            }
-            onReconcile={() => recover('reconcile')}
-            onAcknowledge={() => recover('acknowledge')}
-            onDelete={() => recover('delete')}
-          />
-          {view?.identity === identity && view.error && <p role="alert">{view.error}</p>}
+      <GitApprovalCardContent
+        deleted={deleted}
+        valid={valid}
+        receipt={receipt}
+        nowMs={nowMs}
+        busy={busy}
+        verified={verified}
+        approval={approval}
+        error={view?.identity === identity ? view.error : undefined}
+        refreshPending={pending || decisionPending}
+        canDecide={canDecide}
+        onRefresh={() => void refresh()}
+        onRecover={recover}
+        onDecide={decide}
+      />
+    </section>
+  );
+}
+
+function GitApprovalCardContent({
+  deleted,
+  valid,
+  receipt,
+  nowMs,
+  busy,
+  verified,
+  approval,
+  error,
+  refreshPending,
+  canDecide,
+  onRefresh,
+  onRecover,
+  onDecide,
+}: Readonly<{
+  deleted: boolean;
+  valid: boolean;
+  receipt: GitDeliveryReceipt | null;
+  nowMs: number;
+  busy: boolean;
+  verified: boolean;
+  approval: ApprovalCardState | undefined;
+  error: string | undefined;
+  refreshPending: boolean;
+  canDecide: boolean;
+  onRefresh: () => void;
+  onRecover: (operation: RecoveryOperation) => void;
+  onDecide: (decision: ApprovalDecision) => void;
+}>) {
+  if (deleted)
+    return (
+      <output className="block">
+        Retained Git record deleted. Its result is no longer available; this operation cannot
+        execute again.
+      </output>
+    );
+  if (!valid || !receipt)
+    return (
+      <p role="alert">
+        This Git review does not match the current Project, session or operation. Approval is
+        unavailable.
+      </p>
+    );
+  return (
+    <>
+      <GitDeliveryReceiptControl
+        receipt={receipt}
+        nowMs={nowMs}
+        pending={busy}
+        unverified={!verified}
+        onCancel={
+          !approval || approval.status === 'rejected' ? () => onRecover('cancel') : undefined
+        }
+        onReconcile={() => onRecover('reconcile')}
+        onAcknowledge={() => onRecover('acknowledge')}
+        onDelete={() => onRecover('delete')}
+      />
+      {error && <p role="alert">{error}</p>}
+      <Button type="button" variant="outline" disabled={refreshPending} onClick={onRefresh}>
+        Refresh saved Git outcome
+      </Button>
+      {(approval?.status === 'pending' || approval?.status === 'failed') && (
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            disabled={!canDecide || nowMs >= receipt.expiresAtMs}
+            onClick={() => onDecide('approve')}
+          >
+            Approve Git operation
+          </Button>
           <Button
             type="button"
             variant="outline"
-            disabled={pending || decisionPending}
-            onClick={() => void refresh()}
+            disabled={!canDecide}
+            onClick={() => onDecide('reject')}
           >
-            Refresh saved Git outcome
+            Deny Git operation
           </Button>
-          {(approval?.status === 'pending' || approval?.status === 'failed') && (
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                disabled={!canDecide || nowMs >= receipt.expiresAtMs}
-                onClick={() => decide('approve')}
-              >
-                Approve Git operation
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={!canDecide}
-                onClick={() => decide('reject')}
-              >
-                Deny Git operation
-              </Button>
-            </div>
-          )}
-        </>
+        </div>
       )}
-    </section>
+    </>
   );
 }
 

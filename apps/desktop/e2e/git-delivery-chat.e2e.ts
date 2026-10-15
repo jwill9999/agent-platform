@@ -71,8 +71,12 @@ for (const scenario of scenarios) {
         replies: gitChatReplies(scenario),
       });
       // Assertion belongs only to this test process; no machine power preferences are changed.
-      awake = spawn('/usr/bin/caffeinate', ['-i', '-w', String(process.pid)], { stdio: 'ignore' });
-      awake.once('error', (error) => failures.push(error));
+      if (process.platform === 'darwin') {
+        awake = spawn('/usr/bin/caffeinate', ['-i', '-w', String(process.pid)], {
+          stdio: 'ignore',
+        });
+        awake.once('error', (error) => failures.push(error));
+      }
       fixture = await createContextTokenFixture(provider);
       const active = fixture;
       const ports = await getDesktopPorts();

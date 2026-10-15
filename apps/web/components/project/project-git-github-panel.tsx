@@ -3256,6 +3256,10 @@ export function ProjectGitHubPanel({
     ? 'Working tree clean'
     : `${changedFileCount} changed ${pluralize(changedFileCount, 'file')}`;
   const publishActionLabel = getPublishActionLabel(actionPending, publishState);
+  let publishReviewLabel = publishActionLabel;
+  if (delivery.pending) publishReviewLabel = 'Git operation pending...';
+  else if (publishState.canPublish && publishActionLabel)
+    publishReviewLabel = `Review ${publishActionLabel.toLowerCase()}`;
 
   const createPullRequest = useCallback(async () => {
     if (!projectId) return;
@@ -3439,7 +3443,7 @@ export function ProjectGitHubPanel({
               </Button>
               {delivery.operations.length > 0 && (
                 <label>
-                  Git operation
+                  Git operation{' '}
                   <select
                     aria-label="Git operation"
                     value={delivery.selected?.id ?? ''}
@@ -4099,11 +4103,7 @@ export function ProjectGitHubPanel({
                                   runAsyncAction(publishCurrentBranch);
                                 }}
                               >
-                                {delivery.pending
-                                  ? 'Git operation pending...'
-                                  : publishState.canPublish
-                                    ? `Review ${publishActionLabel.toLowerCase()}`
-                                    : publishActionLabel}
+                                {publishReviewLabel}
                               </Button>
                             )}
                             {publishState.canClearStaleUpstream && (
@@ -4350,7 +4350,7 @@ export function ProjectGitHubPanel({
                                   checked={pullRequestDraft}
                                   disabled={actionPending !== null || delivery.pending}
                                   onChange={(event) => setPullRequestDraft(event.target.checked)}
-                                />
+                                />{' '}
                                 Create as draft
                               </label>
                               <div className="flex flex-wrap gap-2">

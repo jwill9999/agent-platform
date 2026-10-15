@@ -1,18 +1,23 @@
+import { dockerFixtureBinary } from './docker-command.js';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-const boundary = '/tmp/agent-platform-git-delivery-boundary';
+const boundary = '/home/appuser/.agent-platform-git-delivery-boundary';
 /** External gh/SSH fixtures only; real API, SQLite, Git and bare remote remain in use. */
 export function createDockerGitBoundary(apiURL: string, branch: string) {
   const container =
     process.env.GIT_DELIVERY_API_CONTAINER ??
     (process.env.CI
-      ? execFileSync('docker', ['compose', 'ps', '-q', 'api'], { encoding: 'utf8' }).trim()
+      ? execFileSync(dockerFixtureBinary(), ['compose', 'ps', '-q', 'api'], {
+          encoding: 'utf8',
+        }).trim()
       : '');
   if (!container) throw new Error('Select an isolated GIT_DELIVERY_API_CONTAINER');
   const inspect = (format: string) =>
-    execFileSync('docker', ['inspect', '--format', format, container], { encoding: 'utf8' }).trim();
+    execFileSync(dockerFixtureBinary(), ['inspect', '--format', format, container], {
+      encoding: 'utf8',
+    }).trim();
   const url = new URL(apiURL);
   const ports = JSON.parse(inspect('{{json .NetworkSettings.Ports}}')) as Record<
     string,
@@ -26,7 +31,10 @@ export function createDockerGitBoundary(apiURL: string, branch: string) {
     throw new Error('API URL does not match the selected owned Compose API container');
   }
   const exec = (args: string[]) =>
-    execFileSync('docker', ['exec', container, ...args], { encoding: 'utf8', timeout: 15_000 });
+    execFileSync(dockerFixtureBinary(), ['exec', container, ...args], {
+      encoding: 'utf8',
+      timeout: 15_000,
+    });
   const actual = exec([
     'node',
     '-e',
@@ -49,7 +57,19 @@ export function createDockerGitBoundary(apiURL: string, branch: string) {
       String(mode),
     ]);
   // Exclusive directory acquisition avoids replacing a live or unexplained old fixture.
-  exec(['node', '-e', 'require("node:fs").mkdirSync(process.argv[1],{mode:448});', boundary]);
+  exec([
+    'node',
+    '-e',
+    `const f=require('node:fs');
+for (const [path,uid] of [['/',0],['/home',0],['/home/appuser',process.getuid()]]) {
+  const stat=f.lstatSync(path);
+  if(!stat.isDirectory()||stat.isSymbolicLink()||stat.uid!==uid||(stat.mode&0o022)!==0)
+    throw Error('Untrusted fixture parent');
+}
+if(process.getuid()!==10001)throw Error('Expected isolated appuser');
+f.mkdirSync(process.argv[1],{mode:0o700});`,
+    boundary,
+  ]);
   write(`${boundary}/owner`, owner);
   const git = (...args: string[]) => exec(['/usr/bin/git', '-C', directory, ...args]).trim();
   const remote = (...args: string[]) => exec(['/usr/bin/git', '--git-dir', bare, ...args]).trim();

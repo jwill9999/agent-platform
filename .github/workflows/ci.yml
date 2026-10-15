@@ -59,6 +59,10 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Test Git delivery boundary fixtures
+        # Node fixture controls require built SDK packages and are separate from browser journeys.
+        run: node --test e2e/support/git-delivery/*.test.mjs
+
       - name: Test local diagnostic command boundaries
         run: node --test scripts/diagnostics.test.mjs
 

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { compareGitDeliveryStrings } from './ordering.js';
 import { realpath } from 'node:fs/promises';
 import {
   GitDeliveryActionSchema,
@@ -61,6 +62,12 @@ type Context =
   | { source: 'panel'; projectId: string }
   | { source: 'chat'; sessionId: string; agentId: string };
 type Binding = { projectId: string; root: string; workspaceRoot: string };
+type ExecutionState = {
+  operation: StoredGitDeliveryOperation;
+  material: GitDeliveryMaterial;
+  effectMayHaveStarted: boolean;
+};
+
 function actionValue(raw: GitDeliveryAction): GitDeliveryAction {
   const parsed = GitDeliveryActionSchema.safeParse(raw);
   if (!parsed.success)
@@ -139,6 +146,39 @@ export function createGitDeliveryService(
       );
     return project;
   }
+  function requireExecutionPolicy(action: GitDeliveryAction) {
+    const settings = loadSettings(db).executionPolicy;
+    if (
+      settings.workspaceWrite === 'block' ||
+      settings.gitMutation === 'block' ||
+      ((action.kind === 'push' || action.kind === 'pull_request') && settings.network === 'block')
+    ) {
+      throw new GitDeliveryError(
+        'GIT_DELIVERY_POLICY_BLOCKED',
+        'Current execution policy blocks this Git operation.',
+        403,
+      );
+    }
+  }
+  function requireUnchangedOwnership(context: Context, project: ReturnType<typeof ownedProject>) {
+    const latestProject = findProject(db, project.id);
+    const latestSession = context.source === 'chat' ? getSession(db, context.sessionId) : undefined;
+    if (
+      !latestProject ||
+      latestProject.archivedAtMs ||
+      JSON.stringify(latestProject.metadata) !== JSON.stringify(project.metadata) ||
+      (context.source === 'chat' &&
+        (!latestSession ||
+          latestSession.projectId !== project.id ||
+          latestSession.agentId !== context.agentId ||
+          latestSession.mode !== 'project'))
+    ) {
+      throw new GitDeliveryError(
+        'GIT_DELIVERY_STALE',
+        'Project binding changed during validation. Prepare a fresh review.',
+      );
+    }
+  }
   async function binding(context: Context, action?: GitDeliveryAction): Promise<Binding> {
     const project = ownedProject(context);
     const { capabilityState, onboardingState, backendProjectRoot, repositoryRoot } =
@@ -161,18 +201,7 @@ export function createGitDeliveryService(
           'This Project is read-only or awaits onboarding approval.',
           403,
         );
-      const settings = loadSettings(db).executionPolicy;
-      if (
-        settings.workspaceWrite === 'block' ||
-        settings.gitMutation === 'block' ||
-        ((action.kind === 'push' || action.kind === 'pull_request') && settings.network === 'block')
-      ) {
-        throw new GitDeliveryError(
-          'GIT_DELIVERY_POLICY_BLOCKED',
-          'Current execution policy blocks this Git operation.',
-          403,
-        );
-      }
+      requireExecutionPolicy(action);
     }
     try {
       const [root, workspaceRoot] = await Promise.all([
@@ -185,38 +214,8 @@ export function createGitDeliveryService(
           'Repository must remain within its approved Project.',
           403,
         );
-      const latestProject = findProject(db, project.id);
-      const latestSession =
-        context.source === 'chat' ? getSession(db, context.sessionId) : undefined;
-      if (
-        !latestProject ||
-        latestProject.archivedAtMs ||
-        JSON.stringify(latestProject.metadata) !== JSON.stringify(project.metadata) ||
-        (context.source === 'chat' &&
-          (!latestSession ||
-            latestSession.projectId !== project.id ||
-            latestSession.agentId !== context.agentId ||
-            latestSession.mode !== 'project'))
-      ) {
-        throw new GitDeliveryError(
-          'GIT_DELIVERY_STALE',
-          'Project binding changed during validation. Prepare a fresh review.',
-        );
-      }
-      if (action) {
-        const settings = loadSettings(db).executionPolicy;
-        if (
-          settings.workspaceWrite === 'block' ||
-          settings.gitMutation === 'block' ||
-          ((action.kind === 'push' || action.kind === 'pull_request') &&
-            settings.network === 'block')
-        )
-          throw new GitDeliveryError(
-            'GIT_DELIVERY_POLICY_BLOCKED',
-            'Current execution policy blocks this Git operation.',
-            403,
-          );
-      }
+      requireUnchangedOwnership(context, project);
+      if (action) requireExecutionPolicy(action);
       return { projectId: project.id, root, workspaceRoot };
     } catch (error) {
       if (error instanceof GitDeliveryError) throw error;
@@ -266,6 +265,67 @@ export function createGitDeliveryService(
     }
     return receipt;
   }
+  function preparedCall(
+    context: Context,
+    projectId: string,
+    action: GitDeliveryAction,
+    toolCallId?: string,
+  ): GitDeliveryReceipt | undefined {
+    if (context.source === 'chat') {
+      if (!toolCallId || toolCallId.length > 256)
+        throw new GitDeliveryError(
+          'GIT_DELIVERY_CALL_REQUIRED',
+          'A trusted tool call identity is required.',
+          400,
+        );
+      const prior = findGitDeliveryCall(db, context.sessionId, toolCallId);
+      if (prior) {
+        if (
+          prior.agentId !== context.agentId ||
+          prior.receipt.projectId !== projectId ||
+          JSON.stringify(prior.receipt.action) !== JSON.stringify(action)
+        )
+          throw new GitDeliveryError(
+            'GIT_DELIVERY_CALL_MISMATCH',
+            'This tool call already refers to different reviewed material.',
+            403,
+          );
+        return prior.receipt;
+      }
+    }
+    return undefined;
+  }
+  async function inspectPreparation(
+    context: Context,
+    fresh: Binding,
+    action: GitDeliveryAction,
+    deadline: AbortSignal,
+  ): Promise<GitDeliveryMaterial> {
+    let material: GitDeliveryMaterial;
+    try {
+      material = await inspectGitDeliveryRepository(
+        fresh.root,
+        fresh.workspaceRoot,
+        action,
+        deadline,
+      );
+      if (action.kind === 'push' || action.kind === 'pull_request') {
+        await binding(context, action);
+        material.remote = await inspectRemote(material, action, deadline);
+        if (action.kind === 'pull_request') {
+          await requireGhAuthentication(material.root, deadline);
+          await matchingPullRequest(material, action, deadline);
+        }
+      }
+    } catch (error) {
+      if (error instanceof GitDeliveryError) throw error;
+      throw new GitDeliveryError(
+        'GIT_DELIVERY_INSPECTION_FAILED',
+        'Repository review failed. Check its branch, HEAD and Git availability.',
+      );
+    }
+    return material;
+  }
   async function prepare(
     context: Context,
     rawAction: GitDeliveryAction,
@@ -282,28 +342,8 @@ export function createGitDeliveryService(
           'GIT_DELIVERY_STALE',
           'Project binding changed. Start a fresh review.',
         );
-      if (context.source === 'chat') {
-        if (!toolCallId || toolCallId.length > 256)
-          throw new GitDeliveryError(
-            'GIT_DELIVERY_CALL_REQUIRED',
-            'A trusted tool call identity is required.',
-            400,
-          );
-        const prior = findGitDeliveryCall(db, context.sessionId, toolCallId);
-        if (prior) {
-          if (
-            prior.agentId !== context.agentId ||
-            prior.receipt.projectId !== fresh.projectId ||
-            JSON.stringify(prior.receipt.action) !== JSON.stringify(action)
-          )
-            throw new GitDeliveryError(
-              'GIT_DELIVERY_CALL_MISMATCH',
-              'This tool call already refers to different reviewed material.',
-              403,
-            );
-          return prior.receipt;
-        }
-      }
+      const prior = preparedCall(context, fresh.projectId, action, toolCallId);
+      if (prior) return prior;
       if (hasUnacknowledgedGitDelivery(db, fresh.root, keyFor(action)))
         throw new GitDeliveryError(
           'GIT_DELIVERY_UNKNOWN_PENDING',
@@ -321,30 +361,7 @@ export function createGitDeliveryService(
           'GIT_DELIVERY_CAPACITY',
           'Receipt history is full. Inspect active outcomes and explicitly delete closed history before preparing more operations.',
         );
-      let material: GitDeliveryMaterial;
-      const deadline = signalFor(timeout, signal);
-      try {
-        material = await inspectGitDeliveryRepository(
-          fresh.root,
-          fresh.workspaceRoot,
-          action,
-          deadline,
-        );
-        if (action.kind === 'push' || action.kind === 'pull_request') {
-          await binding(context, action);
-          material.remote = await inspectRemote(material, action, deadline);
-          if (action.kind === 'pull_request') {
-            await requireGhAuthentication(material.root, deadline);
-            await matchingPullRequest(material, action, deadline);
-          }
-        }
-      } catch (error) {
-        if (error instanceof GitDeliveryError) throw error;
-        throw new GitDeliveryError(
-          'GIT_DELIVERY_INSPECTION_FAILED',
-          'Repository review failed. Check its branch, HEAD and Git availability.',
-        );
-      }
+      const material = await inspectPreparation(context, fresh, action, signalFor(timeout, signal));
       const time = now();
       const receipt: GitDeliveryReceipt = {
         id: randomUUID(),
@@ -432,6 +449,301 @@ export function createGitDeliveryService(
       );
     }
   }
+  async function revalidateExecution(
+    context: Context,
+    initial: Binding,
+    operation: StoredGitDeliveryOperation,
+    material: GitDeliveryMaterial,
+    deadline: AbortSignal,
+  ): Promise<void> {
+    const current = await binding(context, operation.receipt.action);
+    if (
+      current.projectId !== initial.projectId ||
+      current.root !== material.root ||
+      current.workspaceRoot !== material.workspaceRoot
+    )
+      throw new GitDeliveryError(
+        'GIT_DELIVERY_STALE',
+        'Project binding changed. Prepare a fresh review.',
+      );
+    const observed = await inspectGitDeliveryRepository(
+      current.root,
+      current.workspaceRoot,
+      operation.receipt.action,
+      deadline,
+    );
+    if (
+      operation.receipt.action.kind === 'push' ||
+      operation.receipt.action.kind === 'pull_request'
+    ) {
+      await binding(context, operation.receipt.action);
+      observed.remote = await inspectRemote(observed, operation.receipt.action, deadline);
+    }
+    if (!sameReviewedMaterial(material, observed))
+      throw new GitDeliveryError(
+        'GIT_DELIVERY_STALE',
+        'Reviewed repository contents changed. Prepare a fresh review.',
+      );
+    if (hasUnacknowledgedGitDelivery(db, current.root, operation.actionKey))
+      throw new GitDeliveryError(
+        'GIT_DELIVERY_UNKNOWN_PENDING',
+        'Inspect the earlier unknown outcome before executing a new operation.',
+      );
+  }
+  async function executeStage(
+    state: ExecutionState,
+    action: Extract<GitDeliveryAction, { kind: 'stage' }>,
+    deadline: AbortSignal,
+  ): Promise<GitDeliveryReceipt> {
+    state.effectMayHaveStarted = true;
+    await git(
+      state.material.root,
+      action.mode === 'stage'
+        ? ['add', '-A', '--', ...action.paths]
+        : ['restore', '--staged', '--', ...action.paths],
+      deadline,
+    );
+    const actual = await git(state.material.root, ['ls-files', '--stage', '-z'], deadline);
+    const head = (await git(state.material.root, ['rev-parse', 'HEAD'], deadline)).trim();
+    const branch = (
+      await git(state.material.root, ['symbolic-ref', '--quiet', '--short', 'HEAD'], deadline)
+    ).trim();
+    const unrelated = (entries: string) =>
+      entries
+        .split('\0')
+        .filter((entry) => entry && !action.paths.includes(entry.slice(entry.indexOf('\t') + 1)))
+        .join('\0');
+    if (
+      unrelated(actual) !== unrelated(state.material.indexEntries) ||
+      head !== state.material.head ||
+      branch !== state.material.branch
+    )
+      throw new GitDeliveryError(
+        'GIT_DELIVERY_EFFECT_MISMATCH',
+        'Repository changed during the approved operation. Inspect before continuing.',
+      );
+    const observed = await inspectGitDeliveryRepository(
+      state.material.root,
+      state.material.workspaceRoot,
+      action,
+      deadline,
+    );
+    if (
+      observed.selectedFingerprint !== state.material.selectedFingerprint ||
+      observed.repositoryIdentity !== state.material.repositoryIdentity
+    )
+      throw new GitDeliveryError(
+        'GIT_DELIVERY_EFFECT_MISMATCH',
+        'Selected files changed during staging. Inspect before continuing.',
+      );
+    state.material = {
+      ...state.material,
+      expectedIndexEntries: actual,
+      expectedIndexTree: observed.indexTree,
+    };
+    return save(
+      state.operation,
+      {
+        ...changed(state.operation.receipt, 'succeeded', now()),
+        result: { indexTree: state.material.expectedIndexTree },
+      },
+      state.material,
+    );
+  }
+  async function executePush(
+    context: Context,
+    initial: Binding,
+    id: string,
+    state: ExecutionState,
+    action: Extract<GitDeliveryAction, { kind: 'push' }>,
+    deadline: AbortSignal,
+  ): Promise<GitDeliveryReceipt> {
+    state.effectMayHaveStarted = true;
+    await pushReviewed(state.material, deadline);
+    if (
+      (await remoteTip(
+        state.material.root,
+        state.material.remote!.endpoint,
+        state.material.remote!.ref,
+        deadline,
+      )) !== state.material.head ||
+      (await currentRepositoryIdentity(state.material.root)) !== state.material.repositoryIdentity
+    )
+      throw new GitDeliveryError(
+        'GIT_DELIVERY_REMOTE_UNVERIFIED',
+        'The remote branch result could not be verified.',
+      );
+    // Persist the proven external effect before optional local bookkeeping.
+    const result = { commitSha: state.material.head, remoteRef: state.material.remote!.ref };
+    const succeeded = save(state.operation, {
+      ...changed(state.operation.receipt, 'succeeded', now()),
+      result,
+    });
+    try {
+      state.operation = stored(context, initial.projectId, id);
+      const warning = await synchroniseTracking(state.material, action, deadline, async () => {
+        if (
+          (await currentRepositoryIdentity(state.material.root)) !==
+          state.material.repositoryIdentity
+        )
+          throw new Error('repository changed');
+        const authority = await binding(context, action);
+        if (
+          authority.projectId !== state.operation.receipt.projectId ||
+          authority.root !== state.material.root ||
+          authority.workspaceRoot !== state.material.workspaceRoot
+        )
+          throw new Error('ownership changed');
+      });
+      return warning
+        ? save(state.operation, { ...succeeded, result: { ...result, warning } })
+        : succeeded;
+    } catch {
+      // The known external result is already durable. Optional bookkeeping cannot undo it.
+      return {
+        ...succeeded,
+        result: {
+          ...result,
+          warning:
+            'The remote branch was updated; optional local bookkeeping could not be recorded. Inspect tracking before continuing.',
+        },
+      };
+    }
+  }
+  async function executePullRequest(
+    context: Context,
+    initial: Binding,
+    id: string,
+    state: ExecutionState,
+    action: Extract<GitDeliveryAction, { kind: 'pull_request' }>,
+    deadline: AbortSignal,
+    existingPullRequest: GitDeliveryReceipt['result'],
+  ): Promise<GitDeliveryReceipt> {
+    if (existingPullRequest)
+      return save(state.operation, {
+        ...changed(state.operation.receipt, 'succeeded', now()),
+        result: {
+          ...existingPullRequest,
+          warning: 'The exact reviewed pull request already exists; no duplicate was created.',
+        },
+      });
+    state.effectMayHaveStarted = true;
+    const result = await createReviewedPullRequest(state.material, action, deadline);
+    const succeeded = save(state.operation, {
+      ...changed(state.operation.receipt, 'succeeded', now()),
+      result,
+    });
+    try {
+      state.operation = stored(context, initial.projectId, id);
+      if (await matchingPullRequest(state.material, action, deadline)) return succeeded;
+    } catch {
+      /* Optional details are independent of the durable creation result. */
+    }
+    const enriched = {
+      ...succeeded,
+      result: {
+        ...result,
+        warning: 'Pull request creation succeeded; optional details could not be refreshed.',
+      },
+    };
+    try {
+      return save(state.operation, enriched);
+    } catch {
+      return enriched;
+    }
+  }
+  async function executeCommit(
+    state: ExecutionState,
+    action: Extract<GitDeliveryAction, { kind: 'commit' }>,
+    deadline: AbortSignal,
+  ): Promise<GitDeliveryReceipt> {
+    state.effectMayHaveStarted = true;
+    await git(state.material.root, ['commit', '-m', action.message], deadline);
+    const commitSha = (await git(state.material.root, ['rev-parse', 'HEAD'], deadline)).trim();
+    const tree = (
+      await git(state.material.root, ['show', '-s', '--format=%T', commitSha], deadline)
+    ).trim();
+    const parents = (
+      await git(state.material.root, ['show', '-s', '--format=%P', commitSha], deadline)
+    ).trim();
+    const branch = (
+      await git(state.material.root, ['symbolic-ref', '--quiet', '--short', 'HEAD'], deadline)
+    ).trim();
+    if (
+      tree !== state.material.indexTree ||
+      parents !== state.material.head ||
+      branch !== state.material.branch ||
+      (await currentRepositoryIdentity(state.material.root)) !== state.material.repositoryIdentity
+    )
+      throw new GitDeliveryError(
+        'GIT_DELIVERY_EFFECT_MISMATCH',
+        'The created commit differs from the approved index or parent. Inspect before continuing.',
+      );
+    return save(state.operation, {
+      ...changed(state.operation.receipt, 'succeeded', now()),
+      result: { commitSha },
+    });
+  }
+  async function recheckBeforeEffect(
+    context: Context,
+    material: GitDeliveryMaterial,
+    action: GitDeliveryAction,
+    deadline: AbortSignal,
+  ): Promise<GitDeliveryReceipt['result']> {
+    let existingPullRequest: GitDeliveryReceipt['result'];
+    if (action.kind === 'push' || action.kind === 'pull_request') {
+      await binding(context, action);
+      await recheckRemoteConfiguration(material, action, deadline);
+      if (action.kind === 'pull_request') {
+        await requireGhAuthentication(material.root, deadline);
+        existingPullRequest = await matchingPullRequest(material, action, deadline);
+        if (
+          (await remoteTip(
+            material.root,
+            material.remote!.endpoint,
+            material.remote!.ref,
+            deadline,
+          )) !== material.head
+        )
+          throw new GitDeliveryError(
+            'GIT_DELIVERY_STALE',
+            'Published branch changed before execution.',
+          );
+      }
+    }
+    if (
+      (await git(material.root, ['rev-parse', 'HEAD'], deadline)).trim() !== material.head ||
+      (await currentRepositoryIdentity(material.root)) !== material.repositoryIdentity
+    )
+      throw new GitDeliveryError('GIT_DELIVERY_STALE', 'Repository changed before execution.');
+    return existingPullRequest;
+  }
+  function failedExecution(state: ExecutionState, error: unknown): GitDeliveryReceipt {
+    if (
+      !state.effectMayHaveStarted &&
+      error instanceof GitDeliveryError &&
+      (error.code === 'GIT_DELIVERY_STALE' || error.status === 403)
+    ) {
+      return save(
+        state.operation,
+        changed(state.operation.receipt, error.status === 403 ? 'denied' : 'stale', now(), {
+          code: error.code,
+          message: error.message,
+        }),
+      );
+    }
+    const uncertain = state.effectMayHaveStarted;
+    return save(
+      state.operation,
+      changed(state.operation.receipt, uncertain ? 'unknown' : 'failed', now(), {
+        code: uncertain ? 'GIT_DELIVERY_OUTCOME_UNKNOWN' : 'GIT_DELIVERY_FAILED',
+        message: uncertain
+          ? 'Outcome is unknown. Inspect and reconcile before retrying; no automatic replay is permitted.'
+          : 'No repository mutation was started. Prepare a new operation after checking the repository.',
+      }),
+      state.material,
+    );
+  }
   async function execute(
     context: Context,
     id: string,
@@ -443,41 +755,9 @@ export function createGitDeliveryService(
       approval(context, operation, execution.approvalRequestId, execution.confirmed);
       if (operation.receipt.state !== 'prepared') return operation.receipt;
       const deadline = signalFor(timeout, execution.signal);
-      let material = JSON.parse(operation.materialJson) as GitDeliveryMaterial;
+      const material = JSON.parse(operation.materialJson) as GitDeliveryMaterial;
       try {
-        const current = await binding(context, operation.receipt.action);
-        if (
-          current.projectId !== initial.projectId ||
-          current.root !== material.root ||
-          current.workspaceRoot !== material.workspaceRoot
-        )
-          throw new GitDeliveryError(
-            'GIT_DELIVERY_STALE',
-            'Project binding changed. Prepare a fresh review.',
-          );
-        const observed = await inspectGitDeliveryRepository(
-          current.root,
-          current.workspaceRoot,
-          operation.receipt.action,
-          deadline,
-        );
-        if (
-          operation.receipt.action.kind === 'push' ||
-          operation.receipt.action.kind === 'pull_request'
-        ) {
-          await binding(context, operation.receipt.action);
-          observed.remote = await inspectRemote(observed, operation.receipt.action, deadline);
-        }
-        if (!sameReviewedMaterial(material, observed))
-          throw new GitDeliveryError(
-            'GIT_DELIVERY_STALE',
-            'Reviewed repository contents changed. Prepare a fresh review.',
-          );
-        if (hasUnacknowledgedGitDelivery(db, current.root, operation.actionKey))
-          throw new GitDeliveryError(
-            'GIT_DELIVERY_UNKNOWN_PENDING',
-            'Inspect the earlier unknown outcome before executing a new operation.',
-          );
+        await revalidateExecution(context, initial, operation, material, deadline);
       } catch (error) {
         const denied = error instanceof GitDeliveryError && error.status === 403;
         return save(
@@ -499,239 +779,41 @@ export function createGitDeliveryService(
         );
       }
       operation = stored(context, initial.projectId, id);
-      let effectMayHaveStarted = false;
+      const state: ExecutionState = { operation, material, effectMayHaveStarted: false };
       try {
         const action = operation.receipt.action;
-        let existingPullRequest: GitDeliveryReceipt['result'];
-        if (action.kind === 'push' || action.kind === 'pull_request') {
-          await binding(context, action);
-          await recheckRemoteConfiguration(material, action, deadline);
-          if (action.kind === 'pull_request') {
-            await requireGhAuthentication(material.root, deadline);
-            existingPullRequest = await matchingPullRequest(material, action, deadline);
-            if (
-              (await remoteTip(
-                material.root,
-                material.remote!.endpoint,
-                material.remote!.ref,
-                deadline,
-              )) !== material.head
-            )
-              throw new GitDeliveryError(
-                'GIT_DELIVERY_STALE',
-                'Published branch changed before execution.',
-              );
-          }
-        }
-        if (
-          (await git(material.root, ['rev-parse', 'HEAD'], deadline)).trim() !== material.head ||
-          (await currentRepositoryIdentity(material.root)) !== material.repositoryIdentity
-        )
-          throw new GitDeliveryError('GIT_DELIVERY_STALE', 'Repository changed before execution.');
+        const existingPullRequest = await recheckBeforeEffect(
+          context,
+          state.material,
+          action,
+          deadline,
+        );
         const finalBinding = await binding(context, action);
         if (
-          finalBinding.projectId !== operation.receipt.projectId ||
-          finalBinding.root !== material.root ||
-          finalBinding.workspaceRoot !== material.workspaceRoot
+          finalBinding.projectId !== state.operation.receipt.projectId ||
+          finalBinding.root !== state.material.root ||
+          finalBinding.workspaceRoot !== state.material.workspaceRoot
         )
           throw new GitDeliveryError(
             'GIT_DELIVERY_STALE',
             'Project binding changed before execution. Prepare a fresh review.',
           );
-        if (action.kind === 'stage') {
-          effectMayHaveStarted = true;
-          await git(
-            material.root,
-            action.mode === 'stage'
-              ? ['add', '-A', '--', ...action.paths]
-              : ['restore', '--staged', '--', ...action.paths],
-            deadline,
-          );
-          const actual = await git(material.root, ['ls-files', '--stage', '-z'], deadline);
-          const head = (await git(material.root, ['rev-parse', 'HEAD'], deadline)).trim();
-          const branch = (
-            await git(material.root, ['symbolic-ref', '--quiet', '--short', 'HEAD'], deadline)
-          ).trim();
-          const unrelated = (entries: string) =>
-            entries
-              .split('\0')
-              .filter(
-                (entry) => entry && !action.paths.includes(entry.slice(entry.indexOf('\t') + 1)),
-              )
-              .join('\0');
-          if (
-            unrelated(actual) !== unrelated(material.indexEntries) ||
-            head !== material.head ||
-            branch !== material.branch
-          )
-            throw new GitDeliveryError(
-              'GIT_DELIVERY_EFFECT_MISMATCH',
-              'Repository changed during the approved operation. Inspect before continuing.',
-            );
-          const observed = await inspectGitDeliveryRepository(
-            material.root,
-            material.workspaceRoot,
+        if (action.kind === 'stage') return await executeStage(state, action, deadline);
+        if (action.kind === 'push')
+          return await executePush(context, initial, id, state, action, deadline);
+        if (action.kind === 'pull_request')
+          return await executePullRequest(
+            context,
+            initial,
+            id,
+            state,
             action,
             deadline,
+            existingPullRequest,
           );
-          if (
-            observed.selectedFingerprint !== material.selectedFingerprint ||
-            observed.repositoryIdentity !== material.repositoryIdentity
-          )
-            throw new GitDeliveryError(
-              'GIT_DELIVERY_EFFECT_MISMATCH',
-              'Selected files changed during staging. Inspect before continuing.',
-            );
-          material = {
-            ...material,
-            expectedIndexEntries: actual,
-            expectedIndexTree: observed.indexTree,
-          };
-          return save(
-            operation,
-            {
-              ...changed(operation.receipt, 'succeeded', now()),
-              result: { indexTree: material.expectedIndexTree },
-            },
-            material,
-          );
-        }
-        if (action.kind === 'push') {
-          effectMayHaveStarted = true;
-          await pushReviewed(material, deadline);
-          if (
-            (await remoteTip(
-              material.root,
-              material.remote!.endpoint,
-              material.remote!.ref,
-              deadline,
-            )) !== material.head ||
-            (await currentRepositoryIdentity(material.root)) !== material.repositoryIdentity
-          )
-            throw new GitDeliveryError(
-              'GIT_DELIVERY_REMOTE_UNVERIFIED',
-              'The remote branch result could not be verified.',
-            );
-          // Persist the proven external effect before optional local bookkeeping.
-          const result = { commitSha: material.head, remoteRef: material.remote!.ref };
-          const succeeded = save(operation, {
-            ...changed(operation.receipt, 'succeeded', now()),
-            result,
-          });
-          try {
-            operation = stored(context, initial.projectId, id);
-            const warning = await synchroniseTracking(material, action, deadline, async () => {
-              if ((await currentRepositoryIdentity(material.root)) !== material.repositoryIdentity)
-                throw new Error('repository changed');
-              const authority = await binding(context, action);
-              if (
-                authority.projectId !== operation.receipt.projectId ||
-                authority.root !== material.root ||
-                authority.workspaceRoot !== material.workspaceRoot
-              )
-                throw new Error('ownership changed');
-            });
-            return warning
-              ? save(operation, { ...succeeded, result: { ...result, warning } })
-              : succeeded;
-          } catch {
-            // The known external result is already durable. Optional bookkeeping cannot undo it.
-            return {
-              ...succeeded,
-              result: {
-                ...result,
-                warning:
-                  'The remote branch was updated; optional local bookkeeping could not be recorded. Inspect tracking before continuing.',
-              },
-            };
-          }
-        }
-        if (action.kind === 'pull_request') {
-          if (existingPullRequest)
-            return save(operation, {
-              ...changed(operation.receipt, 'succeeded', now()),
-              result: {
-                ...existingPullRequest,
-                warning:
-                  'The exact reviewed pull request already exists; no duplicate was created.',
-              },
-            });
-          effectMayHaveStarted = true;
-          const result = await createReviewedPullRequest(material, action, deadline);
-          const succeeded = save(operation, {
-            ...changed(operation.receipt, 'succeeded', now()),
-            result,
-          });
-          try {
-            operation = stored(context, initial.projectId, id);
-            if (await matchingPullRequest(material, action, deadline)) return succeeded;
-          } catch {
-            /* Optional details are independent of the durable creation result. */
-          }
-          const enriched = {
-            ...succeeded,
-            result: {
-              ...result,
-              warning: 'Pull request creation succeeded; optional details could not be refreshed.',
-            },
-          };
-          try {
-            return save(operation, enriched);
-          } catch {
-            return enriched;
-          }
-        }
-        effectMayHaveStarted = true;
-        await git(material.root, ['commit', '-m', action.message], deadline);
-        const commitSha = (await git(material.root, ['rev-parse', 'HEAD'], deadline)).trim();
-        const tree = (
-          await git(material.root, ['show', '-s', '--format=%T', commitSha], deadline)
-        ).trim();
-        const parents = (
-          await git(material.root, ['show', '-s', '--format=%P', commitSha], deadline)
-        ).trim();
-        const branch = (
-          await git(material.root, ['symbolic-ref', '--quiet', '--short', 'HEAD'], deadline)
-        ).trim();
-        if (
-          tree !== material.indexTree ||
-          parents !== material.head ||
-          branch !== material.branch ||
-          (await currentRepositoryIdentity(material.root)) !== material.repositoryIdentity
-        )
-          throw new GitDeliveryError(
-            'GIT_DELIVERY_EFFECT_MISMATCH',
-            'The created commit differs from the approved index or parent. Inspect before continuing.',
-          );
-        return save(operation, {
-          ...changed(operation.receipt, 'succeeded', now()),
-          result: { commitSha },
-        });
+        return await executeCommit(state, action, deadline);
       } catch (error) {
-        if (
-          !effectMayHaveStarted &&
-          error instanceof GitDeliveryError &&
-          (error.code === 'GIT_DELIVERY_STALE' || error.status === 403)
-        ) {
-          return save(
-            operation,
-            changed(operation.receipt, error.status === 403 ? 'denied' : 'stale', now(), {
-              code: error.code,
-              message: error.message,
-            }),
-          );
-        }
-        const uncertain = effectMayHaveStarted;
-        return save(
-          operation,
-          changed(operation.receipt, uncertain ? 'unknown' : 'failed', now(), {
-            code: uncertain ? 'GIT_DELIVERY_OUTCOME_UNKNOWN' : 'GIT_DELIVERY_FAILED',
-            message: uncertain
-              ? 'Outcome is unknown. Inspect and reconcile before retrying; no automatic replay is permitted.'
-              : 'No repository mutation was started. Prepare a new operation after checking the repository.',
-          }),
-          material,
-        );
+        return failedExecution(state, error);
       }
     });
   }
@@ -742,6 +824,105 @@ export function createGitDeliveryService(
     const operation = stored(context, ownedProject(context).id, id);
     if (operation.receipt.state !== 'prepared') return operation.receipt;
     return save(operation, changed(operation.receipt, reason, now()));
+  }
+  async function reconcileRemote(
+    context: Context,
+    current: Binding,
+    operation: StoredGitDeliveryOperation,
+    material: GitDeliveryMaterial,
+    action: Extract<GitDeliveryAction, { kind: 'push' | 'pull_request' }>,
+    deadline: AbortSignal,
+  ): Promise<GitDeliveryReceipt> {
+    const permitted = await binding(context, action);
+    if (
+      permitted.root !== material.root ||
+      permitted.workspaceRoot !== material.workspaceRoot ||
+      !material.remote
+    )
+      return operation.receipt;
+    await recheckRemoteConfiguration(material, action, deadline);
+    if (
+      (await remoteTip(material.root, material.remote.endpoint, material.remote.ref, deadline)) !==
+      material.head
+    )
+      return operation.receipt;
+    const result =
+      action.kind === 'push'
+        ? {
+            commitSha: material.head,
+            remoteRef: material.remote.ref,
+            warning:
+              'Reconciled from the remote branch; inspect local tracking and any external Git activity.',
+          }
+        : await matchingPullRequest(material, action, deadline);
+    if (result && (await currentRepositoryIdentity(current.root)) === material.repositoryIdentity)
+      return save(operation, { ...changed(operation.receipt, 'succeeded', now()), result });
+    return operation.receipt;
+  }
+  async function reconcileCommit(
+    current: Binding,
+    operation: StoredGitDeliveryOperation,
+    material: GitDeliveryMaterial,
+    action: Extract<GitDeliveryAction, { kind: 'commit' }>,
+    head: string,
+    deadline: AbortSignal,
+  ): Promise<GitDeliveryReceipt> {
+    const tree = (await git(current.root, ['show', '-s', '--format=%T', head], deadline)).trim();
+    const parents = (await git(current.root, ['show', '-s', '--format=%P', head], deadline)).trim();
+    const message = (await git(current.root, ['show', '-s', '--format=%B', head], deadline)).trim();
+    if (
+      tree === material.indexTree &&
+      parents === material.head &&
+      message === action.message &&
+      (await currentRepositoryIdentity(current.root)) === material.repositoryIdentity
+    )
+      return save(operation, {
+        ...changed(operation.receipt, 'succeeded', now()),
+        result: {
+          commitSha: head,
+          warning: 'Reconciled from the current commit; inspect any external Git activity.',
+        },
+      });
+    return operation.receipt;
+  }
+  async function reconcileLocal(
+    current: Binding,
+    operation: StoredGitDeliveryOperation,
+    material: GitDeliveryMaterial,
+    deadline: AbortSignal,
+  ): Promise<GitDeliveryReceipt> {
+    const branch = (
+      await git(current.root, ['symbolic-ref', '--quiet', '--short', 'HEAD'], deadline)
+    ).trim();
+    if (branch !== material.branch) return operation.receipt;
+    const head = (await git(current.root, ['rev-parse', 'HEAD'], deadline)).trim();
+    if (
+      operation.receipt.action.kind === 'stage' &&
+      material.expectedIndexEntries !== undefined &&
+      head === material.head &&
+      (await git(current.root, ['ls-files', '--stage', '-z'], deadline)) ===
+        material.expectedIndexEntries
+    ) {
+      if ((await currentRepositoryIdentity(current.root)) !== material.repositoryIdentity)
+        return operation.receipt;
+      return save(operation, {
+        ...changed(operation.receipt, 'succeeded', now()),
+        result: {
+          indexTree: material.expectedIndexTree,
+          warning: 'Reconciled from the current index; inspect any external Git activity.',
+        },
+      });
+    }
+    if (operation.receipt.action.kind === 'commit' && head !== material.head)
+      return await reconcileCommit(
+        current,
+        operation,
+        material,
+        operation.receipt.action,
+        head,
+        deadline,
+      );
+    return operation.receipt;
   }
   async function reconcile(
     context: Context,
@@ -760,86 +941,9 @@ export function createGitDeliveryService(
         return operation.receipt;
       try {
         const action = operation.receipt.action;
-        if (action.kind === 'push' || action.kind === 'pull_request') {
-          const permitted = await binding(context, action);
-          if (
-            permitted.root !== material.root ||
-            permitted.workspaceRoot !== material.workspaceRoot ||
-            !material.remote
-          )
-            return operation.receipt;
-          await recheckRemoteConfiguration(material, action, deadline);
-          if (
-            (await remoteTip(
-              material.root,
-              material.remote.endpoint,
-              material.remote.ref,
-              deadline,
-            )) !== material.head
-          )
-            return operation.receipt;
-          const result =
-            action.kind === 'push'
-              ? {
-                  commitSha: material.head,
-                  remoteRef: material.remote.ref,
-                  warning:
-                    'Reconciled from the remote branch; inspect local tracking and any external Git activity.',
-                }
-              : await matchingPullRequest(material, action, deadline);
-          if (
-            result &&
-            (await currentRepositoryIdentity(current.root)) === material.repositoryIdentity
-          )
-            return save(operation, { ...changed(operation.receipt, 'succeeded', now()), result });
-          return operation.receipt;
-        }
-        const branch = (
-          await git(current.root, ['symbolic-ref', '--quiet', '--short', 'HEAD'], deadline)
-        ).trim();
-        if (branch !== material.branch) return operation.receipt;
-        const head = (await git(current.root, ['rev-parse', 'HEAD'], deadline)).trim();
-        if (
-          operation.receipt.action.kind === 'stage' &&
-          material.expectedIndexEntries !== undefined &&
-          head === material.head &&
-          (await git(current.root, ['ls-files', '--stage', '-z'], deadline)) ===
-            material.expectedIndexEntries
-        ) {
-          if ((await currentRepositoryIdentity(current.root)) !== material.repositoryIdentity)
-            return operation.receipt;
-          return save(operation, {
-            ...changed(operation.receipt, 'succeeded', now()),
-            result: {
-              indexTree: material.expectedIndexTree,
-              warning: 'Reconciled from the current index; inspect any external Git activity.',
-            },
-          });
-        }
-        if (operation.receipt.action.kind === 'commit' && head !== material.head) {
-          const tree = (
-            await git(current.root, ['show', '-s', '--format=%T', head], deadline)
-          ).trim();
-          const parents = (
-            await git(current.root, ['show', '-s', '--format=%P', head], deadline)
-          ).trim();
-          const message = (
-            await git(current.root, ['show', '-s', '--format=%B', head], deadline)
-          ).trim();
-          if (
-            tree === material.indexTree &&
-            parents === material.head &&
-            message === operation.receipt.action.message &&
-            (await currentRepositoryIdentity(current.root)) === material.repositoryIdentity
-          )
-            return save(operation, {
-              ...changed(operation.receipt, 'succeeded', now()),
-              result: {
-                commitSha: head,
-                warning: 'Reconciled from the current commit; inspect any external Git activity.',
-              },
-            });
-        }
+        if (action.kind === 'push' || action.kind === 'pull_request')
+          return await reconcileRemote(context, current, operation, material, action, deadline);
+        return await reconcileLocal(current, operation, material, deadline);
       } catch {
         /* Ambiguous or unavailable evidence must retain unknown. */
       }
@@ -889,7 +993,7 @@ export function createGitDeliveryService(
           )
             .split('\0')
             .filter(Boolean)
-            .sort();
+            .sort(compareGitDeliveryStrings);
           const latest = await binding(actor);
           if (
             latest.root !== current.root ||

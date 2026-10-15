@@ -1347,6 +1347,124 @@ function assertCurrentMcpApproval(db: DrizzleDb, agentId: string, call: ToolCall
   }
 }
 
+function claimResumedApproval(
+  db: DrizzleDb,
+  approvalRequestId: string,
+  toolCall: ToolCallIntent,
+  agentId: string,
+  res: Response,
+): ApprovalRequest | undefined {
+  let approval: ApprovalRequest;
+  try {
+    approval = claimApprovalRequestForResume(db, approvalRequestId, Date.now());
+  } catch (error) {
+    mapResumeApprovalError(error);
+  }
+  if (isGitDeliveryTool(toolCall.name) && approval.status !== 'rejected') {
+    try {
+      assertClaimedGitApproval(db, approval, toolCall, agentId);
+    } catch (error) {
+      if (!(error instanceof HttpError)) throw error;
+      // Finish the pre-stream refusal before shared stream cleanup ends the response.
+      res.status(error.status).json({ error: { code: error.code, message: error.message } });
+      return undefined;
+    }
+  }
+  return approval;
+}
+
+async function dispatchResumedApproval({
+  db,
+  options,
+  agentCtx,
+  modelCfg,
+  runId,
+  sessionId,
+  emitter,
+  signal,
+  approval,
+  toolCall,
+  messages,
+  resumeBuild,
+  approvalHistory,
+}: {
+  db: DrizzleDb;
+  options: ChatRouterOptions;
+  agentCtx: AgentContext;
+  modelCfg: Awaited<ReturnType<typeof acquireRuntimeContext>>['modelCfg'];
+  runId: string;
+  sessionId: string;
+  emitter: OutputEmitter;
+  signal: AbortSignal;
+  approval: ApprovalRequest;
+  toolCall: ToolCallIntent;
+  messages: ChatMessage[];
+  resumeBuild: ReturnType<typeof buildResumeMessages>;
+  approvalHistory: ReturnType<typeof approvalContext>;
+}) {
+  let resumeMessages: ChatMessage[];
+  let stopAfterDispatch = false;
+  let mcpHalt: HarnessStateType['mcpHalt'];
+  let nativeToolExecutor: NativeToolExecutor | undefined;
+  if (approval.status === 'rejected') {
+    resumeMessages = [buildRejectedToolMessage(toolCall, approval)];
+    await emitter.emit({
+      type: 'error',
+      code: 'APPROVAL_REJECTED',
+      message: 'Human rejected tool execution.',
+    });
+    createAuditLog(db).logRejectedApproval(
+      toolCall.name,
+      toolCall.args,
+      agentCtx.agent.id,
+      sessionId,
+      'Human rejected tool execution.',
+      approval.riskTier,
+    );
+  } else {
+    nativeToolExecutor = createRuntimeNativeToolExecutor({
+      db,
+      agentCtx,
+      runId,
+      sessionId,
+      options,
+    });
+    const dispatchNode = createRuntimeToolDispatchNode({
+      db,
+      agentCtx,
+      runId,
+      sessionId,
+      emitter,
+      options,
+      approvedToolCallIds: new Set([toolCall.id]),
+      ...(toolCall.gitDeliveryBinding
+        ? {
+            gitDeliveryApproval: {
+              toolCallId: toolCall.id,
+              operationId: toolCall.gitDeliveryBinding.operationId,
+              approvalRequestId: approval.id,
+            },
+          }
+        : {}),
+      nativeToolExecutor,
+    });
+    const dispatchState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
+      currentTurnStartIndex: resumeBuild.currentTurnStartIndex,
+      ...approvalHistory,
+      projectAccessPolicy: projectAccessPolicyForSession(db, sessionId),
+    });
+    dispatchState.llmOutput = { kind: 'tool_calls', calls: [toolCall] };
+    const dispatchResult = await dispatchNode(dispatchState, {
+      configurable: { thread_id: sessionId, signal },
+    });
+    resumeMessages = dispatchResult.messages ?? [];
+    stopAfterDispatch = dispatchResult.halted === true;
+    mcpHalt = dispatchResult.mcpHalt;
+  }
+
+  return { resumeMessages, stopAfterDispatch, mcpHalt, nativeToolExecutor };
+}
+
 export async function handleSessionResume(
   db: DrizzleDb,
   options: ChatRouterOptions,
@@ -1399,22 +1517,9 @@ export async function handleSessionResume(
   let heartbeatId: ReturnType<typeof setInterval> | undefined;
 
   try {
-    try {
-      approval = claimApprovalRequestForResume(db, approvalRequestId, Date.now());
-    } catch (error) {
-      mapResumeApprovalError(error);
-    }
-
-    if (isGitDeliveryTool(toolCall.name) && approval.status !== 'rejected') {
-      try {
-        assertClaimedGitApproval(db, approval, toolCall, agentCtx.agent.id);
-      } catch (error) {
-        if (!(error instanceof HttpError)) throw error;
-        // Finish the pre-stream refusal before shared stream cleanup ends the response.
-        res.status(error.status).json({ error: { code: error.code, message: error.message } });
-        return;
-      }
-    }
+    const claimed = claimResumedApproval(db, approvalRequestId, toolCall, agentCtx.agent.id, res);
+    if (!claimed) return;
+    approval = claimed;
     const completeDiagnostics = beginDiagnosticRun(sessionId, runId);
     observeDiagnosticApproval(
       approvalRequestId,
@@ -1440,65 +1545,22 @@ export async function handleSessionResume(
     const approvalHistory = approvalContext(db, sessionId, messages);
     const initialCount = messages.length - (resumeBuild.reconstructedToolCallContext ? 1 : 0);
 
-    let resumeMessages: ChatMessage[];
-    let stopAfterDispatch = false;
-    let mcpHalt: HarnessStateType['mcpHalt'];
-    let nativeToolExecutor: NativeToolExecutor | undefined;
-    if (approval.status === 'rejected') {
-      resumeMessages = [buildRejectedToolMessage(toolCall, approval)];
-      await emitter.emit({
-        type: 'error',
-        code: 'APPROVAL_REJECTED',
-        message: 'Human rejected tool execution.',
-      });
-      createAuditLog(db).logRejectedApproval(
-        toolCall.name,
-        toolCall.args,
-        agentCtx.agent.id,
-        sessionId,
-        'Human rejected tool execution.',
-        approval.riskTier,
-      );
-    } else {
-      nativeToolExecutor = createRuntimeNativeToolExecutor({
+    const { resumeMessages, stopAfterDispatch, mcpHalt, nativeToolExecutor } =
+      await dispatchResumedApproval({
         db,
-        agentCtx,
-        runId,
-        sessionId,
         options,
-      });
-      const dispatchNode = createRuntimeToolDispatchNode({
-        db,
         agentCtx,
+        modelCfg,
         runId,
         sessionId,
         emitter,
-        options,
-        approvedToolCallIds: new Set([toolCall.id]),
-        ...(toolCall.gitDeliveryBinding
-          ? {
-              gitDeliveryApproval: {
-                toolCallId: toolCall.id,
-                operationId: toolCall.gitDeliveryBinding.operationId,
-                approvalRequestId: approval.id,
-              },
-            }
-          : {}),
-        nativeToolExecutor,
+        signal,
+        approval,
+        toolCall,
+        messages,
+        resumeBuild,
+        approvalHistory,
       });
-      const dispatchState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
-        currentTurnStartIndex: resumeBuild.currentTurnStartIndex,
-        ...approvalHistory,
-        projectAccessPolicy: projectAccessPolicyForSession(db, sessionId),
-      });
-      dispatchState.llmOutput = { kind: 'tool_calls', calls: [toolCall] };
-      const dispatchResult = await dispatchNode(dispatchState, {
-        configurable: { thread_id: sessionId, signal },
-      });
-      resumeMessages = dispatchResult.messages ?? [];
-      stopAfterDispatch = dispatchResult.halted === true;
-      mcpHalt = dispatchResult.mcpHalt;
-    }
 
     const graph = buildRuntimeGraph({
       db,

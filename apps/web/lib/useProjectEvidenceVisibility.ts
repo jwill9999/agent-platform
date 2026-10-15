@@ -6,7 +6,7 @@ const STORAGE_KEY = 'agent-platform:projectEvidenceVisible';
 
 /** Layout preference only: does not change Project permissions or chat approvals. */
 export function useProjectEvidenceVisibility(previewDocked: boolean) {
-  const [preferredVisible, setVisible] = useState(true);
+  const [preferredVisible, setPreferredVisible] = useState(true);
   const [wideViewport, setWideViewport] = useState(false);
 
   useEffect(() => {
@@ -20,14 +20,14 @@ export function useProjectEvidenceVisibility(previewDocked: boolean) {
 
   useEffect(() => {
     try {
-      setVisible(globalThis.localStorage.getItem(STORAGE_KEY) !== '0');
+      setPreferredVisible(globalThis.localStorage.getItem(STORAGE_KEY) !== '0');
     } catch {
       // Storage can be unavailable; the panel remains usable for this session.
     }
   }, []);
 
   const update = useCallback((next: boolean) => {
-    setVisible(next);
+    setPreferredVisible(next);
     try {
       globalThis.localStorage.setItem(STORAGE_KEY, next ? '1' : '0');
     } catch {
@@ -35,11 +35,10 @@ export function useProjectEvidenceVisibility(previewDocked: boolean) {
     }
   }, []);
 
-  const unavailableReason = !wideViewport
-    ? 'Widen the window to show the activity and Git panel.'
-    : previewDocked
-      ? null
-      : 'Dock the web preview to show the activity and Git panel.';
+  let unavailableReason: string | null = null;
+  if (!wideViewport) unavailableReason = 'Widen the window to show the activity and Git panel.';
+  else if (!previewDocked)
+    unavailableReason = 'Dock the web preview to show the activity and Git panel.';
 
   return {
     visible: preferredVisible && unavailableReason === null,

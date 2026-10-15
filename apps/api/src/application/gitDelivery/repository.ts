@@ -6,6 +6,7 @@ import path from 'node:path';
 import type { GitDeliveryAction } from '@agent-platform/contracts';
 import { gitDeliveryEnvironment, runGitDeliveryCommand } from './process.js';
 import { GitDeliveryError, type GitDeliveryRemoteMaterial } from './types.js';
+import { compareGitDeliveryStrings } from './ordering.js';
 
 export interface GitDeliveryMaterial {
   remote?: GitDeliveryRemoteMaterial;
@@ -52,7 +53,7 @@ export function normaliseGitDeliveryPaths(paths: string[]): string[] {
     }
     return value;
   });
-  return [...new Set(checked)].sort();
+  return [...new Set(checked)].sort(compareGitDeliveryStrings);
 }
 async function verifyParent(root: string, selected: string): Promise<void> {
   let parent = path.dirname(path.join(root, selected));
@@ -149,35 +150,16 @@ export function indexPaths(entries: string): string[] {
         .filter(Boolean)
         .map((line) => line.slice(line.indexOf('\t') + 1)),
     ),
-  ].sort();
+  ].sort(compareGitDeliveryStrings);
 }
 export function selectedIndexEntries(entries: string, paths: string[]): string {
   return entries
     .split('\0')
     .filter((line) => line && paths.includes(line.slice(line.indexOf('\t') + 1)))
-    .sort()
+    .sort(compareGitDeliveryStrings)
     .join('\0');
 }
-export async function inspectGitDeliveryRepository(
-  root: string,
-  workspaceRoot: string,
-  action: GitDeliveryAction,
-  signal: AbortSignal,
-): Promise<GitDeliveryMaterial> {
-  if (!within(workspaceRoot, root))
-    throw new GitDeliveryError(
-      'GIT_DELIVERY_ROOT_ESCAPE',
-      'Repository must remain within its approved Project.',
-      403,
-    );
-  const top = (await git(root, ['rev-parse', '--show-toplevel'], signal)).trim();
-  const gitDirectory = await lstat(path.join(root, '.git')).catch(() => undefined);
-  if ((await realpath(top)) !== root || !gitDirectory?.isDirectory())
-    throw new GitDeliveryError(
-      'GIT_DELIVERY_LAYOUT_UNSUPPORTED',
-      'This delivery flow requires a regular repository at the approved Project root.',
-      409,
-    );
+async function requireNoRepositoryOperation(root: string): Promise<void> {
   for (const state of [
     'MERGE_HEAD',
     'CHERRY_PICK_HEAD',
@@ -202,6 +184,28 @@ export async function inspectGitDeliveryRepository(
         'Finish the existing merge, rebase, cherry-pick or bisect before delivery.',
       );
   }
+}
+export async function inspectGitDeliveryRepository(
+  root: string,
+  workspaceRoot: string,
+  action: GitDeliveryAction,
+  signal: AbortSignal,
+): Promise<GitDeliveryMaterial> {
+  if (!within(workspaceRoot, root))
+    throw new GitDeliveryError(
+      'GIT_DELIVERY_ROOT_ESCAPE',
+      'Repository must remain within its approved Project.',
+      403,
+    );
+  const top = (await git(root, ['rev-parse', '--show-toplevel'], signal)).trim();
+  const gitDirectory = await lstat(path.join(root, '.git')).catch(() => undefined);
+  if ((await realpath(top)) !== root || !gitDirectory?.isDirectory())
+    throw new GitDeliveryError(
+      'GIT_DELIVERY_LAYOUT_UNSUPPORTED',
+      'This delivery flow requires a regular repository at the approved Project root.',
+      409,
+    );
+  await requireNoRepositoryOperation(root);
   const branch = (await git(root, ['symbolic-ref', '--quiet', '--short', 'HEAD'], signal)).trim();
   if (!branch || ['main', 'master', 'staging'].includes(branch))
     throw new GitDeliveryError(
@@ -263,7 +267,7 @@ export async function inspectGitDeliveryRepository(
     )
       .split('\0')
       .filter(Boolean)
-      .sort();
+      .sort(compareGitDeliveryStrings);
     if (staged.length === 0)
       throw new GitDeliveryError(
         'GIT_DELIVERY_NOTHING_STAGED',

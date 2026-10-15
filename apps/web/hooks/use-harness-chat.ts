@@ -2,17 +2,15 @@
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
-import type {
-  DiagnosticPartialFailure,
-  ApprovalRequest,
-  ApprovalRequestStatus,
-  CapabilityRecovery,
-  MessageRecord,
-  WorkspaceEvent,
-} from '@agent-platform/contracts';
 import { z } from 'zod';
 import { gitApprovalReceipt, isGitDeliveryTool, gitReceiptBinding } from '@/lib/git-chat-receipts';
 import {
+  type DiagnosticPartialFailure,
+  type ApprovalRequest,
+  type ApprovalRequestStatus,
+  type CapabilityRecovery,
+  type MessageRecord,
+  type WorkspaceEvent,
   ApprovalRequestSchema,
   GitDeliveryReceiptSchema,
   type GitDeliveryReceipt,

@@ -59,3 +59,14 @@ The reviewed source includes an accessible Hide panel control and its actual Dar
 The separate P2 [test telemetry isolation finding](agent-platform-test-telemetry-isolation.md) records rejected external tracing uploads observed in test stderr. Exact asynchronous ownership and activation source are unproven; this is not an assertion failure or a waiver. Process-scoped tracing is disabled before imports in future local test commands, with no product/global credential change. The linked follow-up remains outside this bounded MVP and does not expand its implementation.
 
 Evidence root: `/Users/letuscode/.codex/git-delivery-implementation-20261014`. Actual source and normal hooks: `chat-commit-source.json`. Browser review: `browser-git-actual-evidence-review.json`, `integrated-panel-denial-qualification.json`, `browser-regression-attempt2/results.json`. Native and diagnostic review: `chat-native-qualification-manifest.json`, `native-regression-qualification.json`. Full source-bound mirror and Beads readbacks are required before each applicable closure. This tip remains in progress until its declared hosted and authorized integration gates pass; broader ii1/7vf, main and paused PR283 remain separate.
+
+## PR329 qualification checkpoint — 15 October 2026
+
+PR329 is open into `feature/git-delivery-mvp`. Its initial hosted Sonar/browser/desktop failures
+have bounded independently reviewed source and fixture repairs. The detailed local results,
+failed invocations, diagnostic review and exact source limits are in the
+[verification results](../testing/git-delivery-mvp.md#pr329-quality-repair-checkpoint--15-october-2026)
+and [review record](../reviews/git-delivery-mvp-plan-review.md#pr329-quality-repair-review--15-october-2026).
+Final exact-head hosted Sonar, browser/desktop/quality checks, resolved findings, complete current
+mirrors and owner acceptance remain required. Keep this task in progress; no merge or staging
+readiness follows from local approval. The prior413767-byte session remains an exact suffix.

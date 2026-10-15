@@ -125,3 +125,57 @@ Implementation source: pushed `093f7b963a7433fc68e4f0d8a006b48eea412ee0`; final 
 | GD-T12     | All five Git browser cases and42 managed-fixture cases (39 existing plus three new chat) qualified across recorded distinct zero-retry runs. Existing browser regression31pass/1optional prerequisite skip; that skipped context case is unqualified, with separate managed context controls passed. |
 
 CI, exact-head hosted Sonar/CodeQL/security findings/review threads and actual protected packaged VM are not inferred from these local counts. Retain failed attempts and diagnostic limitations. A default-suite external tracing403 observation is tracked separately in `agent-platform-test-telemetry-isolation`; future local commands disable process tracing before imports and explicit telemetry testing must use an owned endpoint. No production diagnostics or required gate is suppressed.
+
+## PR329 quality repair checkpoint — 15 October 2026
+
+Initial hosted head `e0df35f1` passed verify, Docker, documentation, cycles and GitGuardian, but
+failed Sonar (17 critical, 24 major and 58 minor findings), browser discovery and Linux desktop
+checks. Sourcery skipped because the diff exceeded its 20,000-line retrieval limit; this is not a
+review pass. Raw failures remain in `pr329-ci-initial-failures.log` under the existing evidence root.
+
+Independent reviews approved bounded complexity refactors, deterministic ordinal Git-path ordering,
+unchanged approval/effect/recovery semantics, accessible receipt rendering and a private checked
+Docker fixture directory with fixed host executables. GD-S01 further extracts the synchronous
+approval claim and Git validation without adding an await or moving cleanup; its final 60 actual
+SDK/HTTP/SQLite/Git tests pass. The estimated complexity is within the limit; only fresh hosted
+Sonar can confirm clearance. No suppression, scanner exclusion, rule change or protection waiver
+was introduced.
+
+Browser discovery now selects `.spec.ts` journeys. The 22 Node fixture controls, including the
+installed SDK check, run explicitly after the CI build and pass locally. Linux no longer attempts
+the macOS-only caffeinate helper. The Linux screenshot baseline is the genuine captured image
+from run38683875976/artifact11950280169, adding only the agreed Hide panel control; thresholds are
+unchanged. A Project panel fixture now waits for bound-session send admission. Its three final
+local cases pass, including merge resolution. The historical remote renderer connection refusal
+has no confirmed cause; bounded startup metadata is captured without retries or a production fix.
+
+Local qualification is deliberately split by source and invocation:
+
+- Reviewed UI151, core76, harness114 and actual API60 tests pass; the final synchronous-claim
+  extraction reran the API60. Full build/typecheck/lint/format/cycles pass, with final API
+  build/typecheck/lint and strict seven-entry fixture typecheck separately passing.
+- All five Git browser journeys pass without retries. The existing browser suite passes31 with
+  one unchanged optional context-fixture prerequisite skip. These Docker images predate GD-S01;
+  all other reviewed runtime bytes match, but the final router was not Docker-tested in that run.
+  Final exact-head hosted browser qualification remains mandatory. Compose diagnostics correctly
+  return intentional403 denials; they are not successful V1 exports.
+- The broad managed-app run passes56 and fails two MCP fixtures because the coordinator invoked
+  them from the repository root rather than the desktop package. Correct-cwd execution then passes
+  all three MCP cases and all three final Git chat cases in one six-case, zero-retry run. All61
+  managed-fixture scenarios have passing evidence across these distinct invocations, not one
+  all-green broad run. The final three panel cases also pass separately after fixture corrections.
+- Seven final native Git V1 exports cover success, denial and real backend restart. Independent
+  review confirmed their exact final runtime binding, durability/privacy/no loss and conservative
+  unknown state. Earlier seven-body review is retained; restarted unknown history explicitly
+  retains `unfinishedPriorProcess=true`. Deterministic model/gh/SSH boundaries and node-double VM
+  cases do not establish live-provider, release-artifact or protected real-VM qualification.
+
+Evidence: `pr329-repair-source-freeze.json`, `pr329-final-repair-source-freeze.json`,
+`pr329-browser-git-repaired`, `pr329-browser-regression`, `pr329-native-regression`,
+`pr329-native-final-six`, `pr329-native-panel-final` and corresponding quality logs in
+`/Users/letuscode/.codex/git-delivery-implementation-20261014`. Failed invocations, typecheck
+configuration attempts and initial hosted failures are retained. Current source reviews are
+bounded approvals; fresh exact-head Sonar, hosted browser/desktop/quality gates and review findings
+remain pending. PR329 is open into `feature/git-delivery-mvp`; no merge readiness or task closure is
+claimed. Final owner acceptance/merge authority remains reserved. Main, PR283 and paused
+orchestration remain separate.
