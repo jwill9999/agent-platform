@@ -44,7 +44,13 @@ vi.mock('../hooks/use-sessions', () => ({
 // selected conversation and invoke the same dropdown callbacks as the production children.
 vi.mock('../components/chat/chat', () => ({
   Chat: (props: ComponentProps<typeof Chat>) =>
-    createElement('output', { 'data-testid': 'conversation' }, props.diagnosticSessionId ?? ''),
+    createElement(
+      'div',
+      null,
+      createElement('output', { 'data-testid': 'conversation' }, props.diagnosticSessionId ?? ''),
+      createElement('input', { 'data-testid': 'draft', defaultValue: '' }),
+      props.sideAccessory,
+    ),
 }));
 vi.mock('../components/chat/agent-model-context', () => ({
   AgentModelProvider: ({
@@ -108,7 +114,13 @@ vi.mock('../components/project/project-instructions-review', () => ({
 vi.mock('../components/project/project-branch-selector', () => ({
   ProjectBranchSelector: () => null,
 }));
-vi.mock('../components/project/project-evidence-rail', () => ({ ProjectEvidenceRail: () => null }));
+vi.mock('../components/project/project-activity-panel', () => ({
+  ProjectActivityPanel: () => createElement('aside', null, 'Activity content'),
+}));
+vi.mock('../components/project/project-git-github-panel', () => ({
+  ProjectGitHubPanel: () =>
+    createElement('aside', { 'aria-label': 'Git and GitHub' }, 'Git content'),
+}));
 vi.mock('../components/project/project-terminal-dock', () => ({ ProjectTerminalDock: () => null }));
 vi.mock('../components/project/project-webview-panel', () => ({ ProjectWebViewPanel: () => null }));
 
@@ -170,6 +182,8 @@ let container: HTMLDivElement;
 beforeEach(async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
   vi.resetAllMocks();
+  localStorage.clear();
+  vi.stubGlobal('matchMedia', () => Object.assign(new EventTarget(), { matches: true }));
   window.history.replaceState(null, '', '/');
   mocks.sessions = [session('A'), session('B'), session('legacy', 'coding')];
   mocks.refresh.mockResolvedValue(undefined);
@@ -257,6 +271,66 @@ async function coldProjectReopen() {
 }
 
 describe('HomePage asynchronous selection ownership', () => {
+  it('preserves Git selection through delayed project binding while resetting session-owned chat', async () => {
+    const pending = deferred<{ session: SessionRecord; created: boolean }>();
+    mocks.picker.mockResolvedValueOnce({ project: project('alpha'), created: false });
+    mocks.bind.mockReturnValueOnce(pending.promise);
+    await click('Open folder');
+    expect(current()).toBe('');
+    await click('Git & GitHub');
+    const before = container.querySelector<HTMLInputElement>('[data-testid="draft"]')!;
+    before.value = 'old session draft';
+    await settle(pending, { session: session('canonical', 'coding', 'alpha'), created: true });
+    expect(current()).toBe('canonical');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe(
+      'Git & GitHub',
+    );
+    expect(container.querySelector('[aria-label="Git and GitHub"]')?.textContent).toBe(
+      'Git content',
+    );
+    const after = container.querySelector<HTMLInputElement>('[data-testid="draft"]')!;
+    expect(after).not.toBe(before);
+    expect(after.value).toBe('');
+  });
+
+  it('keeps the selected Git view when switching sessions within the same project', async () => {
+    mocks.sessions.push(session('alternate', 'coding', 'alpha'));
+    await openProject();
+    await click('Git & GitHub');
+    await click('Select alternate');
+    expect(current()).toBe('alternate');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe(
+      'Git & GitHub',
+    );
+    expect(container.querySelector('[aria-label="Git and GitHub"]')).not.toBeNull();
+  });
+
+  it('retains Git through hide/show but resets to Activity after leaving the project', async () => {
+    await openProject();
+    await click('Git & GitHub');
+    const toggle = () =>
+      container.querySelector<HTMLButtonElement>('[aria-controls="project-evidence-rail"]')!;
+    await act(async () => toggle().click());
+    expect(container.querySelector('#project-evidence-rail')).toBeNull();
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Show activity and Git panel"]')!
+        .click(),
+    );
+    expect(container.querySelector('[aria-label="Git and GitHub"]')).not.toBeNull();
+    await navigate(workspaceHomeRequestedEvent);
+    await openProject('beta');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe(
+      'Activity',
+    );
+    await click('Git & GitHub');
+    await navigate(workspaceHomeRequestedEvent);
+    await openProject('alpha');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe(
+      'Activity',
+    );
+  });
+
   it('keeps a usable personal conversation when the current personal navigation is requested again', async () => {
     await openPersonal();
     await navigate(workspacePersonalChatRequestedEvent);
