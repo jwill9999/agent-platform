@@ -1,3 +1,33 @@
+## Current handoff: diagnostic benchmark process isolation
+
+15 October: task `agent-platform-diagnostics-benchmark-isolation` is in progress on
+`task/diagnostics-benchmark-isolation`, from feature head `5a3e283f`. PR327 asset-copy delivery is
+merged and closed with complete publication/readback; protected PR324 is still unmerged.
+
+The fresh staging verify job fails only the unchanged diagnostic benchmark overhead limit;
+321 other API tests pass. The critic verified raw measurements and approved a bounded fresh-process
+CI experiment with safe CPU/GC observations. This does not establish the cause of the observed
+latency. Workload, assertions, deadlines and limits remain unchanged. The dedicated local command
+selects one test and passes all nine samples (maximum overhead 0.249750 ms; enqueue 0.013166 ms).
+Numeric CPU/GC/memory observations are retained without modifying pass criteria. Independent source,
+local evidence and documentation review approved without findings. Normal hooks, full mirrors and
+new hosted feature/staging qualification remain pending.
+
+The separate packaged-VM setup failure was confirmed ENOSPC. Reviewed byte-identical APFS clone
+replacement preserved every retained image/evidence byte. A guarded retry of only that failed job
+passes all 19 cases at CI38661857710 attempt2/job116189675009; actual job-temp cleanup left 13.36 GiB
+before asset preparation. Independent review verifies all 19 first attempts and shutdowns, 18 VM
+releases and ten complete clean diagnostic reports; all 104 retained files are hash-verified. That
+successful VM retry does not qualify or waive the failed benchmark.
+
+See [the bounded repair specification](docs/tasks/agent-platform-diagnostics-benchmark-isolation.md).
+Keep active Git delivery branches/worktree, main, PR283 and paused orchestration separate. Parent
+promotion remains in progress; no delivered-branch cleanup until actual protected staging succeeds.
+
+The complete previous handoff follows unchanged as historical context.
+
+---
+
 ## Session: Private VM asset-copy repair — 15 October 2026
 
 Current task: `agent-platform-desktop-vm-asset-copy` on `task/desktop-vm-asset-copy`,
