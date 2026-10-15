@@ -43,6 +43,20 @@ function isCommitChecks(args, repository) {
 
 function panelPrRead(args, repository) {
   if (args[0] !== 'pr') return undefined;
+  if (args[1] === 'view' && args.includes('--')) {
+    const branch = args[7];
+    if (
+      typeof branch === 'string' &&
+      branch.length > 0 &&
+      branch.length <= 255 &&
+      ![...branch].some(
+        (character) => character.charCodeAt(0) <= 32 || character.charCodeAt(0) === 127,
+      ) &&
+      exact(args, ['pr', 'view', '--repo', repository, '--json', checkFields, '--', branch])
+    )
+      return { kind: 'pr-checks', branch };
+    throw new Error('Unexpected fixture query');
+  }
   if (args[1] === 'view') {
     const input = options(args.slice(2), ['--repo', '--json']);
     if (input['--repo'] === repository && input['--json'] === checkFields)
@@ -134,7 +148,9 @@ function readResult(request, config, ledger) {
     }));
     return { code: 0, output: `${JSON.stringify(rows)}\n` };
   }
-  const rows = ledger.pullRequests.filter((pr) => pr.headRefName === config.currentBranch);
+  const rows = ledger.pullRequests.filter(
+    (pr) => pr.headRefName === (request.branch ?? config.currentBranch),
+  );
   if (rows.length !== 1)
     return { code: 1, error: 'No unambiguous fixture pull request for branch' };
   const { number, url } = rows[0];

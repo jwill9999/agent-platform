@@ -72,11 +72,15 @@ jobs:
           echo "$workflow_test_bin" >> "$GITHUB_PATH"
 
       - name: Test
+        # Keep timing and physical-storage measurements free of competing test suites.
+        # The one excluded test runs in the required fresh-process step immediately below.
+        run: pnpm -r --workspace-concurrency=1 run test --maxWorkers=1 --minWorkers=1 --no-file-parallelism --exclude '**/diagnostics.performance.test.ts'
+
+      - name: Diagnostic performance in a fresh process
         env:
           DIAGNOSTICS_BENCHMARK_RESULT: ${{ runner.temp }}/diagnostics-benchmark.json
-        # Keep timing and physical-storage measurements free of competing test suites.
-        # Preserve the full test inventory, workload, deadlines and assertions.
-        run: pnpm -r --workspace-concurrency=1 run test --maxWorkers=1 --minWorkers=1 --no-file-parallelism
+        # Preserve the full benchmark workload, deadlines and assertions, without the API suite's reused fork.
+        run: pnpm --filter @agent-platform/api exec vitest run test/diagnostics.performance.test.ts --maxWorkers=1 --minWorkers=1 --no-file-parallelism
 
       - name: Upload diagnostic benchmark measurements
         if: always()
@@ -116,8 +120,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      # Every compose command, including teardown, uses the same test-only boundary.
-      COMPOSE_FILE: docker-compose.yml:e2e/support/git-delivery/compose.yml
+      # Existing browser projects retain their qualified GitHub-read boundary.
+      COMPOSE_FILE: docker-compose.yml:docker-compose.github-read-e2e.yml
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -146,7 +150,7 @@ jobs:
         run: make workspace-init
 
       - name: Start API + web (compose profile services)
-        run: docker compose --profile services up -d --build
+        run: docker compose -f docker-compose.yml -f docker-compose.github-read-e2e.yml --profile services up -d --build
 
       - name: Wait for API
         run: |
@@ -210,7 +214,45 @@ jobs:
         env:
           BASE_URL: http://127.0.0.1:3001
           API_URL: http://127.0.0.1:3000
-        run: pnpm run test:e2e
+        run: pnpm run test:e2e --project=chromium --project=chat-reply --project=github-read --project=mcp-onboarding
+
+      - name: Preserve first browser phase logs
+        run: |
+          docker compose --profile services ps > github-read-compose-ps.txt
+          docker compose logs --no-color api > github-read-api-logs.txt
+
+      - name: Select isolated Git delivery boundary
+        run: |
+          docker compose -f docker-compose.yml -f e2e/support/git-delivery/compose.yml --profile services up -d --no-deps --force-recreate api
+          echo "COMPOSE_FILE=docker-compose.yml:e2e/support/git-delivery/compose.yml" >> "$GITHUB_ENV"
+
+      - name: Wait for Git delivery API
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS --max-time 2 http://127.0.0.1:3000/health >/dev/null; then
+              echo "Git delivery api ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --profile services ps
+          exit 1
+
+      - name: Git delivery browser tests
+        env:
+          BASE_URL: http://127.0.0.1:3001
+          API_URL: http://127.0.0.1:3000
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-git-delivery
+        run: pnpm run test:e2e --project=git-delivery --no-deps --output=test-results-git-delivery
+
+      - name: Upload Git delivery browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: git-delivery-browser-report
+          path: |
+            playwright-report-git-delivery/
+            test-results-git-delivery/
 
       - name: Upload Playwright report
         if: failure()
@@ -233,6 +275,8 @@ jobs:
           path: |
             docker-compose-ps.txt
             api-logs.txt
+            github-read-compose-ps.txt
+            github-read-api-logs.txt
 
       - name: Stop compose
         if: always()

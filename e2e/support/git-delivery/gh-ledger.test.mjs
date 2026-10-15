@@ -292,3 +292,49 @@ test('current branch configuration is explicit, validated and cannot change duri
     await unlink(lock);
   }
 });
+
+test('qualified asynchronous PR reads use the explicit captured branch rather than fixture current branch', async (context) => {
+  const fixture = await own(context, { currentBranch: 'task/elsewhere' });
+  await invoke(fixture, create);
+  const explicit = [...panelChecks, '--', 'task/example'];
+  assert.deepEqual(JSON.parse((await invoke(fixture, explicit)).stdout), {
+    number: 1,
+    url: 'https://github.com/fixture/project/pull/1',
+    statusCheckRollup: [],
+  });
+  await assert.rejects(invoke(fixture, [...panelChecks, '--', 'task/missing']), { code: 1 });
+  const rows = JSON.parse((await invoke(fixture, panelList)).stdout);
+  assert.deepEqual(rows[0].statusCheckRollup, []);
+  assert.equal(rows[0].reviewDecision, undefined);
+  assert.equal(rows[0].mergeable, undefined);
+  assert.equal((await fixture.readLedger()).pullRequests.length, 1);
+  assert.deepEqual((await fixture.readLedger()).calls[1].args, explicit);
+});
+
+test('explicit-branch PR reads reject altered argv before ledger effects', async (context) => {
+  const fixture = await own(context);
+  for (const args of [
+    [...panelChecks, '--'],
+    [...panelChecks, '--', ''],
+    [...panelChecks, '--', 'task/example', '--web'],
+    [...panelChecks, 'task/example'],
+    [...panelChecks, '--', 'bad\nbranch'],
+    [
+      ...panelChecks.map((arg) => (arg === 'fixture/project' ? 'another/repo' : arg)),
+      '--',
+      'task/example',
+    ],
+    [
+      'pr',
+      'view',
+      'task/example',
+      '--repo',
+      'fixture/project',
+      '--json',
+      'number,url,statusCheckRollup',
+    ],
+  ])
+    await assert.rejects(invoke(fixture, args), { code: 2 });
+  assert.deepEqual((await fixture.readLedger()).calls, []);
+  assert.deepEqual((await fixture.readLedger()).pullRequests, []);
+});

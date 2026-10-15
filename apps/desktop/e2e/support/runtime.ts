@@ -37,3 +37,31 @@ export function getOpenPort(): Promise<number> {
     });
   });
 }
+
+/** Reserve both ports together so the OS cannot reuse the first for the second.
+ * Reservations end before child processes bind; unrelated processes can still race us.
+ */
+export async function getDesktopPorts(): Promise<{ backendPort: number; rendererPort: number }> {
+  const backend = createServer();
+  const renderer = createServer();
+  const listen = (server: ReturnType<typeof createServer>) =>
+    new Promise<number>((resolvePort, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        if (typeof address === 'object' && address) resolvePort(address.port);
+        else reject(new Error('Failed to allocate a local port.'));
+      });
+    });
+  try {
+    const backendPort = await listen(backend);
+    const rendererPort = await listen(renderer);
+    return { backendPort, rendererPort };
+  } finally {
+    await Promise.all(
+      [backend, renderer].map(
+        (server) => new Promise<void>((resolveClose) => server.close(() => resolveClose())),
+      ),
+    );
+  }
+}

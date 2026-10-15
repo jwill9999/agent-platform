@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
+import {
+  _electron as electron,
+  type ElectronApplication,
+  type Page,
+  type Request,
+  type Response,
+} from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -343,6 +349,50 @@ test.describe('Electron Project Git workflow panel', () => {
     let rendererPort = await getOpenPort();
     while (rendererPort === backendPort) rendererPort = await getOpenPort();
     let app: ElectronApplication | undefined;
+    let observedPage: Page | undefined;
+    const pendingReads = new Set<Request>();
+    const lifecycle: Array<{
+      event: string;
+      at: number;
+      path?: string;
+      status?: number;
+      pending: number;
+    }> = [];
+    const record = (event: string, request?: Request, status?: number) => {
+      lifecycle.push({
+        event,
+        at: Date.now(),
+        ...(request ? { path: new URL(request.url()).pathname } : {}),
+        ...(status === undefined ? {} : { status }),
+        pending: pendingReads.size,
+      });
+    };
+    const onRequest = (request: Request) => {
+      if (!/\/(?:git\/checks|github\/pull-requests)$/u.test(new URL(request.url()).pathname))
+        return;
+      pendingReads.add(request);
+      record('request', request);
+    };
+    const onResponse = (response: Response) => {
+      if (pendingReads.has(response.request()))
+        record('response', response.request(), response.status());
+    };
+    const onFinished = (request: Request) => {
+      if (!pendingReads.delete(request)) return;
+      record('finished', request);
+    };
+    const onFailed = (request: Request) => {
+      if (!pendingReads.delete(request)) return;
+      record('failed', request);
+    };
+    const settleReads = async (page: Page, buttonName: string, phase: string) => {
+      await expect(page.getByRole('button', { name: buttonName, exact: true })).toBeEnabled({
+        timeout: 10_000,
+      });
+      await expect.poll(() => pendingReads.size, { timeout: 10_000 }).toBe(0);
+      record(phase);
+    };
+
     let ghFixture: Awaited<ReturnType<typeof createGhLedgerFixture>> | undefined;
     let transport: Awaited<ReturnType<typeof createGitTransportFixture>> | undefined;
     const failures: unknown[] = [];
@@ -386,6 +436,11 @@ test.describe('Electron Project Git workflow panel', () => {
         },
       });
       const page = await app.firstWindow();
+      observedPage = page;
+      page.on('request', onRequest);
+      page.on('response', onResponse);
+      page.on('requestfinished', onFinished);
+      page.on('requestfailed', onFailed);
       const configured = await page.request.post(
         `http://127.0.0.1:${backendPort}/v1/model-configs`,
         {
@@ -425,6 +480,7 @@ test.describe('Electron Project Git workflow panel', () => {
         },
         branch,
       );
+      await settleReads(page, 'Refresh Git state', 'remote-delivery-settled');
       await testInfo.attach('remote-delivery-result', {
         body: JSON.stringify(result, null, 2),
         contentType: 'application/json',
@@ -436,6 +492,14 @@ test.describe('Electron Project Git workflow panel', () => {
     } catch (error) {
       failures.push(error);
     }
+    observedPage?.off('request', onRequest);
+    observedPage?.off('response', onResponse);
+    observedPage?.off('requestfinished', onFinished);
+    observedPage?.off('requestfailed', onFailed);
+    await testInfo.attach('github-pr-create-read-lifecycle', {
+      body: Buffer.from(JSON.stringify(lifecycle, null, 2)),
+      contentType: 'application/json',
+    });
     try {
       await app?.close();
     } catch (error) {

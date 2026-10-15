@@ -79,7 +79,7 @@ import type { DrizzleDb } from '@agent-platform/db';
 import { PathJail } from '@agent-platform/harness';
 import { Router } from 'express';
 import { createGitDeliveryRouter } from '../../../interfaces/http/v1/gitDeliveryRouter.js';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
@@ -113,6 +113,7 @@ import {
   discoverProjectInstructions,
   parseProjectInstructionFileReferences,
 } from '../../projects/projectInstructions.js';
+import { acquireGitHubRead, type GitHubReadOperation } from '../../projects/githubReadProcess.js';
 import { assessProjectOnboarding } from '../../projects/projectAssessment.js';
 import {
   buildOnboardingDraft,
@@ -1935,115 +1936,201 @@ function parseGhCommitCheckRuns(output: string): ProjectGitCheckRun[] {
   });
 }
 
-function projectGitChecks(project: ProjectRecord) {
-  let projectRoot: string;
+type GitHubReadIdentity = {
+  repositoryRoot: string;
+  remoteUrl: string | undefined;
+  currentBranch: string;
+  fullHeadSha: string;
+};
+type GitHubReadOptions = Parameters<typeof unavailableGitChecks>[1];
+
+async function githubReadIdentity(project: ProjectRecord, operation: GitHubReadOperation) {
+  let root: string;
   try {
-    projectRoot = projectRootForBackendRead(project);
+    root = projectRootForBackendRead(project);
   } catch {
-    return unavailableGitChecks('Project folder is not available.');
+    return undefined;
   }
+  const git = async (cwd: string, args: string[]) =>
+    (await operation.run(GIT_BINARY, ['-C', cwd, ...args], cwd))?.trim();
+  const reportedRoot = await git(root, ['rev-parse', '--show-toplevel']);
+  if (!reportedRoot) return undefined;
+  let repositoryRoot: string;
+  try {
+    repositoryRoot = realpathSync(reportedRoot);
+  } catch {
+    return undefined;
+  }
+  const remoteUrl = await git(repositoryRoot, ['remote', 'get-url', 'origin']);
+  const currentBranch = await git(repositoryRoot, ['branch', '--show-current']);
+  const fullHeadSha = await git(repositoryRoot, ['rev-parse', 'HEAD']);
+  if (currentBranch === undefined || !fullHeadSha || !/^[a-f0-9]{40,64}$/.test(fullHeadSha)) {
+    return undefined;
+  }
+  return { repositoryRoot, remoteUrl, currentBranch, fullHeadSha };
+}
 
-  const repositoryRoot = gitValue(projectRoot, ['rev-parse', '--show-toplevel']);
-  if (!repositoryRoot) return unavailableGitChecks('Project is not a Git repository.');
+function githubReadFailure(operation: GitHubReadOperation): string | undefined {
+  switch (operation.failureReason) {
+    case 'timeout':
+      return 'GitHub read exceeded its time limit.';
+    case 'output_limit':
+      return 'GitHub read exceeded its output limit.';
+    case 'cancelled':
+      return 'GitHub read was cancelled.';
+    case 'closed':
+      return 'GitHub read is no longer available.';
+    default:
+      return undefined;
+  }
+}
 
-  const remoteUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
-  const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
-  const fullHeadSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD']);
-  const headSha = fullHeadSha?.slice(0, 12);
-  const repositoryName = basename(repositoryRoot);
-  const githubDetected = githubRemoteDetected(remoteUrl);
-  const repositorySlug = githubRepositorySlug(remoteUrl);
+function sameGithubReadIdentity(left: GitHubReadIdentity, right: GitHubReadIdentity): boolean {
+  return (
+    left.repositoryRoot === right.repositoryRoot &&
+    left.remoteUrl === right.remoteUrl &&
+    left.currentBranch === right.currentBranch &&
+    left.fullHeadSha === right.fullHeadSha
+  );
+}
 
-  const baseOptions = {
-    repositoryName,
-    ...(remoteUrl ? { remoteUrl } : {}),
-    ...(currentBranch ? { currentBranch } : {}),
-    ...(headSha ? { headSha } : {}),
-    githubRemoteDetected: githubDetected,
-  };
-
-  if (!githubDetected || !repositorySlug) {
-    return unavailableGitChecks(
-      'No GitHub origin remote is configured for this Project.',
-      baseOptions,
+async function withGithubRead<T>(
+  project: ProjectRecord,
+  signal: AbortSignal | undefined,
+  unavailable: (reason: string, options?: GitHubReadOptions) => T,
+  read: (
+    operation: GitHubReadOperation,
+    identity: GitHubReadIdentity,
+    repositorySlug: string,
+    options: GitHubReadOptions,
+  ) => Promise<T>,
+  expectedIdentity?: GitHubReadIdentity,
+): Promise<T> {
+  const operation = acquireGitHubRead(signal);
+  if (!operation) return unavailable('GitHub reads are busy. Try again shortly.');
+  let options: GitHubReadOptions = {};
+  try {
+    const identity = await githubReadIdentity(project, operation);
+    if (!identity)
+      return unavailable(
+        githubReadFailure(operation) ?? 'Project repository or HEAD is not available.',
+      );
+    if (expectedIdentity && !sameGithubReadIdentity(identity, expectedIdentity)) {
+      return unavailable(
+        'Project repository changed before GitHub information could be refreshed.',
+      );
+    }
+    const { repositoryRoot, remoteUrl, currentBranch, fullHeadSha } = identity;
+    const repositorySlug = githubRepositorySlug(remoteUrl);
+    options = {
+      repositoryName: basename(repositoryRoot),
+      ...(remoteUrl ? { remoteUrl } : {}),
+      ...(currentBranch ? { currentBranch } : {}),
+      headSha: fullHeadSha.slice(0, 12),
+      githubRemoteDetected: githubRemoteDetected(remoteUrl),
+    };
+    if (!options.githubRemoteDetected || !repositorySlug) {
+      return unavailable('No GitHub origin remote is configured for this Project.', options);
+    }
+    const version = await operation.run(githubCliBinary(), ['--version'], repositoryRoot);
+    if (!version?.trim()) {
+      return unavailable(
+        githubReadFailure(operation) ?? 'GitHub CLI is not installed or is not available on PATH.',
+        options,
+      );
+    }
+    options = { ...options, ghAvailable: true };
+    const auth = await operation.run(
+      githubCliBinary(),
+      ['auth', 'status', '--hostname', 'github.com'],
+      repositoryRoot,
     );
+    if (auth === undefined) {
+      return unavailable(
+        githubReadFailure(operation) ?? 'GitHub CLI is not authenticated for github.com.',
+        options,
+      );
+    }
+    options = { ...options, authenticated: true };
+    const result = await read(operation, identity, repositorySlug, options);
+    const failure = githubReadFailure(operation);
+    if (failure) return unavailable(failure, options);
+    const finalIdentity = await githubReadIdentity(project, operation);
+    if (githubReadFailure(operation)) return unavailable(githubReadFailure(operation)!, options);
+    if (!finalIdentity || !sameGithubReadIdentity(identity, finalIdentity)) {
+      return unavailable(
+        'Project repository changed while GitHub information was loading. Refresh to try again.',
+      );
+    }
+    return result;
+  } finally {
+    await operation.close();
   }
+}
 
-  const ghVersion = ghValue(repositoryRoot, ['--version']);
-  if (!ghVersion) {
-    return unavailableGitChecks('GitHub CLI is not installed or is not available on PATH.', {
-      ...baseOptions,
-      ghAvailable: false,
-    });
-  }
-
-  if (!ghSuccess(repositoryRoot, ['auth', 'status', '--hostname', 'github.com'])) {
-    return unavailableGitChecks('GitHub CLI is not authenticated for github.com.', {
-      ...baseOptions,
-      ghAvailable: true,
-      authenticated: false,
-    });
-  }
-
-  if (currentBranch) {
-    const pullRequestOutput = ghValue(repositoryRoot, [
-      'pr',
-      'view',
-      '--repo',
-      repositorySlug,
-      '--json',
-      'number,url,statusCheckRollup',
-    ]);
-    if (pullRequestOutput !== undefined) {
-      const pullRequestChecks = parseGhPullRequestChecks(pullRequestOutput);
+async function projectGitChecks(
+  project: ProjectRecord,
+  signal?: AbortSignal,
+  expectedIdentity?: GitHubReadIdentity,
+) {
+  return withGithubRead(
+    project,
+    signal,
+    unavailableGitChecks,
+    async (operation, identity, repositorySlug, baseOptions) => {
+      const { repositoryRoot, currentBranch, fullHeadSha } = identity;
+      if (currentBranch) {
+        const pullRequestOutput = await operation.run(
+          githubCliBinary(),
+          [
+            'pr',
+            'view',
+            '--repo',
+            repositorySlug,
+            '--json',
+            'number,url,statusCheckRollup',
+            '--',
+            currentBranch,
+          ],
+          repositoryRoot,
+        );
+        if (pullRequestOutput !== undefined) {
+          const pullRequestChecks = parseGhPullRequestChecks(pullRequestOutput);
+          return ProjectGitChecksResultSchema.parse({
+            available: true,
+            ...baseOptions,
+            scope: 'pull_request',
+            pullRequestNumber: pullRequestChecks.number,
+            ...(pullRequestChecks.url ? { pullRequestUrl: pullRequestChecks.url } : {}),
+            checkedAt: new Date().toISOString(),
+            summary: summarizeChecks(pullRequestChecks.checks),
+            checks: pullRequestChecks.checks,
+          });
+        }
+      }
+      const checkRunsOutput = await operation.run(
+        githubCliBinary(),
+        ['api', `repos/${repositorySlug}/commits/${fullHeadSha}/check-runs`, '--jq', '.check_runs'],
+        repositoryRoot,
+      );
+      if (checkRunsOutput === undefined) {
+        return unavailableGitChecks(
+          'GitHub checks could not be loaded for this Project.',
+          baseOptions,
+        );
+      }
+      const checks = parseGhCommitCheckRuns(checkRunsOutput);
       return ProjectGitChecksResultSchema.parse({
         available: true,
         ...baseOptions,
-        scope: 'pull_request',
-        pullRequestNumber: pullRequestChecks.number,
-        ...(pullRequestChecks.url ? { pullRequestUrl: pullRequestChecks.url } : {}),
-        ghAvailable: true,
-        authenticated: true,
+        scope: 'head_commit',
         checkedAt: new Date().toISOString(),
-        summary: summarizeChecks(pullRequestChecks.checks),
-        checks: pullRequestChecks.checks,
+        summary: summarizeChecks(checks),
+        checks,
       });
-    }
-  }
-
-  if (!fullHeadSha) {
-    return unavailableGitChecks('Current branch HEAD could not be inspected.', {
-      ...baseOptions,
-      ghAvailable: true,
-      authenticated: true,
-    });
-  }
-
-  const checkRunsOutput = ghValue(repositoryRoot, [
-    'api',
-    `repos/${repositorySlug}/commits/${fullHeadSha}/check-runs`,
-    '--jq',
-    '.check_runs',
-  ]);
-  if (checkRunsOutput === undefined) {
-    return unavailableGitChecks('GitHub checks could not be loaded for this Project.', {
-      ...baseOptions,
-      ghAvailable: true,
-      authenticated: true,
-    });
-  }
-
-  const checks = parseGhCommitCheckRuns(checkRunsOutput);
-  return ProjectGitChecksResultSchema.parse({
-    available: true,
-    ...baseOptions,
-    scope: 'head_commit',
-    ghAvailable: true,
-    authenticated: true,
-    checkedAt: new Date().toISOString(),
-    summary: summarizeChecks(checks),
-    checks,
-  });
+    },
+    expectedIdentity,
+  );
 }
 
 function unavailableGitPullRequests(
@@ -2196,86 +2283,63 @@ function parseGhPullRequests(
   });
 }
 
-function projectGithubPullRequests(project: ProjectRecord) {
-  let projectRoot: string;
-  try {
-    projectRoot = projectRootForBackendRead(project);
-  } catch {
-    return unavailableGitPullRequests('Project folder is not available.');
-  }
-
-  const repositoryRoot = gitValue(projectRoot, ['rev-parse', '--show-toplevel']);
-  if (!repositoryRoot) return unavailableGitPullRequests('Project is not a Git repository.');
-
-  const remoteUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
-  const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
-  const headSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD'])?.slice(0, 12);
-  const repositoryName = basename(repositoryRoot);
-  const githubDetected = githubRemoteDetected(remoteUrl);
-  const repositorySlug = githubRepositorySlug(remoteUrl);
-
-  const baseOptions = {
-    repositoryName,
-    ...(remoteUrl ? { remoteUrl } : {}),
-    ...(currentBranch ? { currentBranch } : {}),
-    ...(headSha ? { headSha } : {}),
-    githubRemoteDetected: githubDetected,
-  };
-
-  if (!githubDetected || !repositorySlug) {
-    return unavailableGitPullRequests(
-      'No GitHub origin remote is configured for this Project.',
-      baseOptions,
-    );
-  }
-
-  const ghVersion = ghValue(repositoryRoot, ['--version']);
-  if (!ghVersion) {
-    return unavailableGitPullRequests('GitHub CLI is not installed or is not available on PATH.', {
-      ...baseOptions,
-      ghAvailable: false,
-    });
-  }
-
-  if (!ghSuccess(repositoryRoot, ['auth', 'status', '--hostname', 'github.com'])) {
-    return unavailableGitPullRequests('GitHub CLI is not authenticated for github.com.', {
-      ...baseOptions,
-      ghAvailable: true,
-      authenticated: false,
-    });
-  }
-
-  const pullRequestsOutput = ghValue(repositoryRoot, [
-    'pr',
-    'list',
-    '--repo',
-    repositorySlug,
-    '--state',
-    'open',
-    '--limit',
-    '30',
-    '--json',
-    'number,title,state,url,headRefName,baseRefName,author,isDraft,reviewDecision,mergeable,createdAt,updatedAt,statusCheckRollup',
-  ]);
-  if (pullRequestsOutput === undefined) {
-    return unavailableGitPullRequests(
-      'GitHub pull requests could not be loaded for this Project.',
-      {
+async function projectGithubPullRequests(
+  project: ProjectRecord,
+  signal?: AbortSignal,
+  expectedIdentity?: GitHubReadIdentity,
+) {
+  return withGithubRead(
+    project,
+    signal,
+    unavailableGitPullRequests,
+    async (operation, identity, repositorySlug, baseOptions) => {
+      const output = await operation.run(
+        githubCliBinary(),
+        [
+          'pr',
+          'list',
+          '--repo',
+          repositorySlug,
+          '--state',
+          'open',
+          '--limit',
+          '30',
+          '--json',
+          'number,title,state,url,headRefName,baseRefName,author,isDraft,reviewDecision,mergeable,createdAt,updatedAt,statusCheckRollup',
+        ],
+        identity.repositoryRoot,
+      );
+      if (output === undefined) {
+        return unavailableGitPullRequests(
+          'GitHub pull requests could not be loaded for this Project.',
+          baseOptions,
+        );
+      }
+      return ProjectGitPullRequestsResultSchema.parse({
+        available: true,
         ...baseOptions,
-        ghAvailable: true,
-        authenticated: true,
-      },
-    );
-  }
+        checkedAt: new Date().toISOString(),
+        pullRequests: parseGhPullRequests(output, identity.currentBranch),
+      });
+    },
+    expectedIdentity,
+  );
+}
 
-  return ProjectGitPullRequestsResultSchema.parse({
-    available: true,
-    ...baseOptions,
-    ghAvailable: true,
-    authenticated: true,
-    checkedAt: new Date().toISOString(),
-    pullRequests: parseGhPullRequests(pullRequestsOutput, currentBranch),
-  });
+// IncomingMessage.close also fires after a normally consumed request. Only a
+// premature response close means this consumer has gone away.
+async function sendGithubRead<T>(res: Response, read: (signal: AbortSignal) => Promise<T>) {
+  const controller = new AbortController();
+  const onClose = () => {
+    if (!res.writableEnded) controller.abort();
+  };
+  res.once('close', onClose);
+  try {
+    const data = await read(controller.signal);
+    if (!res.destroyed && !controller.signal.aborted) res.json({ data });
+  } finally {
+    res.off('close', onClose);
+  }
 }
 
 function refreshProjectGitMetadata(db: DrizzleDb, id: string): ProjectRecord {
@@ -3236,7 +3300,7 @@ export function createProjectsRouter(db: DrizzleDb): Router {
     asyncHandler(async (req, res) => {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
-      res.json({ data: projectGitChecks(project) });
+      await sendGithubRead(res, (signal) => projectGitChecks(project, signal));
     }),
   );
 
@@ -3245,7 +3309,7 @@ export function createProjectsRouter(db: DrizzleDb): Router {
     asyncHandler(async (req, res) => {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
-      res.json({ data: projectGithubPullRequests(project) });
+      await sendGithubRead(res, (signal) => projectGithubPullRequests(project, signal));
     }),
   );
 

@@ -287,7 +287,18 @@ export function ensurePackagedMacosVmAssets(
     );
   }
 
+  assertSafeMacosVmRuntimeChild(runtimeDir, runtimeImagesDir);
   mkdirSync(runtimeImagesDir, { recursive: true });
+  if (process.platform === 'darwin') {
+    // Node's clone flag is unsupported on macOS. Native cp uses clonefile with ordinary-copy
+    // fallback, keeping independently writable runtime images instead of shared mutable files.
+    execFileSync('/bin/cp', [
+      '-cR',
+      `${resolve(paths.macosVmPackagedAssetsDir)}/.`,
+      runtimeImagesDir,
+    ]);
+    return;
+  }
   cpSync(paths.macosVmPackagedAssetsDir, runtimeImagesDir, { recursive: true, force: true });
 }
 

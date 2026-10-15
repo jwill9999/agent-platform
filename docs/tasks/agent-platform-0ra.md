@@ -50,6 +50,10 @@ Before close: upstream tasks closed, applicable owner grant recorded, requiremen
 
 Owner implementation authorization recorded on 14 October; independent final source/quality review and final owner acceptance remain required. After close, read back closed state and sync Dolt, recording actual completion. Missing required test/publication/merge evidence blocks applicable task completion.
 
-## Current implementation evidence
+## Remote checkpoint before staging refresh
 
 `task/git-delivery-publish` now exists from pushed local checkpoint `45042d8d`. The shared remote service, panel and controlled external boundaries are implemented and independently reviewed;22 remote regressions and the affected local quality gates pass. Connected browser testing exposed a history-selection recovery defect; its reviewed correction passes8 hook tests and the corrected browser remote journey now passes with zero retries and reviewed real effects. The corrected application also passed Electron local/conflict cases in attempt3 and the remote case in attempt4 with zero retries, as distinct runs. Current checkpoint publication and final integration gates remain pending. See the [current results](../reviews/git-delivery-mvp-plan-review.md#remote-delivery-checkpoint--15-october-2026). Beads remains in progress; preliminary implementation or earlier historical delivery does not close this task.
+
+## Integrated checkpoint evidence
+
+Qualified staging `4ffc5fc0` is reconciled into this task's prepared merge. The integrated API passes126 cases, controlled gh fixture16, and all three Electron Git journeys pass in one run with zero retries. The browser inventory preserves every existing case and adds exactly two Git cases (34 total); the actual fresh integrated browser run remains pending Docker engine restoration. The earlier bounded browser pass and all failed attempts remain recorded separately. Current push/publication, final connected chat/diagnostics and task acceptance gates are still outstanding; no automatic closure is implied.
