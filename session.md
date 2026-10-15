@@ -1,3 +1,35 @@
+## Session: Private VM asset-copy repair — 15 October 2026
+
+Current task: `agent-platform-desktop-vm-asset-copy` on `task/desktop-vm-asset-copy`,
+from actual feature `c6a00dad3f80e772f4c1206c6e3a13adf16b6de3`.
+See [the bounded repair specification](docs/tasks/agent-platform-desktop-vm-asset-copy.md).
+
+PR326 is delivered and closed; PR324 remains unmerged. Its green hosted VM check concealed three
+first-attempt failures (16 passed, three flaky). Independent inspection of all 146 preserved files
+confirmed private asset copying consumed 15.094–20.720 seconds and verified shutdown/release, without
+establishing the underlying filesystem cause. No retry-green staging qualification is claimed.
+
+The repair prefers native macOS clonefile copying (existing Node behavior elsewhere) for each existing
+private runtime copy, with ordinary fallback;
+no cache sharing, hardlinks, deadline increases, benchmark changes or cleanup shortcuts. The critic
+approved the private-copy plan; the initial Node-only flag proved ineffective on macOS (`ENOSYS`).
+Fixed native `/bin/cp -cR` completes the disposable 4 GB probe in 0.00415 s; no performance guarantee is
+inferred. The first two local VM cases passed, while Block was interrupted by a confirmed five-minute
+host sleep. Its failure and fixture are retained. With the corrected native route and a task-lifetime
+awake assertion, the three affected cases and full 19-case real-VM suite pass without retries. All
+19 shutdowns, 18 applicable VM releases and ten complete diagnostic reports pass independent review;
+asset phases measure 3–75 ms. Supervisor unit tests (24), build/typecheck and scoped quality pass.
+The unchanged Darwin branch ran the full suite; final source restores exact prior non-Darwin options.
+
+Full branch-specific publication/readback and fresh hosted feature/staging qualification remain
+pending. Existing reports, prior unknown 503/benchmark failures and the complete historical handoff
+below remain retained. Parent promotion stays in progress; local success does not qualify PR324.
+
+Keep all active Git delivery MVP branches/worktree separate, along with main, paused PR283 and the four
+paused refs and dirty/unrelated checkouts. No branch cleanup before verified protected staging delivery.
+
+---
+
 ## Current handoff: diagnostics failure evidence — 14 October 2026
 
 PR326 at `93b13f47` passed the repaired process-restart and readiness-helper tests, but its verify
