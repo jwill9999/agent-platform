@@ -209,6 +209,8 @@ describe('normalizeProjectActivity', () => {
       createElement(ProjectEvidenceRail, {
         projectId: 'project-1',
         sessionId: 'session-1',
+        view: 'activity',
+        onViewChange: () => {},
         profile: 'coding',
       }),
     );

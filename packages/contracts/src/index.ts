@@ -686,3 +686,4 @@ export {
 } from './workspace.js';
 export * from './diagnostics.js';
 export * from './diagnosticReport.js';
+export * from './gitDelivery.js';

@@ -6,6 +6,8 @@ const ciBrowserChannel = process.env.CI ? { channel: 'chrome' as const } : {};
 
 export default defineConfig({
   testDir: '.',
+  // Browser journeys only; support/*.test.mjs are explicit Node fixture checks.
+  testMatch: '**/*.spec.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -21,7 +23,7 @@ export default defineConfig({
     {
       name: 'chromium',
       testIgnore:
-        /(?:mcp-(?:onboarding|chat)|chat-reply-reliability|github-read-responsiveness)\.spec\.ts/,
+        /(?:mcp-(?:onboarding|chat)|chat-reply-reliability|github-read-responsiveness|git-delivery-[a-z-]+)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },
     },
     {
@@ -45,6 +47,15 @@ export default defineConfig({
       name: 'mcp-onboarding',
       testMatch: /mcp-(onboarding|chat)\.spec\.ts/,
       dependencies: ['github-read'],
+      fullyParallel: false,
+      workers: 1,
+      use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },
+    },
+    {
+      // Owns the isolated API's external gh boundary; never run beside other journeys.
+      name: 'git-delivery',
+      testMatch: /git-delivery-[a-z-]+\.spec\.ts/,
+      dependencies: ['mcp-onboarding'],
       fullyParallel: false,
       workers: 1,
       use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },

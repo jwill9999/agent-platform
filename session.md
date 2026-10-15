@@ -1,3 +1,162 @@
+# Git delivery qualification handoff — 15 October 2026
+
+Live task state is authoritative in Beads `agent-platform-git-delivery-verification` and PR330. This checkpoint records the reviewed repair; later checks, merges and cleanup are recorded there. All older handoffs below are historical and do not override current owner authority or live delivery state.
+
+## PR330 renderer readiness and Git selection repair — 15 October 2026
+
+PR329 is delivered to `feature/git-delivery-mvp` at `220a5dc0` after all nine executed
+exact-head checks and independent source/evidence review. The owner authorized guarded feature
+and staging merges after actual tests, protection checks and review findings clear, followed by
+recovery-protected cleanup. Protected staging PR330 still targets `4ffc5fc0`; it is held through
+this repair, with main and paused PR283/four orchestration branches separate.
+
+PR330 had fourteen green executed check conclusions at `220a5dc0`, but its actual Electron
+report was `ok:false`: sixty expected passes and one flaky local Git-panel case. Its first
+attempt failed at a single reload with `ERR_CONNECTION_REFUSED`; a retry passed. GD-E01 records
+that a retry-green job is insufficient clean qualification. The prior ordinary full Promptfoo
+analysis (seven batches), nineteen first-attempt packaged VM tests, browser journeys and raw
+nine-sample benchmark were independently qualified for that old source only. Sonar was OK with
+31 minor observations and no major/critical findings; scoped CodeQL was clear. Sourcery's
+oversized-diff skip is a limitation, not approval. None qualifies the future changed head.
+
+Two controlled actual Electron failure/control pairs established that reloading while initial
+renderer navigation remains pending can reject bootstrap and reclaim both services. Waiting
+for the exact owned renderer origin with `waitUntil: 'load'` before one real reload preserved
+healthy services. The old hosted trace cannot establish its historical cause. All three Git
+fixture launches now reuse that existing load boundary and paired-port allocator. Safe bounded
+startup/parent status is attached before cleanup; attachment errors preserve primary failures
+while independent owned cleanup runs (GD-F01). This metadata does not prove renderer-child
+health or expose child stderr, credentials, response bodies or session contents.
+
+The first repeated readiness run was eight passes and one divergent-pull failure, not nine
+passes: Refresh detached and the screenshot showed Activity. Two completed natural probe invocations passed five/five and three/three without reproducing
+that ordering. A separately interrupted invocation retained three completed passes, one interrupted
+case and six unrun cases (exit130); it is not a clean completed invocation. A separate controlled real session-response
+probe did prove a product defect: Git selected on the initial rail, then releasing the actual
+successful session POST remounted the session-keyed chat and reset the rail to Activity. Its
+final diagnostic lookup consumed the remaining test budget; that instrumentation limitation
+and the original failure remain retained. Attribution of the earlier eight/one failure remains
+inference, while the controlled post-click reset is observed evidence.
+
+Only the Activity/Git selection is lifted into project-scoped page state. It survives canonical
+binding and same-project session changes, resets immediately on project/Home changes, and
+rejects obsolete callbacks, including return to the same project. The rail is controlled by that
+one value. Chat keys/reset semantics, session/message/approval ownership and Git authorization
+remain intact. No visibility persistence, runtime startup handling, API policy or dependency
+changes are introduced. The divergent native fixture holds a real backend response until Git
+is selected, then verifies canonical binding and preserved Git selection/content before the
+original Refresh, pull, merge and push assertions. No synthetic successful session response,
+extra click retry, raised deadline or removed effect check qualifies the fix.
+
+Actual local qualification: 37 focused web tests pass, including deferred binding with the real
+page/rail and independently reset chat draft, same-project sessions, hide/show, Home/project
+reset and obsolete callbacks. Production web build, post-build typecheck, scoped lint/format and
+fixture TypeScript pass. Running typecheck concurrently with Next build initially encountered
+missing generated types; the sequential post-build run passed. Existing tool-discovery/lint
+failures and all diagnostic probe limitations are retained, not relabeled as product failures.
+All three actual native Git-panel journeys repeated three times pass 9/9, with retries disabled,
+zero flakes/skips, duration 134.047s. Nine decoded inline startup attachments
+have distinct ports, the owned page origin, a ready window and live parent before cleanup, with
+no observed cancellation/truncation. Seven source files have independent approval with exact
+hashes in `pr330-selection-source-review.json`.
+
+Evidence root: `/Users/letuscode/.codex/git-delivery-implementation-20261014`;
+`pr330-initial-load-repro/verification.json`, `pr330-initial-load-repro/divergent-read-probe/`
+(including `delayed-session/`), the retained eight/one run `pr330-readiness-native-nine-final/`,
+`pr330-selection-native-nine/results.json`, `pr330-selection-startup-attachments/`, and
+`pr330-view-ownership-tests.log`/`pr330-view-web-build.log`/`pr330-view-typecheck-final.log`.
+
+The task continues on `task/git-delivery-load-readiness` from the actual feature merge. Next are
+normal commit/push, complete four-document branch mirrors/readbacks, final independent review,
+and a repair PR to the existing feature. Its guarded merge must precede new PR330 exact-head
+full security analysis, actual packaged VM, clean browser/Electron and diagnostic evidence,
+benchmark, live protections and resolved reviews. Existing seven business-run V1 exports remain
+retained; this selection repair does not change event collection, and new hosted acceptance
+reports must confirm the actual application flow. Keep Beads verification in progress through
+verified staging delivery, preservation, delivered-branch cleanup and final sync. Broader ii1/7vf,
+P2 test-telemetry work, main and paused orchestration remain outside this delivery.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — PR329 quality repairs, 15 October 2026
+
+PR329 remains open from `task/git-delivery-verification` into `feature/git-delivery-mvp`.
+Initial head `e0df35f1` passed build/Docker/docs/cycles/GitGuardian but failed hosted Sonar,
+browser discovery and Linux desktop checks. Independently reviewed repairs address complexity,
+Git-path ordering, fixture executable/directory safety, receipt rendering and test readiness.
+Node fixture controls now run after the CI build; browser discovery selects real `.spec.ts`
+journeys. Linux caffeinate invocation and the genuine Linux Hide panel baseline are corrected.
+No security rule, deadline, screenshot threshold or protection has been weakened.
+
+Local UI151/core76/harness114/API60 and Node fixture22 controls pass. Full quality gates passed;
+final synchronous approval-claim extraction has another passing API60 and API quality checks.
+Five Git browser cases pass, plus31 existing browser cases and one unchanged optional context
+prerequisite skip. Their Docker router predates the final synchronous extraction; final exact-head
+hosted browser evidence is still required. Native broad56passes/two wrong-cwd MCP failures are
+retained; correct desktop-cwd execution passes3MCP+3finalGit cases without retries, and final3panel
+cases pass separately. All61 scenarios have passing evidence across these distinct runs. This is
+not a claim that one broad invocation passed all61.
+
+Seven final native Git diagnostic reports passed final runtime-bound independent review; earlier
+seven-body approval remains retained. Success, denial and actual backend restart are covered,
+with `unfinishedPriorProcess=true` honestly retained on restarted unknown history and no replay.
+The initial remote renderer refusal remains unexplained; bounded startup metadata now aids any
+recurrence. Model/GitHub/SSH boundaries are deterministic, and managed node-double journeys do
+not qualify a protected real-VM or distribution release.
+
+Next is normal commit/push, complete changed-document mirrors/readbacks, fresh hosted Sonar and
+all exact-head CI/review gates. The verification Beads task remains in progress. No owner final
+acceptance, merge, staging readiness or broad-epic completion is claimed. Main, paused PR283/four
+branches, unrelated dirty checkouts and retained session history remain separate. Evidence is
+`/Users/letuscode/.codex/git-delivery-implementation-20261014`. All handoffs below are preserved
+historical checkpoints; their pending/opening statements do not override this current status.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — Git delivery verification, 15 October 2026
+
+The final task is `agent-platform-git-delivery-verification` on `task/git-delivery-verification`, chained from pushed `task/git-delivery-tools` at `093f7b963a7433fc68e4f0d8a006b48eea412ee0`. Its implementation tree is `3d172658ffcc645ddfe4c9a53312816e7c1dbc7d` and includes qualified staging `4ffc5fc0`. All39 reviewed files are byte-identical after normal hooks; cycles/build/typecheck and contracts128/DB147/desktop187/web366/harness745/API459 passed. No bypass or history rewrite was used; an attempted pull-rebase was aborted and exact clean source restored before normal push.
+
+Independent source and actual connected-evidence reviews are approved. All five Git browser scenarios pass across recorded separate zero-retry runs; existing browser regression31pass with one unchanged optional context prerequisite skip. All39 existing managed-app cases pass across38 original plus one reviewed Darwin baseline rerun, and three new native chat scenarios separately pass. Seven safe V1 reports were reviewed; the real backend-restart unknown case preserves its history and explicitly reports `unfinishedPriorProcess=true`. Models/GitHub/SSH transport remain deterministic fixtures; live-provider/distributed-release proof is not claimed.
+
+The next delivery is this final tip PR into `feature/git-delivery-mvp`, with current full documentation mirrors, actual exact-head hosted checks, comments/security findings and genuine Linux screenshot qualification. Linux's old control baseline lacks the agreed Hide panel control and must be updated only from an actual reviewed Linux artifact, with thresholds intact. Final owner acceptance and feature/staging merge authority remain separate; no merge readiness or protected VM/full-scan success is inferred from local tests. Broader ii1/7vf and the separate P2 test-telemetry isolation follow-up remain outside this MVP.
+
+Evidence: `/Users/letuscode/.codex/git-delivery-implementation-20261014`; source/normal gates `chat-commit-source.json`, browser `browser-git-actual-evidence-review.json`, native `chat-native-qualification-manifest.json` and `native-regression-qualification.json`. The telemetry follow-up records rejected external trace uploads in test stderr without claiming their activation source; future local tests disable process tracing before imports, without changing credentials, globals or product diagnostics. Beads remains authoritative and source-bound full mirrors/readbacks are mandatory. Main, paused draft PR283/four retained branches and dirty/unrelated checkouts remain untouched. The complete prior093f handoff follows unchanged; its pending-push/publication wording is historical.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — reviewed chat Git delivery, 15 October 2026
+
+The bounded Git delivery implementation is on `task/git-delivery-tools`, chained from pushed `2a254204cb381c517e1518f5041806ec3452ee2a` and incorporating qualified staging `4ffc5fc0`. The four typed chat tools reuse the reviewed receipt service and require a distinct persisted human approval per mutation. Fresh permission blocks remain authoritative. Retained outcomes can be restored, reconciled, acknowledged, cancelled or explicitly deleted through chat with the activity/Git rail hidden. Missing or invalid approval linkage is recovery-only and grants no execution authority.
+
+Independent source review approved the backend corrections, retained-operation inventory, trusted Git-tool registry assignment and final UI recovery/admission/deletion changes. Focused gates passed117 harness,45 real SDK/HTTP/SQLite/Git,105 web and seven OpenAPI tests, plus four provider-fixture controls. Full monorepo build, typecheck, lint, formatting and cycles pass. These are distinct runs, not one aggregate suite. Normal commit/push hooks and final hosted qualification remain pending for this new source.
+
+Native chat success and actual-backend-restart recovery passed in attempt2; denial passed the corrected attempt3 with zero retries. Seven actual V1 reports were independently reviewed: correlated, durable, verified, nontruncated and without dropped/pending events; the restarted unknown-outcome report explicitly retains `unfinishedPriorProcess=true`. Model HTTP/GitHub/SSH boundaries are deterministic; Git, SQLite, approval persistence, application and renderer are real. Browser attempt2 passed success and unknown; the separately corrected denial case then passed with the full actual rejection paragraph. Earlier failed request-count/text expectations and an invalid coordinator probe remain retained, not reported as product success. Fresh integrated manual panel local/remote cases pass in separate zero-retry runs. Existing browser regression passes31 with one pre-existing optional context prerequisite skip. All39 existing managed-app regression cases now have passing evidence across38 original cases plus one targeted rerun after the independently approved Darwin baseline update for the new Hide panel control. The real Linux screenshot remains pending hosted capture and review.
+
+Docker Engine29.8.0 is healthy after a targeted stale-backend recovery; the owner cleared approximately20GB of build cache. The agent performed no prune, factory reset or data deletion. Evidence is under `/Users/letuscode/.codex/git-delivery-implementation-20261014`; `chat-native-qualification-manifest.json` binds the native results and diagnostic limits. The previous2a254 documentation publication has22 verified full readbacks; current source mirrors await its pushed revision. Beads tasks remain in progress until their declared gates pass. No Git MVP PR is open yet. Final tip targets `feature/git-delivery-mvp`; final owner acceptance and merge authority remain separate. Main, paused draft PR283, its four branches and unrelated dirty checkouts remain separate. The complete previous handoff follows unchanged.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — integrated Git delivery checkpoint, 15 October 2026
+
+Git delivery is in progress on `task/git-delivery-publish`. The reviewed remote checkpoint `ea17b38e` was reconciled with qualified staging `4ffc5fc0` at local merge `d8e687d1`. Its normal push caught a type dependency cycle between repository and remote modules; moving the unchanged shared interface into their common types module clears the required cycle check and22 remote tests. Normal push/publication gates remain pending. The integrated application passed all three Electron Git journeys in one31.4-second run, zero retries: local stage/commit, merge resolution and reviewed remote delivery/recovery. The combined API integration passed126 cases, the controlled gh fixture16, and the browser inventory selects all34 cases exactly once across32 existing plus2 Git delivery cases. Both unique handoff histories and their complete shared history are retained below; reconstruction proof is in `staging-session-preservation.json`.
+
+The browser suite already passed the bounded remote journey before this staging refresh; a fresh integrated browser run remains outstanding because Docker Desktop's engine/status calls time out. The owner has been asked to restart Docker while code/Electron work continues. No daemon restart, unrelated container change or false browser pass is claimed. Sonar/IDE Problems tools are unavailable in this session; local typecheck/lint/meaningful tests are the fallback, and final hosted Sonar/CodeQL remain required.
+
+Next is Project Chat delivery using the same service: canonical review, one persisted approval per mutation, strict one-call execution authority, immediate denial cancellation and human-visible recovery with the panel hidden. Chat implementation, success/failure diagnostics review, current full mirrors and the final segment-tip PR/hosted checks remain outstanding. Intermediate Beads tasks stay in progress until their own gates pass. The Git MVP has no new merge grant; main and paused PR283/orchestration remain separate. Prior feature promotion and recovery-protected cleanup are complete at staging `4ffc5fc0`.
+
+<!-- markdownlint-disable MD025 -->
+
+## Integration and historical handoffs
+
+# Qualified staging integration checkpoint — 15 October 2026
+
+The Git delivery branch is reconciling qualified staging `4ffc5fc0`. Both unique handoff histories below are retained verbatim; their byte-identical shared historical suffix appears once in the Git history. The complete staging body can be reconstructed from its retained prefix and that shared suffix. Earlier status claims remain historical. Current Git MVP completion still requires chat delivery, diagnostics and final connected/hosted qualification.
+
+<!-- markdownlint-disable MD025 -->
+
+## Qualified staging handoff history
+
 ## Current handoff: diagnostic benchmark process isolation
 
 15 October: task `agent-platform-diagnostics-benchmark-isolation` is in progress on
@@ -385,6 +544,176 @@ are superseded by the current handoff and live Beads; do not repeat completed re
 <!-- markdownlint-disable MD025 -->
 
 ## Shared prior handoff history
+
+## Git delivery handoff history
+
+# Current handoff — Git remote delivery verification, 15 October 2026
+
+Owner-authorized Git delivery MVP implementation continues on `task/git-delivery-publish`, chained from pushed local checkpoint `45042d8d` into `feature/git-delivery-mvp`. The local stage/commit browser and Electron journeys passed with zero retries, normal affected-package push hooks passed, and all eight checkpoint documents have full immutable-revision Notion readbacks. Earlier pending statements below describe historical checkpoints, not current blockers.
+
+The shared publish/push/PR service and panel are implemented. Independent review corrections protect symbolic tracking references, immutable destinations, known remote success when optional bookkeeping fails, fresh policy authority and stale Project responses. The corrected remote service passes 22 real-Git regression cases; panel qualification passed 50 focused tests. A connected browser run passed cancellation, publish, a separately reviewed second push and lost-response handling, then exposed an older cancelled receipt being selected after reload. The reviewed fix prioritizes unacknowledged unknown outcomes, otherwise the latest operation, while preserving explicit selection; all eight hook tests pass. The corrected browser remote journey passed1/1 with zero retries and independent trace/real-effect review. Electron stage/commit and conflict resolution passed on the corrected application in attempt3; remote delivery passed separately in attempt4 with zero retries after waiting for the original saved session before the single Git-tab click. The critic-approved read-only status/diff correction passes52 router cases and preserves actual index bytes. These are distinct recorded runs, not a claimed single three-case pass; failures remain retained.
+
+The next slice is typed Project Chat mutations with canonical persisted review, one-call approval authority, immediate denial cancellation, no automatic mutation retries and readable recovery while the rail is hidden. Its implementation map passed independent critique. Chat journeys, diagnostic success/failure report review, final qualified-staging incorporation, current checkpoint publication and hosted segment-tip PR gates remain outstanding. Docker Desktop is running but its engine/status calls currently time out; no daemon restart or unrelated container changes were made. This does not invalidate the recorded browser result, but engine availability must be restored for later connected browser runs. No feature completion, new-feature merge or paused orchestration resumption is claimed. See the [verification record](docs/reviews/git-delivery-mvp-plan-review.md).
+
+The prior feature promotion is now complete: PR324 merged into protected staging at `4ffc5fc08b485d47ffba5a31b3d114ba8f7e57d0`, with all14 executed checks successful, zero unresolved findings and independently verified full scan,19 first-attempt real VM cases,58 first-attempt Electron cases,31 browser passes plus one existing skip, diagnostics and nine benchmark samples. Delivered refs were cleaned with recovery protection; current Git delivery branches, main and PR283/paused work were retained. Refresh this Git chain against that qualified staging before final acceptance; the merge is not yet incorporated here.
+
+<!-- markdownlint-disable MD025 -->
+
+## Historical handoff (retained verbatim)
+
+# Current handoff — Git delivery MVP implementation authorized, 14 October 2026
+
+The owner accepted plan `1c556ec6` and authorized implementation through completion using Beads, implementation skill, critic and agreed browser/Electron/diagnostics checks. `agent-platform-4hm` is in progress on `task/git-delivery-commit`, chained from the reviewed planning tip. Whole-file selection, explicit commit text and one approval per chat mutation are accepted defaults. No new-feature merge or main/paused-orchestration authority is inferred.
+
+The independent critic approved isolated additive contracts/receipt DB/application service and rail visibility on qualified staging `2a848b9a`. A later independent source review permits runtime integration on this existing qualified baseline without importing candidate code; final actual qualified-staging incorporation and semantic overlap review remain mandatory before acceptance. PR326 delivered the independently qualified readiness repair into the prior feature at `c6a00dad`; PR324 is running fresh protected staging checks. Preserve all failures and final full gates; do not import the unqualified candidate. If further baseline repairs overlap new modules, reassess before continuing. Docker Desktop is now reachable; connected tests still require isolated compose/app fixtures.
+
+The local service and mounted production API passed independent review after GD-I01–08 corrections; the combined API/core/adjacent/bootstrap gate passed 112 cases. Fifty-six current focused web tests pass after reviewed GD-I09–12 fixes for uncertain responses, stale Project callbacks, hidden-only staged files and rename unstaging. API/web typecheck, scoped lint and the full monorepo build pass. Browser and Electron source now exercises explicit review and independent real Git effects; the first local Electron journey passed with zero retries and exact Git effects, while browser attempts exposed an unsent fixture input and then a missing configured temporary-directory parent in fresh Docker. The parent-creation repair passes 62 core/router/bootstrap tests; rebuilt connected verification is pending. Three diagnosed fixture failures are retained. Remote delivery, chat tools and diagnostic acceptance remain outstanding. The prior feature passed its feature gates and independent evidence review; its protected staging qualification remains pending under the separate promotion worker.
+
+See [accepted plan](docs/planning/git-delivery-mvp.md), [verification](docs/testing/git-delivery-mvp.md) and [critic record](docs/reviews/git-delivery-mvp-plan-review.md). All prior planning/session history below remains verbatim. Implementation evidence and publication follow the actual task gates; preliminary tests do not establish completion.
+
+The next browser attempt passed local review and stale-index denial, then encountered the unchanged API 100-request/minute limit. A fixture-only pacing correction respects the observed reset without changing limits or assertions. The initial normal push failed two unchanged workflow-control timing/lease cases; both passed focused one-fork diagnosis. A complete normal-hook retry is pending; no paused runtime source was changed.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — Git delivery MVP planning, 14 October 2026
+
+The owner requested a bounded plan and independent critic review before implementing the next feature. Scope: manual selected-file commit/publish/PR delivery and the same operations through existing Project Chat, with per-operation approvals and an optional remembered Activity/Git panel. Future CLI/voice, automatic merge, conflict-resolver expansion, distribution and paused orchestration remain excluded.
+
+Planning task: `agent-platform-git-delivery-plan`, parent existing `agent-platform-ii1`. [Full plan and manifest](docs/planning/git-delivery-mvp.md), [verification](docs/testing/git-delivery-mvp.md), [critique](docs/reviews/git-delivery-mvp-plan-review.md). Reuse existing `4hm`/`0ra`; new chat tools and bounded verification tasks supplement, not replace, broader `7vf`. Runtime implementation has not begun. Final owner review is required after planning/documentation completion.
+
+Planning checkout starts from qualified staging `2a848b9a`. Prior delivery continues separately through PR324 for d185; a green hosted desktop job contained one retry caused by duplicate API/renderer fixture ports, so merge is held for a bounded repair and fresh qualification. Refresh this planning chain from actual qualified staging before implementation and recheck source changes. Preserve original session history below exactly. Docker engine was unreachable at planning inspection; existing dev runner was online/busy with PR324 at inspection. Planning has no paid model calls or product test execution.
+
+Independent planning critique approved the corrected contract with no remaining findings. It covers exact permission precedence, literal paths/full-index review, approval binding, bounded receipt lifecycle/recovery, migration and composed browser/Electron diagnostics tests. Owner review remains pending; implementation has not started. Publication/validation receipts are recorded in the planning Beads task when completed.
+
+<!-- markdownlint-disable MD025 -->
+
+## Earlier handoff (retained verbatim)
+
+# Current handoff — qualify the desktop lifecycle repair before staging, 14 October 2026
+
+The owner authorized merging both completed features into protected staging after all actual
+checks and review findings clear, followed by recovery-protected cleanup. PR283 and the four
+paused orchestration branches remain separate; main and unrelated dirty checkouts are preserved.
+
+PR319 delivered the local-MVP handoff into `feature/local-mvp-handoff` at `749dba13`.
+PR320 delivered d185 into `feature/github-read-responsiveness` at `0affcda2`; d185 remains closed
+for its completed feature scope. Neither promotion is complete. Protected PR321 currently targets
+staging `1e4bd7af` with the handoff source. Both ordinary security scans, Sonar, CodeQL, browser,
+Electron and diagnostic benchmarks passed, but its actual 19-case packaged VM suite reported
+**11 passes, five failures and three flaky results**. PR321 must not merge on that result.
+The failed startup/cleanup evidence is retained; no failure is waived or relabeled as success.
+
+The bounded prerequisite [desktop lifecycle repair](docs/tasks/agent-platform-desktop-startup-lifecycle.md)
+is in progress on `task/desktop-startup-lifecycle`, based on the actual handoff feature.
+Independent critique approved owning pending startup, cancelling and joining it on quit, guarding
+late publication, and confirming child close plus log completion before app exit. Fixture cleanup
+now requires bounded, safe shutdown evidence. The original startup timeout's sole cause remains
+unproven: synchronous asset preparation and host resource pressure are possible contributors.
+Readiness deadlines, security policy, real VM assertions and asset-copy behavior are unchanged.
+
+Local verification passed all 174 desktop unit tests and all 19 signed-runtime packaged VM
+journeys on their first attempts (zero skips or retries, 8.4 minutes), plus the separate previously
+failing direct-write Block case. Production API/renderer/desktop builds, desktop lint/typecheck,
+direct Markdown and formatting pass. Independent final source, full-suite evidence and diagnostic review approved the repair with no
+actionable findings. Ten safe reports are durable/verified with zero pending/dropped events and
+no truncation; existing lineage limitations remain tracked separately. Full publication/readback
+receipts are recorded in Beads and the evidence directory. All new hosted qualification and both
+staging merges remain pending.
+These local results do not establish the original startup timeout's sole cause.
+
+PR322's first pushed source `f9934ee6` then failed Sonar on six maintainability findings.
+The scoped repair preserves strict phase parsing and sequential, cancellable readiness while
+removing the flagged complexity, sorting and collection patterns. No rule suppression or timeout
+increase is used. The earlier local 19-case pass is retained separately from this repair's affected
+verification; fresh exact-head hosted qualification remains mandatory before either staging merge.
+All eight changed source/test files passed independent review. The correction passes 55 focused
+tests and two connected Electron journeys using the signed runtime (real-VM approved shell command
+and pre-execution direct-write Block), both first attempt with zero skips, plus desktop
+build/typecheck/lint. Full fresh hosted gates remain pending.
+
+Next: finish and deliver the reviewed repair into the existing handoff feature, then requalify
+PR321 with genuine full scans, clean connected tests and all current protections/reviews. Only
+then merge the actual qualified staging revision into a reviewed d185 integration task, preserving
+both handoff histories and the new lifecycle source, and qualify its separate staging promotion.
+`agent-platform-local-mvp-promotion` owns the final staging verification and branch cleanup.
+Keep the d185 diagnostic/navigation/export follow-ups open; they are outside this lifecycle repair.
+
+Evidence: `/Users/letuscode/.codex/local-mvp-promotion-20261014`, including independently verified
+`critic-pr321/independent-qualification-failed-vm.json`. Beads is authoritative for current status;
+all previous handoffs below are retained historical context, not new approval or launch gates.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — reply fix delivered; next local MVP priority, 13 October 2026
+
+## Completed development baseline
+
+[PR315](https://github.com/jwill9999/agent-platform/pull/315) merged into protected `staging`
+at `1e4bd7af30b092cc9a2d795e9c022ebfd5212176`. Its tree
+`229d777b5056ff56f753e9fe9cfdfea82b4b2664` matches reviewed feature head `a9bcb302`.
+All 15 executed checks passed, with no unresolved review threads or blocking reviews.
+Electron passed 55 tests without flaky retries; the actual packaged macOS VM suite passed 19.
+Browser passed 30 with one existing environment-dependent skip; the 15-package verification
+passed 3,005 tests with 77 existing optional skips. Both full security scans completed actual
+analysis; Sonar reported zero open issues and scoped CodeQL had no open alerts.
+The nine-sample diagnostics benchmark passed unchanged 20ms/2ms bounds.
+Independent source and evidence review approved delivery. Sourcery's optional size/budget skip
+and ordinary scanner coverage limitations remain disclosed in the verification record.
+
+`agent-platform-sizx` and `agent-platform-diagnostic-export-file-read` are closed and Dolt-synced.
+Six delivered chat-reply local/remote branches were removed after seven recovery tags were pushed
+and read back. Main and the four paused orchestration remote branches remain unchanged; PR283
+remains open as a draft. Primary and paused dirty checkouts were preserved, including the explicitly
+recorded Beads status-journal appends. Staging is the local development baseline, not a distribution
+release; checkout-free export, signing/notarization and wider distribution architecture remain phase two.
+
+Final receipts: `/Users/letuscode/.codex/chat-reply-implementation-20261013/pr315-completion.json`,
+`pr315-staging-merge.json`, `pr315-delivered-branch-cleanup.json`, and
+`pr315-final-closure-preservation.json` in the same directory. Durable implementation evidence:
+[reply verification](docs/reviews/chat-reply-reliability.md).
+
+## Recommended next discussion
+
+The owner requested a backlog review and recommendation, not another implementation launch.
+Beads remains authoritative; the following is a dated recommendation, not a second task tracker.
+
+1. **Recommend first: `agent-platform-d185` — keep the API responsive during GitHub checks.**
+   Current staging still uses synchronous GitHub CLI calls in the Project checks/PR read paths.
+   Existing evidence records GitHub checks taking 1.47–5.35 seconds and a separate Personal-session
+   creation completing after 4.44 seconds amid Project requests. A fixture with its own local Git
+   root avoided unintended live-remote coupling. These observations support the responsiveness
+   investigation, but do not prove the sole cause of every historical timeout.
+   A bounded next plan should cover asynchronous, time/output-bounded read-side GitHub operations,
+   preserve repository/ref identity and credential/process validation, and prove chat, health and
+   diagnostic export remain responsive during slow/unavailable checks. Inventory adjacent PR reads
+   before agreeing scope; do not expand this into a rewrite of all Git operations or UI.
+2. **Then `agent-platform-est0` — make keyless Ollama selection work consistently.**
+   The API accepts default Ollama configurations without keys, but an explicit chat model selection
+   still rejects every configuration without `hasApiKey`. This is a small local-model usability win;
+   keyed providers must retain credential validation. No provider installation or product fix ran here.
+3. **Next larger feature: `agent-platform-ii1` — complete the everyday Git workflow.**
+   Reconcile delivered code with older tickets, then select one useful commit → push → PR slice.
+   `agent-platform-0ra` already records an implementation commit and a stale dependency hold;
+   `agent-platform-4hm` remains open. Do not assume either needs rewriting from its status alone.
+
+The direct-file policy ticket also retains an old pre-merge note despite PR271 being merged and its
+merge commit being an ancestor of current staging. Reconcile acceptance/delivery separately before
+changing its status; this review does not establish a new permission defect or close that task.
+Existing observability/export and initial-session-draft follow-ups remain open. No broad backlog
+reprioritization, release activation, paid calls or paused prototype resumption occurred.
+
+## This documentation delivery
+
+Tracking: [agent-platform-local-mvp-handoff](docs/tasks/agent-platform-local-mvp-handoff.md).
+The update is on `task/local-mvp-handoff`, based on `feature/local-mvp-handoff` at the verified staging
+commit above. It needs its own reviewed documentation integration; the previous reply-feature merge
+does not contain this later handoff. Publication/check outcomes and current delivery state are recorded
+in Beads and `/Users/letuscode/.codex/local-mvp-handoff-20261013`.
+
+Everything below is retained historical context. Its pending work and earlier authorization wording
+are superseded by the current handoff and live Beads; do not repeat completed reply deliveries.
+
+<!-- markdownlint-disable MD025 -->
 
 # Current handoff — complete diagnostic reads before staging, 13 October 2026
 

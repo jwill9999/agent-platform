@@ -7,6 +7,8 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  withCompleteGitIndex,
+  selectedGitChangePaths,
   defaultRepositoryName,
   deriveGitPullRequestCreateState,
   deriveGitPublishState,
@@ -494,6 +496,38 @@ describe('deriveGitWorkflowTabs', () => {
     });
   });
 
+  it('does not let historical push success hide a newer commit or branch', () => {
+    const previousSuccess = 'Published the previous reviewed commit.';
+    expect(
+      deriveGitPublishState({
+        status: status({ clean: true, ahead: 0, behind: 0, upstreamState: 'active' }),
+        commitSuccess: null,
+        pushSuccess: previousSuccess,
+      }),
+    ).toMatchObject({ pushed: true });
+    expect(
+      deriveGitPublishState({
+        status: status({ clean: true, ahead: 1, behind: 0, upstreamState: 'active' }),
+        commitSuccess: 'Committed a second change.',
+        pushSuccess: previousSuccess,
+      }),
+    ).toMatchObject({ pushed: false, canPublish: true, actionLabel: 'Push' });
+    expect(
+      deriveGitPublishState({
+        status: status({
+          currentBranch: 'feature/another',
+          clean: true,
+          ahead: 0,
+          behind: 0,
+          upstreamState: 'none',
+          upstreamBranch: undefined,
+        }),
+        commitSuccess: null,
+        pushSuccess: previousSuccess,
+      }),
+    ).toMatchObject({ pushed: false, canPublish: true, actionLabel: 'Publish branch' });
+  });
+
   it('uses Publish tab state that disables push until divergent branches are pulled', () => {
     expect(
       deriveGitPublishState({
@@ -895,5 +929,34 @@ describe('Git panel loading and diff guards', () => {
         },
       }),
     ).toBe(true);
+  });
+});
+
+describe('complete index and literal rename review', () => {
+  it('exposes Commit and overview guidance when only a filtered path is staged', () => {
+    const full = withCompleteGitIndex(cleanStatus, 1);
+    expect(deriveGitWorkflowTabs({ status: full })).toContainEqual({
+      id: 'commit',
+      label: 'Commit',
+      badge: 1,
+    });
+    expect(deriveGitWorkflowOverview({ status: full }).primaryAction?.tab).toBe('commit');
+    expect(full.workingTree.total).toBe(0);
+    expect(cleanStatus.workingTree.staged).toBe(0);
+  });
+  it('reviews both literal endpoints of a rename without expanding ordinary paths', () => {
+    const renamed = {
+      path: 'new\nname.txt',
+      originalPath: 'old name.txt',
+      status: 'renamed' as const,
+      indexStatus: 'R',
+      worktreeStatus: ' ',
+      staged: true,
+      unstaged: false,
+    };
+    expect(selectedGitChangePaths(renamed)).toEqual(['old name.txt', 'new\nname.txt']);
+    expect(selectedGitChangePaths({ ...renamed, originalPath: renamed.path })).toEqual([
+      'new\nname.txt',
+    ]);
   });
 });

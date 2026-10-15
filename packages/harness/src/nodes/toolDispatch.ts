@@ -1,5 +1,7 @@
 import { sameMcpApprovalBinding, type McpApprovalBinding } from '../security/mcpApproval.js';
 import type {
+  GitDeliveryPort,
+  GitDeliveryReceipt,
   Agent,
   ApprovalRequest,
   ExecutionPolicyCategory,
@@ -33,7 +35,12 @@ import { ToolRateLimiter } from '../security/rateLimiter.js';
 import { isSystemTool, GET_SKILL_DETAIL_ID, SYSTEM_TOOLS } from '../systemTools.js';
 import { CODING_APPLY_PATCH_ID } from '../tools/index.js';
 import { BROWSER_TOOL_IDS } from '../tools/browserTools.js';
-import { GIT_TOOL_IDS } from '../tools/gitTools.js';
+import {
+  GIT_TOOL_IDS,
+  GIT_DELIVERY_TOOL_IDS,
+  isGitDeliveryTool,
+  parseGitDeliveryToolAction,
+} from '../tools/gitTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
 import { wrapToolResult, scanForInjection } from '../security/injectionGuard.js';
 import { scanOutput } from '../security/outputGuard.js';
@@ -50,6 +57,9 @@ export type ToolDispatchContext = {
   mcpApprovalBindings?: ReadonlyMap<string, McpApprovalBinding>;
   isMcpBindingCurrent?: (binding: McpApprovalBinding) => boolean;
   nativeToolExecutor?: NativeToolExecutor;
+  gitDelivery?: GitDeliveryPort;
+  /** Trusted authority for this reconstructed dispatch only; never continued into the model loop. */
+  gitDeliveryApproval?: { toolCallId: string; operationId: string; approvalRequestId: string };
   emitter?: OutputEmitter;
   dispatcher?: PluginDispatcher;
   pathJail?: PathJail;
@@ -85,6 +95,7 @@ export type ApprovalRequestCreateInput = {
   executionPayloadJson?: string;
   riskTier: RiskTier;
   createdAtMs: number;
+  expiresAtMs?: number;
 };
 
 /** Map system tool IDs to their path operation type for PathJail enforcement. */
@@ -116,6 +127,7 @@ const WRITE_TOOL_IDS = new Set(
     .map(([toolId]) => toolId),
 );
 WRITE_TOOL_IDS.add(CODING_APPLY_PATCH_ID);
+for (const id of Object.values(GIT_DELIVERY_TOOL_IDS)) WRITE_TOOL_IDS.add(id);
 
 const RESOURCE_WRITE_TOOL_IDS = new Set([
   'sys_write_file',
@@ -461,10 +473,36 @@ async function dispatchMcpTool(
   }
 }
 
+/** Only a private, exact resume binding grants Git execution authority. */
+function nativeDispatchOptions(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+  signal?: AbortSignal,
+): Parameters<NativeToolExecutor>[2] {
+  const authority = ctx.gitDeliveryApproval;
+  if (
+    isGitDeliveryTool(call.name) &&
+    authority &&
+    call.gitDeliveryBinding?.operationId === authority.operationId &&
+    call.id === authority.toolCallId
+  ) {
+    return {
+      gitDelivery: {
+        operationId: authority.operationId,
+        approvalRequestId: authority.approvalRequestId,
+      },
+      signal,
+    };
+  }
+  if (call.name === 'sys_bash' && call.approvalGranted === true) return { approvalGranted: true };
+  return undefined;
+}
+
 /** Dispatch a tool call to a native executor. */
 async function dispatchNativeTool(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
+  signal?: AbortSignal,
 ): Promise<{ output: Output; ok: boolean }> {
   if (!ctx.nativeToolExecutor) {
     return {
@@ -477,10 +515,7 @@ async function dispatchNativeTool(
     };
   }
   try {
-    const options =
-      call.name === 'sys_bash' && call.approvalGranted === true
-        ? { approvalGranted: true }
-        : undefined;
+    const options = nativeDispatchOptions(call, ctx, signal);
     const result = options
       ? await ctx.nativeToolExecutor(call.name, call.args, options)
       : await ctx.nativeToolExecutor(call.name, call.args);
@@ -505,19 +540,50 @@ function isOutputOk(output: Output): boolean {
   return true;
 }
 
+function approvedForDispatch(call: ToolCallIntent, ctx: ToolDispatchContext): boolean {
+  if (isGitDeliveryTool(call.name)) {
+    return (
+      ctx.gitDeliveryApproval?.toolCallId === call.id &&
+      ctx.gitDeliveryApproval.operationId === call.gitDeliveryBinding?.operationId
+    );
+  }
+  return ctx.approvedToolCallIds?.has(call.id) ?? false;
+}
+
+async function jailSystemTool(call: ToolCallIntent, ctx: ToolDispatchContext) {
+  if (!isSystemTool(call.name)) return { call };
+  const result = await enforcePathJail(call, ctx);
+  if (result && 'output' in result) {
+    ctx.auditLog?.logDenied(
+      call.name,
+      call.args,
+      ctx.agent.id,
+      '',
+      result.output.type === 'error'
+        ? (result.output.message ?? 'Path access denied')
+        : 'Path access denied',
+    );
+    return { output: result.output };
+  }
+  return { call: result && 'args' in result ? { ...call, args: result.args } : call };
+}
+
 async function dispatchSingleTool(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
   options?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
-  const approvedForResume = ctx.approvedToolCallIds?.has(call.id) ?? false;
+  const approvedForResume = approvedForDispatch(call, ctx);
   if (!approvedForResume && !isToolExecutionAllowed(ctx.agent, call.name)) {
     const output = buildCapabilityRecoveryOutput(call);
     ctx.auditLog?.logDenied(call.name, call.args, ctx.agent.id, '', 'Tool not in agent allowlist');
     return { output, ok: false };
   }
 
-  const onboardingBlockReason = onboardingWriteBlockReason(call, ctx);
+  const onboardingBlockReason =
+    isGitDeliveryTool(call.name) && approvedForResume
+      ? undefined // The bound Git service rechecks persisted policy and records a durable denied outcome.
+      : onboardingWriteBlockReason(call, ctx);
   if (onboardingBlockReason) {
     const { output } = await handleProjectWriteBlock(call, ctx, onboardingBlockReason);
     ctx.auditLog?.logDenied(
@@ -530,32 +596,16 @@ async function dispatchSingleTool(
     return { output, ok: false };
   }
 
-  // PathJail: enforce file-path constraints for system tools
-  let safeCall = call;
-  if (isSystemTool(call.name)) {
-    const pathResult = await enforcePathJail(call, ctx);
-    if (pathResult && 'output' in pathResult) {
-      ctx.auditLog?.logDenied(
-        call.name,
-        call.args,
-        ctx.agent.id,
-        '',
-        pathResult.output.type === 'error'
-          ? (pathResult.output.message ?? 'Path access denied')
-          : 'Path access denied',
-      );
-      return { output: pathResult.output, ok: false };
-    }
-    if (pathResult && 'args' in pathResult) {
-      safeCall = { ...call, args: pathResult.args };
-    }
-  }
+  // Path checks complete before MCP admission or any native dispatch.
+  const jailed = await jailSystemTool(call, ctx);
+  if (jailed.output) return { output: jailed.output, ok: false };
+  const safeCall = jailed.call;
 
   const parsed = parseToolId(safeCall.name);
   const denial = mcpAdmissionError(safeCall, ctx, approvedForResume);
   if (denial) return { output: denial, ok: false };
   if (parsed.kind === 'mcp') return dispatchMcpTool(parsed, safeCall, ctx, options);
-  return dispatchNativeTool(safeCall, ctx);
+  return dispatchNativeTool(safeCall, ctx, options?.signal);
 }
 
 function resolveToolMetadata(
@@ -771,6 +821,7 @@ async function createApprovalRequiredOutput(
   executionCall: ToolCallIntent,
   riskTier: RiskTier,
   reason: string,
+  expiresAtMs?: number,
 ): Promise<Output> {
   const request = await ctx.approvalRequests!.create({
     sessionId: state.sessionId ?? '',
@@ -782,12 +833,16 @@ async function createApprovalRequiredOutput(
       toolCallId: executionCall.id,
       toolName: executionCall.name,
       args: executionCall.args,
+      ...(executionCall.gitDeliveryBinding
+        ? { gitDeliveryBinding: executionCall.gitDeliveryBinding }
+        : {}),
       ...(ctx.mcpApprovalBindings?.get(executionCall.name)
         ? { mcpBinding: ctx.mcpApprovalBindings.get(executionCall.name) }
         : {}),
     }),
     riskTier,
     createdAtMs: Date.now(),
+    ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
   });
 
   return {
@@ -798,6 +853,108 @@ async function createApprovalRequiredOutput(
     argsPreview: parseArgsPreview(request.argsJson),
     message: `Tool "${displayCall.name}" requires human approval before execution. ${reason}`,
   };
+}
+
+function isTrustedGitResume(call: ToolCallIntent, ctx: ToolDispatchContext): boolean {
+  return (
+    isGitDeliveryTool(call.name) &&
+    ctx.gitDeliveryApproval?.toolCallId === call.id &&
+    ctx.gitDeliveryApproval.operationId === call.gitDeliveryBinding?.operationId
+  );
+}
+async function cancelUnexecutedGit(call: ToolCallIntent, ctx: ToolDispatchContext): Promise<void> {
+  if (!isTrustedGitResume(call, ctx) || !ctx.gitDelivery) return;
+  try {
+    await ctx.gitDelivery.cancel(call.gitDeliveryBinding!.operationId, 'cancelled');
+  } catch {
+    /* No effect was entered. Preserve the preparation for inspection/expiry if storage is unavailable. */
+  }
+}
+async function appendNotExecutedCalls(
+  ctx: ToolDispatchContext,
+  calls: ToolCallIntent[],
+  messages: ChatMessage[],
+  traces: TraceEvent[],
+  step: number,
+): Promise<void> {
+  for (const call of calls) {
+    const output: Output = {
+      type: 'tool_result',
+      toolId: call.name,
+      data: {
+        ok: false,
+        error: 'GIT_DELIVERY_NOT_EXECUTED',
+        message:
+          'This call was not executed because Git review or recovery stopped the batch. Start a new request to continue.',
+      },
+    };
+    await emitToolOutput(ctx, output);
+    messages.push({
+      role: 'tool',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: outputToContent(call.name, output),
+    });
+    traces.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+  }
+}
+
+async function prepareGitApproval(
+  ctx: ToolDispatchContext,
+  state: HarnessStateType,
+  call: ToolCallIntent,
+  signal?: AbortSignal,
+): Promise<Output> {
+  let receipt: GitDeliveryReceipt | undefined;
+  try {
+    const action = parseGitDeliveryToolAction(call.name, call.args);
+    if (!ctx.gitDelivery || !ctx.approvalRequests || call.gitDeliveryBinding)
+      throw new Error('Missing Git approval boundary');
+    // This persisted binding/policy check precedes either generic approval path, including an unallowlisted tool.
+    receipt = await ctx.gitDelivery.prepare(action, { toolCallId: call.id, signal });
+    if (receipt.state !== 'prepared')
+      return {
+        type: 'tool_result',
+        toolId: call.name,
+        data: { ok: receipt.state === 'succeeded', gitDeliveryReceipt: receipt },
+      };
+    const output = await createApprovalRequiredOutput(
+      ctx,
+      state,
+      { ...call, args: { gitDeliveryReceipt: receipt } },
+      {
+        id: call.id,
+        name: call.name,
+        args: receipt.action,
+        gitDeliveryBinding: { operationId: receipt.id },
+      },
+      'high',
+      'Review the exact prepared Git operation.',
+      receipt.expiresAtMs,
+    );
+    ctx.auditLog?.logPendingApproval(
+      call.name,
+      { gitDeliveryReceipt: receipt },
+      ctx.agent.id,
+      state.sessionId ?? '',
+      'high',
+    );
+    return output;
+  } catch {
+    if (receipt && ctx.gitDelivery) {
+      try {
+        await ctx.gitDelivery.cancel(receipt.id, 'cancelled');
+      } catch {
+        /* No effect was started; an unclaimed preparation remains bounded by expiry. */
+      }
+    }
+    return {
+      type: 'error',
+      code: 'GIT_DELIVERY_PREPARATION_DENIED',
+      message:
+        'Git delivery requires a current approved Project, permitted policy and a valid complete action. No Git mutation was started.',
+    };
+  }
 }
 
 /**
@@ -857,6 +1014,15 @@ async function executeToolWithRetry(
   let retryCount = 0;
 
   // The adapter owns cancellation/timeout. Replaying an ambiguous MCP call may duplicate effects.
+  if (isGitDeliveryTool(call.name)) {
+    const deadlineSignal = AbortSignal.timeout(Math.max(1, effectiveTimeout));
+    const ownedSignal = signal ? AbortSignal.any([signal, deadlineSignal]) : deadlineSignal;
+    const result = await dispatchSingleTool(call, ctx, {
+      timeoutMs: effectiveTimeout,
+      signal: ownedSignal,
+    });
+    return { ...result, retryCount: 0 };
+  }
   if (parseToolId(call.name).kind === 'mcp') {
     const result = await dispatchSingleTool(call, ctx, { timeoutMs: effectiveTimeout, signal });
     return { ...result, retryCount: 0 };
@@ -1177,9 +1343,23 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     // Wall-time deadline check — abort before dispatching tools
     const deadline = checkDeadline(state);
     if (deadline.expired) {
+      const trustedGit = llmOutput.calls.find((call) => isTrustedGitResume(call, ctx));
+      if (trustedGit) await cancelUnexecutedGit(trustedGit, ctx);
+      const stoppedMessages: ChatMessage[] = [];
+      const stoppedTraces: TraceEvent[] = [];
+      if (llmOutput.calls.some((call) => isGitDeliveryTool(call.name)))
+        await appendNotExecutedCalls(
+          ctx,
+          llmOutput.calls,
+          stoppedMessages,
+          stoppedTraces,
+          state.taskIndex ?? 0,
+        );
       return {
+        ...(stoppedMessages.length ? { messages: stoppedMessages, llmOutput: null } : {}),
         halted: true,
         trace: [
+          ...stoppedTraces,
           {
             type: 'deadline_exceeded',
             elapsedMs: deadline.elapsedMs,
@@ -1194,17 +1374,58 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     const toolMessages: ChatMessage[] = [];
     const traceEvents: TraceEvent[] = [];
     let totalToolRetries = 0;
+    let gitApprovalConsumed = false;
     let toolCallCount = state.totalToolCalls ?? 0;
     const maxToolCallsTotal = ctx.agent.executionLimits.maxToolCallsTotal;
     const newLoadedSkillIds: string[] = [];
 
-    for (const call of llmOutput.calls) {
-      if (signal?.aborted) break;
+    for (const [callIndex, call] of llmOutput.calls.entries()) {
+      if (signal?.aborted) {
+        const trustedGit = llmOutput.calls
+          .slice(callIndex)
+          .find((item) => isTrustedGitResume(item, ctx));
+        if (trustedGit) await cancelUnexecutedGit(trustedGit, ctx);
+        if (llmOutput.calls.slice(callIndex).some((item) => isGitDeliveryTool(item.name))) {
+          await appendNotExecutedCalls(
+            ctx,
+            llmOutput.calls.slice(callIndex),
+            toolMessages,
+            traceEvents,
+            step,
+          );
+          return {
+            halted: true,
+            llmOutput: null,
+            messages: toolMessages,
+            trace: traceEvents,
+            totalToolCalls: toolCallCount,
+          };
+        }
+        break;
+      }
+      const gitCall = isGitDeliveryTool(call.name);
 
       // Cumulative tool call limit
       if (maxToolCallsTotal && toolCallCount >= maxToolCallsTotal) {
         toolMessages.push(buildLimitReachedMessage(call, maxToolCallsTotal));
         traceEvents.push({ type: 'limit_hit', kind: 'max_steps' });
+        if (gitCall) {
+          await cancelUnexecutedGit(call, ctx);
+          await appendNotExecutedCalls(
+            ctx,
+            llmOutput.calls.slice(callIndex + 1),
+            toolMessages,
+            traceEvents,
+            step,
+          );
+          return {
+            halted: true,
+            llmOutput: null,
+            messages: toolMessages,
+            trace: traceEvents,
+            totalToolCalls: toolCallCount,
+          };
+        }
         continue;
       }
       toolCallCount++;
@@ -1228,11 +1449,67 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
             message: `Tool "${call.name}" rate-limited: ${rlResult.count}/${rlResult.limit} calls in the last ${rlResult.windowMs / 1000}s. Wait before retrying.`,
           }),
         });
+        if (gitCall) {
+          await cancelUnexecutedGit(call, ctx);
+          await appendNotExecutedCalls(
+            ctx,
+            llmOutput.calls.slice(callIndex + 1),
+            toolMessages,
+            traceEvents,
+            step,
+          );
+          return {
+            halted: true,
+            llmOutput: null,
+            messages: toolMessages,
+            trace: traceEvents,
+            totalToolCalls: toolCallCount,
+          };
+        }
         continue;
       }
       rateLimiter.record(call.name);
 
-      const approvedForResume = ctx.approvedToolCallIds?.has(call.id) ?? false;
+      const gitAuthority = ctx.gitDeliveryApproval;
+      const approvedForResume = gitCall
+        ? !gitApprovalConsumed &&
+          gitAuthority?.toolCallId === call.id &&
+          gitAuthority.operationId === call.gitDeliveryBinding?.operationId
+        : (ctx.approvedToolCallIds?.has(call.id) ?? false);
+      if (gitCall && !approvedForResume) {
+        const output = await prepareGitApproval(ctx, state, call, signal);
+        await emitToolOutput(ctx, output);
+        if (output.type !== 'approval_required')
+          toolMessages.push({
+            role: 'tool',
+            toolCallId: call.id,
+            toolName: call.name,
+            content: outputToContent(call.name, output),
+          });
+        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+        if (output.type === 'approval_required')
+          traceEvents.push({
+            type: 'tool_approval_required',
+            toolId: call.name,
+            step,
+            riskTier: 'high',
+          });
+        await appendNotExecutedCalls(
+          ctx,
+          llmOutput.calls.slice(callIndex + 1),
+          toolMessages,
+          traceEvents,
+          step,
+        );
+        return {
+          halted: true,
+          llmOutput: null,
+          messages: toolMessages,
+          trace: traceEvents,
+          totalToolCalls: toolCallCount,
+        };
+      }
+      if (gitCall) gitApprovalConsumed = true;
       const mcpDenial = mcpAdmissionError(call, ctx, approvedForResume);
       if (mcpDenial) {
         await emitToolOutput(ctx, mcpDenial);
@@ -1310,7 +1587,10 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         continue;
       }
 
-      const onboardingBlockReason = onboardingWriteBlockReason(call, ctx);
+      const onboardingBlockReason =
+        gitCall && approvedForResume
+          ? undefined // Avoid a stale snapshot bypassing the service's durable denied receipt.
+          : onboardingWriteBlockReason(call, ctx);
       if (onboardingBlockReason) {
         const { output, message } = await handleProjectWriteBlock(call, ctx, onboardingBlockReason);
         ctx.auditLog?.logDenied(
@@ -1323,7 +1603,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         await emitToolOutput(ctx, output);
         if (message) toolMessages.push(message);
         traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
-        if (output.type === 'text') {
+        if (output.type === 'text' || gitCall) {
           return {
             halted: true,
             llmOutput: null,
@@ -1379,7 +1659,10 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
 
       const toolMetadata = resolveToolMetadata(safeCall, ctx);
-      const actionPolicy = executionPolicyDecision(ctx, safeCall, toolMetadata);
+      const actionPolicy =
+        gitCall && approvedForResume
+          ? undefined
+          : executionPolicyDecision(ctx, safeCall, toolMetadata);
       if (actionPolicy?.state === 'denied') {
         let denialCode = 'WORKSPACE_WRITE_POLICY_DENIED';
         if (parseToolId(safeCall.name).kind === 'mcp') denialCode = 'MCP_POLICY_DENIED';
@@ -1414,6 +1697,14 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
           },
         });
         traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok: false });
+        if (gitCall)
+          return {
+            halted: true,
+            llmOutput: null,
+            messages: toolMessages,
+            trace: traceEvents,
+            totalToolCalls: toolCallCount,
+          };
         continue;
       }
       const browserUrlReason = browserUrlApprovalReason(safeCall);
@@ -1601,6 +1892,24 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok });
       totalToolRetries += retryCount;
+      if (gitCall && !ok) {
+        await appendNotExecutedCalls(
+          ctx,
+          llmOutput.calls.slice(callIndex + 1),
+          toolMessages,
+          traceEvents,
+          step,
+        );
+        return {
+          halted: true,
+          llmOutput: null,
+          messages: toolMessages,
+          trace: traceEvents,
+          totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
+          totalToolCalls: toolCallCount,
+          loadedSkillIds: newLoadedSkillIds,
+        };
+      }
       if (
         output.type === 'error' &&
         (output.code === 'MCP_OUTCOME_UNKNOWN' || output.code === 'MCP_APPROVAL_STALE')

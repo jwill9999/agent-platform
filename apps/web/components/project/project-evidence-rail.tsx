@@ -1,18 +1,19 @@
 'use client';
 
 import type { ProjectProfile, WorkspaceEvent } from '@agent-platform/contracts';
-import React, { useState } from 'react';
+import React from 'react';
 
 import type { ApprovalCardState, ToolTraceEvent } from '@/hooks/use-harness-chat';
 import { cn } from '@/lib/cn';
+import type { ProjectEvidenceView } from '@/lib/useProjectEvidenceView';
 import { ProjectActivityPanel } from './project-activity-panel';
 import { ProjectGitHubPanel } from './project-git-github-panel';
-
-type EvidenceView = 'activity' | 'git';
 
 export function ProjectEvidenceRail({
   projectId,
   sessionId,
+  view,
+  onViewChange,
   profile,
   workspaceEventsByMessage,
   approvalEventsByMessage,
@@ -24,6 +25,8 @@ export function ProjectEvidenceRail({
 }: Readonly<{
   projectId: string | null;
   sessionId: string | null;
+  view: ProjectEvidenceView;
+  onViewChange: (view: ProjectEvidenceView) => void;
   profile: ProjectProfile;
   workspaceEventsByMessage?: Readonly<Record<string, readonly WorkspaceEvent[]>>;
   approvalEventsByMessage?: Readonly<Record<string, readonly ApprovalCardState[]>>;
@@ -33,11 +36,11 @@ export function ProjectEvidenceRail({
   isStartingProjectInstructions?: boolean;
   onStartProjectInstructions?: () => void;
 }>) {
-  const [view, setView] = useState<EvidenceView>('activity');
   if (!projectId) return null;
 
   return (
     <div
+      id="project-evidence-rail"
       className="flex h-full min-h-0 w-[360px] max-w-[30vw] shrink-0 flex-col overflow-hidden border-l border-border bg-background/95"
       aria-label="Project evidence"
     >
@@ -60,7 +63,7 @@ export function ProjectEvidenceRail({
                 ? 'bg-secondary text-foreground'
                 : 'text-muted-foreground hover:bg-accent',
             )}
-            onClick={() => setView(candidate)}
+            onClick={() => onViewChange(candidate)}
           >
             {candidate === 'activity' ? 'Activity' : 'Git & GitHub'}
           </button>

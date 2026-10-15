@@ -241,6 +241,12 @@ test.describe('Electron Project access', () => {
       await expectProjectLocationBreadcrumb(projectChatHeader);
       const projectControls = projectChatHeader.getByRole('group', { name: 'Project controls' });
       await expect(projectControls.getByLabel(/Project command status:/)).toBeVisible();
+      const evidenceToggle = projectControls.getByRole('button', {
+        name: 'Hide activity and Git panel',
+        exact: true,
+      });
+      await expect(evidenceToggle).toBeVisible();
+      await expect(evidenceToggle).toHaveAttribute('aria-expanded', 'true');
       await expect(projectControls).toHaveScreenshot(
         `project-chat-controls-${process.platform}.png`,
         VISUAL_REGRESSION_OPTIONS,

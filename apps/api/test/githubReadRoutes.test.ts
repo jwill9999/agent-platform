@@ -351,50 +351,30 @@ describe('bounded GitHub read API integration', () => {
     ).toEqual(['fixture/repo', 'fixture/second']);
   });
 
-  it('does not replay a created PR when its consumer disconnects during enrichment', async () => {
-    git('update-ref', `refs/remotes/origin/${branch}`, git('rev-parse', 'HEAD'));
-    git('config', `branch.${branch}.remote`, 'origin');
-    git('config', `branch.${branch}.merge`, `refs/heads/${branch}`);
+  it('rejects the retired PR creation endpoint before any held GitHub command starts', async () => {
     setConfig({ hold: true });
-    const controller = new AbortController();
-    const pending = fetch(base + endpoint('github/pull-requests'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Created' }),
-      signal: controller.signal,
-    }).then(
-      () => 'unexpected response',
-      () => 'aborted',
-    );
-    await until(() => queries().length === 1);
-    controller.abort();
-    expect(await pending).toBe('aborted');
-    await delay(350);
-    release();
-    await request(server).get(endpoint('git/checks')).expect(200);
-    expect(readFileSync(join(fixture, 'created'), 'utf8')).toBe('created\n');
+    const beforeHead = git('rev-parse', 'HEAD');
+    const response = await request(server)
+      .post(endpoint('github/pull-requests'))
+      .send({ title: 'Created' })
+      .expect(410);
+    expect(response.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
+    expect(calls()).toEqual([]);
+    expect(existsSync(join(fixture, 'created'))).toBe(false);
+    expect(git('rev-parse', 'HEAD')).toBe(beforeHead);
   });
 
-  it('retains created identity when the repository changes during enrichment', async () => {
-    git('update-ref', `refs/remotes/origin/${branch}`, git('rev-parse', 'HEAD'));
-    git('config', `branch.${branch}.remote`, 'origin');
-    git('config', `branch.${branch}.merge`, `refs/heads/${branch}`);
+  it('cannot revive retired PR creation by changing the current branch', async () => {
+    git('checkout', '-b', 'changed-before-create');
     setConfig({ hold: true });
-    const pending = fetch(base + endpoint('github/pull-requests'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title: 'Created' }),
-    }).then((response) => response.json());
-    await until(() => queries().length === 1);
-    git('checkout', '-b', 'changed-after-create');
-    release();
-    const response = await pending;
-    expect(response.data).toMatchObject({
-      pullRequest: { number: 42, headRefName: branch },
-      pullRequests: { available: false },
-    });
-    expect(response.data.checks).toBeUndefined();
-    expect(readFileSync(join(fixture, 'created'), 'utf8')).toBe('created\n');
+    const response = await request(server)
+      .post(endpoint('github/pull-requests'))
+      .send({ title: 'Created' })
+      .expect(410);
+    expect(response.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
+    expect(calls()).toEqual([]);
+    expect(existsSync(join(fixture, 'created'))).toBe(false);
+    expect(git('branch', '--show-current')).toBe('changed-before-create');
   });
 
   it.each(['--version', 'auth'])(
@@ -496,26 +476,19 @@ describe('bounded GitHub read API integration', () => {
     15000,
   );
 
+  // Creation/enrichment now belongs to the prepared receipt service; its real-Git
+  // regressions cover known success, optional detail/storage failure and lost response.
   it.each(['auth', 'query', 'parse', 'timeout'] as const)(
-    'retains one successful PR creation after enrichment %s failure',
+    'retired PR creation refuses unreviewed effects before enrichment %s can run',
     async (enrichment) => {
-      const head = git('rev-parse', 'HEAD');
-      git('update-ref', `refs/remotes/origin/${branch}`, head);
-      git('config', `branch.${branch}.remote`, 'origin');
-      git('config', `branch.${branch}.merge`, `refs/heads/${branch}`);
       setConfig({ enrichment });
       const response = await request(server)
         .post(endpoint('github/pull-requests'))
         .send({ title: 'Created' })
-        .expect(200);
-      expect(response.body.data).toMatchObject({
-        pullRequest: { number: 42 },
-        pullRequests: { available: false },
-      });
-      expect(response.body.data.checks).toBeUndefined();
-      expect(readFileSync(join(fixture, 'created'), 'utf8')).toBe('created\n');
-      expect(calls().filter((args) => args[1] === 'create')).toHaveLength(1);
+        .expect(410);
+      expect(response.body.error.code).toBe('PROJECT_GIT_PREPARE_REQUIRED');
+      expect(calls()).toEqual([]);
+      expect(existsSync(join(fixture, 'created'))).toBe(false);
     },
-    15000,
   );
 });

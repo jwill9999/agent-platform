@@ -50,12 +50,13 @@ export async function apiGet<T>(path: string): Promise<T | undefined> {
 export async function apiPost<T>(
   path: string,
   body: unknown,
-  init: { headers?: HeadersInit } = {},
+  init: { headers?: HeadersInit; signal?: AbortSignal } = {},
 ): Promise<T | undefined> {
   const res = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...init.headers },
     body: JSON.stringify(body),
+    signal: init.signal,
   });
   const text = await res.text();
   if (!res.ok) {
@@ -85,8 +86,13 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T | undefi
   return json.data;
 }
 
-export async function apiDelete(path: string): Promise<void> {
-  const res = await fetch(path, { method: 'DELETE' });
+export async function apiDelete(path: string, body?: unknown): Promise<void> {
+  const res = await fetch(path, {
+    method: 'DELETE',
+    ...(body === undefined
+      ? {}
+      : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  });
   if (!res.ok) {
     const text = await res.text();
     throw parseErrorBody(res.status, text);

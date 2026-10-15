@@ -1,6 +1,12 @@
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
-import { createDiagnosticStore, closeDatabase, openDatabase, runSeed } from '@agent-platform/db';
+import {
+  createDiagnosticStore,
+  closeDatabase,
+  openDatabase,
+  recoverGitDeliveryOperations,
+  runSeed,
+} from '@agent-platform/db';
 import { consumeDiagnosticAccess } from './infrastructure/diagnostics/localAccess.js';
 
 import type { HarnessStateType, ToolCallIntent } from '@agent-platform/harness';
@@ -18,6 +24,8 @@ let dbHandle: ReturnType<typeof openDatabase> | null = null;
 
 if (sqlitePath) {
   dbHandle = openDatabase(sqlitePath);
+  // Recover interrupted receipts once at host startup, before accepting any work.
+  recoverGitDeliveryOperations(dbHandle.db, Date.now());
   runSeed(dbHandle.db);
   log.info('db.ready', { sqlitePath });
 }

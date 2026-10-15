@@ -5,6 +5,9 @@ import { access, realpath } from 'node:fs/promises';
 import { isAbsolute, relative, resolve } from 'node:path';
 
 import {
+  GitDeliveryActionSchema,
+  type GitDeliveryAction,
+  type GitDeliveryPort,
   CodingGitBranchInfoResultSchema,
   CodingGitChangedFilesResultSchema,
   CodingGitDiffInputSchema,
@@ -33,6 +36,110 @@ export const GIT_TOOL_IDS = {
   branchInfo: 'sys_git_branch_info',
   changedFiles: 'sys_git_changed_files',
 } as const;
+
+export const GIT_DELIVERY_TOOL_IDS = {
+  stage: 'sys_git_stage',
+  commit: 'sys_git_commit',
+  push: 'sys_git_push',
+  pull_request: 'sys_git_create_pull_request',
+} as const;
+export function isGitDeliveryTool(toolId: string): boolean {
+  return Object.values(GIT_DELIVERY_TOOL_IDS).some((id) => id === toolId);
+}
+export function parseGitDeliveryToolAction(toolId: string, args: unknown): GitDeliveryAction {
+  const action = GitDeliveryActionSchema.parse(args);
+  if (GIT_DELIVERY_TOOL_IDS[action.kind] !== toolId)
+    throw new Error('Git action does not match tool');
+  return action;
+}
+const deliveryPaths = {
+  type: 'array',
+  minItems: 1,
+  maxItems: 500,
+  items: { type: 'string', minLength: 1, maxLength: 4096 },
+};
+const deliveryDefinitions = [
+  {
+    kind: 'stage',
+    description:
+      'Prepare selected Project paths for staging or unstaging. Human review is always required.',
+    properties: { mode: { type: 'string', enum: ['stage', 'unstage'] }, paths: deliveryPaths },
+  },
+  {
+    kind: 'commit',
+    description:
+      'Prepare a commit of the complete current Project index. List every staged path, including unrelated entries, for human review.',
+    properties: {
+      message: { type: 'string', minLength: 1, maxLength: 10000 },
+      paths: deliveryPaths,
+    },
+  },
+  {
+    kind: 'push',
+    description:
+      'Prepare publication or push of the exact current Project branch tip. Human review is always required; no force push.',
+    properties: { mode: { type: 'string', enum: ['publish', 'push'] } },
+  },
+  {
+    kind: 'pull_request',
+    description:
+      'Prepare a GitHub pull request for the already published Project branch, with explicit base and contents for human review.',
+    properties: {
+      baseBranch: { type: 'string', minLength: 1, maxLength: 255 },
+      title: { type: 'string', minLength: 1, maxLength: 256 },
+      body: { type: 'string', maxLength: 65536 },
+      draft: { type: 'boolean' },
+    },
+  },
+] as const;
+export const GIT_DELIVERY_TOOLS: readonly ContractTool[] = deliveryDefinitions.map(
+  (definition) => ({
+    id: GIT_DELIVERY_TOOL_IDS[definition.kind],
+    slug: GIT_DELIVERY_TOOL_IDS[definition.kind].replaceAll('_', '-'),
+    name: GIT_DELIVERY_TOOL_IDS[definition.kind].slice(4),
+    description: definition.description,
+    riskTier: 'high',
+    requiresApproval: true,
+    config: {
+      inputSchema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { kind: { type: 'string', enum: [definition.kind] }, ...definition.properties },
+        required: ['kind', ...Object.keys(definition.properties)],
+      },
+    },
+  }),
+);
+export const GIT_DELIVERY_TOOL_MAP = buildRiskMap(GIT_DELIVERY_TOOL_IDS, 'high');
+export async function executeGitDeliveryTool(
+  toolId: string,
+  args: Record<string, unknown>,
+  port: GitDeliveryPort | undefined,
+  authority?: { operationId: string; approvalRequestId: string; signal?: AbortSignal },
+): Promise<Output> {
+  let executionEntered = false;
+  try {
+    const action = parseGitDeliveryToolAction(toolId, args);
+    if (!port || !authority) throw new Error('Missing trusted approval');
+    const reviewed = await port.get(authority.operationId);
+    if (JSON.stringify(reviewed.action) !== JSON.stringify(action))
+      throw new Error('Changed action');
+    executionEntered = true;
+    const receipt = await port.execute(authority.operationId, {
+      approvalRequestId: authority.approvalRequestId,
+      signal: authority.signal,
+    });
+    return toolResult(toolId, { ok: receipt.state === 'succeeded', gitDeliveryReceipt: receipt });
+  } catch {
+    return {
+      type: 'error',
+      code: executionEntered ? 'GIT_DELIVERY_OUTCOME_UNAVAILABLE' : 'GIT_DELIVERY_EXECUTION_DENIED',
+      message: executionEntered
+        ? 'The Git operation outcome could not be retrieved. Inspect its receipt before continuing; do not retry the mutation.'
+        : 'Git delivery could not enter this reviewed operation. Inspect its receipt before preparing another action.',
+    };
+  }
+}
 
 export const GIT_TOOL_MAP = buildRiskMap(GIT_TOOL_IDS, 'low');
 
