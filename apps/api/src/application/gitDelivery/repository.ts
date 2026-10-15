@@ -5,8 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { GitDeliveryAction } from '@agent-platform/contracts';
 import { gitDeliveryEnvironment, runGitDeliveryCommand } from './process.js';
-import { GitDeliveryError } from './types.js';
-import type { GitDeliveryRemoteMaterial } from './remote.js';
+import { GitDeliveryError, type GitDeliveryRemoteMaterial } from './types.js';
 
 export interface GitDeliveryMaterial {
   remote?: GitDeliveryRemoteMaterial;

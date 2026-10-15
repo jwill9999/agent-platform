@@ -40,3 +40,15 @@ export interface GitDeliveryServiceOptions {
   /** Internal dependency option for bounded command tests; never read from action/HTTP/model data. */
   commandTimeoutMs?: number;
 }
+
+export interface GitDeliveryRemoteMaterial {
+  name: string;
+  endpoint: string;
+  repositorySlug: string;
+  ref: string;
+  trackingRef: string;
+  trackingTip: string;
+  remoteTip: string;
+  baseTip?: string;
+  configuration: string;
+}

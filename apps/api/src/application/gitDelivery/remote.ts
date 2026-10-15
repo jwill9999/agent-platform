@@ -2,20 +2,10 @@ import { createHash } from 'node:crypto';
 import type { GitDeliveryAction, GitDeliveryReceipt } from '@agent-platform/contracts';
 import { git, type GitDeliveryMaterial } from './repository.js';
 import { runGitDeliveryCommand } from './process.js';
-import { GitDeliveryError } from './types.js';
+import { GitDeliveryError, type GitDeliveryRemoteMaterial } from './types.js';
 
 type RemoteAction = Extract<GitDeliveryAction, { kind: 'push' | 'pull_request' }>;
-export interface GitDeliveryRemoteMaterial {
-  name: string;
-  endpoint: string;
-  repositorySlug: string;
-  ref: string;
-  trackingRef: string;
-  trackingTip: string;
-  remoteTip: string;
-  baseTip?: string;
-  configuration: string;
-}
+
 const fields = 'number,url,headRefName,baseRefName,title,body,isDraft';
 const shaPattern = /^[0-9a-f]{40}$/;
 const zero = '0'.repeat(40);
