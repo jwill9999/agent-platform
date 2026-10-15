@@ -4,9 +4,12 @@ import { useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { UIMessage } from 'ai';
 import { Sparkles } from 'lucide-react';
 import { Message, getMessageText } from './message';
+import { GitChatHistory } from './git-chat-history';
+import { isGitDeliveryTool } from '@/lib/git-chat-receipts';
 import { DiagnosticExportAction } from './diagnostic-export';
 import type {
   DiagnosticPartialFailure,
+  GitDeliveryReceipt,
   SensorDashboardResponse,
   WorkspaceEvent,
 } from '@agent-platform/contracts';
@@ -14,7 +17,11 @@ import { ChatInput } from './chat-input';
 import { SensorStatusPanel } from './sensor-status-panel';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 import type { CriticEvent } from '@/lib/critic-events';
-import type { ApprovalCardState, ApprovalDecision, ToolTraceEvent } from '@/hooks/use-harness-chat';
+import type {
+  ApprovalCardState,
+  ApprovalDecisionHandler,
+  ToolTraceEvent,
+} from '@/hooks/use-harness-chat';
 import { WorkspaceResourcePreviewProvider } from './workspace-resource-cards';
 
 export interface ChatProps {
@@ -54,8 +61,11 @@ export interface ChatProps {
   workspaceWebViewProjectId?: string | null;
   /** Approval requests keyed by assistant message id. */
   approvalEventsByMessage?: Record<string, readonly ApprovalCardState[]>;
+  gitRecoveryReceipts?: readonly GitDeliveryReceipt[];
+  onGitReceiptChange?: (receipt: GitDeliveryReceipt) => void;
+  onGitReceiptDeleted?: (receipt: GitDeliveryReceipt) => void;
   /** User decision handler for approval requests. */
-  onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
+  onApprovalDecision?: ApprovalDecisionHandler;
   /** Session-scoped sensor status, kept outside the chat transcript. */
   showSensors?: boolean;
   sensorDashboard?: SensorDashboardResponse | null;
@@ -98,6 +108,9 @@ export function Chat({
   workspaceEventsByMessage,
   workspaceWebViewProjectId,
   approvalEventsByMessage,
+  gitRecoveryReceipts,
+  onGitReceiptChange,
+  onGitReceiptDeleted,
   onApprovalDecision,
   showSensors = true,
   sensorDashboard,
@@ -155,6 +168,7 @@ export function Chat({
                     <Message
                       key={message.id}
                       message={message}
+                      diagnosticSessionId={diagnosticSessionId}
                       isStreaming={
                         isLoading && message.role === 'assistant' && index === messages.length - 1
                       }
@@ -188,13 +202,29 @@ export function Chat({
                           ? approvalEventsByMessage?.[message.id]
                           : undefined
                       }
+                      gitApprovalsManaged
                       onApprovalDecision={onApprovalDecision}
                     />
                   ))}
                   {conversationAccessory}
-                  <div ref={messagesEndRef} className="h-4" />
                 </>
               )}
+              <GitChatHistory
+                key={JSON.stringify([workspaceWebViewProjectId, diagnosticSessionId])}
+                approvals={Object.entries(approvalEventsByMessage ?? {}).flatMap(
+                  ([id, approvals]) =>
+                    approvals
+                      .filter((approval) => isGitDeliveryTool(approval.toolName))
+                      .map((approval) => ({ approval, toolEvents: toolEventsByMessage?.[id] })),
+                )}
+                recoveryReceipts={gitRecoveryReceipts ?? []}
+                projectId={workspaceWebViewProjectId}
+                sessionId={diagnosticSessionId}
+                onDecision={onApprovalDecision}
+                onReceiptChange={onGitReceiptChange}
+                onReceiptDeleted={onGitReceiptDeleted}
+              />
+              <div ref={messagesEndRef} className="h-4" />
             </div>
           </div>
 

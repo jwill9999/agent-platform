@@ -106,6 +106,47 @@ export function getApprovalRequest(db: DrizzleDb, id: string): ApprovalRequest {
   return rowToContract(row);
 }
 
+/** Start from retained operations, not a newest-approval page: deleted history cannot hide recovery. */
+export function listRetainedGitDeliveryApprovals(
+  db: DrizzleDb,
+  projectId: string,
+  sessionId: string,
+  agentId: string,
+): Array<{ operationId: string; approval: ApprovalRequest | undefined }> {
+  const operations = schema.gitDeliveryOperations;
+  return db
+    .select({ operationId: operations.id, approval: schema.approvalRequests })
+    .from(operations)
+    .leftJoin(
+      schema.approvalRequests,
+      // At most two candidates expose ambiguity without allowing unbounded corrupt history.
+      sql`${schema.approvalRequests.id} IN (
+        SELECT candidate.id FROM approval_requests candidate
+        WHERE CASE WHEN json_valid(candidate.execution_payload_json)
+          THEN json_extract(candidate.execution_payload_json, '$.gitDeliveryBinding.operationId')
+          ELSE NULL END = ${operations.id}
+        ORDER BY candidate.created_at_ms, candidate.id LIMIT 2
+      )`,
+    )
+    .where(
+      and(
+        eq(operations.projectId, projectId),
+        eq(operations.sessionId, sessionId),
+        eq(operations.agentId, agentId),
+        eq(operations.source, 'chat'),
+      ),
+    )
+    .orderBy(desc(operations.createdAtMs), operations.id)
+    .all()
+    .map(({ operationId, approval }) => {
+      try {
+        return { operationId, approval: approval ? rowToContract(approval) : undefined };
+      } catch {
+        return { operationId, approval: undefined };
+      }
+    });
+}
+
 function buildQueryConditions(query: ApprovalRequestQuery) {
   const conditions = [];
   if (query.sessionId) conditions.push(eq(schema.approvalRequests.sessionId, query.sessionId));

@@ -32,6 +32,8 @@ export type ToolCallIntent = {
   approvalGranted?: boolean;
   /** Internal durable approval identity; never authority supplied by a model. */
   mcpBinding?: McpApprovalBinding;
+  /** Internal persisted receipt binding, never supplied in model arguments. */
+  gitDeliveryBinding?: { operationId: string };
 };
 
 export type LlmTextOutput = {
@@ -64,7 +66,11 @@ export type LlmModelConfig = {
 export type NativeToolExecutor = (
   toolId: string,
   args: Record<string, unknown>,
-  options?: { approvalGranted?: boolean },
+  options?: {
+    approvalGranted?: boolean;
+    gitDelivery?: { operationId: string; approvalRequestId: string };
+    signal?: AbortSignal;
+  },
 ) => Promise<Output>;
 
 // ---------------------------------------------------------------------------

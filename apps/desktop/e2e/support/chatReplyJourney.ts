@@ -1,5 +1,13 @@
 import { expect, type TestInfo } from '@playwright/test';
-import { chromium, type Browser, type ElectronApplication, type Page } from 'playwright';
+import {
+  chromium,
+  type Browser,
+  type ElectronApplication,
+  type Page,
+  type Download,
+  type Response,
+  type Request,
+} from 'playwright';
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -107,6 +115,7 @@ export async function replyJourney(
   info: TestInfo,
   mode: ReplyJourney['mode'],
   run: (ctx: ReplyJourney) => Promise<void>,
+  prepare?: (fixture: ContextTokenFixture) => Promise<void> | void,
 ) {
   const failures: unknown[] = [];
   const progress = createReplyProgress(info, mode, failures);
@@ -123,6 +132,7 @@ export async function replyJourney(
   try {
     progress('fixture-create');
     fixture = await createContextTokenFixture(provider);
+    await prepare?.(fixture);
     const reportPaths = ['success', 'failure', 'approval'].map((name) =>
       join(fixture!.root, `${name}.json`),
     );
@@ -461,11 +471,31 @@ export async function exportReplyReport(
     ctx.progress('export-native');
     report = await exportContextTokenReport(ctx.page, destination, forbidden);
   } else {
-    const download = ctx.page.waitForEvent('download');
-    ctx.progress('export-click');
-    await ctx.page.getByRole('button', { name: 'Export diagnostic report', exact: true }).click();
-    ctx.progress('export-download');
-    const downloaded = await download;
+    const startedAt = Date.now();
+    const attempt: Record<string, unknown> = {
+      path: '/api/diagnostics/report',
+      outcome: 'pending',
+    };
+    ctx.evidence.exportAttempts ??= [];
+    const attempts = ctx.evidence.exportAttempts as Array<Record<string, unknown>>;
+    attempts.push(attempt);
+    const observed = observeDiagnosticDownload(ctx.page, attempt, startedAt);
+    let downloaded;
+    try {
+      ctx.progress('export-click');
+      await ctx.page.getByRole('button', { name: 'Export diagnostic report', exact: true }).click({
+        timeout: Math.max(1, 10_000 - (Date.now() - startedAt)),
+      });
+      ctx.progress('export-download');
+      downloaded = await observed.result;
+      attempt.outcome = 'downloaded';
+    } catch (error) {
+      attempt.outcome = 'failed';
+      throw error;
+    } finally {
+      observed.close();
+      attempt.elapsedMs = Date.now() - startedAt;
+    }
     ctx.progress('export-save');
     await downloaded.saveAs(destination);
     const raw = readFileSync(destination, 'utf8');
@@ -495,4 +525,102 @@ export async function exportReplyReport(
   ctx.evidence[filename] = report;
   ctx.progress('export-validate', 'completed');
   return report;
+}
+
+/** Observe one existing browser export; no additional API request or retry is issued. */
+function observeDiagnosticDownload(
+  page: Page,
+  attempt: Record<string, unknown>,
+  startedAt: number,
+) {
+  const endpoint = new URL('/api/diagnostics/report', page.url()).href;
+  let downloaded: Download | undefined;
+  let responseAccepted = false;
+  let resolve!: (value: Download) => void;
+  let reject!: (error: Error) => void;
+  const result = new Promise<Download>((accept, fail) => {
+    resolve = accept;
+    reject = fail;
+  });
+  // A click can fail before the caller awaits the result.
+  void result.catch(() => undefined);
+  const finish = () => {
+    if (downloaded && responseAccepted) resolve(downloaded);
+  };
+  const onDownload = (value: Download) => {
+    downloaded = value;
+    finish();
+  };
+  const matches = (request: Request) => request.url() === endpoint && request.method() === 'POST';
+  const onResponse = (response: Response) => {
+    if (!matches(response.request())) return;
+    attempt.status = response.status();
+    attempt.responseMs = Date.now() - startedAt;
+    if (response.ok()) {
+      responseAccepted = true;
+      finish();
+      return;
+    }
+    // Retain only known error codes, never arbitrary response contents or headers.
+    void response
+      .json()
+      .then((body: unknown) => {
+        const code = (body as { error?: { code?: unknown } } | null)?.error?.code;
+        if (
+          typeof code === 'string' &&
+          [
+            'DIAGNOSTICS_DENIED',
+            'INVALID_SCOPE',
+            'DIAGNOSTICS_UNAVAILABLE',
+            'REPORT_TOO_LARGE',
+            'SCOPE_MISMATCH',
+          ].includes(code)
+        )
+          attempt.code = code;
+      })
+      .catch(() => undefined)
+      .finally(() => reject(new Error(`Diagnostic export returned HTTP ${response.status()}`)));
+  };
+  const onRequestFailed = (request: Request) => {
+    if (!matches(request)) return;
+    attempt.networkFailed = true;
+    reject(new Error('Diagnostic export request failed'));
+  };
+  let checkingStatus = false;
+  const statusPoll = setInterval(() => {
+    if (checkingStatus) return;
+    checkingStatus = true;
+    void page
+      .getByRole('status')
+      .filter({ hasText: 'Diagnostics could not be exported.' })
+      .isVisible()
+      .then((visible) => {
+        if (!visible) return;
+        attempt.visibleFailure = true;
+        // Let an observed HTTP failure retain its bounded allowlisted code first.
+        if (typeof attempt.status === 'number' && attempt.status >= 400) return;
+        reject(new Error('Diagnostic export displayed its failure status'));
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        checkingStatus = false;
+      });
+  }, 50);
+  const deadline = setTimeout(() => {
+    attempt.deadlineExceeded = true;
+    reject(new Error('Diagnostic export did not download within 10s'));
+  }, 10_000);
+  page.on('download', onDownload);
+  page.on('response', onResponse);
+  page.on('requestfailed', onRequestFailed);
+  return {
+    result,
+    close: () => {
+      clearTimeout(deadline);
+      clearInterval(statusPoll);
+      page.off('download', onDownload);
+      page.off('response', onResponse);
+      page.off('requestfailed', onRequestFailed);
+    },
+  };
 }

@@ -111,11 +111,12 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'fetch',
-    vi.fn(
-      (url: string, init?: RequestInit) =>
-        new Promise<Response>((resolve, reject) => {
-          calls.push({ url, init, resolve, reject });
-        }),
+    vi.fn((url: string, init?: RequestInit) =>
+      url.includes('/approval-requests/git-delivery?')
+        ? Promise.resolve(envelope({ approvals: [], recoveryReceipts: [] }))
+        : new Promise<Response>((resolve, reject) => {
+            calls.push({ url, init, resolve, reject });
+          }),
     ),
   );
   container = document.createElement('div');

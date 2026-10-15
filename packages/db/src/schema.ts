@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   index,
   integer,
@@ -462,3 +463,34 @@ export const workingMemoryArtifacts = sqliteTable('working_memory_artifacts', {
   createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
   updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
 });
+
+/** Reviewed product Git operations; private material is never returned directly to clients. */
+export const gitDeliveryOperations = sqliteTable(
+  'git_delivery_operations',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id').notNull(),
+    repositoryRoot: text('repository_root').notNull(),
+    source: text('source').notNull(),
+    sessionId: text('session_id'),
+    agentId: text('agent_id'),
+    toolCallId: text('tool_call_id'),
+    actionKey: text('action_key').notNull(),
+    state: text('state').notNull(),
+    receiptJson: text('receipt_json').notNull(),
+    materialJson: text('material_json').notNull(),
+    createdAtMs: integer('created_at_ms').notNull(),
+    updatedAtMs: integer('updated_at_ms').notNull(),
+    expiresAtMs: integer('expires_at_ms').notNull(),
+    acknowledgedAtMs: integer('acknowledged_at_ms'),
+  },
+  (table) => ({
+    projectIdx: index('git_delivery_project_idx').on(table.projectId, table.createdAtMs),
+    callIdx: uniqueIndex('git_delivery_chat_call_idx')
+      .on(table.sessionId, table.toolCallId)
+      .where(sql`${table.source} = 'chat'`),
+    activeRepoIdx: uniqueIndex('git_delivery_active_repo_idx')
+      .on(table.repositoryRoot)
+      .where(sql`${table.state} = 'executing'`),
+  }),
+);

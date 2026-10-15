@@ -7,7 +7,6 @@ import type {
   ProjectGitChecksResult,
   ProjectGitConflictFileResult,
   ProjectGitConflictSummary,
-  ProjectGitCreatePullRequestResult,
   ProjectGitDiffMode,
   ProjectGitFileDiffResult,
   ProjectGitHubRepositoryConnectionResult,
@@ -31,8 +30,10 @@ import {
   X,
 } from 'lucide-react';
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { GitDeliveryReceiptControl } from './git-delivery-receipt';
+import { useGitDelivery } from '@/lib/useGitDelivery';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -211,7 +212,7 @@ function getRepositoryDialogTitle(mode: RepositoryConnectionMode): string {
 
 function getRepositoryDialogDescription(mode: RepositoryConnectionMode): string {
   if (mode === 'create') {
-    return 'Create a GitHub repository, set it as origin, and push this project.';
+    return 'Create a GitHub repository and set it as origin. Review publishing separately.';
   }
   return 'Connect this local project to a GitHub repository you already have.';
 }
@@ -584,6 +585,23 @@ function getNoGithubRemoteOverview(status: ProjectGitStatusResult): GitWorkflowO
   };
 }
 
+export function withCompleteGitIndex(
+  status: ProjectGitStatusResult,
+  stagedCount: number,
+): ProjectGitStatusResult {
+  return {
+    ...status,
+    clean: status.clean && stagedCount === 0,
+    workingTree: { ...status.workingTree, staged: stagedCount },
+  };
+}
+
+export function selectedGitChangePaths(file: ProjectGitChangedFile): string[] {
+  return file.originalPath && file.originalPath !== file.path
+    ? [file.originalPath, file.path]
+    : [file.path];
+}
+
 export function deriveGitWorkflowOverview({
   status,
   pullRequests,
@@ -785,7 +803,7 @@ export function deriveGitPublishState({
 }>): GitPublishState {
   if (status.workingTree.conflicts > 0) return getMergeConflictState();
   if (status.clean && status.behind > 0) return getPullRemoteChangesState(status);
-  if (pushSuccess || (status.clean && status.upstreamState === 'active' && status.ahead === 0))
+  if (status.clean && status.upstreamState === 'active' && status.ahead === 0)
     return getPublishedState(pushSuccess);
   if (!status.remoteUrl) return getNotConnectedState(commitSuccess);
   if (status.upstreamState === 'missing') return getStaleUpstreamState(status);
@@ -1789,11 +1807,12 @@ function RepositoryCreateForm({
         </div>
       </div>
       <div className="rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
-        This will create the repository on GitHub, add it as origin, and push the current branch.
+        This will create the repository on GitHub and add it as origin. Publishing the branch
+        requires a separate review.
       </div>
       <RepositoryDialogActions
         pendingLabel="Creating..."
-        submitLabel="Create repository & push"
+        submitLabel="Create repository"
         pending={createPending}
         actionPending={actionPending}
         onCancel={onCancel}
@@ -2259,7 +2278,7 @@ function ResolvedConflictPanel({
             onClick={() => runAsyncAction(() => commitMergeResolution(true))}
             disabled={actionPending !== null || !mergeCommitMessage.trim()}
           >
-            {actionPending === 'merge-commit-push' ? 'Pushing...' : 'Commit & push'}
+            {actionPending === 'merge-commit-push' ? 'Committing...' : 'Commit & review push'}
           </Button>
         </div>
       </div>
@@ -2393,6 +2412,19 @@ export function ProjectGitHubPanel({
   isStartingProjectInstructions = false,
   onStartProjectInstructions,
 }: ProjectGitHubPanelProps) {
+  const delivery = useGitDelivery(projectId);
+  // A new token also distinguishes A -> B -> A from the original A request.
+  const projectView = useRef({ projectId });
+  if (projectView.current.projectId !== projectId) projectView.current = { projectId };
+  const view = projectView.current;
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const isCurrentView = useCallback(() => mounted.current && projectView.current === view, [view]);
   const [open, setOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
   const [preferredTab, setPreferredTab] = useState<PanelTab | null>(null);
@@ -2434,6 +2466,7 @@ export function ProjectGitHubPanel({
   const [pullRequestTitle, setPullRequestTitle] = useState('');
   const [pullRequestBaseBranch, setPullRequestBaseBranch] = useState('');
   const [pullRequestBody, setPullRequestBody] = useState('');
+  const [pullRequestDraft, setPullRequestDraft] = useState(false);
   const [pullRequestSuccess, setPullRequestSuccess] = useState<string | null>(null);
   const [mergeCommitMessage, setMergeCommitMessage] = useState('Resolve merge conflicts');
   const [repositoryDialogOpen, setRepositoryDialogOpen] = useState(false);
@@ -2449,6 +2482,7 @@ export function ProjectGitHubPanel({
   const [lastRepositoryUrl, setLastRepositoryUrl] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
+    if (!isCurrentView()) return;
     if (!projectId) {
       setStatus(null);
       setStatusProjectId(null);
@@ -2460,19 +2494,22 @@ export function ProjectGitHubPanel({
       const next = await apiGet<ProjectGitStatusResult>(
         apiPath('projects', projectId, 'git', 'status'),
       );
+      if (!isCurrentView()) return;
       setStatus(next ?? EmptyGitStatus());
       setStatusProjectId(projectId);
       setError(null);
     } catch (cause) {
+      if (!isCurrentView()) return;
       setStatus(EmptyGitStatus());
       setStatusProjectId(projectId);
       setError(cause instanceof ApiRequestError ? cause.message : 'Failed to load Git state.');
     } finally {
-      setLoading(false);
+      if (isCurrentView()) setLoading(false);
     }
-  }, [projectId]);
+  }, [isCurrentView, projectId]);
 
   const loadChanges = useCallback(async () => {
+    if (!isCurrentView()) return;
     if (!projectId) {
       setChanges(null);
       setChangesProjectId(null);
@@ -2486,6 +2523,7 @@ export function ProjectGitHubPanel({
       const next = await apiGet<ProjectGitChangesResult>(
         apiPath('projects', projectId, 'git', 'changes'),
       );
+      if (!isCurrentView()) return;
       setChanges(next ?? null);
       setChangesProjectId(projectId);
       setChangesError(null);
@@ -2495,17 +2533,19 @@ export function ProjectGitHubPanel({
         return next.files[0] ?? null;
       });
     } catch (cause) {
+      if (!isCurrentView()) return;
       setChanges(null);
       setChangesProjectId(projectId);
       setSelectedChange(null);
       setDiff(null);
       setChangesError(cause instanceof ApiRequestError ? cause.message : 'Failed to load changes.');
     } finally {
-      setChangesLoading(false);
+      if (isCurrentView()) setChangesLoading(false);
     }
-  }, [projectId]);
+  }, [isCurrentView, projectId]);
 
   const loadChecks = useCallback(async () => {
+    if (!isCurrentView()) return;
     if (!projectId) {
       setChecks(null);
       setChecksProjectId(null);
@@ -2517,19 +2557,22 @@ export function ProjectGitHubPanel({
       const next = await apiGet<ProjectGitChecksResult>(
         apiPath('projects', projectId, 'git', 'checks'),
       );
+      if (!isCurrentView()) return;
       setChecks(next ?? null);
       setChecksProjectId(projectId);
       setChecksError(null);
     } catch (cause) {
+      if (!isCurrentView()) return;
       setChecks(null);
       setChecksProjectId(projectId);
       setChecksError(cause instanceof ApiRequestError ? cause.message : 'Failed to load checks.');
     } finally {
-      setChecksLoading(false);
+      if (isCurrentView()) setChecksLoading(false);
     }
-  }, [projectId]);
+  }, [isCurrentView, projectId]);
 
   const loadPullRequests = useCallback(async () => {
+    if (!isCurrentView()) return;
     if (!projectId) {
       setPullRequests(null);
       setPullRequestsProjectId(null);
@@ -2541,21 +2584,24 @@ export function ProjectGitHubPanel({
       const next = await apiGet<ProjectGitPullRequestsResult>(
         apiPath('projects', projectId, 'github', 'pull-requests'),
       );
+      if (!isCurrentView()) return;
       setPullRequests(next ?? null);
       setPullRequestsProjectId(projectId);
       setPullRequestsError(null);
     } catch (cause) {
+      if (!isCurrentView()) return;
       setPullRequests(null);
       setPullRequestsProjectId(projectId);
       setPullRequestsError(
         cause instanceof ApiRequestError ? cause.message : 'Failed to load pull requests.',
       );
     } finally {
-      setPullRequestsLoading(false);
+      if (isCurrentView()) setPullRequestsLoading(false);
     }
-  }, [projectId]);
+  }, [isCurrentView, projectId]);
 
   const loadBranches = useCallback(async () => {
+    if (!isCurrentView()) return;
     if (!projectId) {
       setBranches(null);
       setBranchesProjectId(null);
@@ -2567,10 +2613,12 @@ export function ProjectGitHubPanel({
       const next = await apiGet<ProjectBranchListResult>(
         apiPath('projects', projectId, 'branches'),
       );
+      if (!isCurrentView()) return;
       setBranches(next ?? null);
       setBranchesProjectId(projectId);
       setBranchesError(null);
     } catch (cause) {
+      if (!isCurrentView()) return;
       setBranches(null);
       setBranchesProjectId(projectId);
       if (cause instanceof ApiRequestError && cause.code === 'PROJECT_GIT_UNAVAILABLE') {
@@ -2581,11 +2629,12 @@ export function ProjectGitHubPanel({
         );
       }
     } finally {
-      setBranchesLoading(false);
+      if (isCurrentView()) setBranchesLoading(false);
     }
-  }, [projectId]);
+  }, [isCurrentView, projectId]);
 
   const loadConflicts = useCallback(async () => {
+    if (!isCurrentView()) return;
     if (!projectId) {
       setConflicts(null);
       setConflictFile(null);
@@ -2598,6 +2647,7 @@ export function ProjectGitHubPanel({
       const next = await apiGet<ProjectGitConflictSummary>(
         apiPath('projects', projectId, 'git', 'conflicts'),
       );
+      if (!isCurrentView()) return;
       setConflicts(next ?? null);
       setConflictError(null);
       setSelectedConflictPath((current) => {
@@ -2606,14 +2656,15 @@ export function ProjectGitHubPanel({
         return next.files[0]?.path ?? null;
       });
     } catch (cause) {
+      if (!isCurrentView()) return;
       setConflicts(null);
       setConflictError(
         cause instanceof ApiRequestError ? cause.message : 'Failed to load merge conflicts.',
       );
     } finally {
-      setConflictsLoading(false);
+      if (isCurrentView()) setConflictsLoading(false);
     }
-  }, [projectId]);
+  }, [isCurrentView, projectId]);
 
   useEffect(() => {
     setStatus(null);
@@ -2641,6 +2692,7 @@ export function ProjectGitHubPanel({
     setPullRequestTitle('');
     setPullRequestBaseBranch('');
     setPullRequestBody('');
+    setPullRequestDraft(false);
     setPullRequestSuccess(null);
     setCommitSuccess(null);
     setPushSuccess(null);
@@ -2700,6 +2752,7 @@ export function ProjectGitHubPanel({
 
   const refreshGitViews = useCallback(async () => {
     await Promise.all([
+      delivery.refresh(),
       loadStatus(),
       loadChanges(),
       activeTab === 'prs' || activeTab === 'overview' ? loadPullRequests() : null,
@@ -2709,6 +2762,7 @@ export function ProjectGitHubPanel({
   }, [
     activeTab,
     conflictResolverOpen,
+    delivery.refresh,
     loadChanges,
     loadChecks,
     loadConflicts,
@@ -2719,60 +2773,25 @@ export function ProjectGitHubPanel({
 
   const stagePaths = useCallback(
     async (paths: string[] | 'all') => {
-      if (!projectId) return;
-      setActionPending(paths === 'all' ? 'stage-all' : `stage:${paths.join('\0')}`);
-      try {
-        const next = await apiPost<ProjectGitChangesResult>(
-          apiPath('projects', projectId, 'git', 'stage'),
-          paths === 'all' ? { all: true } : { paths },
-        );
-        setChanges(next ?? null);
-        setChangesProjectId(projectId);
-        setSelectedChange((current) =>
-          current && next
-            ? (next.files.find((file) => file.path === current.path) ?? null)
-            : current,
-        );
-        if (paths !== 'all') setSelectedDiffMode('staged');
-        setChangesError(null);
-        await loadStatus();
-      } catch (cause) {
-        setChangesError(cause instanceof ApiRequestError ? cause.message : 'Failed to stage file.');
-      } finally {
-        setActionPending(null);
-      }
+      if (!projectId || changesProjectId !== projectId) return;
+      const selected =
+        paths === 'all'
+          ? (changes?.files
+              .filter((file) => file.unstaged || file.status === 'untracked')
+              .flatMap(selectedGitChangePaths) ?? [])
+          : paths;
+      if (selected.length === 0) return;
+      await delivery.prepare({ kind: 'stage', mode: 'stage', paths: selected });
     },
-    [loadStatus, projectId],
+    [changes, changesProjectId, delivery.prepare, projectId],
   );
 
   const unstagePaths = useCallback(
     async (paths: string[]) => {
-      if (!projectId) return;
-      setActionPending(`unstage:${paths.join('\0')}`);
-      try {
-        const next = await apiPost<ProjectGitChangesResult>(
-          apiPath('projects', projectId, 'git', 'unstage'),
-          { paths },
-        );
-        setChanges(next ?? null);
-        setChangesProjectId(projectId);
-        setSelectedChange((current) =>
-          current && next
-            ? (next.files.find((file) => file.path === current.path) ?? null)
-            : current,
-        );
-        setSelectedDiffMode('unstaged');
-        setChangesError(null);
-        await loadStatus();
-      } catch (cause) {
-        setChangesError(
-          cause instanceof ApiRequestError ? cause.message : 'Failed to unstage file.',
-        );
-      } finally {
-        setActionPending(null);
-      }
+      if (!projectId || paths.length === 0) return;
+      await delivery.prepare({ kind: 'stage', mode: 'unstage', paths });
     },
-    [loadStatus, projectId],
+    [delivery.prepare, projectId],
   );
 
   const stashPaths = useCallback(
@@ -2807,118 +2826,74 @@ export function ProjectGitHubPanel({
   );
 
   const commitStagedChanges = useCallback(async () => {
-    if (!projectId) return;
-    const message = commitMessage.trim();
-    if (!message) {
-      setChangesError('Enter a commit message before committing staged changes.');
-      return;
-    }
-    setActionPending('commit');
-    try {
-      const nextStatus = await apiPost<ProjectGitStatusResult>(
-        apiPath('projects', projectId, 'git', 'commit'),
-        { message },
-      );
-      setStatus(nextStatus ?? null);
-      setStatusProjectId(projectId);
-      setCommitMessage('');
-      setCommitSuccess(
-        nextStatus?.recentCommit
-          ? `Committed ${shortSha(nextStatus.recentCommit.sha)}: ${nextStatus.recentCommit.subject}`
-          : 'Commit completed.',
-      );
-      setPushSuccess(null);
-      setPreferredTab('push');
-      setActiveTab('push');
-      setSelectedChange(null);
-      setDiff(null);
-      setSelectedDiffMode('unstaged');
-      setChangesError(null);
-      await loadChanges();
-    } catch (cause) {
-      setChangesError(cause instanceof ApiRequestError ? cause.message : 'Failed to commit files.');
-    } finally {
-      setActionPending(null);
-    }
-  }, [commitMessage, loadChanges, projectId]);
+    if (!projectId || !commitMessage.trim() || delivery.stagedPaths.length === 0) return;
+    await delivery.prepare({
+      kind: 'commit',
+      message: commitMessage.trim(),
+      paths: delivery.stagedPaths,
+    });
+  }, [commitMessage, delivery.prepare, delivery.stagedPaths, projectId]);
+
+  const executeDelivery = useCallback(
+    async (id: string) => {
+      if (!isCurrentView()) return;
+      const receipt = await delivery.perform(id, 'execute');
+      if (!receipt || !isCurrentView()) return;
+      if (receipt?.state === 'succeeded' && receipt.action.kind === 'commit') {
+        setPushSuccess(null);
+        setPullRequestSuccess(null);
+        setCommitMessage('');
+        setCommitSuccess(
+          `Committed ${receipt.result?.commitSha ?? 'reviewed changes'}: ${receipt.action.message}`,
+        );
+        setPreferredTab('push');
+        setActiveTab('push');
+        setSelectedChange(null);
+        setDiff(null);
+      }
+      if (receipt.state === 'succeeded' && receipt.action.kind === 'push') {
+        setPushSuccess(
+          `Published ${receipt.review.head} to ${receipt.result?.remoteRef ?? receipt.review.remoteRef}.`,
+        );
+        setCommitSuccess(null);
+        setPullRequestSuccess(null);
+        setPreferredTab('prs');
+        setActiveTab('prs');
+      }
+      if (receipt.state === 'succeeded' && receipt.action.kind === 'pull_request') {
+        setPullRequestSuccess(
+          `Pull request ready: ${receipt.result?.pullRequestUrl ?? 'see saved result'}`,
+        );
+        setPullRequestsError(null);
+        setPreferredTab('prs');
+        setActiveTab('prs');
+      }
+      await refreshGitViews();
+      if (!isCurrentView()) return;
+      if (
+        receipt.state === 'succeeded' &&
+        (receipt.action.kind === 'push' || receipt.action.kind === 'pull_request')
+      ) {
+        await Promise.all([loadPullRequests(), loadChecks()]);
+      }
+    },
+    [delivery.perform, isCurrentView, loadChecks, loadPullRequests, refreshGitViews],
+  );
+
+  useEffect(() => {
+    // A previous success is historical once repository identity or its tip changes.
+    setPushSuccess(null);
+  }, [status?.currentBranch, status?.recentCommit?.sha, status?.upstreamBranch, status?.remoteUrl]);
 
   const pushCurrentBranch = useCallback(async () => {
     if (!projectId) return;
-    setActionPending('push');
-    try {
-      const nextStatus = await apiPost<ProjectGitStatusResult>(
-        apiPath('projects', projectId, 'git', 'push'),
-        {},
-      );
-      setStatus(nextStatus ?? null);
-      setStatusProjectId(projectId);
-      setPushSuccess(
-        nextStatus?.currentBranch
-          ? `Pushed ${nextStatus.currentBranch} to ${nextStatus.upstreamBranch ?? 'upstream'}.`
-          : 'Push completed.',
-      );
-      setCommitSuccess(null);
-      setPullRequestSuccess(null);
-      setLastRepositoryUrl(normalizeGitHubUrl(nextStatus?.remoteUrl));
-      if (
-        nextStatus?.githubRemoteDetected &&
-        nextStatus.currentBranch &&
-        !isLikelyPrimaryBranch(nextStatus.currentBranch)
-      ) {
-        setPreferredTab('prs');
-        setActiveTab('prs');
-      } else {
-        setPreferredTab('push');
-      }
-      setError(null);
-      await Promise.all([
-        activeTab === 'changes' || activeTab === 'commit' ? loadChanges() : null,
-        loadChecks(),
-        loadPullRequests(),
-      ]);
-    } catch (cause) {
-      setError(cause instanceof ApiRequestError ? cause.message : 'Failed to push branch.');
-    } finally {
-      setActionPending(null);
-    }
-  }, [activeTab, loadChanges, loadChecks, loadPullRequests, projectId]);
+    await delivery.prepare({ kind: 'push', mode: 'push' });
+  }, [delivery.prepare, projectId]);
 
   const publishCurrentBranch = useCallback(async () => {
     if (!projectId) return;
-    setActionPending('publish');
-    try {
-      const nextStatus = await apiPost<ProjectGitStatusResult>(
-        apiPath('projects', projectId, 'git', 'publish'),
-        {},
-      );
-      setStatus(nextStatus ?? null);
-      setStatusProjectId(projectId);
-      setPushSuccess(
-        nextStatus?.currentBranch
-          ? `Published ${nextStatus.currentBranch} to ${nextStatus.upstreamBranch ?? 'origin'}.`
-          : 'Branch published.',
-      );
-      setCommitSuccess(null);
-      setPullRequestSuccess(null);
-      setLastRepositoryUrl(normalizeGitHubUrl(nextStatus?.remoteUrl));
-      if (
-        nextStatus?.githubRemoteDetected &&
-        nextStatus.currentBranch &&
-        !isLikelyPrimaryBranch(nextStatus.currentBranch)
-      ) {
-        setPreferredTab('prs');
-        setActiveTab('prs');
-      } else {
-        setPreferredTab('push');
-      }
-      setError(null);
-      await Promise.all([loadChecks(), loadPullRequests()]);
-    } catch (cause) {
-      setError(cause instanceof ApiRequestError ? cause.message : 'Failed to publish branch.');
-    } finally {
-      setActionPending(null);
-    }
-  }, [activeTab, loadChecks, loadPullRequests, projectId]);
+    await delivery.prepare({ kind: 'push', mode: 'publish' });
+  }, [delivery.prepare, projectId]);
 
   const openRepositoryDialog = useCallback(
     (mode: RepositoryConnectionMode) => {
@@ -2950,7 +2925,7 @@ export function ProjectGitHubPanel({
           name: repositoryName.trim(),
           description: repositoryDescription.trim() || undefined,
           visibility: repositoryVisibility,
-          pushCurrentBranch: true,
+          pushCurrentBranch: false,
         },
       );
       if (result?.status) {
@@ -3118,7 +3093,7 @@ export function ProjectGitHubPanel({
         );
         setConflictFile(null);
         setConflictError(null);
-        await Promise.all([loadConflicts(), loadStatus(), loadChanges()]);
+        await Promise.all([loadConflicts(), loadStatus(), loadChanges(), delivery.refresh()]);
       } catch (cause) {
         setConflictError(
           cause instanceof ApiRequestError ? cause.message : 'Failed to resolve conflict.',
@@ -3127,7 +3102,7 @@ export function ProjectGitHubPanel({
         setActionPending(null);
       }
     },
-    [loadChanges, loadConflicts, loadStatus, projectId, selectedConflictPath],
+    [delivery.refresh, loadChanges, loadConflicts, loadStatus, projectId, selectedConflictPath],
   );
 
   const commitMergeResolution = useCallback(
@@ -3142,7 +3117,7 @@ export function ProjectGitHubPanel({
       try {
         const nextStatus = await apiPost<ProjectGitStatusResult>(
           apiPath('projects', projectId, 'git', 'conflicts', 'commit'),
-          { message, push },
+          { message, push: false },
         );
         setStatus(nextStatus ?? null);
         setStatusProjectId(projectId);
@@ -3151,7 +3126,7 @@ export function ProjectGitHubPanel({
             ? `Committed ${shortSha(nextStatus.recentCommit.sha)}: ${nextStatus.recentCommit.subject}`
             : 'Merge resolution committed.',
         );
-        setPushSuccess(push ? 'Merge resolution pushed.' : null);
+        setPushSuccess(null);
         setConflictResolverOpen(false);
         setConflicts(null);
         setConflictFile(null);
@@ -3159,7 +3134,13 @@ export function ProjectGitHubPanel({
         setPreferredTab('push');
         setActiveTab('push');
         setConflictError(null);
-        await Promise.all([loadChanges(), loadChecks(), loadPullRequests()]);
+        await Promise.all([loadChanges(), loadChecks(), loadPullRequests(), delivery.refresh()]);
+        if (push) {
+          await delivery.prepare({
+            kind: 'push',
+            mode: nextStatus?.upstreamState === 'active' ? 'push' : 'publish',
+          });
+        }
       } catch (cause) {
         setConflictError(
           cause instanceof ApiRequestError ? cause.message : 'Failed to commit merge resolution.',
@@ -3168,7 +3149,15 @@ export function ProjectGitHubPanel({
         setActionPending(null);
       }
     },
-    [loadChanges, loadChecks, loadPullRequests, mergeCommitMessage, projectId],
+    [
+      delivery.prepare,
+      delivery.refresh,
+      loadChanges,
+      loadChecks,
+      loadPullRequests,
+      mergeCommitMessage,
+      projectId,
+    ],
   );
 
   const statusLoading = shouldRenderGitStatusLoader({
@@ -3182,8 +3171,12 @@ export function ProjectGitHubPanel({
   const currentChecks = checksProjectId === projectId ? checks : null;
   const currentPullRequests = pullRequestsProjectId === projectId ? pullRequests : null;
   const currentBranches = branchesProjectId === projectId ? branches : null;
+  const workflowStatus = useMemo(
+    () => withCompleteGitIndex(currentStatus, delivery.stagedPaths.length),
+    [currentStatus, delivery.stagedPaths.length],
+  );
   const workflowOverview = deriveGitWorkflowOverview({
-    status: currentStatus,
+    status: workflowStatus,
     pullRequests: currentPullRequests,
     checks: currentChecks,
   });
@@ -3233,12 +3226,12 @@ export function ProjectGitHubPanel({
   const tabs = useMemo(
     () =>
       deriveGitWorkflowTabs({
-        status: currentStatus,
+        status: workflowStatus,
         pullRequests: currentPullRequests,
         checks: currentChecks,
         pushSuccess,
       }),
-    [currentChecks, currentPullRequests, currentStatus, pushSuccess],
+    [currentChecks, currentPullRequests, workflowStatus, pushSuccess],
   );
   const conflictFiles = conflicts?.files ?? [];
   const unresolvedConflictFiles = conflictFiles.filter((file) => !file.resolved);
@@ -3263,6 +3256,10 @@ export function ProjectGitHubPanel({
     ? 'Working tree clean'
     : `${changedFileCount} changed ${pluralize(changedFileCount, 'file')}`;
   const publishActionLabel = getPublishActionLabel(actionPending, publishState);
+  let publishReviewLabel = publishActionLabel;
+  if (delivery.pending) publishReviewLabel = 'Git operation pending...';
+  else if (publishState.canPublish && publishActionLabel)
+    publishReviewLabel = `Review ${publishActionLabel.toLowerCase()}`;
 
   const createPullRequest = useCallback(async () => {
     if (!projectId) return;
@@ -3275,48 +3272,19 @@ export function ProjectGitHubPanel({
       setPullRequestsError('Enter a base branch.');
       return;
     }
-    setActionPending('create-pull-request');
-    try {
-      const result = await apiPost<ProjectGitCreatePullRequestResult>(
-        apiPath('projects', projectId, 'github', 'pull-requests'),
-        {
-          title,
-          body: pullRequestBody.trim() || undefined,
-          baseBranch: effectivePullRequestBaseBranch,
-          draft: false,
-        },
-      );
-      if (result?.pullRequests) {
-        setPullRequests(result.pullRequests);
-        setPullRequestsProjectId(projectId);
-      }
-      if (result?.checks) {
-        setChecks(result.checks);
-        setChecksProjectId(projectId);
-      }
-      setPullRequestSuccess(
-        result?.pullRequest
-          ? `Created PR #${result.pullRequest.number}: ${result.pullRequest.title}`
-          : 'Pull request created.',
-      );
-      setPullRequestsError(null);
-      setPullRequestBody('');
-      setPreferredTab('prs');
-      setActiveTab('prs');
-      await Promise.all([loadStatus(), loadChecks()]);
-    } catch (cause) {
-      setPullRequestsError(
-        cause instanceof ApiRequestError ? cause.message : 'Failed to create pull request.',
-      );
-    } finally {
-      setActionPending(null);
-    }
+    await delivery.prepare({
+      kind: 'pull_request',
+      title,
+      body: pullRequestBody,
+      baseBranch: effectivePullRequestBaseBranch,
+      draft: pullRequestDraft,
+    });
   }, [
+    delivery.prepare,
     effectivePullRequestBaseBranch,
-    loadChecks,
-    loadStatus,
     projectId,
     pullRequestBody,
+    pullRequestDraft,
     pullRequestCreateState.defaultTitle,
     pullRequestTitle,
   ]);
@@ -3464,6 +3432,58 @@ export function ProjectGitHubPanel({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 text-sm">
+              {delivery.error && <p role="alert">{delivery.error}</p>}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={delivery.pending}
+                onClick={() => runAsyncAction(delivery.refresh)}
+              >
+                Refresh Git operations
+              </Button>
+              {delivery.operations.length > 0 && (
+                <label>
+                  Git operation{' '}
+                  <select
+                    aria-label="Git operation"
+                    value={delivery.selected?.id ?? ''}
+                    onChange={(event) => delivery.select(event.target.value)}
+                  >
+                    {delivery.operations.map((operation) => (
+                      <option key={operation.id} value={operation.id}>
+                        {operation.action.kind} — {operation.state} — {operation.id.slice(0, 8)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {delivery.selected && (
+                <GitDeliveryReceiptControl
+                  receipt={delivery.selected}
+                  nowMs={Date.now()}
+                  pending={delivery.pending}
+                  unverified={delivery.unverifiedIds.includes(delivery.selected.id)}
+                  onConfirm={(id) => runAsyncAction(() => executeDelivery(id))}
+                  onCancel={(id) =>
+                    runAsyncAction(async () => {
+                      await delivery.perform(id, 'cancel');
+                    })
+                  }
+                  onReconcile={(id) =>
+                    runAsyncAction(async () => {
+                      await delivery.perform(id, 'reconcile');
+                      await refreshGitViews();
+                    })
+                  }
+                  onAcknowledge={(id) =>
+                    runAsyncAction(async () => {
+                      await delivery.perform(id, 'acknowledge');
+                    })
+                  }
+                  onDelete={(id) => runAsyncAction(() => delivery.remove(id))}
+                />
+              )}
+
               {error && (
                 <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   {error}
@@ -3791,7 +3811,9 @@ export function ProjectGitHubPanel({
                               type="button"
                               size="sm"
                               onClick={() =>
-                                runAsyncAction(() => stagePaths([selectedChange.path]))
+                                runAsyncAction(() =>
+                                  stagePaths(selectedGitChangePaths(selectedChange)),
+                                )
                               }
                               disabled={actionPending !== null}
                             >
@@ -3821,7 +3843,9 @@ export function ProjectGitHubPanel({
                               size="sm"
                               variant="outline"
                               onClick={() =>
-                                runAsyncAction(() => unstagePaths([selectedChange.path]))
+                                runAsyncAction(() =>
+                                  unstagePaths(selectedGitChangePaths(selectedChange)),
+                                )
                               }
                               disabled={actionPending !== null}
                             >
@@ -3854,10 +3878,28 @@ export function ProjectGitHubPanel({
               {!statusLoading && currentStatus.available && activeTab === 'commit' && (
                 <GitCard title="Commit">
                   <div className="space-y-3">
+                    <div>
+                      <strong>Complete staged index</strong>
+                      <ul aria-label="Complete staged index">
+                        {delivery.stagedPaths.map((path) => (
+                          <li key={path} className="whitespace-pre-wrap break-all">
+                            {path}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              disabled={delivery.pending}
+                              onClick={() => runAsyncAction(() => unstagePaths([path]))}
+                            >
+                              Review unstage
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                     {changesLoading && (
                       <div className="text-xs text-muted-foreground">Loading staged files...</div>
                     )}
-                    {stagedFiles.length === 0 && (
+                    {delivery.stagedPaths.length === 0 && (
                       <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
                         No staged files are ready to commit. Go back to Changes to choose files.
                       </div>
@@ -3895,7 +3937,11 @@ export function ProjectGitHubPanel({
                         value={commitMessage}
                         onChange={(event) => setCommitMessage(event.target.value)}
                         placeholder="Commit message"
-                        disabled={stagedFiles.length === 0 || actionPending !== null}
+                        disabled={
+                          delivery.stagedPaths.length === 0 ||
+                          actionPending !== null ||
+                          delivery.pending
+                        }
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' && !event.shiftKey) {
                             event.preventDefault();
@@ -3907,13 +3953,14 @@ export function ProjectGitHubPanel({
                         type="button"
                         size="sm"
                         disabled={
-                          stagedFiles.length === 0 ||
+                          delivery.stagedPaths.length === 0 ||
                           actionPending !== null ||
+                          delivery.pending ||
                           commitMessage.trim().length === 0
                         }
                         onClick={() => runAsyncAction(commitStagedChanges)}
                       >
-                        {actionPending === 'commit' ? 'Committing...' : 'Commit'}
+                        {delivery.pending ? 'Preparing review...' : 'Review commit'}
                       </Button>
                     </div>
                     {stagedFiles.length > 0 && (
@@ -3923,7 +3970,7 @@ export function ProjectGitHubPanel({
                           size="sm"
                           variant="ghost"
                           onClick={() => setActiveTab('changes')}
-                          disabled={actionPending !== null}
+                          disabled={actionPending !== null || delivery.pending}
                         >
                           Back to changes
                         </Button>
@@ -4035,6 +4082,7 @@ export function ProjectGitHubPanel({
                                 size="sm"
                                 disabled={
                                   actionPending !== null ||
+                                  delivery.pending ||
                                   (!publishState.canPublish &&
                                     !publishState.canPull &&
                                     currentStatus.workingTree.conflicts === 0)
@@ -4055,7 +4103,7 @@ export function ProjectGitHubPanel({
                                   runAsyncAction(publishCurrentBranch);
                                 }}
                               >
-                                {publishActionLabel}
+                                {publishReviewLabel}
                               </Button>
                             )}
                             {publishState.canClearStaleUpstream && (
@@ -4296,16 +4344,23 @@ export function ProjectGitHubPanel({
                                   className="min-h-20 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                 />
                               </div>
+                              <label className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={pullRequestDraft}
+                                  disabled={actionPending !== null || delivery.pending}
+                                  onChange={(event) => setPullRequestDraft(event.target.checked)}
+                                />{' '}
+                                Create as draft
+                              </label>
                               <div className="flex flex-wrap gap-2">
                                 <Button
                                   type="button"
                                   size="sm"
-                                  disabled={actionPending !== null}
+                                  disabled={actionPending !== null || delivery.pending}
                                   onClick={() => runAsyncAction(createPullRequest)}
                                 >
-                                  {actionPending === 'create-pull-request'
-                                    ? 'Creating...'
-                                    : 'Create pull request'}
+                                  {delivery.pending ? 'Preparing review...' : 'Review pull request'}
                                 </Button>
                                 {currentGitHubUrl && (
                                   <Button type="button" size="sm" variant="outline" asChild>

@@ -779,6 +779,50 @@ paths:
                   offset:
                     type: integer
 
+  /v1/approval-requests/git-delivery:
+    get:
+      operationId: listRetainedGitDeliveryApprovals
+      summary: Read retained chat Git approvals and recovery-only receipts
+      tags:
+        - approval-requests
+      parameters:
+        - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Current session retained Git inventory; no execution authority.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - data
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required:
+                      - approvals
+                      - recoveryReceipts
+                    properties:
+                      approvals:
+                        type: array
+                        maxItems: 1000
+                        items:
+                          $ref: '#/components/schemas/PublicGitApprovalRequest'
+                      recoveryReceipts:
+                        type: array
+                        maxItems: 1000
+                        items:
+                          $ref: '#/components/schemas/GitDeliveryReceipt'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/approval-requests/{id}:
     parameters:
       - $ref: '#/components/parameters/ResourceId'
@@ -1563,6 +1607,255 @@ components:
           minimum: 0
         decisionReason:
           type: string
+
+    PublicGitApprovalRequest:
+      type: object
+      required:
+        - id
+        - sessionId
+        - runId
+        - agentId
+        - toolName
+        - argsJson
+        - riskTier
+        - status
+        - createdAtMs
+      properties:
+        id:
+          type: string
+          minLength: 1
+        sessionId:
+          type: string
+          minLength: 1
+        runId:
+          type: string
+          minLength: 1
+        agentId:
+          type: string
+          minLength: 1
+        toolName:
+          type: string
+          minLength: 1
+        argsJson:
+          type: string
+          description: Redacted JSON string of the requested tool arguments.
+        executionPayloadJson:
+          type: string
+          nullable: true
+          enum:
+            - null
+          description: Private execution payload is never exposed by this read.
+        riskTier:
+          $ref: '#/components/schemas/RiskTier'
+        status:
+          $ref: '#/components/schemas/ApprovalRequestStatus'
+        createdAtMs:
+          type: integer
+          minimum: 0
+        decidedAtMs:
+          type: integer
+          minimum: 0
+        expiresAtMs:
+          type: integer
+          minimum: 0
+        decisionReason:
+          type: string
+        resumedAtMs:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+    GitDeliveryReceipt:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+        sessionId:
+          type: string
+        source:
+          type: string
+          enum:
+            - panel
+            - chat
+        action:
+          anyOf:
+            - type: object
+              properties:
+                kind:
+                  type: string
+                  enum:
+                    - stage
+                mode:
+                  type: string
+                  enum:
+                    - stage
+                    - unstage
+                paths:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 4096
+                  minItems: 1
+                  maxItems: 500
+              required:
+                - kind
+                - mode
+                - paths
+              additionalProperties: false
+            - type: object
+              properties:
+                kind:
+                  type: string
+                  enum:
+                    - commit
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 10000
+                paths:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 4096
+                  minItems: 1
+                  maxItems: 500
+              required:
+                - kind
+                - message
+                - paths
+              additionalProperties: false
+            - type: object
+              properties:
+                kind:
+                  type: string
+                  enum:
+                    - push
+                mode:
+                  type: string
+                  enum:
+                    - publish
+                    - push
+              required:
+                - kind
+                - mode
+              additionalProperties: false
+            - type: object
+              properties:
+                kind:
+                  type: string
+                  enum:
+                    - pull_request
+                baseBranch:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+                body:
+                  type: string
+                  maxLength: 65536
+                draft:
+                  type: boolean
+              required:
+                - kind
+                - baseBranch
+                - title
+                - body
+                - draft
+              additionalProperties: false
+        state:
+          type: string
+          enum:
+            - prepared
+            - executing
+            - succeeded
+            - failed
+            - unknown
+            - cancelled
+            - denied
+            - stale
+            - expired
+        createdAtMs:
+          type: number
+        updatedAtMs:
+          type: number
+        expiresAtMs:
+          type: number
+        review:
+          type: object
+          properties:
+            branch:
+              type: string
+            head:
+              type: string
+            indexTree:
+              type: string
+            paths:
+              type: array
+              items:
+                type: string
+            remoteName:
+              type: string
+            remoteRef:
+              type: string
+            repositorySlug:
+              type: string
+            warning:
+              type: string
+          required:
+            - branch
+            - head
+            - indexTree
+            - paths
+          additionalProperties: false
+        result:
+          type: object
+          properties:
+            commitSha:
+              type: string
+            indexTree:
+              type: string
+            remoteRef:
+              type: string
+            pullRequestUrl:
+              type: string
+            pullRequestNumber:
+              type: integer
+              exclusiveMinimum: true
+              minimum: 0
+            warning:
+              type: string
+          additionalProperties: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+          required:
+            - code
+            - message
+          additionalProperties: false
+        acknowledgedAtMs:
+          type: number
+      required:
+        - id
+        - projectId
+        - source
+        - action
+        - state
+        - createdAtMs
+        - updatedAtMs
+        - expiresAtMs
+        - review
+      additionalProperties: false
 
     ApprovalRequestDecisionBody:
       type: object

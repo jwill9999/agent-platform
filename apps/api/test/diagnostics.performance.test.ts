@@ -12,7 +12,7 @@ import {
   updateSettings,
 } from '@agent-platform/db';
 import { createRequire } from 'node:module';
-import { monitorEventLoopDelay } from 'node:perf_hooks';
+import { monitorEventLoopDelay, PerformanceObserver } from 'node:perf_hooks';
 const Database = createRequire(new URL('../../../packages/db/package.json', import.meta.url))(
   'better-sqlite3',
 ) as new (path: string) => ReturnType<typeof openDatabase>['sqlite'];
@@ -57,6 +57,12 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
       enqueueSamples: number;
       eventLoopP95Ms: number;
       eventLoopSamples: number;
+      wallDurationMs: number;
+      cpuUserMs: number;
+      cpuSystemMs: number;
+      residentBytesBefore: number;
+      residentBytesAfter: number;
+      observedGcDurationsMs: number[];
     }
   > = {};
   let captureActiveSample: (() => void) | undefined;
@@ -74,6 +80,8 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
       enqueueLimitMs: 2,
       provider: 'deterministic fixture',
       logSink: 'non-retaining no-op; production serialization still runs',
+      observationScope:
+        'Warm-up plus measured requests; process CPU includes worker threads. GC records are asynchronously observed and may be incomplete. Observations never adjust durations or pass criteria.',
     };
     const json = JSON.stringify(evidence, null, 2);
     // Always retain numerical evidence, including partial measurements on assertion failure.
@@ -117,6 +125,12 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
           enqueueSamples: 0,
           eventLoopP95Ms: 0,
           eventLoopSamples: 0,
+          wallDurationMs: 0,
+          cpuUserMs: 0,
+          cpuSystemMs: 0,
+          residentBytesBefore: 0,
+          residentBytesAfter: 0,
+          observedGcDurationsMs: [] as number[],
         });
         const initialLogCalls = logCalls;
         captureActiveSample = () => {
@@ -196,7 +210,21 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
         const durations = sample.requestDurationsMs;
         const eventLoop = monitorEventLoopDelay({ resolution: 10 });
         eventLoop.enable();
+        const gc = new PerformanceObserver((list) => {
+          sample.observedGcDurationsMs.push(...list.getEntries().map((entry) => entry.duration));
+        });
+        gc.observe({ entryTypes: ['gc'] });
+        cleanups.push(async () => gc.disconnect());
+        const initialCpu = process.cpuUsage();
+        const windowStarted = performance.now();
+        sample.residentBytesBefore = process.memoryUsage().rss;
         captureActiveSample = () => {
+          sample.observedGcDurationsMs.push(...gc.takeRecords().map((entry) => entry.duration));
+          const cpu = process.cpuUsage(initialCpu);
+          sample.cpuUserMs = cpu.user / 1000;
+          sample.cpuSystemMs = cpu.system / 1000;
+          sample.wallDurationMs = performance.now() - windowStarted;
+          sample.residentBytesAfter = process.memoryUsage().rss;
           sample.requestP95Ms = percentile95(durations);
           sample.enqueueP95Ms = percentile95(enqueue);
           sample.enqueueSamples = enqueue.length;
@@ -229,6 +257,9 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
         eventLoop.disable();
         sample.status = 'verifying';
         publishMeasurements();
+        // Freeze the measurement window before durable-history verification and cleanup.
+        gc.disconnect();
+        captureActiveSample = undefined;
         expect(Number(eventLoop.count)).toBeGreaterThan(0);
         expect(providerCalls).toBe(110);
         let retainedEvents = 0;

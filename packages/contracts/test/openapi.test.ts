@@ -182,7 +182,7 @@ describe('openApiToToolDefinitions', () => {
     expect(openApiToToolDefinitions(doc)).toEqual([]);
   });
 
-  it('parses the real spec and produces 30 operations', () => {
+  it('parses the real spec and produces 38 operations', () => {
     const specPath = resolve(
       __dirname,
       '..',
@@ -195,7 +195,12 @@ describe('openApiToToolDefinitions', () => {
     const doc = parse(readFileSync(specPath, 'utf-8'));
     const tools = openApiToToolDefinitions(doc);
 
-    expect(tools.length).toBe(37);
+    expect(tools.length).toBe(38);
+    expect(tools.find((tool) => tool.name === 'listRetainedGitDeliveryApprovals')).toMatchObject({
+      method: 'GET',
+      path: '/v1/approval-requests/git-delivery',
+      parameters: { required: ['sessionId'], properties: { sessionId: { type: 'string' } } },
+    });
 
     const names = tools.map((t) => t.name);
     expect(names).toContain('listAgents');

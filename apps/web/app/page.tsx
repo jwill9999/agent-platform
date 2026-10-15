@@ -39,6 +39,8 @@ import {
 } from '@/components/project/project-instructions-review';
 import { ProjectBranchSelector } from '@/components/project/project-branch-selector';
 import { ProjectEvidenceRail } from '@/components/project/project-evidence-rail';
+import { ProjectEvidenceToggle } from '@/components/project/project-evidence-toggle';
+import { useProjectEvidenceVisibility } from '@/lib/useProjectEvidenceVisibility';
 import { ProjectTerminalDock } from '@/components/project/project-terminal-dock';
 import {
   ProjectWebViewPanel,
@@ -122,6 +124,9 @@ type ProjectChatHeaderProps = Readonly<{
   onReturnHome: () => void;
   terminalOpen: boolean;
   onToggleTerminal: () => void;
+  evidenceVisible: boolean;
+  evidenceUnavailableReason: string | null;
+  onEvidenceVisibleChange: (visible: boolean) => void;
   canOpenIde: boolean;
   isOpeningIde: boolean;
   onOpenIde: () => void;
@@ -538,6 +543,9 @@ function ProjectChatHeader({
   onReturnHome,
   terminalOpen,
   onToggleTerminal,
+  evidenceVisible,
+  evidenceUnavailableReason,
+  onEvidenceVisibleChange,
   canOpenIde,
   isOpeningIde,
   onOpenIde,
@@ -583,6 +591,11 @@ function ProjectChatHeader({
         )}
       </div>
       <ProjectCommandRunnerStatus commandRunner={commandRunner} />
+      <ProjectEvidenceToggle
+        visible={evidenceVisible}
+        onVisibleChange={onEvidenceVisibleChange}
+        unavailableReason={evidenceUnavailableReason}
+      />
       <Button
         type="button"
         size="sm"
@@ -618,6 +631,11 @@ export default function HomePage() {
   const [activeProject, setActiveProject] = useState<ProjectDesktopRecord | null>(null);
   const [projectTerminalOpen, setProjectTerminalOpen] = useState(false);
   const [projectWebViewMode, setProjectWebViewMode] = useState<ProjectWebViewMode>('docked');
+  const {
+    visible: projectEvidenceVisible,
+    unavailableReason: evidenceUnavailableReason,
+    setVisible: setProjectEvidenceVisible,
+  } = useProjectEvidenceVisibility(projectWebViewMode === 'docked');
   const [projectGitRefreshKey, setProjectGitRefreshKey] = useState(0);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
@@ -697,6 +715,9 @@ export default function HomePage() {
     toolEventsByMessage,
     workspaceEventsByMessage,
     approvalEventsByMessage,
+    gitRecoveryReceipts,
+    updateGitReceipt,
+    removeGitReceipt,
     decideApproval,
     hasPendingApproval,
     canSend: chatCanSend,
@@ -1632,7 +1653,7 @@ export default function HomePage() {
 
   const handleApprovalDecision = useCallback(
     (approvalRequestId: string, decision: ApprovalDecision) => {
-      decideApproval(approvalRequestId, decision, selectedModelConfigId);
+      return decideApproval(approvalRequestId, decision, selectedModelConfigId);
     },
     [decideApproval, selectedModelConfigId],
   );
@@ -1754,6 +1775,9 @@ export default function HomePage() {
               onReturnHome={handleReturnHome}
               terminalOpen={projectTerminalOpen}
               onToggleTerminal={() => setProjectTerminalOpen((open) => !open)}
+              evidenceVisible={projectEvidenceVisible}
+              evidenceUnavailableReason={evidenceUnavailableReason}
+              onEvidenceVisibleChange={setProjectEvidenceVisible}
               canOpenIde={isDesktopProjectIdeBridgeAvailable}
               isOpeningIde={isOpeningProjectIde}
               onOpenIde={handleOpenProjectIde}
@@ -1795,6 +1819,9 @@ export default function HomePage() {
               workspaceEventsByMessage={workspaceEventsByMessage}
               workspaceWebViewProjectId={workspaceWebViewProjectId}
               approvalEventsByMessage={approvalEventsByMessage}
+              gitRecoveryReceipts={gitRecoveryReceipts}
+              onGitReceiptChange={updateGitReceipt}
+              onGitReceiptDeleted={removeGitReceipt}
               onApprovalDecision={handleApprovalDecision}
               showSensors={false}
               sensorDashboard={sensorDashboard}
@@ -1855,7 +1882,7 @@ export default function HomePage() {
                       viewMode={projectWebViewMode}
                       onViewModeChange={setProjectWebViewMode}
                     />
-                    {projectWebViewMode === 'docked' && (
+                    {projectWebViewMode === 'docked' && projectEvidenceVisible && (
                       <ProjectEvidenceRail
                         projectId={activeProject?.id ?? null}
                         sessionId={sessionId}

@@ -38,6 +38,7 @@ export function ProjectEvidenceRail({
 
   return (
     <div
+      id="project-evidence-rail"
       className="flex h-full min-h-0 w-[360px] max-w-[30vw] shrink-0 flex-col overflow-hidden border-l border-border bg-background/95"
       aria-label="Project evidence"
     >

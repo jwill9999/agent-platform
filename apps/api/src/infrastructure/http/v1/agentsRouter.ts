@@ -1,3 +1,4 @@
+import { SYSTEM_TOOLS, isGitDeliveryTool } from '@agent-platform/harness';
 import { AgentCreateBodySchema, AgentSchema } from '@agent-platform/contracts';
 import {
   createAgent,
@@ -6,6 +7,7 @@ import {
   listAgents,
   replaceAgent,
   getModelConfig,
+  upsertTool,
 } from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
 import { Router } from 'express';
@@ -13,6 +15,12 @@ import { Router } from 'express';
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
 import { parseBody, requireParam } from './routerUtils.js';
+
+function ensureAssignedGitTools(db: DrizzleDb, ids: string[]): void {
+  for (const tool of SYSTEM_TOOLS) {
+    if (isGitDeliveryTool(tool.id) && ids.includes(tool.id)) upsertTool(db, tool);
+  }
+}
 
 export function createAgentsRouter(db: DrizzleDb): Router {
   const router = Router();
@@ -42,6 +50,7 @@ export function createAgentsRouter(db: DrizzleDb): Router {
         if (!cfg)
           throw new HttpError(404, 'NOT_FOUND', `Model config '${body.modelConfigId}' not found`);
       }
+      ensureAssignedGitTools(db, body.allowedToolIds);
       const agent = createAgent(db, body);
       res.status(201).json({ data: agent });
     }),
@@ -59,6 +68,7 @@ export function createAgentsRouter(db: DrizzleDb): Router {
         if (!cfg)
           throw new HttpError(404, 'NOT_FOUND', `Model config '${agent.modelConfigId}' not found`);
       }
+      ensureAssignedGitTools(db, agent.allowedToolIds);
       replaceAgent(db, agent);
       res.json({ data: getAgent(db, existing.id) });
     }),

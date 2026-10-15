@@ -2,15 +2,20 @@
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
-import type {
-  DiagnosticPartialFailure,
-  ApprovalRequest,
-  ApprovalRequestStatus,
-  CapabilityRecovery,
-  MessageRecord,
-  WorkspaceEvent,
+import { z } from 'zod';
+import { gitApprovalReceipt, isGitDeliveryTool, gitReceiptBinding } from '@/lib/git-chat-receipts';
+import {
+  type DiagnosticPartialFailure,
+  type ApprovalRequest,
+  type ApprovalRequestStatus,
+  type CapabilityRecovery,
+  type MessageRecord,
+  type WorkspaceEvent,
+  ApprovalRequestSchema,
+  GitDeliveryReceiptSchema,
+  type GitDeliveryReceipt,
+  WorkspaceEventSchema,
 } from '@agent-platform/contracts';
-import { WorkspaceEventSchema } from '@agent-platform/contracts';
 import { apiPath, apiPost } from '@/lib/apiClient';
 import { observeChatResponse, partialChatFailure } from '@/lib/chat-diagnostics';
 import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
@@ -465,7 +470,10 @@ function approvalFromRecord(request: ApprovalRequest): ApprovalCardState {
     toolName: request.toolName,
     riskTier: request.riskTier,
     argsPreview: parseApprovalArgs(request.argsJson),
-    status: request.resumedAtMs ? 'executed' : approvalStatusFromRecord(request.status),
+    status:
+      request.resumedAtMs && !isGitDeliveryTool(request.toolName)
+        ? 'executed'
+        : approvalStatusFromRecord(request.status),
   };
 }
 
@@ -498,7 +506,12 @@ export function hasBlockingApprovalEvents(
   approvalsByMessage: Record<string, readonly ApprovalCardState[]>,
 ): boolean {
   return Object.values(approvalsByMessage).some((approvals) =>
-    approvals.some((approval) => BLOCKING_APPROVAL_STATUSES.has(approval.status)),
+    approvals.some((approval) => {
+      if (!BLOCKING_APPROVAL_STATUSES.has(approval.status)) return false;
+      if (!isGitDeliveryTool(approval.toolName)) return true;
+      const receipt = gitApprovalReceipt(approval.toolName, approval.argsPreview);
+      return receipt === null || (receipt.state === 'prepared' && receipt.expiresAtMs > Date.now());
+    }),
   );
 }
 
@@ -521,6 +534,11 @@ export type ChatAdmission =
     }
   | { accepted: true; completion: Promise<void>; isCurrent: () => boolean };
 
+export type ApprovalDecisionHandler = (
+  approvalRequestId: string,
+  decision: ApprovalDecision,
+) => ChatAdmission | void;
+
 type ChatView = {
   selection: symbol;
   epoch: number;
@@ -534,6 +552,7 @@ type ChatView = {
   toolEventsByMessage: Record<string, ToolTraceEvent[]>;
   workspaceEventsByMessage: Record<string, WorkspaceEvent[]>;
   approvalEventsByMessage: Record<string, ApprovalCardState[]>;
+  gitRecoveryReceipts: GitDeliveryReceipt[];
   restorationStatus: ChatRestorationStatus;
   restorationError: string | null;
 };
@@ -565,6 +584,7 @@ function emptyChatView(selection: symbol, epoch: number, status: ChatRestoration
     toolEventsByMessage: {},
     workspaceEventsByMessage: {},
     approvalEventsByMessage: {},
+    gitRecoveryReceipts: [],
     restorationStatus: status,
     restorationError: null,
   };
@@ -600,12 +620,73 @@ async function restoredRecords<T>(path: string, signal: AbortSignal): Promise<T[
   return data as T[];
 }
 
+const PublicGitApprovalSchema = ApprovalRequestSchema.omit({ executionPayloadJson: true }).extend({
+  executionPayloadJson: z.null().optional(),
+});
+const GitRestorationSchema = z
+  .object({
+    approvals: z.array(PublicGitApprovalSchema).max(1000),
+    recoveryReceipts: z.array(GitDeliveryReceiptSchema).max(1000),
+  })
+  .strict();
+
+async function restoredGitRecords(sessionId: string, signal: AbortSignal) {
+  const params = new URLSearchParams({ sessionId });
+  const response = await fetch(`${apiPath('approval-requests', 'git-delivery')}?${params}`, {
+    cache: 'no-store',
+    signal,
+  });
+  if (!response.ok) throw new Error(RESTORE_FAILURE);
+  const envelope: unknown = await response.json();
+  const parsed = GitRestorationSchema.safeParse(
+    envelope && typeof envelope === 'object' && 'data' in envelope ? envelope.data : undefined,
+  );
+  if (!parsed.success || parsed.data.approvals.length + parsed.data.recoveryReceipts.length > 1000)
+    throw new Error(RESTORE_FAILURE);
+  const receiptIds = new Set<string>();
+  const approvalIds = new Set<string>();
+  const approvals: ApprovalRequest[] = [];
+  for (const record of parsed.data.approvals) {
+    const receipt = gitApprovalReceipt(
+      record.toolName,
+      parseApprovalArgs(record.argsJson),
+      sessionId,
+    );
+    if (
+      record.sessionId !== sessionId ||
+      !receipt ||
+      receiptIds.has(receipt.id) ||
+      approvalIds.has(record.id)
+    )
+      throw new Error(RESTORE_FAILURE);
+    receiptIds.add(receipt.id);
+    approvalIds.add(record.id);
+    approvals.push(ApprovalRequestSchema.omit({ executionPayloadJson: true }).parse(record));
+  }
+  for (const receipt of parsed.data.recoveryReceipts) {
+    if (receipt.source !== 'chat' || receipt.sessionId !== sessionId || receiptIds.has(receipt.id))
+      throw new Error(RESTORE_FAILURE);
+    receiptIds.add(receipt.id);
+  }
+  return { approvals, recoveryReceipts: parsed.data.recoveryReceipts };
+}
+
 async function restoreChatSnapshot(sessionId: string, signal: AbortSignal) {
   const params = new URLSearchParams({ sessionId, status: 'pending' });
-  const [records, approvals] = await Promise.all([
+  const [records, pendingApprovals, retainedGit] = await Promise.all([
     restoredRecords<MessageRecord>(apiPath('sessions', sessionId, 'messages'), signal),
     restoredRecords<ApprovalRequest>(`${apiPath('approval-requests')}?${params}`, signal),
+    restoredGitRecords(sessionId, signal),
   ]);
+  // Retained operations are authoritative for Git. Pending history may contain deleted ghosts.
+  const approvals = [
+    ...new Map(
+      [
+        ...pendingApprovals.filter((record) => !isGitDeliveryTool(record.toolName)),
+        ...retainedGit.approvals,
+      ].map((record) => [record.id, record]),
+    ).values(),
+  ];
   const messages = records.map(messageRecordToUi).filter((m): m is UIMessage => m !== null);
   const approvalEventsByMessage: Record<string, ApprovalCardState[]> = {};
   if (approvals.length) {
@@ -616,7 +697,7 @@ async function restoreChatSnapshot(sessionId: string, signal: AbortSignal) {
     }
     approvalEventsByMessage[assistant.id] = approvals.map(approvalFromRecord);
   }
-  return { messages, approvalEventsByMessage };
+  return { messages, approvalEventsByMessage, gitRecoveryReceipts: retainedGit.recoveryReceipts };
 }
 
 function appendChatEvent<T>(previous: Record<string, T[]>, id: string, event: T) {
@@ -1001,10 +1082,90 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   };
   const setError = (error: string | null) =>
     makePublisher(generation, generation.epoch).publish((previous) => ({ ...previous, error }));
+  const updateGitReceipt = useCallback(
+    (value: GitDeliveryReceipt) => {
+      const parsed = GitDeliveryReceiptSchema.safeParse(value);
+      if (
+        !parsed.success ||
+        parsed.data.source !== 'chat' ||
+        parsed.data.sessionId !== generation.sessionId
+      )
+        return;
+      const receipt = parsed.data;
+      const { publish } = makePublisher(generation, generation.epoch);
+      publish((previous) => {
+        let changed = false;
+        const approvalEventsByMessage = Object.fromEntries(
+          Object.entries(previous.approvalEventsByMessage).map(([id, approvals]) => [
+            id,
+            approvals.map((approval) => {
+              const prior = gitApprovalReceipt(
+                approval.toolName,
+                approval.argsPreview,
+                generation.sessionId ?? undefined,
+              );
+              if (
+                !prior ||
+                gitReceiptBinding(prior) !== gitReceiptBinding(receipt) ||
+                receipt.updatedAtMs < prior.updatedAtMs ||
+                JSON.stringify(prior) === JSON.stringify(receipt)
+              )
+                return approval;
+              changed = true;
+              return { ...approval, argsPreview: { gitDeliveryReceipt: receipt } };
+            }),
+          ]),
+        );
+        return changed ? { ...previous, approvalEventsByMessage } : previous;
+      });
+    },
+    [generation, makePublisher],
+  );
+  const removeGitReceipt = useCallback(
+    (receipt: GitDeliveryReceipt) => {
+      if (receipt.source !== 'chat' || receipt.sessionId !== generation.sessionId) return;
+      const matches = (prior: GitDeliveryReceipt | null) =>
+        prior !== null &&
+        gitReceiptBinding(prior) === gitReceiptBinding(receipt) &&
+        receipt.updatedAtMs >= prior.updatedAtMs;
+      makePublisher(generation, generation.epoch).publish((previous) => ({
+        ...previous,
+        approvalEventsByMessage: Object.fromEntries(
+          Object.entries(previous.approvalEventsByMessage).map(([id, approvals]) => [
+            id,
+            approvals.filter(
+              (approval) => !matches(gitApprovalReceipt(approval.toolName, approval.argsPreview)),
+            ),
+          ]),
+        ),
+        gitRecoveryReceipts: previous.gitRecoveryReceipts.filter((prior) => !matches(prior)),
+      }));
+    },
+    [generation, makePublisher],
+  );
   const view =
     storedView.selection === generation.selection && storedView.epoch === generation.epoch
       ? storedView
       : generation.state;
+  useLayoutEffect(() => {
+    const now = Date.now();
+    const expiries = Object.values(view.approvalEventsByMessage)
+      .flat()
+      .flatMap((approval) => {
+        if (!BLOCKING_APPROVAL_STATUSES.has(approval.status)) return [];
+        const receipt = gitApprovalReceipt(approval.toolName, approval.argsPreview);
+        return receipt?.state === 'prepared' && receipt.expiresAtMs > now
+          ? [receipt.expiresAtMs]
+          : [];
+      });
+    if (!expiries.length) return;
+    const { publish } = makePublisher(generation, generation.epoch);
+    const timer = setTimeout(
+      () => publish((previous) => ({ ...previous })),
+      Math.min(Math.min(...expiries) - now, 2_147_483_647),
+    );
+    return () => clearTimeout(timer);
+  }, [generation, makePublisher, view]);
   const hasPendingApproval = hasBlockingApprovalEvents(view.approvalEventsByMessage);
   const canSend =
     generation.active &&
@@ -1020,5 +1181,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     hasPendingApproval,
     canSend,
     retryHistory,
+    updateGitReceipt,
+    removeGitReceipt,
   };
 }
