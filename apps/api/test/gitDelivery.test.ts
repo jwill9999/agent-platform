@@ -90,6 +90,13 @@ describe('Git delivery shared local service', () => {
     time = Date.now();
     service = createGitDeliveryService(opened.db, { now: () => time });
   });
+  afterEach(() => {
+    pathReadHook.before = undefined;
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    closeDatabase(opened.sqlite);
+    rmSync(directory, { recursive: true, force: true });
+  });
   it('preserves ordinal path and index ordering through complete review and a real commit', async () => {
     const paths = ['\ue000.txt', '😀.txt', 'Ω.txt', 'a.txt', 'Z.txt', '2.txt', '10.txt'];
     const expected = ['10.txt', '2.txt', 'Z.txt', 'a.txt', 'Ω.txt', '😀.txt', '\ue000.txt'];
@@ -112,13 +119,6 @@ describe('Git delivery shared local service', () => {
     expect(run(repo, ['rev-parse', 'HEAD'])).toBe(outcome.result?.commitSha);
     expect(run(repo, ['diff', '--cached', '--name-only'])).toBe('');
     for (const file of paths) expect(run(repo, ['show', `HEAD:${file}`])).toBe(`content:${file}`);
-  });
-  afterEach(() => {
-    pathReadHook.before = undefined;
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-    closeDatabase(opened.sqlite);
-    rmSync(directory, { recursive: true, force: true });
   });
   const changedFile = () => writeFileSync(join(repo, 'file.txt'), 'new content\n');
   const action = (): GitDeliveryAction => ({ kind: 'stage', mode: 'stage', paths: ['file.txt'] });
