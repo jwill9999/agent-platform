@@ -2,7 +2,12 @@ import { existsSync } from 'node:fs';
 import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/contracts';
+import type {
+  GitDeliveryPort,
+  Output,
+  Tool as ContractTool,
+  RiskTier,
+} from '@agent-platform/contracts';
 import type { CommandRunner } from './commandRunner.js';
 import {
   commandRunnerResultToOutput,
@@ -31,6 +36,10 @@ import {
   CODING_EDIT_TOOLS,
   CODING_EDIT_MAP,
   executeCodingEditTool,
+  GIT_DELIVERY_TOOLS,
+  GIT_DELIVERY_TOOL_MAP,
+  isGitDeliveryTool,
+  executeGitDeliveryTool,
   GIT_TOOLS,
   GIT_TOOL_MAP,
   executeGitTool,
@@ -85,6 +94,7 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   ...MEDIUM_RISK_MAP,
   ...CODING_EDIT_MAP,
   ...GIT_TOOL_MAP,
+  ...GIT_DELIVERY_TOOL_MAP,
   ...QUALITY_GATE_MAP,
   ...REPO_DISCOVERY_TOOL_MAP,
   ...MEMORY_TOOL_MAP,
@@ -188,6 +198,7 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
   ...CODING_EDIT_TOOLS,
   // Read-only git inspection tools
   ...GIT_TOOLS,
+  ...GIT_DELIVERY_TOOLS,
   // Governed build/test runner
   ...QUALITY_GATE_TOOLS,
   // Repository discovery and bounded code search
@@ -336,6 +347,7 @@ async function handleListFiles(toolId: string, args: Record<string, unknown>): P
  * Returns an error `Output` for unknown tool IDs.
  */
 export function createSystemToolExecutor(options?: {
+  gitDelivery?: GitDeliveryPort;
   observability?: ObservabilityToolContext;
   memory?: MemoryToolContext;
   workspaceRoot?: string;
@@ -357,6 +369,15 @@ export function createSystemToolExecutor(options?: {
     args: Record<string, unknown>,
     executionOptions,
   ): Promise<Output> => {
+    if (isGitDeliveryTool(toolId)) {
+      const authority = executionOptions?.gitDelivery;
+      return executeGitDeliveryTool(
+        toolId,
+        args,
+        options?.gitDelivery,
+        authority ? { ...authority, signal: executionOptions?.signal } : undefined,
+      );
+    }
     // Core tools
     switch (toolId) {
       case ids.bash:

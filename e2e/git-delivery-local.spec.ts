@@ -17,7 +17,8 @@ test('Docker Project reviews local Git delivery, rejects stale index and remembe
   page,
   request,
 }, testInfo) => {
-  test.setTimeout(120_000);
+  // Two bounded, observed rate-limit windows plus the unchanged real review journey.
+  test.setTimeout(180_000);
   let rateLimitRemaining = Number.POSITIVE_INFINITY;
   let rateLimitResetAt = 0;
   page.on('response', (response) => {
@@ -30,6 +31,23 @@ test('Docker Project reviews local Git delivery, rejects stale index and remembe
       rateLimitResetAt = Date.now() + Number(reset) * 1000;
     }
   });
+  // A preceding serialized chat journey can consume the shared window before onboarding.
+  // Wait only for the server's observed reset; do not retry an application mutation.
+  const entryBudget = await request.get(`${apiURL}/v1/settings`);
+  expect([200, 429]).toContain(entryBudget.status());
+  const entryHeader = entryBudget.headers()['ratelimit'];
+  const entryRemaining = Number(entryHeader?.match(/remaining=(\d+)/)?.[1]);
+  const entryReset = Number(entryHeader?.match(/reset=(\d+)/)?.[1]);
+  expect(Number.isFinite(entryRemaining) && Number.isFinite(entryReset)).toBe(true);
+  if (entryRemaining < 90) {
+    const waitMs = entryReset * 1000 + 100;
+    expect(waitMs).toBeLessThanOrEqual(61_000);
+    await testInfo.attach('entry-request-budget-pacing', {
+      body: JSON.stringify({ status: entryBudget.status(), remaining: entryRemaining, waitMs }),
+      contentType: 'application/json',
+    });
+    await delay(waitMs);
+  }
   // Never discover or modify an arbitrary local user's running stack.
   const container =
     process.env.GIT_DELIVERY_API_CONTAINER ??

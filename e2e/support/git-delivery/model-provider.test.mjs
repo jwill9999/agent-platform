@@ -75,3 +75,42 @@ test('bounds request size and owns a loopback listener with explicit cleanup', a
   }
   await assert.rejects(globalThis.fetch(fixture.baseURL));
 });
+
+test('streams distinct fragmented tool calls and requires every abandoned or completed result', async (t) => {
+  const second = {
+    ...call,
+    id: 'commit-1',
+    name: 'sys_git_commit',
+    args: { message: 'Reviewed later' },
+  };
+  const fixture = await startGitDeliveryProvider({
+    model,
+    replies: [
+      { kind: 'tools', calls: [call, second] },
+      { kind: 'text', text: 'Batch accounted for.', requiredToolResults: [call.id, second.id] },
+    ],
+  });
+  t.after(() => fixture.close());
+  const input = body();
+  input.tools.push({ type: 'function', function: { name: second.name } });
+  const response = await post(fixture, input);
+  assert.equal(response.status, 200);
+  const chunks = (await response.text())
+    .split('\n\n')
+    .filter((line) => line.startsWith('data: {'))
+    .map((line) => JSON.parse(line.slice(6)));
+  const argumentsByIndex = new Map();
+  for (const entry of chunks.flatMap((chunk) => chunk.choices[0].delta.tool_calls ?? []))
+    argumentsByIndex.set(
+      entry.index,
+      (argumentsByIndex.get(entry.index) ?? '') + (entry.function.arguments ?? ''),
+    );
+  assert.deepEqual(
+    [...argumentsByIndex.values()].map((value) => JSON.parse(value)),
+    [call.args, second.args],
+  );
+  input.messages.push({ role: 'tool', tool_call_id: call.id, content: 'completed' });
+  assert.equal((await post(fixture, input)).status, 400);
+  input.messages.push({ role: 'tool', tool_call_id: second.id, content: 'not executed' });
+  assert.match(await (await post(fixture, input)).text(), /Batch accounted for/);
+});

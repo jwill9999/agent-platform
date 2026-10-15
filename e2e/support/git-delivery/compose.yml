@@ -5,3 +5,6 @@ services:
     environment:
       AGENT_PLATFORM_GH_BINARY: /tmp/agent-platform-git-delivery-boundary/gh
       GIT_DELIVERY_GH_FIXTURE_DIR: /tmp/agent-platform-git-delivery-boundary/state
+      # The selected serialized journey owns this in-container inert HTTP provider.
+      # No host Ollama process or external model service is used by these tests.
+      OLLAMA_BASE_URL: http://127.0.0.1:11434/v1

@@ -1,3 +1,4 @@
+import { createGitDeliveryService } from '../../../application/gitDelivery/index.js';
 import { parseToolId } from '@agent-platform/agent-validation';
 import {
   beginDiagnosticRun,
@@ -22,6 +23,7 @@ import {
   completeToolExecution,
   createApprovalRequest,
   getApprovalRequest,
+  getGitDeliveryOperation,
   getWorkingMemoryArtifact,
   claimApprovalRequestForResume,
   ApprovalRequestAlreadyResumedError,
@@ -71,6 +73,8 @@ import {
   createNdjsonEmitter,
   contractToolsToDefinitions,
   createSystemToolExecutor,
+  isGitDeliveryTool,
+  parseGitDeliveryToolAction,
   PathJail,
   DEFAULT_MOUNTS,
   createToolAuditLogger,
@@ -530,6 +534,7 @@ function parseExecutionPayload(request: ApprovalRequest): ToolCallIntent {
     toolName: string;
     args: Record<string, unknown>;
     mcpBinding?: McpApprovalBinding;
+    gitDeliveryBinding?: { operationId: string };
   };
   try {
     parsed = z
@@ -537,6 +542,7 @@ function parseExecutionPayload(request: ApprovalRequest): ToolCallIntent {
         toolCallId: z.string().min(1),
         toolName: z.string().min(1),
         args: z.record(z.string(), z.unknown()).default({}),
+        gitDeliveryBinding: z.object({ operationId: z.string().uuid() }).strict().optional(),
         mcpBinding: z
           .object({
             serverId: z.string().min(1),
@@ -559,11 +565,34 @@ function parseExecutionPayload(request: ApprovalRequest): ToolCallIntent {
     );
   }
 
+  if (isGitDeliveryTool(parsed.toolName)) {
+    try {
+      if (!parsed.gitDeliveryBinding || parsed.mcpBinding) throw new Error('Missing Git binding');
+      z.object({
+        toolCallId: z.string().min(1),
+        toolName: z.string().min(1),
+        args: z.record(z.string(), z.unknown()),
+        gitDeliveryBinding: z.object({ operationId: z.string().uuid() }).strict(),
+      })
+        .strict()
+        .parse(JSON.parse(request.executionPayloadJson));
+      parsed.args = parseGitDeliveryToolAction(parsed.toolName, parsed.args);
+    } catch {
+      throw new HttpError(
+        409,
+        'APPROVAL_RESUME_STATE_INVALID',
+        'Git approval resume state is invalid',
+      );
+    }
+  } else if (parsed.gitDeliveryBinding) {
+    throw new HttpError(409, 'APPROVAL_RESUME_STATE_INVALID', 'Unexpected Git approval binding');
+  }
   return {
     id: parsed.toolCallId,
     name: parsed.toolName,
     args: parsed.args,
     ...(parsed.mcpBinding ? { mcpBinding: parsed.mcpBinding } : {}),
+    ...(parsed.gitDeliveryBinding ? { gitDeliveryBinding: parsed.gitDeliveryBinding } : {}),
   };
 }
 
@@ -606,6 +635,47 @@ function approvalContext(
     approvalToolCallIds: unique,
     pendingApprovalToolCallIds: pendingApprovalToolCallIds.filter((id) => unique.includes(id)),
   };
+}
+
+/** Bind cancellation/execution authority to the freshly claimed persisted row, never model data. */
+function assertClaimedGitApproval(
+  db: DrizzleDb,
+  approval: ApprovalRequest,
+  call: ToolCallIntent,
+  agentId: string,
+): void {
+  const current = getSession(db, approval.sessionId);
+  const project = current?.projectId ? findProject(db, current.projectId) : undefined;
+  const operation = call.gitDeliveryBinding
+    ? getGitDeliveryOperation(db, call.gitDeliveryBinding.operationId)
+    : undefined;
+  const claimedCall = parseExecutionPayload(approval);
+  if (
+    approval.status !== 'approved' ||
+    approval.resumedAtMs === undefined ||
+    (approval.expiresAtMs !== undefined && approval.expiresAtMs <= Date.now()) ||
+    !current ||
+    current.mode !== 'project' ||
+    current.agentId !== agentId ||
+    approval.agentId !== agentId ||
+    !project ||
+    project.archivedAtMs ||
+    !operation ||
+    operation.receipt.source !== 'chat' ||
+    operation.receipt.projectId !== project.id ||
+    operation.receipt.sessionId !== current.id ||
+    operation.agentId !== agentId ||
+    operation.toolCallId !== call.id ||
+    approval.toolName !== call.name ||
+    !isDeepStrictEqual(claimedCall, call) ||
+    !isDeepStrictEqual(operation.receipt.action, call.args)
+  ) {
+    throw new HttpError(
+      409,
+      'GIT_DELIVERY_APPROVAL_INVALID',
+      'Claimed Git approval no longer matches this owned operation.',
+    );
+  }
 }
 
 function buildResumeMessages(
@@ -1007,12 +1077,20 @@ function createRuntimeNativeToolExecutor({
               sessionId,
               traceId: runId,
             },
+            gitDelivery: createGitDeliveryService(db).chat({
+              sessionId,
+              agentId: agentCtx.agent.id,
+            }),
             memory: { db, sessionId, agentId: agentCtx.agent.id },
             defaultRepoPath,
             workspaceRoot,
             pathJail,
           }
         : {
+            gitDelivery: createGitDeliveryService(db).chat({
+              sessionId,
+              agentId: agentCtx.agent.id,
+            }),
             memory: { db, sessionId, agentId: agentCtx.agent.id },
             defaultRepoPath,
             workspaceRoot,
@@ -1032,6 +1110,7 @@ function createRuntimeToolDispatchNode({
   options,
   approvedToolCallIds,
   nativeToolExecutor,
+  gitDeliveryApproval,
 }: {
   db: DrizzleDb;
   agentCtx: AgentContext;
@@ -1041,6 +1120,7 @@ function createRuntimeToolDispatchNode({
   options: ChatRouterOptions;
   approvedToolCallIds?: ReadonlySet<string>;
   nativeToolExecutor?: NativeToolExecutor;
+  gitDeliveryApproval?: { toolCallId: string; operationId: string; approvalRequestId: string };
 }) {
   const resolvedNativeToolExecutor =
     nativeToolExecutor ??
@@ -1075,6 +1155,8 @@ function createRuntimeToolDispatchNode({
         },
       },
       approvedToolCallIds,
+      gitDelivery: createGitDeliveryService(db).chat({ sessionId, agentId: agentCtx.agent.id }),
+      gitDeliveryApproval,
       skillResolver: (id: string) => getSkill(db, id),
       projectAccessPolicy,
       workspaceResources,
@@ -1323,6 +1405,16 @@ export async function handleSessionResume(
       mapResumeApprovalError(error);
     }
 
+    if (isGitDeliveryTool(toolCall.name) && approval.status !== 'rejected') {
+      try {
+        assertClaimedGitApproval(db, approval, toolCall, agentCtx.agent.id);
+      } catch (error) {
+        if (!(error instanceof HttpError)) throw error;
+        // Finish the pre-stream refusal before shared stream cleanup ends the response.
+        res.status(error.status).json({ error: { code: error.code, message: error.message } });
+        return;
+      }
+    }
     const completeDiagnostics = beginDiagnosticRun(sessionId, runId);
     observeDiagnosticApproval(
       approvalRequestId,
@@ -1383,6 +1475,15 @@ export async function handleSessionResume(
         emitter,
         options,
         approvedToolCallIds: new Set([toolCall.id]),
+        ...(toolCall.gitDeliveryBinding
+          ? {
+              gitDeliveryApproval: {
+                toolCallId: toolCall.id,
+                operationId: toolCall.gitDeliveryBinding.operationId,
+                approvalRequestId: approval.id,
+              },
+            }
+          : {}),
         nativeToolExecutor,
       });
       const dispatchState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
@@ -1406,7 +1507,7 @@ export async function handleSessionResume(
       sessionId,
       emitter,
       options,
-      approvedToolCallIds: new Set([toolCall.id]),
+      approvedToolCallIds: isGitDeliveryTool(toolCall.name) ? undefined : new Set([toolCall.id]),
       nativeToolExecutor,
     });
     const resumeState = buildInitialState(

@@ -715,6 +715,9 @@ export default function HomePage() {
     toolEventsByMessage,
     workspaceEventsByMessage,
     approvalEventsByMessage,
+    gitRecoveryReceipts,
+    updateGitReceipt,
+    removeGitReceipt,
     decideApproval,
     hasPendingApproval,
     canSend: chatCanSend,
@@ -1650,7 +1653,7 @@ export default function HomePage() {
 
   const handleApprovalDecision = useCallback(
     (approvalRequestId: string, decision: ApprovalDecision) => {
-      decideApproval(approvalRequestId, decision, selectedModelConfigId);
+      return decideApproval(approvalRequestId, decision, selectedModelConfigId);
     },
     [decideApproval, selectedModelConfigId],
   );
@@ -1816,6 +1819,9 @@ export default function HomePage() {
               workspaceEventsByMessage={workspaceEventsByMessage}
               workspaceWebViewProjectId={workspaceWebViewProjectId}
               approvalEventsByMessage={approvalEventsByMessage}
+              gitRecoveryReceipts={gitRecoveryReceipts}
+              onGitReceiptChange={updateGitReceipt}
+              onGitReceiptDeleted={removeGitReceipt}
               onApprovalDecision={handleApprovalDecision}
               showSensors={false}
               sensorDashboard={sensorDashboard}

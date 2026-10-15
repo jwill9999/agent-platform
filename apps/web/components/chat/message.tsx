@@ -8,13 +8,19 @@ import { ThinkingBlock } from './thinking-block';
 import { Markdown } from './markdown';
 import type { CriticEvent } from '@/lib/critic-events';
 import { ApprovalCard } from './approval-card';
+import { GitApprovalCard, isGitDeliveryTool } from './git-approval-card';
 import { ToolTraceBlock } from './tool-trace-block';
 import { BrowserArtifactPreviews } from './browser-artifact-previews';
 import { WorkspaceResourceCards } from './workspace-resource-cards';
-import type { ApprovalCardState, ApprovalDecision, ToolTraceEvent } from '@/hooks/use-harness-chat';
+import type {
+  ApprovalCardState,
+  ApprovalDecisionHandler,
+  ToolTraceEvent,
+} from '@/hooks/use-harness-chat';
 import type { WorkspaceEvent } from '@agent-platform/contracts';
 
 interface MessageProps {
+  diagnosticSessionId?: string | null;
   message: UIMessage;
   /** True while this assistant bubble is waiting for the first streamed token. */
   isAwaitingStreamContent?: boolean;
@@ -33,7 +39,8 @@ interface MessageProps {
   /** Approval requests emitted for this assistant turn. */
   approvals?: readonly ApprovalCardState[];
   /** User decision handler for approval requests. */
-  onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
+  onApprovalDecision?: ApprovalDecisionHandler;
+  gitApprovalsManaged?: boolean;
 }
 
 export function getMessageText(message: UIMessage): string {
@@ -62,6 +69,7 @@ function countContextFiles(content: string): number {
 
 export function Message({
   message,
+  diagnosticSessionId,
   isAwaitingStreamContent = false,
   criticEvents,
   thinking,
@@ -71,6 +79,7 @@ export function Message({
   isStreaming = false,
   approvals,
   onApprovalDecision,
+  gitApprovalsManaged = false,
 }: Readonly<MessageProps>) {
   const isUser = message.role === 'user';
   const text = getMessageText(message);
@@ -109,13 +118,26 @@ export function Message({
             />
           )}
           {hasApprovals &&
-            approvals.map((approval) => (
-              <ApprovalCard
-                key={approval.approvalRequestId}
-                approval={approval}
-                onDecision={onApprovalDecision}
-              />
-            ))}
+            approvals
+              .filter((approval) => !gitApprovalsManaged || !isGitDeliveryTool(approval.toolName))
+              .map((approval) =>
+                isGitDeliveryTool(approval.toolName) ? (
+                  <GitApprovalCard
+                    key={approval.approvalRequestId}
+                    approval={approval}
+                    projectId={workspaceWebViewProjectId}
+                    sessionId={diagnosticSessionId}
+                    toolEvents={toolEvents}
+                    onDecision={onApprovalDecision}
+                  />
+                ) : (
+                  <ApprovalCard
+                    key={approval.approvalRequestId}
+                    approval={approval}
+                    onDecision={onApprovalDecision}
+                  />
+                ),
+              )}
           {showFinalReview && finalAccept && <CriticReviewBlock event={finalAccept} />}
           {hasCritic && !finalAccept && <CriticBadges events={criticEvents} />}
           {!hasText &&

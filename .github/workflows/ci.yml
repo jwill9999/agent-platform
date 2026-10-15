@@ -225,6 +225,9 @@ jobs:
         run: |
           docker compose -f docker-compose.yml -f e2e/support/git-delivery/compose.yml --profile services up -d --no-deps --force-recreate api
           echo "COMPOSE_FILE=docker-compose.yml:e2e/support/git-delivery/compose.yml" >> "$GITHUB_ENV"
+          git_delivery_api_container=$(docker compose -f docker-compose.yml -f e2e/support/git-delivery/compose.yml ps -q api)
+          test -n "$git_delivery_api_container"
+          echo "GIT_DELIVERY_API_CONTAINER=$git_delivery_api_container" >> "$GITHUB_ENV"
 
       - name: Wait for Git delivery API
         run: |

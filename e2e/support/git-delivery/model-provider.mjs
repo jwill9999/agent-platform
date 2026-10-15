@@ -39,13 +39,29 @@ export async function startGitDeliveryProvider({ model, replies, port = 0 }) {
             throw new Error('Expected actual tool result missing from model continuation');
           }
         }
-        if (reply.kind === 'tool') {
+        const calls =
+          reply.kind === 'tool' ? [reply] : reply.kind === 'tools' ? reply.calls : undefined;
+        if (calls) {
           if (
-            !body.tools?.some(
-              (tool) => tool.type === 'function' && tool.function?.name === reply.name,
+            !Array.isArray(calls) ||
+            calls.length < 1 ||
+            calls.length > 8 ||
+            new Set(calls.map((call) => call.id)).size !== calls.length
+          )
+            throw new Error('Invalid scripted tool batch');
+          for (const call of calls) {
+            if (
+              typeof call.id !== 'string' ||
+              !call.id ||
+              typeof call.name !== 'string' ||
+              !call.args ||
+              typeof call.args !== 'object' ||
+              Array.isArray(call.args) ||
+              !body.tools?.some(
+                (tool) => tool.type === 'function' && tool.function?.name === call.name,
+              )
             )
-          ) {
-            throw new Error('Expected Git tool was not offered by the actual harness');
+              throw new Error('Expected Git tool was not offered by the actual harness');
           }
         } else if (reply.kind !== 'text') {
           throw new Error('Unsupported scripted response');
@@ -63,30 +79,29 @@ export async function startGitDeliveryProvider({ model, replies, port = 0 }) {
               ...(usage ? { usage } : {}),
             })}\n\n`,
           );
-        if (reply.kind === 'tool') {
-          const args = JSON.stringify(reply.args);
-          const middle = Math.floor(args.length / 2);
-          emit(
-            {
-              tool_calls: [
-                {
-                  index: 0,
-                  id: reply.id,
-                  type: 'function',
-                  function: {
-                    name: reply.name,
-                    arguments: args.slice(0, middle),
+        if (calls) {
+          for (const [index, call] of calls.entries()) {
+            const args = JSON.stringify(call.args);
+            const middle = Math.floor(args.length / 2);
+            emit(
+              {
+                tool_calls: [
+                  {
+                    index,
+                    id: call.id,
+                    type: 'function',
+                    function: { name: call.name, arguments: args.slice(0, middle) },
                   },
-                },
-              ],
-            },
-            null,
-          );
-          emit({ tool_calls: [{ index: 0, function: { arguments: args.slice(middle) } }] }, null);
+                ],
+              },
+              null,
+            );
+            emit({ tool_calls: [{ index, function: { arguments: args.slice(middle) } }] }, null);
+          }
         } else {
           emit({ content: reply.text }, null);
         }
-        emit({}, reply.kind === 'tool' ? 'tool_calls' : 'stop', {
+        emit({}, calls ? 'tool_calls' : 'stop', {
           prompt_tokens: 20,
           completion_tokens: 10,
           total_tokens: 30,
