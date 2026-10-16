@@ -2,6 +2,43 @@
 
 **Date:** 16 October 2026. **Beads:** `agent-platform-harness-r3.cancel`, IN_PROGRESS.
 
+## Current local and hosted qualification — 16 October 2026
+
+Application 4f4ecaf5 passed all nine executed feature checks; hosted desktop 67 and browser31 plus
+one existing optional context skip, Git 5 and Stop 5 passed. Sonar is OK/zero open issues; no unresolved
+review threads were present. Sourcery budget and feature VM skips do not supply review/staging proof.
+
+Fresh Docker browser 16 passed first attempt with source/image/served-byte, actual SQLite/effect and
+owned-cleanup review. Current local Electron qualification is65 retained passes plus two focused
+requalifications,67 unique cases, not a new green full 67 batch. The original full 65/67 failure and
+pre-child launcher-path failure remain preserved. Exact model-card scoping fixes badge ambiguity;
+passive request timing fills an evidence gap without changing export behavior. Original MCP export503
+is genuine and its cause remains unknown; later200 and focused200 at 13.164/7.030ms are not a runtime
+fix. No pre-export readiness requests, retries, changed deadlines or relaxed assertions were added.
+The two revised test hashes and base4f4 identify dirty test provenance; immutable publication/Beads
+receipts must bind the later pushed source by byte equality after commit and push.
+
+The actual signed-helper VM Stop representative passed once in 45.170seconds, acknowledgement 8.173ms.
+Guest started/late effects remain honestly unknown with two unresolved attempts and one provider request. Its 43-event
+safe report is durable/verified/ready/zero loss. Independent review checked 3 ZIPs and 681 members, signature,
+entitlement and 49 selected source/runtime bindings. Development signing is not hardened; the 4 GiB
+image was not freshly rehashed. Composite desktop review checked 409 artifacts and 113 ZIPs and 50 unique
+reports: 49 ready local, one intentional disabled partial, plus three disclosed prior-process flags.
+Raw synthetic traces/DB/provider artifacts are not shareable diagnostic reports.
+
+The application 4f4 affected-package hooks passed 1,718 with unchanged benchmark. Hosted benchmark 900/990
+passed independently: max relative p95 2.735 ms <= 20 ms, enqueue p95 0.0488 ms < 2 ms, healthy 1,540 events per mode and
+zero loss. Prior local 42.482 ms and hosted 135.637 ms failures remain valid evidence without a proven
+cause. Individual SQLite/S4822 false-positive dispositions have independent source-backed exact
+comment/status readbacks; no rule/profile/exclusion/security or test-policy weakening occurred.
+
+Evidence: `qualification-4f4ecaf5/browser-approved-proof.json`,
+`electron-composite-approved-proof.json`, `vm-after-focused-independent-approval.json`,
+`pr334-sonar-4f4-qualification.json` and `pr334-benchmark-4f4-independent-qualification.json` in the
+existing local evidence root. Final current-head CI, full mirrors/readbacks, owner acceptance and
+actual reserved merges remain delivery gates. Monitoring remains OPEN/unstarted; stress is not ready.
+The dated checkpoints below retain their original statuses and failures as history.
+
 ## Current repair checkpoint — 16 October 2026, 04:43 UTC
 
 Application repair 9867a61b is independently reviewed but not yet pushed. The normal hook passed

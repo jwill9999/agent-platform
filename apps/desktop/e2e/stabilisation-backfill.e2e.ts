@@ -67,9 +67,7 @@ test.describe('Electron stabilisation automation backfill', () => {
 
       await openModelsSettings(page);
       await createModelConfig(page);
-      await expect(page.getByText('E2E persisted OpenAI')).toBeVisible();
-      await expect(page.getByText('gpt-4o-mini-e2e')).toBeVisible();
-      await expect(page.getByText('Key stored')).toBeVisible();
+      await expectPersistedModelCard(page);
       await expectNoPrimaryUiLeakage(page, fixture);
 
       await page.getByRole('link', { name: /Workspaces/ }).click();
@@ -88,9 +86,7 @@ test.describe('Electron stabilisation automation backfill', () => {
       app = await launchFixture(fixture);
       page = await app.firstWindow();
       await openModelsSettings(page);
-      await expect(page.getByText('E2E persisted OpenAI')).toBeVisible();
-      await expect(page.getByText('gpt-4o-mini-e2e')).toBeVisible();
-      await expect(page.getByText('Key stored')).toBeVisible();
+      await expectPersistedModelCard(page);
       await expectUsableSurface(page, 'Models settings after restart');
 
       await page.getByRole('link', { name: /Workspaces/ }).click();
@@ -183,7 +179,7 @@ function launchFixture(fixture: Fixture): Promise<ElectronApplication> {
       AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(fixture.runtimeDir, 'tmp'),
       AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([fixture.projectDir]),
       SECRETS_MASTER_KEY: masterKey,
-      CI: process.env.CI,
+      ...(process.env.CI === undefined ? {} : { CI: process.env.CI }),
     },
   });
 }
@@ -206,6 +202,15 @@ async function openModelsSettings(page: Page): Promise<void> {
   await page.getByLabel('Open settings menu').click();
   await page.getByRole('menuitem', { name: 'Models' }).click();
   await expect(page.getByRole('heading', { name: 'Models & API Keys' })).toBeVisible();
+}
+
+async function expectPersistedModelCard(page: Page): Promise<void> {
+  const heading = page.getByRole('heading', { name: 'E2E persisted OpenAI', exact: true });
+  const card = heading.locator('..');
+  await expect(card).toHaveCount(1);
+  await expect(heading).toBeVisible();
+  await expect(card.getByText('gpt-4o-mini-e2e', { exact: true })).toBeVisible();
+  await expect(card.getByText('🔑 Key stored', { exact: true })).toBeVisible();
 }
 
 async function createModelConfig(page: Page): Promise<void> {
