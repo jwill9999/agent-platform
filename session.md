@@ -17,7 +17,7 @@ metadata. Main, staging and paused PR283/orchestration remain separate.
 Actual source `a2b867dfbc6aef38b2f16e6aede51e078413f24d`, tree
 `3bb0592a6fd411bd769e2aa4e2629c902e620f45`, passed all nine executed hosted feature checks in
 CI `38936644754` attempt1. Sonar is OK with zero open issues, duplication1.0%, all ratings1 and
-hotspots100%. No unresolved threads or blocking reviews. Sourcery's weekly-budget skip and the
+hotspots100%. No unresolved threads or blocking reviews. Sourcery's 150,000-diff-character size-limit skip and the
 feature-target VM skip are limitations, not code review or staging qualification.
 
 Clean readiness was withheld despite CI success: Electron reported67 passed plus one flaky
@@ -79,6 +79,25 @@ process boundary using only stored metadata, without source, live observation or
 truth. The separate post-assessment comparison confirms the controlled seed was found, with
 incomplete coverage/independent snapshots and causal uncertainty preserved. This is not a new
 performance bug or proof of a provider/resource cause. Original insufficient idle report retained.
+
+## Subsequent hosted fixture checkpoint
+
+Exact `7a7831fa55287a64b40582215fb199e737ca9a84` completed all nine executed checks in
+CI38942508081 attempt1. Electron68 passed with no retries/flaky cases; browser31 general plus one
+existing isolated-context prerequisite skip, Git5 and Stop5. Live Sonar is OK/zero open issues,
+duplication0.9%, all ratings1/hotspots100%. No unresolved review threads or blocking reviews.
+Actual Sourcery outputs for both a2b and7a7 say the diff exceeds150,000 characters; the earlier
+budget attribution was incorrect. Independent source/evidence review establishes the skipped
+hosted review's limitation. Feature VM skip does not qualify staging.
+
+The new hosted benchmark artifact12064322746 was fully downloaded, hashed against its API digest,
+CRC checked and independently recomputed:900 measured/990 requests, worst relative p95 overhead
+2.874497 ms against20 ms and enqueue0.021693 ms against2 ms; healthy captures zero loss.
+Enabled stores retain their initial probes, not periodic-load capacity. No fresh CodeQL analysis
+ran on this feature event; a zero-open-alert PR-ref query is only scoped alert evidence, not a
+new analysis or broad security qualification. These are source-bound7a7 results; this factual
+documentation correction requires fresh pushed-head hosted gates and full mirror/readbacks.
+No unchanged local runtime tests or benchmark are repeated for this documentation-only delta.
 
 ## Contract, publication and remaining delivery
 
