@@ -5,12 +5,17 @@ conditional grant into `feature/project-chat-stop` at `a5d17683961236f9cf089030b
 Its tree matches reviewed `e1713628`; all nine executed checks passed with no unresolved findings.
 Stop is CLOSED/read back/synced. This is feature delivery, not staging promotion.
 
-[Monitoring](docs/tasks/agent-platform-local-diagnostics-monitoring.md) remains IN_PROGRESS in
-[PR339](https://github.com/jwill9999/agent-platform/pull/339), `task/local-diagnostics-monitoring`
-into `feature/local-diagnostics-monitoring`. The feature starts at staging `cf5f0452` plus the
-qualified Stop dependency. This source checkpoint records the repair and retained evidence; current
-pushed revision, terminal gates and publication receipts are recorded in canonical Beads and PR
-metadata. Main, staging and paused PR283/orchestration remain separate.
+[Monitoring](docs/tasks/agent-platform-local-diagnostics-monitoring.md) remains IN_PROGRESS pending
+final documentation delivery and publication. [PR339](https://github.com/jwill9999/agent-platform/pull/339)
+merged into `feature/local-diagnostics-monitoring` at
+`ce3624dfac8c364ac447e75f9a740eaf31a5771b`; its tree exactly matches reviewed/tested7a7 below.
+This merge was observed after the independent terminal review; it was not performed by this
+follow-up. The documentation push after that merge recreated `task/local-diagnostics-monitoring`.
+Retain its ancestry and deliver this two-document correction through a separate PR into the same
+feature. Do not treat it as already included in PR339 or qualified by old checks.
+The feature contains staging `cf5f0452` plus Stop. Actual staging remains `cf5f0452`, without these
+Stop/monitoring changes. Current pushed revision, follow-up PR, terminal gates and publication
+receipts are recorded in canonical Beads/PR metadata. Main and paused PR283/orchestration stay separate.
 
 ## Hosted result and bounded fixture repair
 
@@ -118,9 +123,10 @@ All nine substantive a2b mirrors plus twenty ordered session parts were fully re
 repair, updated results/handoff, renderer-identity spec and stress preflight require current source-
 bound full mirror/readbacks before acceptance. Preserve/reuse existing page and part identities.
 
-Normal affected desktop gates, fresh hosted checks and findings review, complete publication and
-actual owner-authorized feature/staging integration remain required. Monitoring merges retain their
-reserved authority; staging also needs actual full security analysis, packaged VM and protections.
+Normal documentation hooks, fresh hosted checks and findings review, complete publication and
+actual owner-authorized follow-up/staging integration remain required. PR339 feature delivery is
+verified; further merges retain reserved authority. Staging also needs actual full security analysis,
+packaged VM and protections.
 Owner stress testing is NOT ready before actual delivery and preflight. No trial has started.
 Evidence: `/Users/letuscode/.codex/local-diagnostics-monitoring-20261016`; original Stop/API receipts
 remain under `/Users/letuscode/.codex/project-chat-stop-implementation-20261016`.

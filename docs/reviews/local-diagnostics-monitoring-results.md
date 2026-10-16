@@ -95,6 +95,13 @@ Healthy variants each retain1,540 events/zero loss/max pending56; locked variant
 honest drops1,284/1,288/1,284. Six enabled companions are ready/one initial probe each, not periodic
 load capacity. Deterministic provider/nonretaining log sink and prior failures remain disclosed.
 
+PR339 subsequently merged at `ce3624dfac8c364ac447e75f9a740eaf31a5771b`; refreshed remote tree
+`e673a432b8c88983b671908776848fe31b698e0a` exactly equals reviewed7a7. This follow-up observed
+that merge and did not perform it. A documentation push after the merge recreated its deleted task
+ref; the retained task history now delivers only this two-document correction into the same feature
+through a separate PR. It is not part of merged PR339. Staging remains `cf5f0452` and no owner trial
+has started. Do not reuse closed-PR checks as qualification for this changed documentation head.
+
 The final source differs from this qualified7a7 checkpoint only to correct and record documentation.
 Normal documentation hooks, fresh exact-head hosted gates, completed full mirrors and expressly
 reserved integration remain required. Source/results critique, prior local connected/VM proofs and
