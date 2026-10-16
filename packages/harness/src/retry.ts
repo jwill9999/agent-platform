@@ -6,6 +6,8 @@
  */
 
 import { randomInt } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { assertRunActive, type RunExecutionControl } from './runControl.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,13 +43,16 @@ export async function withRetry<T>(
   fn: () => Promise<T>,
   config: RetryConfig,
   onRetry?: RetryCallback,
+  options?: { signal?: AbortSignal; runControl?: RunExecutionControl },
 ): Promise<T> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < config.maxAttempts; attempt++) {
+    assertRunActive(options?.runControl, options?.signal);
     try {
       return await fn();
     } catch (err) {
+      assertRunActive(options?.runControl, options?.signal);
       lastError = err;
 
       if (!config.isRetryable(err)) {
@@ -59,7 +64,7 @@ export async function withRetry<T>(
 
       const delayMs = computeDelay(attempt, config);
       onRetry?.(attempt + 1, err, delayMs);
-      await sleep(delayMs);
+      await sleep(delayMs, undefined, { signal: options?.signal });
     }
   }
 
@@ -76,10 +81,6 @@ function computeDelay(attempt: number, config: RetryConfig): number {
   const rand = randomInt(0, 1_000_001) / 1_000_000; // 0..1 inclusive
   const jitter = exponential * config.jitterFactor * (rand * 2 - 1);
   return Math.max(0, Math.round(exponential + jitter));
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ---------------------------------------------------------------------------

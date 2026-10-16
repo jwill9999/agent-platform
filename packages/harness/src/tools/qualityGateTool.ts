@@ -1,3 +1,9 @@
+import {
+  assertRunActive,
+  invokeRunAction,
+  isRunInterruption,
+  type RunExecutionControl,
+} from '../runControl.js';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { constants, existsSync } from 'node:fs';
@@ -77,6 +83,8 @@ type QualityGateOptions = {
   workspaceRoot?: string;
   defaultRepoPath?: string;
   pnpmBin?: string;
+  signal?: AbortSignal;
+  runControl?: RunExecutionControl;
 };
 
 type CommandSpec = {
@@ -90,6 +98,7 @@ type CommandResult = {
   stderr: string;
   exitCode: number | null;
   timedOut: boolean;
+  code?: 'COMMAND_OUTCOME_UNKNOWN';
 };
 
 const PACKAGE_SUPPORTED_PROFILES = new Set<CodingQualityGateProfile>([
@@ -249,7 +258,12 @@ function parseFailures(stdout: string, stderr: string): CodingQualityGateFailure
   return failures;
 }
 
-function runCommand(spec: CommandSpec, cwd: string, timeoutMs: number): Promise<CommandResult> {
+function runCommand(
+  spec: CommandSpec,
+  cwd: string,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<CommandResult> {
   return new Promise((resolveResult) => {
     const proc = execFile(
       spec.bin,
@@ -257,6 +271,7 @@ function runCommand(spec: CommandSpec, cwd: string, timeoutMs: number): Promise<
       {
         cwd,
         timeout: timeoutMs,
+        signal,
         maxBuffer: MAX_EXEC_BUFFER_BYTES,
         env: { ...process.env, CI: process.env.CI ?? '1' },
       },
@@ -270,8 +285,18 @@ function runCommand(spec: CommandSpec, cwd: string, timeoutMs: number): Promise<
             ? error.code
             : timedOut
               ? null
-              : 0;
-        resolveResult({ stdout, stderr, exitCode, timedOut });
+              : error
+                ? 1
+                : 0;
+        const uncertain =
+          signal?.aborted || timedOut || (error && 'killed' in error && error.killed === true);
+        resolveResult({
+          stdout,
+          stderr,
+          exitCode,
+          timedOut,
+          ...(uncertain ? { code: 'COMMAND_OUTCOME_UNKNOWN' as const } : {}),
+        });
       },
     );
     proc.on('error', () => {});
@@ -352,6 +377,8 @@ async function handleRunQualityGate(
   options?: QualityGateOptions,
 ): Promise<Output> {
   const startedAtMs = Date.now();
+  let checkingAdmission = false;
+  let commandInvoked = false;
   try {
     const input = CodingRunQualityGateInputSchema.parse(args);
     const repoPath = await resolveRepoPath(
@@ -362,7 +389,24 @@ async function handleRunQualityGate(
     const command = buildCommand(input.profile, packageName, resolvePnpmBin(options?.pnpmBin));
     const timeoutMs = Math.min(input.timeoutMs ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS);
     const maxOutputBytes = Math.min(input.maxOutputBytes ?? DEFAULT_OUTPUT_BYTES, MAX_OUTPUT_BYTES);
-    const commandResult = await runCommand(command, repoPath, timeoutMs);
+    checkingAdmission = true;
+    const commandResult = await invokeRunAction(
+      options?.runControl,
+      options?.signal,
+      'sensor',
+      () => {
+        commandInvoked = true;
+        return runCommand(command, repoPath, timeoutMs, options?.signal);
+      },
+    );
+    if (commandResult.code === 'COMMAND_OUTCOME_UNKNOWN')
+      return {
+        type: 'error',
+        code: 'COMMAND_OUTCOME_UNKNOWN',
+        message:
+          'The quality command may still have running work. Its completion is unknown; check the outcome before trying again.',
+      };
+    assertRunActive(undefined, options?.signal);
     const stdout = tailUtf8(commandResult.stdout, maxOutputBytes);
     const stderr = tailUtf8(commandResult.stderr, maxOutputBytes);
     const failures = parseFailures(commandResult.stdout, commandResult.stderr);
@@ -408,6 +452,8 @@ async function handleRunQualityGate(
       ),
     });
   } catch (err) {
+    if ((checkingAdmission && !commandInvoked) || isRunInterruption(err, options?.signal))
+      throw err;
     return failure(toolId, errorMessage(err), startedAtMs);
   }
 }

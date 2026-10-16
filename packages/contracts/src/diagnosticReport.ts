@@ -41,7 +41,10 @@ export function renderDiagnosticObservation(sequence: number, event: DiagnosticE
     event.inputTokens !== undefined || event.outputTokens !== undefined
       ? `; provider-reported input/output ${event.inputTokens ?? 'unknown'}/${event.outputTokens ?? 'unknown'}`
       : '';
-  return `${sequence}. ${event.phase}: ${event.outcome}${duration}${error}; request ${event.requestId}${operation}${attempt}${context}${usage}`;
+  const control = event.control
+    ? `; logical run ${event.control.logicalRunId}; ${event.control.stage}; ${event.control.state}; reason ${event.control.reason}; ${event.control.inFlight} admitted unresolved`
+    : '';
+  return `${sequence}. ${event.phase}: ${event.outcome}${duration}${error}; request ${event.requestId}${operation}${attempt}${context}${usage}${control}`;
 }
 
 function renderSummary(report: DiagnosticReport): string {

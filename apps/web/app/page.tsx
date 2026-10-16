@@ -723,11 +723,18 @@ export default function HomePage() {
     updateGitReceipt,
     removeGitReceipt,
     decideApproval,
+    canDecideApproval,
     hasPendingApproval,
     canSend: chatCanSend,
     restorationStatus,
     restorationError,
     retryHistory,
+    canStop,
+    stop,
+    stopPending,
+    runControlStatusText,
+    runControlError,
+    retryRunControl,
   } = useHarnessChat(sessionId, isResuming);
   const { sessions, loading: sessionsLoading, refresh: refreshSessions } = useSessions();
   const scopedSessions =
@@ -1050,6 +1057,10 @@ export default function HomePage() {
     ) => {
       const isCurrent = options?.isCurrent ?? beginSelection();
       if (!isCurrent()) return null;
+      // A first request can acquire its title while its stream is still active.
+      // Reopening the Project must not wait for that old stream to finish before
+      // exposing the retained session in the shared history menu.
+      void refreshSessions(isCurrent).catch(() => {});
       if (options?.updateUrl !== false && globalThis.window !== undefined) {
         globalThis.window.history.pushState(null, '', buildProjectChatHref(project.id));
         globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
@@ -1071,7 +1082,7 @@ export default function HomePage() {
       }
       return nextAgentId ?? null;
     },
-    [agents, beginSelection, clearAttachments, modelConfigs, selectedAgentId],
+    [agents, beginSelection, clearAttachments, modelConfigs, refreshSessions, selectedAgentId],
   );
 
   const handleOpenProject = useCallback(async () => {
@@ -1554,7 +1565,7 @@ export default function HomePage() {
   const modelStatusText = hasUsableModelConfig
     ? getInputStatusText(hasPendingApproval, selectedMode, sessionId)
     : 'Create a model in Settings > Models before sending.';
-  let inputStatusText = modelStatusText;
+  let inputStatusText = runControlStatusText ?? modelStatusText;
   if (restorationStatus === 'restoring') inputStatusText = 'Restoring chat history and approvals…';
   if (restorationStatus === 'restore-error')
     inputStatusText = restorationError ?? 'Unable to restore chat history.';
@@ -1808,6 +1819,15 @@ export default function HomePage() {
               resetKey={`${selectedMode}:${activeProject?.id ?? 'none'}:${sessionId ?? 'none'}`}
               messages={messages}
               onSend={handleSend}
+              onStop={
+                canStop
+                  ? () => {
+                      void stop();
+                    }
+                  : undefined
+              }
+              stopPending={stopPending}
+              onRetryRunControl={runControlError ? retryRunControl : undefined}
               isLoading={isLoading}
               canSend={canSend}
               inputStatusText={inputStatusText}
@@ -1826,7 +1846,7 @@ export default function HomePage() {
               gitRecoveryReceipts={gitRecoveryReceipts}
               onGitReceiptChange={updateGitReceipt}
               onGitReceiptDeleted={removeGitReceipt}
-              onApprovalDecision={handleApprovalDecision}
+              onApprovalDecision={canDecideApproval ? handleApprovalDecision : undefined}
               showSensors={false}
               sensorDashboard={sensorDashboard}
               sensorLoading={sensorLoading}

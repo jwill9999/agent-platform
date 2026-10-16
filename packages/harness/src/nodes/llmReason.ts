@@ -1,3 +1,11 @@
+import {
+  abortReason,
+  assertRunActive,
+  invokeRunAction,
+  isRunInterruption,
+  RunStoppedError,
+  type RunExecutionControl,
+} from '../runControl.js';
 import type { ContextDecisionMetadata } from '@agent-platform/contracts';
 import { admitProviderContext } from '../providerContext.js';
 import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
@@ -246,6 +254,29 @@ async function firePromptBuildHook(
   }
 }
 
+/** Preserve an exact SDK rejection of this execution's own abort reason before error wrapping. */
+function providerStreamError(error: unknown, signal?: AbortSignal): Error {
+  if (signal?.aborted && error === signal.reason) {
+    if (abortReason(signal) === 'user_stop') return new RunStoppedError();
+    return new DOMException(
+      'Model request interrupted.',
+      abortReason(signal) === 'timeout' ? 'TimeoutError' : 'AbortError',
+    );
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+async function withProviderAbortIdentity<T>(
+  signal: AbortSignal | undefined,
+  action: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    throw providerStreamError(error, signal);
+  }
+}
+
 /**
  * Consume the merged `fullStream` — drains the SDK pipeline once.
  * Returns the accumulated text-delta content.
@@ -253,6 +284,7 @@ async function firePromptBuildHook(
 async function consumeFullStream(
   result: StreamTextResult<ToolSet, unknown>,
   emitter: OutputEmitter | undefined,
+  signal?: AbortSignal,
 ): Promise<string> {
   let fullText = '';
   for await (const part of result.fullStream) {
@@ -270,7 +302,7 @@ async function consumeFullStream(
     } else if (part.type === 'error') {
       // Throw immediately so callers never reach `await result.text`, which
       // hangs indefinitely when the stream errors while `onError` is set.
-      throw part.error instanceof Error ? part.error : new Error(String(part.error));
+      throw providerStreamError(part.error, signal);
     }
   }
   return fullText;
@@ -353,9 +385,10 @@ async function tryReasoningFallback(
 async function streamAndAccumulate(
   result: StreamTextResult<ToolSet, unknown>,
   emitter: OutputEmitter | undefined,
+  signal?: AbortSignal,
 ): Promise<string> {
   const streamedText = result.fullStream
-    ? await consumeFullStream(result, emitter)
+    ? await consumeFullStream(result, emitter, signal)
     : await consumeTextStream(result, emitter);
 
   return reconcileText(streamedText, result, emitter);
@@ -604,11 +637,12 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     config?: RunnableConfig,
   ): Promise<Partial<HarnessStateType>> {
     const signal = config?.configurable?.signal as AbortSignal | undefined;
+    const runControl = config?.configurable?.runControl as RunExecutionControl | undefined;
 
     if (signal?.aborted) {
       return {
         halted: true,
-        trace: [{ type: 'stream_aborted', reason: 'client_disconnect' }],
+        trace: [{ type: 'stream_aborted', reason: abortReason(signal) }],
       };
     }
 
@@ -675,40 +709,77 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     const retryTraceEvents: TraceEvent[] = [];
     const retryCounter = { count: 0 };
 
-    const { fullText, finalToolCalls, usage, finishReason } = await withRetry(
-      async () => {
-        let streamError: Error | null = null;
-        notifyObserver(() => onModelAttempt?.());
-        const res = streamText({
-          model,
-          messages: admission.messages,
-          maxTokens: admission.decision.outputCap,
-          tools,
-          maxSteps: 1,
-          abortSignal: signal,
-          onError: ({ error }) => {
-            streamError = error instanceof Error ? error : new Error(String(error));
-          },
-        });
-
-        const text = await streamAndAccumulate(res, emitter);
-
-        if (streamError) {
-          throw streamError;
-        }
-
-        const toolCalls = await res.toolCalls;
-        const usageInfo = await res.usage;
-
-        const finishReason = await res.finishReason;
-        if (finishReason !== 'length')
-          await emitToolCallPlaceholder(text, toolCalls, toolDefinitions, toolNameMap, emitter);
-
-        return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo, finishReason };
+    let partialText = '';
+    const partialEmitter: OutputEmitter = {
+      emit(event) {
+        if (event.type === 'text') partialText += event.content;
+        return emitter?.emit(event);
       },
-      LLM_RETRY_CONFIG,
-      buildRetryCallback(step, retryTraceEvents, retryCounter, dispatcher, state),
-    );
+      end() {},
+    };
+    let completed;
+    try {
+      completed = await withRetry(
+        () =>
+          invokeRunAction(runControl, signal, 'model', () =>
+            withProviderAbortIdentity(signal, async () => {
+              let streamError: Error | null = null;
+              notifyObserver(() => onModelAttempt?.());
+              const res = streamText({
+                model,
+                messages: admission.messages,
+                maxTokens: admission.decision.outputCap,
+                tools,
+                maxSteps: 1,
+                maxRetries: 0,
+                abortSignal: signal,
+                onError: ({ error }) => {
+                  streamError = providerStreamError(error, signal);
+                },
+              });
+
+              const text = await streamAndAccumulate(res, partialEmitter, signal);
+
+              if (streamError) {
+                throw streamError;
+              }
+
+              const toolCalls = await res.toolCalls;
+              const usageInfo = await res.usage;
+
+              const finishReason = await res.finishReason;
+              if (finishReason !== 'length')
+                await emitToolCallPlaceholder(
+                  text,
+                  toolCalls,
+                  toolDefinitions,
+                  toolNameMap,
+                  emitter,
+                );
+
+              return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo, finishReason };
+            }),
+          ),
+        LLM_RETRY_CONFIG,
+        buildRetryCallback(step, retryTraceEvents, retryCounter, dispatcher, state),
+        { signal, runControl },
+      );
+      assertRunActive(runControl, signal);
+    } catch (error) {
+      if (!isRunInterruption(error, signal)) throw error;
+      return {
+        halted: true,
+        llmOutput: null,
+        messages: partialText ? [{ role: 'assistant', content: partialText }] : [],
+        totalRetries: (state.totalRetries ?? 0) + retryCounter.count,
+        trace: [
+          contextTrace,
+          ...retryTraceEvents,
+          { type: 'stream_aborted', reason: abortReason(signal, error) },
+        ],
+      };
+    }
+    const { fullText, finalToolCalls, usage, finishReason } = completed;
 
     const tokenUsage = normaliseTokenUsage(usage);
     const { output, assistantMessage } = buildLlmOutput(

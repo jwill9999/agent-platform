@@ -97,10 +97,29 @@ export async function openGitChat(
   identity: Awaited<ReturnType<typeof createGitChatSession>>,
   origin = '',
 ) {
-  await page.goto(`${origin}/?projectId=${identity.projectId}&sessionId=${identity.session.id}`);
+  // The initial visible composer can precede URL-selected session restoration.
+  // Wait for the real final session's history/control reads before typing into
+  // its keyed view; otherwise a late mount can discard fixture input.
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === `/api/v1/sessions/${identity.session.id}/active-run` &&
+        response.ok(),
+    ),
+    page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === `/api/v1/sessions/${identity.session.id}/messages` &&
+        response.ok(),
+    ),
+    page.goto(`${origin}/?projectId=${identity.projectId}&sessionId=${identity.session.id}`),
+  ]);
+  await expect(page.getByRole('combobox', { name: 'Active agent' })).toContainText(
+    identity.agent.name,
+  );
   const input = page.getByPlaceholder('Ask about this Project...');
   await expect(input).toBeEnabled();
   await input.fill('/init');
+  await expect(input).toHaveValue('/init');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   await page.getByRole('button', { name: 'Approve instructions' }).click();
   await expect(page.getByText('Project instructions approved').last()).toBeVisible();

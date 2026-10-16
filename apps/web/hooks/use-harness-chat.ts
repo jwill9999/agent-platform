@@ -17,6 +17,7 @@ import {
   WorkspaceEventSchema,
 } from '@agent-platform/contracts';
 import { apiPath, apiPost } from '@/lib/apiClient';
+import { useHarnessRunControl } from './use-harness-run-control';
 import { observeChatResponse, partialChatFailure } from '@/lib/chat-diagnostics';
 import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
 
@@ -546,6 +547,9 @@ type ChatView = {
   status: 'ready' | 'streaming';
   error: string | null;
   diagnosticRequestId: string | null;
+  runId: string | null;
+  controlEpoch: number;
+  precedingRunId: string | null;
   diagnosticFailure: DiagnosticPartialFailure | null;
   criticEventsByMessage: Record<string, CriticEvent[]>;
   thinkingByMessage: Record<string, string>;
@@ -578,6 +582,9 @@ function emptyChatView(selection: symbol, epoch: number, status: ChatRestoration
     status: 'ready',
     error: null,
     diagnosticRequestId: null,
+    runId: null,
+    controlEpoch: 0,
+    precedingRunId: null,
     diagnosticFailure: null,
     criticEventsByMessage: {},
     thinkingByMessage: {},
@@ -806,6 +813,11 @@ function publishAssistant(publish: PublishChat, assistantId: string, text: strin
   }));
 }
 
+function publishRunIdentity(response: Response, publish: PublishChat) {
+  const identity = z.string().uuid().safeParse(response.headers.get('x-harness-run-id'));
+  if (identity.success) publish((previous) => ({ ...previous, runId: identity.data }));
+}
+
 async function runOwnedSend(
   sessionId: string,
   assistantId: string,
@@ -828,6 +840,7 @@ async function runOwnedSend(
         ...(modelConfigId ? { modelConfigId } : {}),
       }),
     });
+    publishRunIdentity(response, publish);
     ({ requestId, apiObserved, responseStatus } = observeChatResponse(response, requestId));
     if (apiObserved && !response.ok)
       publish((previous) => ({ ...previous, diagnosticRequestId: requestId }));
@@ -881,6 +894,7 @@ async function runOwnedApproval(
       },
       body: JSON.stringify({ approvalRequestId: requestId }),
     });
+    publishRunIdentity(response, publish);
     if (!response.ok) {
       mcpHaltMessage = await mcpApprovalHaltFromResponse(response);
       throw new Error(await parseErrorResponse(response));
@@ -1001,7 +1015,12 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         reason:
           generation.state.restorationStatus === 'restore-error' ? 'restore-error' : 'restoring',
       };
-    if (generation.operation?.busy) return { accepted: false, reason: 'busy' };
+    if (
+      !runControl.runControlReady ||
+      generation.operation?.busy ||
+      ['running', 'stop_requested'].includes(runControl.runControl?.state ?? '')
+    )
+      return { accepted: false, reason: 'busy' };
     return null;
   };
 
@@ -1009,7 +1028,14 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     const operation: ChatOperation = { busy: true };
     generation.operation = operation;
     const { isCurrent, publish } = makePublisher(generation, generation.epoch, operation);
-    publish((previous) => ({ ...previous, status: 'streaming', error: null }));
+    publish((previous) => ({
+      ...previous,
+      status: 'streaming',
+      error: null,
+      runId: null,
+      controlEpoch: previous.controlEpoch + 1,
+      precedingRunId: runControl.runControl?.id ?? previous.runId,
+    }));
     const completion = run(publish).finally(() => {
       if (!isCurrent()) return;
       operation.busy = false;
@@ -1027,7 +1053,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     if (denied) return denied;
     const trimmed = messageForApi.trim();
     if (!trimmed) return { accepted: false, reason: 'empty' };
-    if (hasBlockingApprovalEvents(generation.state.approvalEventsByMessage))
+    if (!stoppedRun && hasBlockingApprovalEvents(generation.state.approvalEventsByMessage))
       return { accepted: false, reason: 'pending-approval' };
     const assistantId = crypto.randomUUID();
     return startOperation(async (publish) => {
@@ -1053,6 +1079,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   ): ChatAdmission => {
     const denied = refusal();
     if (denied) return denied;
+    if (stoppedRun) return { accepted: false, reason: 'invalid-approval' };
     const approval = Object.values(generation.state.approvalEventsByMessage)
       .flat()
       .find((item) => item.approvalRequestId === requestId);
@@ -1166,17 +1193,72 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     );
     return () => clearTimeout(timer);
   }, [generation, makePublisher, view]);
-  const hasPendingApproval = hasBlockingApprovalEvents(view.approvalEventsByMessage);
+  const runControl = useHarnessRunControl(
+    sessionId,
+    view.runId,
+    view.status === 'streaming',
+    view.controlEpoch,
+    view.precedingRunId,
+  );
+  const stoppedRun = Boolean(
+    runControl.runControl &&
+    ['stop_requested', 'cancelled', 'interrupted', 'outcome_unknown'].includes(
+      runControl.runControl.state,
+    ),
+  );
+  useLayoutEffect(() => {
+    const record = runControl.runControl;
+    if (
+      !record ||
+      !['cancelled', 'interrupted', 'outcome_unknown'].includes(record.state) ||
+      (generation.state.runId && generation.state.runId !== record.id)
+    )
+      return;
+    // Retire display ownership only after authoritative settlement/uncertainty. The
+    // old response continues draining and can never overwrite a later request.
+    generation.operation = null;
+    makePublisher(generation, generation.epoch).publish((previous) => ({
+      ...previous,
+      status: 'ready',
+      thinkingByMessage: {},
+      approvalEventsByMessage: Object.fromEntries(
+        Object.entries(previous.approvalEventsByMessage).map(([id, approvals]) => [
+          id,
+          approvals.map((approval) =>
+            BLOCKING_APPROVAL_STATUSES.has(approval.status)
+              ? {
+                  ...approval,
+                  status: 'not_completed' as const,
+                  error:
+                    'This run is stopped or interrupted; its approval cannot dispatch further work.',
+                }
+              : approval,
+          ),
+        ]),
+      ),
+    }));
+  }, [generation, makePublisher, runControl.runControl]);
+  const hasPendingApproval = !stoppedRun && hasBlockingApprovalEvents(view.approvalEventsByMessage);
+  // The rendered affordance must follow the same authority/admission fence as
+  // decideApproval; a visible historical card can precede run discovery.
+  const canDecideApproval = !stoppedRun && refusal() === null;
   const canSend =
     generation.active &&
     current.current === generation &&
     view.restorationStatus === 'ready' &&
     view.status === 'ready' &&
-    !hasPendingApproval;
+    !hasPendingApproval &&
+    runControl.runControlReady &&
+    !['running', 'waiting_for_approval', 'stop_requested'].includes(
+      runControl.runControl?.state ?? '',
+    );
   return {
     ...view,
+    ...runControl,
+    status: stoppedRun ? ('ready' as const) : view.status,
     sendMessage,
     decideApproval,
+    canDecideApproval,
     setError,
     hasPendingApproval,
     canSend,

@@ -1,6 +1,6 @@
 # Acknowledged Stop for shared harness runs
 
-**Beads:** `agent-platform-harness-r3.cancel`, P1 OPEN/planning-only.
+**Beads:** `agent-platform-harness-r3.cancel`, P1 IN_PROGRESS; owner-approved implementation, not completed.
 **Parent:** `agent-platform-harness-r3`, still deferred. **Plan:** [bounded Stop](../planning/project-chat-stop-mvp.md).
 
 ## Task requirements
@@ -22,17 +22,16 @@ are not part of this task. MON-1/QA-1 are separately owned follow-ups, not hidde
 
 ## Dependency order and authority
 
-Hard upstream: `agent-platform-harness-review-gate` OPEN and `agent-platform-harness-v1` CLOSED.
-Planning proceeds in parallel with an unresolved implementation decision. At owner acceptance,
-record the exact Stop-only grant and reconcile only this review-gate edge; do not close the global
-gate or activate its other children. Parent relationship is scope, not a prerequisite to finishing
+Hard upstream: `agent-platform-harness-v1` CLOSED. The owner approved this bounded native task
+on 16 October; only its hard edge to `agent-platform-harness-review-gate` was removed. The global
+review-gate remains OPEN and its other dependencies stay intact. Parent relationship is scope, not a prerequisite to finishing
 this bounded task. Existing downstream `harness-r3.reconcile` and `harness-v4.local` stay open/gated.
 New queued monitoring and owner stress tasks depend on this task; they do not block Stop completion.
 
 ## Implementation and paths
 
-Proposed feature/project-chat-stop from actual qualified staging; task/project-chat-stop from it.
-No code branch is created by this planning request. Work packages within this one task: main DB
+Implementation uses `feature/project-chat-stop` from qualified staging `cf5f0452`, with
+`task/project-chat-stop` retaining the reviewed planning ancestry. The feature is not merged. Work packages within this one task: main DB
 control/schema + contracts; shared control service/routes + dispatch/approval fencing; client state,
 safe diagnostics and connected acceptance. A two-day feasibility checkpoint precedes UI expansion.
 
@@ -78,7 +77,19 @@ feature PR merge/tree verification required before task close/readback/Dolt sync
 own current full scan/actual VM/protections and actual merge grant; main never implicit. Two repair
 iterations per recurring finding trigger bounded replanning, not weaker tests.
 
-Planning owner review is pending. Product tests and runtime implementation are not run. Complete
-pre-close checks and actual reviewer/PR/revision links during delivery; do not check them off from
-this plan. Older September task/managed-contract wording is historical and refined by this native
-scoped plan under ADR0005; retained broader scopes and paused work are untouched.
+Owner planning acceptance and implementation authority are recorded. Shared durable control,
+headless/API, approval/retry/sensor fences, Project Chat and safe V1 diagnostic linkage are implemented.
+Early dirty-tree test provenance remains in the results; final identity is the reviewed file-hash
+receipt plus immutable pushed source/PR metadata in Beads and publication receipts.
+
+At the 16 October 2026, 00:56 UTC checkpoint, 397 web cases, five Docker Stop journeys, Git 49 and
+combined diagnostic/resumed-history 19 cases passed; independently inspected earlier Electron Stop
+and signed real-VM representative evidence is retained. Nine adjacent browser cases, final fresh
+Electron 67/current-source VM representative, full API/normal hooks and current hosted qualification
+remain required. Global Docker RPC stalls require engine recovery/owner restart decision; the
+existing limiter is unchanged. Normal push/draft PR qualification does not make the task ready,
+waive local gates or authorize a merge. Full mirrors/readbacks and final results review still apply.
+See the [implementation record](../reviews/project-chat-stop-results.md). Older September managed
+contract wording is historical and refined by this native scoped plan under ADR0005; broader scopes,
+PR283 and paused orchestration stay untouched. Monitoring and owner stress testing remain blocked
+by their declared dependencies; no completion or stress-ready claim is made.

@@ -42,6 +42,28 @@ async function submit() {
 }
 
 describe('composer admission', () => {
+  it('offers an accessible independent Stop while send is blocked, without submitting the draft', async () => {
+    const onSend = vi.fn();
+    const onStop = vi.fn();
+    await act(async () =>
+      root.render(createElement(ChatInput, { onSend, onStop, isLoading: true, canSend: false })),
+    );
+    const stop = container.querySelector<HTMLButtonElement>('button[aria-label="Stop run"]')!;
+    expect(stop.type).toBe('button');
+    expect(stop.disabled).toBe(false);
+    await act(async () => stop.click());
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(onSend).not.toHaveBeenCalled();
+    await act(async () =>
+      root.render(
+        createElement(ChatInput, { onSend, onStop, stopPending: true, isLoading: false }),
+      ),
+    );
+    expect(
+      container.querySelector<HTMLButtonElement>('button[aria-label="Stop run"]')!.disabled,
+    ).toBe(true);
+  });
+
   it('retains the contextual Project textbox name and the default message name', async () => {
     const onSend = vi.fn().mockReturnValue(true);
     await act(async () =>

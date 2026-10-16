@@ -1,9 +1,15 @@
 # Shared harness Stop — bounded local MVP plan
 
-**Status:** Proposed for owner review; planning only. **Date:** 16 October 2026.
+**Status:** Owner-approved for Stop, then durable monitoring implementation; qualification in progress.
+**Date:** 16 October 2026.
 **Product baseline:** staging `cf5f04524c25c29635b0d84bda4e76282f28ddcb`, tree
 `e4212ec7b8362cbd7fc25120d6dd856df8ad9691`. Planning starts from documentation head
-`369ae33440aff2c9e7067d28c02176390650448a`; runtime source is identical to that baseline.
+`369ae33440aff2c9e7067d28c02176390650448a`; that was the preimplementation runtime baseline.
+Early local tests used documentation ancestry `1b574dbc5fc9e0151d1ed8beac5a2ddc0f02c06e` with
+dirty Stop source on `task/project-chat-stop`; that historical commit alone does not identify the
+implementation. Final source identity comes from the reviewed file-hash receipt and immutable pushed
+revision in Beads/publication metadata. Current-head hosted qualification, review and any actual
+merge grant remain separate from this local implementation record.
 
 ## Outcome and owner decisions
 
@@ -11,15 +17,23 @@ Give the user a reliable way to stop one logical harness run through a shared ba
 The Project Chat button is its first client; future CLI/voice clients must use the same identity,
 permissions, acknowledgement and state contract. No control authority lives solely in a renderer.
 The owner requested current-source planning and independent critique before implementation, then
-added an interface-neutral API audit and durable recording for later agent reviews. No implementation,
-new client, paid run, automatic remediation, merge or release has been authorized by this plan.
+added an interface-neutral API audit and durable recording for later agent reviews. On 16 October
+the owner approved implementation of Stop, then durable monitoring, using Beads, independent critique
+and the agreed tests. That authorization covers routine implementation and repairs. Merge, release,
+paid calls, new voice/CLI clients and automatic remediation remain separately reserved.
+Actual progress and qualification gaps are in the [implementation record](../reviews/project-chat-stop-results.md).
 
 Stop is the first delivery. A separate small monitoring delivery must record normal use durably
 before a bounded owner hands-on trial. The owner need not notice symptoms or remember to export.
 Daily/periodic review can inspect stored windows and produce evidence-linked Beads issues. A
 recurring review automation has not been scheduled; cadence and runtime authority stay separate.
 
-## Source evidence and existing work
+## Preimplementation source evidence and existing work
+
+The following inventory describes the planning baseline, before the current working implementation.
+Implemented boundaries, actual results and remaining qualification are recorded separately in the
+[implementation results](../reviews/project-chat-stop-results.md); these original gaps are not a claim
+that the new Stop source is absent.
 
 - `apps/web/components/chat/chat-input.tsx` has send/loading controls but no Stop capability.
   `apps/web/hooks/use-harness-chat.ts` drains obsolete streams; selection changes are not cancellation.
@@ -62,9 +76,9 @@ A logical run record contains server-generated ID, session/project binding, proc
 state/version, requested/acknowledged/settled timestamps and fixed reason. Each execution/approval
 continuation points to that logical run; never trust caller-supplied actor/owner identities.
 
-Proposed typed routes are `GET /v1/sessions/:id/active-run`,
+The working implementation supplies typed routes `GET /v1/sessions/:id/active-run`,
 `GET /v1/sessions/:id/runs/:runId` and `POST /v1/sessions/:id/runs/:runId/stop`.
-These are proposed new APIs, not existing endpoints. Return stable error codes and authoritative
+These are new working-tree APIs, not yet delivered endpoints. Return stable error codes and authoritative
 state/version with the same session/run IDs for every client. Publish identity in the accepted
 chat response before asynchronous setup; status lookup recovers a lost response. Enforce one active
 logical run per session transactionally; reject conflicting starts rather than create uncontrolled
@@ -91,8 +105,8 @@ there is no automatic continuation, cleanup effect or recovery/reconciliation en
 Inventory all reachable chat sub-dispatches, including `sensorCheckNode` and its feedback quality-gate
 commands, not only toolDispatch. Apply the same fence/signal to sensor command starts and retries;
 a suppressed required sensor is cancelled/not-run, never passed. Preserve Git before-push checks.
-The actual pinned stack is `ai@4.3.19` and `@langchain/langgraph@0.2.74`. AI SDK internal retries
-currently bypass the outer observation boundary. For this slice explicitly set `maxRetries: 0`
+The actual pinned stack is `ai@4.3.19` and `@langchain/langgraph@0.2.74`. At the planning baseline, AI SDK internal retries
+bypassed the outer observation boundary. The working implementation explicitly sets `maxRetries: 0`
 at this chat provider call and retain the existing controlled outer retry policy/count/backoff,
 so every actual HTTP attempt crosses admission and receives its own diagnostic attempt. Review
 that bounded retry-ownership change and test a real local 503/backoff ledger; do not silently
@@ -110,13 +124,13 @@ legacy Git/non-Git data, row-limit pressure, migration rollback/failure and cras
 
 ## Task, document and branch manifest
 
-| Work / title                | Beads and canonical spec                                                                               | Order / branch mapping                                                                                                                                                                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Plan shared Stop            | [agent-platform-project-chat-stop-plan](../tasks/agent-platform-project-chat-stop-plan.md)             | Current docs task `task/project-chat-stop-plan` chained from `task/post-git-handoff-review` at 369ae; documentation integration `feature/local-mvp-handoff-review`. PR332 remains the earlier documentation segment, not Stop delivery.                            |
-| Audit client independence   | [agent-platform-harness-interface-audit](../tasks/agent-platform-harness-interface-audit.md)           | Source audit in this planning branch; [findings](../reviews/harness-interface-audit.md). No broad repair allocation.                                                                                                                                               |
-| Implement acknowledged Stop | [agent-platform-harness-r3.cancel](../tasks/agent-platform-harness-r3.cancel.md)                       | After owner approval and scoped gate reconciliation: proposed `feature/project-chat-stop` from actual staging, then `task/project-chat-stop`. Copy reviewed planning docs only if not yet integrated; review resulting diff. These code branches do not exist yet. |
-| Durable local monitoring    | [agent-platform-local-diagnostics-monitoring](../tasks/agent-platform-local-diagnostics-monitoring.md) | Queued after Stop; own proposed `feature/local-diagnostics-monitoring` then `task/local-diagnostics-monitoring`. Not part of Stop implementation approval by implication.                                                                                          |
-| Owner stress/review         | [agent-platform-local-mvp-stress-review](../tasks/agent-platform-local-mvp-stress-review.md)           | Hard-blocked by Stop and monitoring; run only on actual qualified integrated revision. No code feature branch required for evidence-only trial; any repair follows a scoped task.                                                                                  |
+| Work / title                | Beads and canonical spec                                                                               | Order / branch mapping                                                                                                                                                                                                                                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plan shared Stop            | [agent-platform-project-chat-stop-plan](../tasks/agent-platform-project-chat-stop-plan.md)             | Reviewed planning ancestry retained from `task/project-chat-stop-plan` and the earlier documentation segment. Current Stop implementation is described below; a planning PR is not Stop delivery.                                                                                                                   |
+| Audit client independence   | [agent-platform-harness-interface-audit](../tasks/agent-platform-harness-interface-audit.md)           | Source audit in this planning branch; [findings](../reviews/harness-interface-audit.md). No broad repair allocation.                                                                                                                                                                                                |
+| Implement acknowledged Stop | [agent-platform-harness-r3.cancel](../tasks/agent-platform-harness-r3.cancel.md)                       | Owner-approved and IN_PROGRESS: `task/project-chat-stop` into `feature/project-chat-stop`, from staging cf5f0452 while retaining reviewed planning ancestry. Reviewed source hashes and the actual pushed revision/PR state are recorded in Beads and publication metadata; local qualification is not integration. |
+| Durable local monitoring    | [agent-platform-local-diagnostics-monitoring](../tasks/agent-platform-local-diagnostics-monitoring.md) | Explicitly owner-approved after Stop, still OPEN/dependency-blocked and unstarted. Proposed `feature/local-diagnostics-monitoring` then `task/local-diagnostics-monitoring`; separate acceptance and source review required.                                                                                        |
+| Owner stress/review         | [agent-platform-local-mvp-stress-review](../tasks/agent-platform-local-mvp-stress-review.md)           | Hard-blocked by Stop and monitoring; run only on actual qualified integrated revision. No code feature branch required for evidence-only trial; any repair follows a scoped task.                                                                                                                                   |
 
 Other artifacts: [verification](../testing/project-chat-stop-mvp.md), [independent critique](../reviews/project-chat-stop-plan-review.md),
 [ADR0005](../adr/0005-native-codex-development.md), [message flow](../architecture/message-flow.md),
@@ -126,27 +140,38 @@ working docs checkout `/Users/letuscode/.codex/worktrees/git-delivery-plan/agent
 Older [MVP reliability plan](mvp-reliability/plan.md) remains historical/broader; this contract refines
 only Stop and the explicit later monitoring/trial requirements, not the whole modernization program.
 
-Stop retains hard blockers review-gate OPEN and V1 CLOSED. On owner acceptance, record the exact
-Stop-only grant and remove only its historical review-gate edge, without closing the global gate or
-changing parent R3/R2, reconciliation or dashboard edges. Until that decision, Stop remains OPEN and
-planning-only. Monitoring remains OPEN/planning-only under the observability parent; owner trial
-remains OPEN/blocked. No broad parent auto-closure or unrelated status change.
+Stop is IN_PROGRESS under the owner's 16 October implementation approval. Its completed V1
+upstream remains closed; only Stop's obsolete hard review-gate edge was removed. The global gate,
+parent R3/R2, reconciliation, dashboards and paused orchestration remain unchanged. Monitoring is
+OPEN and authorized after Stop; the owner trial remains blocked by both actual deliveries. No broad
+parent auto-closure or unrelated status change follows this bounded task.
 
 ## Verification and feasibility
 
-All product scenarios are **planned, not run**; [S01–S14/M01–M06/Q01](../testing/project-chat-stop-mvp.md)
-define actions, independent control/effect assertions, fixtures, evidence and gate ownership.
-Use real API/SQLite/harness, connected Docker browser, standalone Electron and mandatory actual
-packaged macOS VM. A no-renderer HTTP journey must prove the same authority. External providers,
-GitHub and MCP effects may use declared deterministic local fixtures; no real provider billing or
-production-capacity conclusion. Reuse real Git/approval/path tests for regression.
+[S01–S14/M01–M06/Q01](../testing/project-chat-stop-mvp.md) remain the acceptance contract. Actual
+partial results, failures, repairs and unexecuted gates are in the
+[results report](../reviews/project-chat-stop-results.md), including a scenario-by-scenario matrix.
+Use real API/SQLite/harness, Docker browser, Electron and a mandatory real packaged macOS VM
+representative. Deterministic local provider/GitHub/MCP boundaries are declared fixtures; they imply
+no paid-provider, production-capacity or cloud-performance qualification.
 
-Docker engine was reachable (29.8.0) during planning. About 13 GiB host free space is insufficient
-for the proposed 20 GiB preflight reserve; restore space before VM/build/stress runs, never delete
-unknown data. Recheck engine, app storage, pinned VM assets, macOS virtualization/entitlements,
-runner labels/online state and free disk before promising execution. Existing PR330 VM/browser/
-Electron evidence proves a feasible route, not future Stop qualification. CI/cloud runner availability
-can still block later delivery. No new application execution or VM tests were run while planning.
+The initial host reserve failed at 11–13 GiB free; heavy work was held. After owner cleanup it passed
+at approximately 47 GiB, with about 40 GiB at the current preparation checkpoint. Recheck the 20 GiB
+reserve before each heavy build/VM launch and preserve unknown data. Full build/typecheck/lint and
+397 web tests passed on recorded source, and the final pinned-fixture Docker Stop suite passed
+5/5 with independently inspected control/effect/privacy artifacts. Git 49 and combined diagnostic/
+resumed-history 19 controls passed after the source/fixture repairs; one adjacent context browser
+case passed. Five earlier Electron Stop journeys/six exports and an earlier signed-VM Stop
+representative passed independent inspection. Those do not qualify the final fresh Electron 67 or
+current-source actual-VM representative. The 20 controlled-helper cases belong to Electron, not a
+20-case real-VM requirement.
+
+At the 16 October 2026, 00:56 UTC local checkpoint, nine adjacent browser cases, fresh full Electron,
+current-source VM and full API/normal hooks remain unqualified. A reply bootstrap encountered the
+existing limiter and later global Docker RPCs stalled; engine recovery/owner restart decision is
+pending. Preserve attempts and actual reset timing; do not weaken limiters or infer a single cause.
+A normal push/draft PR may obtain hosted evidence while local recovery proceeds, but no outstanding
+acceptance gate, review or reserved merge grant is waived. See the results for exact evidence.
 
 ## Effort, stopping point and delivery
 
@@ -166,5 +191,5 @@ Every actual result records source/version, pass/fail/skip/blocked/not-run and f
 Two focused repair iterations or two environment retries per recurring failure trigger evidence-backed
 replanning; no unchanged endless reruns or relaxed assertions. Default paid spend is zero.
 Protected staging requires actual current-head full security/quality checks, actual packaged VM and
-resolved reviews plus explicit merge authority; this planning request grants no merge. Preserve
+resolved reviews plus explicit merge authority; the recorded implementation grant does not grant merge. Preserve
 main, PR283/four paused refs and every dirty/unrelated checkout. No background orchestration resumes.

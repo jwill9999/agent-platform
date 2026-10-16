@@ -1,3 +1,56 @@
+# Stop implementation and durable monitoring handoff — 16 October 2026
+
+The owner approved bounded shared Stop, then durable monitoring, using Beads, implementation skill,
+independent critique and agreed tests. Stop source is on `task/project-chat-stop` into
+`feature/project-chat-stop`, based on staging `cf5f04524c25c29635b0d84bda4e76282f28ddcb` with
+reviewed planning ancestry. Early tests used documentation SHA
+`1b574dbc5fc9e0151d1ed8beac5a2ddc0f02c06e` plus dirty source; that historical SHA alone does not
+identify implementation. Use the reviewed source-hash receipt, immutable pushed revision and canonical
+Beads/publication metadata for actual PR, mirror and delivery state. Merge/release authority is separate.
+
+This is a partial local qualification checkpoint, 16 October 2026, 00:56 UTC.
+`agent-platform-harness-r3.cancel` remains IN_PROGRESS. Shared main-DB authority, headless read/Stop,
+approval/retry/sensor fencing, Project Chat and safe V1 diagnostic linkage are implemented/reviewed.
+Only Stop's obsolete global review-gate edge was removed; the gate and unrelated scopes remain.
+The [results](docs/reviews/project-chat-stop-results.md) record S01–S14 evidence and gaps;
+[verification](docs/testing/project-chat-stop-mvp.md) remains the acceptance contract.
+
+Passed recorded controls include 397 web cases, final pinned-fixture Docker Stop 5/5 (32.3 seconds),
+Git 49 and combined diagnostic/resumed-history 19, plus an adjacent browser context case. Earlier
+Electron Stop 5/six exports and signed real-VM Stop 1/1 (47.8 seconds, acknowledgement 8.180916 ms)
+passed independent artifact inspection; the older exploratory 88 ms capture is separate. The 20
+controlled-helper cases are part of full Electron 67, not 20 real-VM runs. Full build/typecheck/lint/
+cycles and the unchanged isolated 900-request benchmark also passed recorded snapshots. Earlier
+broad API failures and the exploratory mixed-source Electron 33 passed/3 failed/1 interrupted/30 unrun remain
+retained with fixes/dispositions, never rewritten as green retries.
+
+Nine adjacent browser cases, final fresh Electron 67/current-source VM representative, full API/normal
+hooks and current-head hosted checks remain unqualified. Reply bootstrap hit the existing 100/min
+limiter; paced retry uses its actual reset header. Later global Docker RPC/readiness stalls require
+engine recovery and the owner's restart decision. Docker Stop itself passed; private Docker export 403
+proves denial only, with native diagnostic export evidence kept separate. Preserve all failures,
+thresholds and unknown data; do not infer a single connection/resource cause or waive gates.
+
+Source and scoped reviews support normal commit/push and draft PR hosted qualification while local
+Docker recovery proceeds. After commit/push, inspect actual current-head hosted checks, security and
+review comments; resolve findings, finish all required local/connected gates, complete six full
+immutable-source mirrors/readbacks and obtain any reserved actual merge grant. A draft PR or subset
+success is not ready/delivered. Published revision and readback receipts belong in source metadata/
+Beads rather than a self-referential commit claim here; preserve historical Notion notes/pages.
+
+Monitoring is explicitly authorized next, OPEN/dependency-blocked and **not started**. Stop's safe
+V1 run events are not periodic resource/history recording. M01–M06 and owner stress trial Q01 remain
+pending; notify the owner only when both actual deliveries qualify for that trial. No paid calls,
+new recurring schedule, production readiness, main promotion or paused orchestration resumption.
+PR283/four paused refs and unrelated dirty checkouts remain separate. The preservation receipt covers
+12 other checkouts and reconstructs original primary dirty work after two authorized journal rows;
+do not claim the whole current dirty diff hash is unchanged. Recheck the 20 GiB reserve before heavy work.
+
+The complete prior handoff follows unchanged as historical context; canonical Beads and this
+implementation checkpoint supersede its planning-only status.
+
+<!-- markdownlint-disable MD025 -->
+
 # Stop planning and durable monitoring handoff — 16 October 2026
 
 Current owner request is planning-only: review existing acknowledged Stop, obtain independent

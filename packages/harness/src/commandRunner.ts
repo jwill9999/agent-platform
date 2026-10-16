@@ -1,3 +1,4 @@
+import { invokeRunAction, type RunExecutionControl } from './runControl.js';
 import { execFile } from 'node:child_process';
 import { accessSync, constants as fsConstants, existsSync, readFileSync, statSync } from 'node:fs';
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
@@ -32,6 +33,8 @@ export type CommandRunnerAuditMetadata = {
 
 export type CommandRunnerRequest = {
   command: string;
+  signal?: AbortSignal;
+  runControl?: RunExecutionControl;
   cwd: string;
   env: CommandEnvironmentPolicy;
   timeoutMs: number;
@@ -63,10 +66,19 @@ export type CommandRunnerApprovalRequiredResult = {
   reason: string;
 };
 
+/** A callback ending does not prove descendant, container or guest effects stopped. */
+export type CommandRunnerUnknownResult = {
+  status: 'outcome_unknown';
+  code: 'COMMAND_OUTCOME_UNKNOWN';
+  reason: 'aborted' | 'timeout' | 'transport_lost' | 'invalid_response';
+  message: string;
+};
+
 export type CommandRunnerResult =
   | CommandRunnerCompletedResult
   | CommandRunnerDeniedResult
-  | CommandRunnerApprovalRequiredResult;
+  | CommandRunnerApprovalRequiredResult
+  | CommandRunnerUnknownResult;
 
 export type CommandRunner = {
   run(request: CommandRunnerRequest): Promise<CommandRunnerResult>;
@@ -146,8 +158,43 @@ export function commandRunnerResultToOutput(toolId: string, result: CommandRunne
     case 'approval_required':
       return toolError('APPROVAL_REQUIRED', result.message);
     case 'denied':
+    case 'outcome_unknown':
       return toolError(result.code, result.message);
   }
+}
+
+function commandOutcomeUnknown(
+  reason: CommandRunnerUnknownResult['reason'],
+): CommandRunnerUnknownResult {
+  return {
+    status: 'outcome_unknown',
+    code: 'COMMAND_OUTCOME_UNKNOWN',
+    reason,
+    message:
+      'The command may still have running work or completed effects. Check its outcome before starting another action.',
+  };
+}
+
+function interruptedCommand(
+  error: unknown,
+  signal?: AbortSignal,
+): CommandRunnerUnknownResult | undefined {
+  if (signal?.aborted) return commandOutcomeUnknown('aborted');
+  if (!error || typeof error !== 'object') return undefined;
+  if (
+    ('killed' in error && error.killed === true) ||
+    ('signal' in error && typeof error.signal === 'string')
+  )
+    return commandOutcomeUnknown('timeout');
+  if ('name' in error && error.name === 'AbortError') return commandOutcomeUnknown('aborted');
+  if (
+    'code' in error &&
+    ['ERR_CHILD_PROCESS_STDIO_MAXBUFFER', 'EPIPE', 'ECONNRESET', 'ETIMEDOUT'].includes(
+      String(error.code),
+    )
+  )
+    return commandOutcomeUnknown('transport_lost');
+  return undefined;
 }
 
 function pathAccessDenied(reason: string): CommandRunnerDeniedResult {
@@ -216,36 +263,48 @@ export function createProjectScopedCommandRunner({
 export function createHostShellCommandRunner(): CommandRunner {
   return {
     run: (request) =>
-      new Promise<CommandRunnerResult>((resolve) => {
-        const startedAt = Date.now();
-        const proc = execFile(
-          '/bin/sh',
-          ['-c', request.command],
-          {
-            cwd: request.cwd,
-            timeout: request.timeoutMs,
-            maxBuffer: request.maxOutputBytes * 2,
-            env:
-              request.env.mode === 'explicit'
-                ? request.env.variables
-                : { ...process.env, ...request.env.variables },
-          },
-          (error, stdout, stderr) => {
-            let exitCode = 0;
-            if (error) {
-              exitCode = 'code' in error && typeof error.code === 'number' ? error.code : 1;
-            }
-            resolve({
-              status: exitCode === 0 ? 'success' : 'failed',
-              stdout: truncate(stdout, request.maxOutputBytes),
-              stderr: truncate(stderr, request.maxOutputBytes),
-              exitCode,
-              durationMs: Date.now() - startedAt,
-            });
-          },
-        );
-        proc.on('error', () => {});
-      }),
+      invokeRunAction(
+        request.runControl,
+        request.signal,
+        'tool',
+        () =>
+          new Promise<CommandRunnerResult>((resolve) => {
+            const startedAt = Date.now();
+            const proc = execFile(
+              '/bin/sh',
+              ['-c', request.command],
+              {
+                cwd: request.cwd,
+                signal: request.signal,
+                timeout: request.timeoutMs,
+                maxBuffer: request.maxOutputBytes * 2,
+                env:
+                  request.env.mode === 'explicit'
+                    ? request.env.variables
+                    : { ...process.env, ...request.env.variables },
+              },
+              (error, stdout, stderr) => {
+                const uncertain = interruptedCommand(error, request.signal);
+                if (uncertain) {
+                  resolve(uncertain);
+                  return;
+                }
+                let exitCode = 0;
+                if (error) {
+                  exitCode = 'code' in error && typeof error.code === 'number' ? error.code : 1;
+                }
+                resolve({
+                  status: exitCode === 0 ? 'success' : 'failed',
+                  stdout: truncate(stdout, request.maxOutputBytes),
+                  stderr: truncate(stderr, request.maxOutputBytes),
+                  exitCode,
+                  durationMs: Date.now() - startedAt,
+                });
+              },
+            );
+            proc.on('error', () => {});
+          }),
+      ),
   };
 }
 
@@ -319,63 +378,80 @@ export function createDockerSandboxCommandRunner(
         };
       }
 
-      return new Promise<CommandRunnerResult>((resolve) => {
-        const startedAt = Date.now();
-        const args = [
-          'run',
-          '--rm',
-          '--network',
-          network,
-          '--memory',
-          memory,
-          '--cpus',
-          cpus,
-          '--pids-limit',
-          String(pidsLimit),
-          '--user',
-          user,
-          '--tmpfs',
-          `/tmp:rw,nosuid,nodev,size=${tmpSize}`,
-          '-v',
-          `${paths.hostWorkspaceRoot}:/workspace:rw`,
-          '-w',
-          paths.containerCwd,
-          image,
-          'sh',
-          '-lc',
-          paths.containerCommand,
-        ];
-        const proc = exec(
-          dockerBinary,
-          args,
-          {
-            cwd: paths.hostWorkspaceRoot,
-            timeout: request.timeoutMs,
-            maxBuffer: request.maxOutputBytes * 2,
-            env: commandRunnerEnvironment(request.env),
-          },
-          (error, stdout, stderr) => {
-            if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-              resolve(
-                dockerUnavailable('Docker is not available. Install Docker or use host mode.'),
-              );
-              return;
-            }
-            let exitCode = 0;
-            if (error) {
-              exitCode = 'code' in error && typeof error.code === 'number' ? error.code : 1;
-            }
-            resolve({
-              status: exitCode === 0 ? 'success' : 'failed',
-              stdout: truncate(stdout, request.maxOutputBytes),
-              stderr: truncate(stderr, request.maxOutputBytes),
-              exitCode,
-              durationMs: Date.now() - startedAt,
-            });
-          },
-        );
-        proc.on('error', () => {});
-      });
+      return invokeRunAction(
+        request.runControl,
+        request.signal,
+        'tool',
+        () =>
+          new Promise<CommandRunnerResult>((resolve) => {
+            const startedAt = Date.now();
+            const args = [
+              'run',
+              '--rm',
+              '--network',
+              network,
+              '--memory',
+              memory,
+              '--cpus',
+              cpus,
+              '--pids-limit',
+              String(pidsLimit),
+              '--user',
+              user,
+              '--tmpfs',
+              `/tmp:rw,nosuid,nodev,size=${tmpSize}`,
+              '-v',
+              `${paths.hostWorkspaceRoot}:/workspace:rw`,
+              '-w',
+              paths.containerCwd,
+              image,
+              'sh',
+              '-lc',
+              paths.containerCommand,
+            ];
+            const proc = exec(
+              dockerBinary,
+              args,
+              {
+                cwd: paths.hostWorkspaceRoot,
+                signal: request.signal,
+                timeout: request.timeoutMs,
+                maxBuffer: request.maxOutputBytes * 2,
+                env: commandRunnerEnvironment(request.env),
+              },
+              (error, stdout, stderr) => {
+                if (
+                  error &&
+                  typeof error === 'object' &&
+                  'code' in error &&
+                  error.code === 'ENOENT'
+                ) {
+                  resolve(
+                    dockerUnavailable('Docker is not available. Install Docker or use host mode.'),
+                  );
+                  return;
+                }
+                const uncertain = interruptedCommand(error, request.signal);
+                if (uncertain) {
+                  resolve(uncertain);
+                  return;
+                }
+                let exitCode = 0;
+                if (error) {
+                  exitCode = 'code' in error && typeof error.code === 'number' ? error.code : 1;
+                }
+                resolve({
+                  status: exitCode === 0 ? 'success' : 'failed',
+                  stdout: truncate(stdout, request.maxOutputBytes),
+                  stderr: truncate(stderr, request.maxOutputBytes),
+                  exitCode,
+                  durationMs: Date.now() - startedAt,
+                });
+              },
+            );
+            proc.on('error', () => {});
+          }),
+      );
     },
   };
 }
@@ -412,7 +488,9 @@ function childProcessErrorCode(error: unknown): string | number | undefined {
     : undefined;
 }
 
-function macosVmProcessFailure(error: unknown, stderr: string): CommandRunnerDeniedResult {
+function macosVmProcessFailure(
+  error: unknown,
+): CommandRunnerDeniedResult | CommandRunnerUnknownResult {
   const code = childProcessErrorCode(error);
   if (code === 'ENOENT') {
     return macosVmUnavailable(
@@ -426,7 +504,7 @@ function macosVmProcessFailure(error: unknown, stderr: string): CommandRunnerDen
       'macOS VM runner helper binary is not executable.',
     );
   }
-  return macosVmUnavailable('macos_vm_runner_process_failed', stderr || errorMessage(error));
+  return commandOutcomeUnknown('transport_lost');
 }
 
 function parseMacosVmHelperResponse(stdout: string): MacosVmHelperResponse | undefined {
@@ -486,81 +564,91 @@ export function createMacosVmCommandRunner({
 
       const envDir = await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-env-'));
       const envFile = join(envDir, 'env.json');
-      await writeFile(envFile, JSON.stringify(commandRunnerEnvironment(request.env)), 'utf8');
-      const timeoutMs = boundedPositiveInteger(
-        request.timeoutMs,
-        MACOS_VM_PRODUCTION_POLICY.commandTimeoutDefaultMs,
-        MACOS_VM_PRODUCTION_POLICY.commandTimeoutMaxMs,
-      );
-      const maxOutputBytes = boundedPositiveInteger(
-        request.maxOutputBytes,
-        MACOS_VM_PRODUCTION_POLICY.outputDefaultBytes,
-        MACOS_VM_PRODUCTION_POLICY.outputMaxBytes,
-      );
-
-      return new Promise<CommandRunnerResult>((resolve) => {
-        const startedAt = Date.now();
-        const args = [
-          'exec',
-          '--runtime-dir',
-          runtimeDir,
-          '--workspace',
-          paths.hostWorkspaceRoot,
-          '--cwd',
-          paths.hostCwd,
-          '--timeout-ms',
-          String(timeoutMs),
-          '--max-output-bytes',
-          String(maxOutputBytes),
-          '--env-file',
-          envFile,
-          '--',
-          paths.guestCommand,
-        ];
-        const proc = exec(
-          helperPath,
-          args,
-          {
-            cwd: paths.hostWorkspaceRoot,
-            timeout: timeoutMs,
-            maxBuffer: maxOutputBytes * 2,
-            env: commandRunnerEnvironment(request.env),
-          },
-          (error, stdout, stderr) => {
-            cleanupTempDirectory(envDir);
-            if (error) {
-              resolve(macosVmProcessFailure(error, stderr));
-              return;
-            }
-
-            const response = parseMacosVmHelperResponse(stdout);
-            if (!response) {
-              resolve(
-                macosVmUnavailable(
-                  'macos_vm_runner_invalid_response',
-                  'macOS VM runner returned an invalid response.',
-                ),
-              );
-              return;
-            }
-
-            if (!response.ok) {
-              resolve(macosVmUnavailable('macos_vm_runner_unavailable', response.message));
-              return;
-            }
-
-            const exitCode = response.exitCode ?? 0;
-            resolve({
-              status: exitCode === 0 ? 'success' : 'failed',
-              stdout: truncate(response.stdout ?? '', maxOutputBytes),
-              stderr: truncate(response.stderr ?? '', maxOutputBytes),
-              exitCode,
-              durationMs: response.durationMs ?? Date.now() - startedAt,
-            });
-          },
+      try {
+        await writeFile(envFile, JSON.stringify(commandRunnerEnvironment(request.env)), 'utf8');
+        const timeoutMs = boundedPositiveInteger(
+          request.timeoutMs,
+          MACOS_VM_PRODUCTION_POLICY.commandTimeoutDefaultMs,
+          MACOS_VM_PRODUCTION_POLICY.commandTimeoutMaxMs,
         );
-        proc.on('error', () => {});
-      });
+        const maxOutputBytes = boundedPositiveInteger(
+          request.maxOutputBytes,
+          MACOS_VM_PRODUCTION_POLICY.outputDefaultBytes,
+          MACOS_VM_PRODUCTION_POLICY.outputMaxBytes,
+        );
+
+        return await invokeRunAction(
+          request.runControl,
+          request.signal,
+          'tool',
+          () =>
+            new Promise<CommandRunnerResult>((resolve) => {
+              const startedAt = Date.now();
+              const args = [
+                'exec',
+                '--runtime-dir',
+                runtimeDir,
+                '--workspace',
+                paths.hostWorkspaceRoot,
+                '--cwd',
+                paths.hostCwd,
+                '--timeout-ms',
+                String(timeoutMs),
+                '--max-output-bytes',
+                String(maxOutputBytes),
+                '--env-file',
+                envFile,
+                '--',
+                paths.guestCommand,
+              ];
+              const proc = exec(
+                helperPath,
+                args,
+                {
+                  cwd: paths.hostWorkspaceRoot,
+                  signal: request.signal,
+                  timeout: timeoutMs,
+                  maxBuffer: maxOutputBytes * 2,
+                  env: commandRunnerEnvironment(request.env),
+                },
+                (error, stdout) => {
+                  const uncertain = interruptedCommand(error, request.signal);
+                  if (uncertain) {
+                    resolve(uncertain);
+                    return;
+                  }
+                  if (error) {
+                    resolve(macosVmProcessFailure(error));
+                    return;
+                  }
+
+                  const response = parseMacosVmHelperResponse(stdout);
+                  if (!response) {
+                    resolve(commandOutcomeUnknown('invalid_response'));
+                    return;
+                  }
+
+                  if (!response.ok) {
+                    resolve(commandOutcomeUnknown('transport_lost'));
+                    return;
+                  }
+
+                  const exitCode = response.exitCode ?? 0;
+                  resolve({
+                    status: exitCode === 0 ? 'success' : 'failed',
+                    stdout: truncate(response.stdout ?? '', maxOutputBytes),
+                    stderr: truncate(response.stderr ?? '', maxOutputBytes),
+                    exitCode,
+                    durationMs: response.durationMs ?? Date.now() - startedAt,
+                  });
+                },
+              );
+              proc.on('error', () => {});
+            }),
+        );
+      } finally {
+        cleanupTempDirectory(envDir);
+      }
     },
   };
 }

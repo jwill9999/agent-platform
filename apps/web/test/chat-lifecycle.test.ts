@@ -15,6 +15,7 @@ let current: Hook;
 let root: Root;
 let container: HTMLDivElement;
 let calls: Call[];
+let controlFetch: (url: string, init?: RequestInit) => Promise<Response>;
 let renderSnapshots: Array<{
   session: string | null;
   messages: string[];
@@ -107,16 +108,19 @@ async function send(message = 'Hello') {
 
 beforeEach(() => {
   calls = [];
+  controlFetch = async () => envelope(null);
   renderSnapshots = [];
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: RequestInit) =>
-      url.includes('/approval-requests/git-delivery?')
-        ? Promise.resolve(envelope({ approvals: [], recoveryReceipts: [] }))
-        : new Promise<Response>((resolve, reject) => {
-            calls.push({ url, init, resolve, reject });
-          }),
+      url.includes('/active-run') || /\/runs\//.test(url)
+        ? controlFetch(url, init)
+        : url.includes('/approval-requests/git-delivery?')
+          ? Promise.resolve(envelope({ approvals: [], recoveryReceipts: [] }))
+          : new Promise<Response>((resolve, reject) => {
+              calls.push({ url, init, resolve, reject });
+            }),
     ),
   );
   container = document.createElement('div');
@@ -466,5 +470,113 @@ describe('mounted chat session lifecycle', () => {
     expect(text()).toContain('The context limit was reached.');
     expect(current.status).toBe('ready');
     expect(posts()).toHaveLength(1);
+  });
+});
+
+describe('chat integration with shared Stop authority', () => {
+  it('does not mistake the previous terminal fallback for settlement of a new request awaiting headers', async () => {
+    const oldId = '81ce397c-a87d-4f20-9e21-9e6edfa92322';
+    const newId = '99ce397c-a87d-4f20-9e21-9e6edfa92322';
+    let saved = {
+      id: oldId,
+      sessionId: 'A',
+      processInstanceId: newId,
+      state: 'cancelled',
+      version: 2,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+      reason: 'user_stop',
+      inFlight: 0,
+    };
+    controlFetch = async () => envelope(saved);
+    await select('A');
+    expect(current.canSend).toBe(true);
+    const next = await send('new request after stopped run');
+    expect(next.isCurrent()).toBe(true);
+    expect(current.status).toBe('streaming');
+    expect(current.runControl).toBeNull();
+    saved = { ...saved, id: newId, state: 'completed', reason: 'none' };
+    await respond(
+      post(0),
+      new Response(JSON.stringify({ type: 'text', content: 'Fresh response' }) + '\n', {
+        headers: { 'x-harness-run-id': newId, 'content-type': 'application/x-ndjson' },
+      }),
+    );
+    await next.completion;
+    expect(text()).toContain('Fresh response');
+    expect(current.runControl?.id).toBe(newId);
+  });
+
+  it('uses the logical identity, releases an uncertain stream without cancelling it, and fences stale approval actions', async () => {
+    const id = '81ce397c-a87d-4f20-9e21-9e6edfa92322';
+    const nextId = '99ce397c-a87d-4f20-9e21-9e6edfa92322';
+    const base = {
+      id,
+      sessionId: 'A',
+      processInstanceId: nextId,
+      state: 'running',
+      version: 1,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+      reason: 'none',
+      inFlight: 1,
+    };
+    let saved: unknown = null;
+    const stops: string[] = [];
+    controlFetch = async (url, init) => {
+      if (init?.method === 'POST') {
+        stops.push(url);
+        saved = { ...base, state: 'outcome_unknown', reason: 'user_stop', version: 3 };
+      }
+      return envelope(saved);
+    };
+    await select('A');
+    const first = await send();
+    let oldController!: ReadableStreamDefaultController<Uint8Array>;
+    const oldBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        oldController = controller;
+      },
+    });
+    saved = base;
+    await respond(
+      post(0),
+      new Response(oldBody, {
+        headers: { 'x-harness-run-id': id, 'content-type': 'application/x-ndjson' },
+      }),
+    );
+    expect(current.canStop).toBe(true);
+    expect(current.runControl?.id).toBe(id);
+    await act(async () => {
+      expect(await current.stop()).toBe(true);
+    });
+    expect(stops).toEqual([`/api/v1/sessions/A/runs/${id}/stop`]);
+    expect(current.status).toBe('ready');
+    expect(current.canSend).toBe(true);
+    expect(current.runControlStatusText).toContain('Admitted work may still finish');
+    expect(current.decideApproval('old-approval', 'approve')).toEqual({
+      accepted: false,
+      reason: 'invalid-approval',
+    });
+    saved = { ...base, id: nextId };
+    const second = await send('new independent request');
+    await respond(
+      post(1),
+      new Response(JSON.stringify({ type: 'text', content: 'New visible response' }) + '\n', {
+        headers: { 'x-harness-run-id': nextId, 'content-type': 'application/x-ndjson' },
+      }),
+    );
+    await second.completion;
+    await act(async () => {
+      oldController.enqueue(
+        new TextEncoder().encode(
+          JSON.stringify({ type: 'text', content: 'Late obsolete answer' }) + '\n',
+        ),
+      );
+      oldController.close();
+      await first.completion;
+    });
+    expect(text()).toContain('New visible response');
+    expect(text()).not.toContain('Late obsolete answer');
   });
 });

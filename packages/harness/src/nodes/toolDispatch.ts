@@ -1,3 +1,9 @@
+import {
+  abortReason,
+  invokeRunAction,
+  isRunInterruption,
+  type RunExecutionControl,
+} from '../runControl.js';
 import { sameMcpApprovalBinding, type McpApprovalBinding } from '../security/mcpApproval.js';
 import type {
   GitDeliveryPort,
@@ -441,7 +447,7 @@ async function dispatchMcpTool(
   parsed: { mcpServerId: string; mcpToolName: string },
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
-  options?: { timeoutMs?: number; signal?: AbortSignal },
+  options?: { timeoutMs?: number; signal?: AbortSignal; runControl?: RunExecutionControl },
 ): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
   const session = ctx.mcpManager.getSession(parsed.mcpServerId);
   if (!session) {
@@ -454,13 +460,17 @@ async function dispatchMcpTool(
       ok: false,
     };
   }
-  try {
-    const { output, images } = await session.callToolAsOutput(parsed.mcpToolName, call.args, {
+  const invocation = invokeRunAction(options?.runControl, options?.signal, 'tool', () =>
+    session.callToolAsOutput(parsed.mcpToolName, call.args, {
       timeoutMs: options?.timeoutMs,
       signal: options?.signal,
-    });
+    }),
+  );
+  try {
+    const { output, images } = await invocation;
     return { output, ok: output.type !== 'error', images };
-  } catch {
+  } catch (error) {
+    if (isRunInterruption(error, options?.signal)) throw error;
     return {
       output: {
         type: 'error',
@@ -494,8 +504,9 @@ function nativeDispatchOptions(
       signal,
     };
   }
-  if (call.name === 'sys_bash' && call.approvalGranted === true) return { approvalGranted: true };
-  return undefined;
+  if (call.name === 'sys_bash' && call.approvalGranted === true)
+    return { approvalGranted: true, ...(signal ? { signal } : {}) };
+  return signal ? { signal } : undefined;
 }
 
 /** Dispatch a tool call to a native executor. */
@@ -503,6 +514,7 @@ async function dispatchNativeTool(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
   signal?: AbortSignal,
+  runControl?: RunExecutionControl,
 ): Promise<{ output: Output; ok: boolean }> {
   if (!ctx.nativeToolExecutor) {
     return {
@@ -514,13 +526,18 @@ async function dispatchNativeTool(
       ok: false,
     };
   }
+  const options = nativeDispatchOptions(call, ctx, signal);
+  const execute = ctx.nativeToolExecutor;
+  const invocation = invokeRunAction(runControl, signal, 'tool', () =>
+    options
+      ? execute(call.name, call.args, { ...options, ...(runControl ? { runControl } : {}) })
+      : execute(call.name, call.args, runControl ? { runControl } : undefined),
+  );
   try {
-    const options = nativeDispatchOptions(call, ctx, signal);
-    const result = options
-      ? await ctx.nativeToolExecutor(call.name, call.args, options)
-      : await ctx.nativeToolExecutor(call.name, call.args);
+    const result = await invocation;
     return { output: result, ok: isOutputOk(result) };
   } catch (err) {
+    if (isRunInterruption(err, signal)) throw err;
     const message = err instanceof Error ? err.message : String(err);
     return { output: { type: 'error', code: 'NATIVE_TOOL_FAILED', message }, ok: false };
   }
@@ -571,7 +588,7 @@ async function jailSystemTool(call: ToolCallIntent, ctx: ToolDispatchContext) {
 async function dispatchSingleTool(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
-  options?: { timeoutMs?: number; signal?: AbortSignal },
+  options?: { timeoutMs?: number; signal?: AbortSignal; runControl?: RunExecutionControl },
 ): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
   const approvedForResume = approvedForDispatch(call, ctx);
   if (!approvedForResume && !isToolExecutionAllowed(ctx.agent, call.name)) {
@@ -605,7 +622,7 @@ async function dispatchSingleTool(
   const denial = mcpAdmissionError(safeCall, ctx, approvedForResume);
   if (denial) return { output: denial, ok: false };
   if (parsed.kind === 'mcp') return dispatchMcpTool(parsed, safeCall, ctx, options);
-  return dispatchNativeTool(safeCall, ctx, options?.signal);
+  return dispatchNativeTool(safeCall, ctx, options?.signal, options?.runControl);
 }
 
 function resolveToolMetadata(
@@ -1009,6 +1026,7 @@ async function executeToolWithRetry(
   traceEvents: TraceEvent[],
   signal?: AbortSignal,
   remainingDeadlineMs?: number,
+  runControl?: RunExecutionControl,
 ): Promise<{ output: Output; ok: boolean; retryCount: number; images?: Output[] }> {
   const effectiveTimeout = resolveToolTimeout(agentToolTimeoutMs, undefined, remainingDeadlineMs);
   let retryCount = 0;
@@ -1020,11 +1038,16 @@ async function executeToolWithRetry(
     const result = await dispatchSingleTool(call, ctx, {
       timeoutMs: effectiveTimeout,
       signal: ownedSignal,
+      runControl,
     });
     return { ...result, retryCount: 0 };
   }
   if (parseToolId(call.name).kind === 'mcp') {
-    const result = await dispatchSingleTool(call, ctx, { timeoutMs: effectiveTimeout, signal });
+    const result = await dispatchSingleTool(call, ctx, {
+      timeoutMs: effectiveTimeout,
+      signal,
+      runControl,
+    });
     return { ...result, retryCount: 0 };
   }
 
@@ -1032,7 +1055,12 @@ async function executeToolWithRetry(
     const result = await withRetry(
       () =>
         withToolTimeout(
-          () => dispatchSingleTool(call, ctx, { timeoutMs: effectiveTimeout }),
+          (ownedSignal) =>
+            dispatchSingleTool(call, ctx, {
+              timeoutMs: effectiveTimeout,
+              signal: ownedSignal,
+              runControl,
+            }),
           effectiveTimeout,
           call.name,
           signal,
@@ -1050,6 +1078,7 @@ async function executeToolWithRetry(
           delayMs,
         });
       },
+      { signal, runControl },
     );
     return { output: result.output, ok: result.ok, retryCount, images: result.images };
   } catch (err) {
@@ -1336,6 +1365,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     config?: RunnableConfig,
   ): Promise<Partial<HarnessStateType>> => {
     const signal = config?.configurable?.signal as AbortSignal | undefined;
+    const runControl = config?.configurable?.runControl as RunExecutionControl | undefined;
     const { llmOutput } = state;
 
     if (llmOutput?.kind !== 'tool_calls') return {};
@@ -1401,7 +1431,14 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
             totalToolCalls: toolCallCount,
           };
         }
-        break;
+        traceEvents.push({ type: 'stream_aborted', reason: abortReason(signal) });
+        return {
+          halted: true,
+          llmOutput: null,
+          messages: toolMessages,
+          trace: traceEvents,
+          totalToolCalls: toolCallCount,
+        };
       }
       const gitCall = isGitDeliveryTool(call.name);
 
@@ -1857,15 +1894,30 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
           toolMetadata?.riskTier,
         ) ?? null;
 
-      const { output, ok, retryCount, images } = await executeToolWithRetry(
-        safeCall,
-        ctx,
-        step,
-        agentToolTimeoutMs,
-        traceEvents,
-        signal,
-        deadline.remainingMs,
-      );
+      let execution;
+      try {
+        execution = await executeToolWithRetry(
+          safeCall,
+          ctx,
+          step,
+          agentToolTimeoutMs,
+          traceEvents,
+          signal,
+          deadline.remainingMs,
+          runControl,
+        );
+      } catch (error) {
+        if (!isRunInterruption(error, signal)) throw error;
+        traceEvents.push({ type: 'stream_aborted', reason: abortReason(signal, error) });
+        return {
+          halted: true,
+          llmOutput: null,
+          messages: toolMessages,
+          trace: traceEvents,
+          totalToolCalls: toolCallCount,
+        };
+      }
+      const { output, ok, retryCount, images } = execution;
 
       if (auditId && ctx.auditLog) ctx.auditLog.logComplete(auditId, output);
 
@@ -1912,6 +1964,20 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
       if (
         output.type === 'error' &&
+        ['COMMAND_OUTCOME_UNKNOWN', 'HTTP_OUTCOME_UNKNOWN', 'DOWNLOAD_OUTCOME_UNKNOWN'].includes(
+          output.code ?? '',
+        )
+      ) {
+        return {
+          halted: true,
+          llmOutput: null,
+          messages: toolMessages,
+          trace: traceEvents,
+          totalToolCalls: toolCallCount,
+        };
+      }
+      if (
+        output.type === 'error' &&
         (output.code === 'MCP_OUTCOME_UNKNOWN' || output.code === 'MCP_APPROVAL_STALE')
       ) {
         return {
@@ -1928,6 +1994,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     }
 
     return {
+      ...(signal?.aborted ? { halted: true } : {}),
       llmOutput: null,
       messages: toolMessages,
       trace: traceEvents,

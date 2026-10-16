@@ -13,7 +13,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { DiagnosticReport } from '@agent-platform/contracts';
+import {
+  RunControlRecordSchema,
+  type DiagnosticReport,
+  type RunControlRecord,
+} from '@agent-platform/contracts';
 import { expect, test, type TestInfo } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 
@@ -52,6 +56,10 @@ const JOURNEY_COMMAND = "printf 'approved change\\n' >> journey.txt";
 const JOURNEY_BEFORE = 'original content\n';
 const JOURNEY_AFTER = `${JOURNEY_BEFORE}approved change\n`;
 const JOURNEY_FINAL = 'Evaluation turn finished';
+const STOP_GUEST_COMMAND = 'sh ./stop-guest.sh';
+const STOP_STARTED = 'stop-started.txt';
+const STOP_RELEASE = 'stop-release.txt';
+const STOP_LATE = 'stop-late.txt';
 const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 async function readCompleteDiagnosticReport(path: string) {
@@ -157,6 +165,387 @@ test.describe('packaged Electron macOS VM command runner', () => {
     }
   });
 });
+
+test(`approved packaged command remains honestly unknown after Stop with its late effect preserved (${process.env.AGENT_PLATFORM_E2E_PACKAGED_VM_RESOURCES_DIR ? 'signed real VM' : 'controlled helper fixture'})`, async () => {
+  test.setTimeout(120_000);
+  const sourceProvenance = captureStopSourceProvenance();
+  const fixture = await createVmFixture({ health: 'ready' });
+  const startedFile = join(fixture.projectDir, STOP_STARTED);
+  const releaseFile = join(fixture.projectDir, STOP_RELEASE);
+  const lateFile = join(fixture.projectDir, STOP_LATE);
+  writeFileSync(
+    join(fixture.projectDir, 'stop-guest.sh'),
+    [
+      '#!/bin/sh',
+      `printf 'started\\n' >> ${STOP_STARTED}`,
+      'attempt=0',
+      `while [ ! -f ${STOP_RELEASE} ] && [ "$attempt" -lt 300 ]; do`,
+      '  sleep 0.1',
+      '  attempt=$((attempt + 1))',
+      'done',
+      `[ -f ${STOP_RELEASE} ] || exit 73`,
+      `printf 'late\\n' >> ${STOP_LATE}`,
+      '',
+    ].join('\n'),
+  );
+  const provider = await startJourneyProvider(
+    STOP_GUEST_COMMAND,
+    'No post-Stop model continuation permitted',
+  );
+  let app: ElectronApplication | undefined;
+  let tracing = false;
+  let approval: ApprovalEvidence | undefined;
+  let acknowledged: RunControlRecord | undefined;
+  let finalRecord: RunControlRecord | undefined;
+  let acknowledgementMs: number | undefined;
+  let runnerStatus: unknown;
+  let servedRuntimeVerified = false;
+  let durableDiagnosticArtifact: { file: string; sha256: string; bytes: number } | undefined;
+  try {
+    app = await launchVmFixture(fixture, {
+      command: STOP_GUEST_COMMAND,
+      providerURL: provider.baseURL,
+    });
+    await configureJourneyModel(fixture);
+    verifyStopServedRuntime(sourceProvenance);
+    servedRuntimeVerified = true;
+    await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
+    tracing = true;
+    const page = await app.firstWindow();
+    await openProject(page);
+    if (fixture.realVmRuntimeDir) runnerStatus = startRealVmRunner(fixture);
+    await expect(page.getByLabel('Project command status: Commands ready')).toBeVisible({
+      timeout: 15_000,
+    });
+    await sendChatMessage(page, '/init');
+    await expect(page.getByRole('button', { name: 'Approve instructions' })).toBeVisible();
+    await page.getByRole('button', { name: 'Approve instructions' }).click();
+    await expect(page.getByText('Project instructions approved').last()).toBeVisible();
+    await sendChatMessage(page, 'Run the disposable guest Stop-control fixture');
+    const card = page.getByTestId('approval-card').last();
+    await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+    approval = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
+      (row) => row.toolName === 'sys_bash',
+    );
+    expect(approval?.status).toBe('pending');
+    expect(existsSync(startedFile)).toBe(false);
+    expect(existsSync(lateFile)).toBe(false);
+    const waiting = await readVmRunControl(fixture, approval!.sessionId);
+    expect(waiting.state).toBe('waiting_for_approval');
+    await page.getByRole('button', { name: 'Export diagnostic report', exact: true }).click();
+    await readCompleteDiagnosticReport(join(fixture.tempRoot, 'waiting-diagnostics.json'));
+    await card.getByRole('button', { name: 'Approve', exact: true }).click();
+    // The effect marker proves command start: an actual guest write with real resources, otherwise the explicitly recorded helper double.
+    await expect.poll(() => existsSync(startedFile), { timeout: 15_000 }).toBe(true);
+    expect(readFileSync(startedFile, 'utf8')).toBe('started\n');
+    expect(existsSync(lateFile)).toBe(false);
+    const admitted = await readVmRunControl(fixture, approval!.sessionId, waiting.id);
+    expect(admitted.state).toBe('running');
+    expect(admitted.inFlight).toBeGreaterThan(0);
+    expect(provider.requests).toHaveLength(1);
+    let requestedAt: number | undefined;
+    const stopPath = `/sessions/${approval!.sessionId}/runs/${waiting.id}/stop`;
+    const observeStop = (request: import('playwright').Request) => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith(stopPath))
+        requestedAt = performance.now();
+    };
+    page.on('request', observeStop);
+    try {
+      const responsePromise = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname.endsWith(stopPath),
+      );
+      await page.getByRole('button', { name: 'Stop run', exact: true }).click();
+      const response = await responsePromise;
+      const responseAt = performance.now();
+      expect(response.ok()).toBe(true);
+      const body = (await response.json()) as { data: unknown };
+      acknowledged = RunControlRecordSchema.parse(body.data);
+      expect(requestedAt).toBeDefined();
+      acknowledgementMs = responseAt - requestedAt!;
+      expect(acknowledgementMs).toBeLessThanOrEqual(2_000);
+    } finally {
+      page.off('request', observeStop);
+    }
+    expect(acknowledged).toMatchObject({
+      id: waiting.id,
+      sessionId: approval!.sessionId,
+      reason: 'user_stop',
+    });
+    expect(acknowledged!.stopAcknowledgedAtMs).toEqual(expect.any(Number));
+    expect(acknowledged!.inFlight).toBeGreaterThan(0);
+    await expect(
+      page.getByText(
+        'Run outcome is unknown. Admitted work may still finish; inspect effects before a new request.',
+        { exact: true },
+      ),
+    ).toBeVisible({ timeout: 15_000 });
+    expect(existsSync(lateFile)).toBe(false);
+    finalRecord = await readVmRunControl(fixture, approval!.sessionId, waiting.id);
+    expect(finalRecord).toMatchObject({ state: 'outcome_unknown', reason: 'user_stop' });
+    expect(finalRecord.inFlight).toBeGreaterThan(0);
+    // The test releases only its fixture barrier. This is the previously approved guest work, not another application invocation.
+    writeFileSync(releaseFile, 'release\n');
+    await expect.poll(() => existsSync(lateFile), { timeout: 10_000 }).toBe(true);
+    expect(readFileSync(lateFile, 'utf8')).toBe('late\n');
+    expect(readFileSync(startedFile, 'utf8')).toBe('started\n');
+    expect(provider.requests).toHaveLength(1);
+    expect(provider.errors).toEqual([]);
+    // The product lost its guest transport receipt: a test observing an effect is not authority to manufacture cancellation.
+    finalRecord = await readVmRunControl(fixture, approval!.sessionId, waiting.id);
+    expect(finalRecord.state).toBe('outcome_unknown');
+    await page.reload();
+    await expect(
+      page.getByText(
+        'Run outcome is unknown. Admitted work may still finish; inspect effects before a new request.',
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect((await readVmRunControl(fixture, approval!.sessionId)).id).toBe(waiting.id);
+    await page.getByRole('button', { name: 'Export diagnostic report', exact: true }).click();
+    const snapshot = await readCompleteDiagnosticReport(
+      join(fixture.tempRoot, 'finished-diagnostics.json'),
+    );
+    const diagnosticPath = test.info().outputPath('stop-durable-diagnostics.json');
+    writeFileSync(diagnosticPath, snapshot.text, { mode: 0o600 });
+    const storedDiagnostic = readFileSync(diagnosticPath);
+    durableDiagnosticArtifact = {
+      file: 'stop-durable-diagnostics.json',
+      sha256: createHash('sha256').update(storedDiagnostic).digest('hex'),
+      bytes: storedDiagnostic.byteLength,
+    };
+    expect(durableDiagnosticArtifact.sha256).toBe(sha256(snapshot.text));
+    expect(snapshot.report.scope).toEqual({ sessionId: approval!.sessionId });
+    expect(snapshot.report.coverage).toMatchObject({
+      durable: true,
+      verified: true,
+      dropped: 0,
+      pending: 0,
+      conflicts: 0,
+    });
+    const controls = snapshot.report.events
+      .map(({ event }) => event)
+      .filter((event) => event.control?.logicalRunId === waiting.id);
+    expect(
+      controls.some(
+        (event) => event.control?.stage === 'acknowledged' && event.control.reason === 'user_stop',
+      ),
+    ).toBe(true);
+    expect(
+      controls.some(
+        (event) =>
+          event.control?.state === 'outcome_unknown' && event.control.reason === 'user_stop',
+      ),
+    ).toBe(true);
+    expect(
+      controls.filter(
+        (event) =>
+          event.control?.stage === 'admitted' && event.control.version > acknowledged!.version,
+      ),
+    ).toEqual([]);
+    expect(snapshot.text).not.toContain(STOP_GUEST_COMMAND);
+    expect(snapshot.text).not.toContain(fixture.projectDir);
+    expect(snapshot.text).not.toContain(HOST_ONLY_CANARY_VALUE);
+    await test.info().attach('stop-durable-diagnostic-report', {
+      path: diagnosticPath,
+      contentType: 'application/json',
+    });
+    await expect(page.getByText(fixture.projectDir)).toHaveCount(0);
+    await expect(page.getByText(HOST_ONLY_CANARY_VALUE)).toHaveCount(0);
+    approval = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
+      (row) => row.id === approval!.id,
+    );
+    expect(approval).toMatchObject({ status: 'approved', resumedAtMs: expect.any(Number) });
+    expect(provider.requests).toHaveLength(1);
+    if (fixture.realVmRuntimeDir)
+      writeVmEvidence(fixture, 'stop-outcome-unknown-late-effect', runnerStatus);
+  } finally {
+    // Release a started guest before teardown even when an assertion fails. Retain the fixture if its completion/cleanup cannot be verified.
+    await recordCleanupFailures(fixture, [
+      {
+        name: 'stop-guest-release',
+        run: async () => {
+          writeFileSync(releaseFile, 'release\n');
+          if (existsSync(startedFile))
+            await expect.poll(() => existsSync(lateFile), { timeout: 10_000 }).toBe(true);
+        },
+      },
+    ]);
+    if (approval)
+      finalRecord = await readVmRunControl(fixture, approval.sessionId, acknowledged?.id).catch(
+        () => finalRecord,
+      );
+    await recordCleanupFailures(fixture, [
+      {
+        name: 'trace',
+        run: async () => {
+          if (app && tracing) {
+            const tracePath = test.info().outputPath('stop-packaged-vm-trace.zip');
+            await app.context().tracing.stop({ path: tracePath });
+            await test.info().attach('stop-packaged-vm-browser-trace', {
+              path: tracePath,
+              contentType: 'application/zip',
+            });
+          }
+        },
+      },
+    ]);
+    await recordCleanupFailures(fixture, [
+      {
+        name: 'stop-evaluation',
+        run: async () => {
+          const evaluation = {
+            scenario: 'approved guest Stop with preserved late effect',
+            mode: fixture.realVmRuntimeDir ? 'signed-real-macos-vm' : 'controlled-helper-fixture',
+            sourceProvenance,
+            servedRuntimeVerified,
+            durableDiagnosticArtifact: durableDiagnosticArtifact ?? null,
+            acknowledgementMs,
+            acknowledged,
+            finalRecord,
+            approval,
+            started: existsSync(startedFile) ? readFileSync(startedFile, 'utf8') : null,
+            late: existsSync(lateFile) ? readFileSync(lateFile, 'utf8') : null,
+            providerRequestCount: provider.requests.length,
+            providerErrors: provider.errors,
+            backendEvents: readBackendEvents(fixture),
+            limitations: [
+              'The external model is a deterministic local HTTP fixture; no live-provider capability or spend claim.',
+              'Guest transport cancellation is not guest termination; late previously admitted effects remain possible.',
+              ...(fixture.realVmRuntimeDir
+                ? []
+                : [
+                    'Controlled helper fixture only; this execution does not qualify the required signed real VM gate.',
+                  ]),
+            ],
+          };
+          const evidencePath = test.info().outputPath('stop-packaged-vm-evaluation.json');
+          writeFileSync(
+            evidencePath,
+            JSON.stringify(evaluation, null, 2).replaceAll(fixture.tempRoot, '<disposable-root>'),
+          );
+          await test.info().attach('stop-packaged-vm-evaluation', {
+            path: evidencePath,
+            contentType: 'application/json',
+          });
+        },
+      },
+    ]);
+    await cleanupFixtureResources(fixture, app, () => provider.close());
+    if (!fixture.vmTeardownFailed) rmSync(fixture.tempRoot, { recursive: true, force: true });
+  }
+});
+
+function captureStopSourceProvenance() {
+  // Capture before launch: a historical HEAD alone does not identify a dirty implementation or its built runtime.
+  const head = execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  }).trim();
+  const dirty =
+    execFileSync(GIT_BINARY, ['status', '--porcelain=v1', '--untracked-files=all'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    }).trim().length > 0;
+  const knownPaths = [
+    'apps/desktop/e2e/packaged-vm-command.e2e.ts',
+    'apps/desktop/dist/main/main.js',
+    'apps/api/src/application/runControl/service.ts',
+    'apps/api/dist/application/runControl/service.js',
+    'apps/api/src/infrastructure/http/v1/chatRouter.ts',
+    'apps/api/dist/infrastructure/http/v1/chatRouter.js',
+    'apps/api/src/infrastructure/http/v1/runControlRouter.ts',
+    'apps/api/dist/infrastructure/http/v1/runControlRouter.js',
+    'packages/harness/src/nodes/llmReason.ts',
+    'packages/harness/dist/nodes/llmReason.js',
+    'packages/harness/src/commandRunner.ts',
+    'packages/harness/dist/commandRunner.js',
+    'packages/harness/src/tools/qualityGateTool.ts',
+    'packages/harness/dist/tools/qualityGateTool.js',
+    'packages/db/src/repositories/runControl.ts',
+    'packages/db/dist/repositories/runControl.js',
+    'apps/web/hooks/use-harness-run-control.ts',
+    'apps/web/hooks/use-harness-chat.ts',
+    'apps/web/.next/standalone/apps/web/server.js',
+    'apps/web/.next/standalone/apps/web/.next/BUILD_ID',
+    'apps/web/.next/standalone/apps/web/.next/app-build-manifest.json',
+    'apps/web/.next/standalone/apps/web/.next/server/app/page.js',
+    'apps/web/.next/standalone/apps/web/.next/server/app/api/chat/route.js',
+    'apps/web/.next/standalone/apps/web/.next/server/app/api/v1/[...path]/route.js',
+  ];
+  const rendererCopies: Array<{ inputPath: string; servedPath: string }> = [];
+  const nextRoot = 'apps/web/.next/standalone/apps/web/.next';
+  const manifest = JSON.parse(
+    readFileSync(join(repoRoot, nextRoot, 'app-build-manifest.json'), 'utf8'),
+  ) as { pages?: Record<string, unknown> };
+  // Hook code is bundled: bind the actual served page/layout JS chunks rather than inventing one source-file counterpart.
+  for (const page of ['/layout', '/page']) {
+    const entries = manifest.pages?.[page];
+    if (!Array.isArray(entries) || entries.length > 128)
+      throw new Error('Missing or unbounded renderer provenance manifest');
+    for (const entry of entries) {
+      if (typeof entry !== 'string') throw new Error('Invalid renderer provenance entry');
+      if (!entry.endsWith('.js')) continue;
+      if (!/^static\/chunks\/[A-Za-z0-9_./-]+\.js$/.test(entry) || entry.split('/').includes('..'))
+        throw new Error('Unexpected renderer provenance path');
+      // The desktop launcher copies .next/static into standalone on launch; fresh builds need not have that target yet.
+      const inputPath = `apps/web/.next/${entry}`;
+      knownPaths.push(inputPath);
+      rendererCopies.push({ inputPath, servedPath: `${nextRoot}/${entry}` });
+    }
+  }
+  const files = [...new Set(knownPaths)].sort().map((path) => {
+    const bytes = readFileSync(join(repoRoot, path));
+    return {
+      path,
+      bytes: bytes.byteLength,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    };
+  });
+  return {
+    capturedAt: new Date().toISOString(),
+    head,
+    dirty,
+    headMeaning: dirty
+      ? 'Ancestry only; uncommitted tested implementation is identified by the listed file hashes.'
+      : 'Clean checkout ancestry; compiled runtime is independently identified by the listed file hashes.',
+    files,
+    rendererCopies,
+    limitations: [
+      'Selected source/runtime byte bindings are not a complete source-tree digest or a reproducible-build attestation.',
+    ],
+  };
+}
+
+function verifyStopServedRuntime(provenance: ReturnType<typeof captureStopSourceProvenance>): void {
+  for (const { inputPath, servedPath } of provenance.rendererCopies) {
+    const source = provenance.files.find((file) => file.path === inputPath);
+    if (!source) throw new Error('Missing captured renderer runtime input');
+    const servedSha256 = createHash('sha256')
+      .update(readFileSync(join(repoRoot, servedPath)))
+      .digest('hex');
+    expect(servedSha256, 'Served renderer chunk differs from its captured prelaunch input').toBe(
+      source.sha256,
+    );
+  }
+}
+
+async function readVmRunControl(
+  fixture: VmFixture,
+  sessionId: string,
+  runId?: string,
+): Promise<RunControlRecord> {
+  const resource = runId
+    ? `sessions/${sessionId}/runs/${runId}`
+    : `sessions/${sessionId}/active-run`;
+  const response = await fetch(`http://127.0.0.1:${fixture.backendPort}/v1/${resource}`, {
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error(`Run control evidence request failed: ${response.status}`);
+  const body = (await response.json()) as { data: unknown };
+  return RunControlRecordSchema.parse(body.data);
+}
 
 const journeyCases = (['node-double', 'provider-http'] as const).flatMap((reasoning) =>
   (['approve', 'reject'] as const).flatMap((decision) =>
@@ -1136,7 +1525,7 @@ function writePackagedVmResources(resourcesDir: string, health: VmFixtureHealth)
       "  fs.appendFileSync(path.join(option('--workspace'), 'journey.txt'), 'approved change\\n');",
       '}',
       "if (args[0] === 'exec') require('node:fs').appendFileSync(require('node:path').join(option('--workspace'), '.runner-invocations'), command + '\\n');",
-      'console.log(JSON.stringify({',
+      'const emitResult = () => console.log(JSON.stringify({',
       '  ok: true,',
       "  mode: 'macos-vm',",
       "  state: 'ready',",
@@ -1146,6 +1535,22 @@ function writePackagedVmResources(resourcesDir: string, health: VmFixtureHealth)
       "  stderr: '',",
       '  durationMs: 7,',
       '}));',
+      `if (args[0] === 'exec' && command === ${JSON.stringify(STOP_GUEST_COMMAND)}) {`,
+      "  const fs = require('node:fs');",
+      "  const path = require('node:path');",
+      "  const workspace = option('--workspace');",
+      "  process.on('SIGTERM', () => {}); // Explicitly non-cooperative transport fixture, never a real-VM claim.",
+      `  fs.appendFileSync(path.join(workspace, ${JSON.stringify(STOP_STARTED)}), 'started\\n');`,
+      '  let ticks = 0;',
+      '  const gate = setInterval(() => {',
+      '    ticks++;',
+      `    if (fs.existsSync(path.join(workspace, ${JSON.stringify(STOP_RELEASE)}))) {`,
+      '      clearInterval(gate);',
+      `      fs.appendFileSync(path.join(workspace, ${JSON.stringify(STOP_LATE)}), 'late\\n');`,
+      '      emitResult();',
+      '    } else if (ticks >= 300) { clearInterval(gate); process.exitCode = 73; }',
+      '  }, 100);',
+      '} else emitResult();',
       '',
     ].join('\n'),
   );

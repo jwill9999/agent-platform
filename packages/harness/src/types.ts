@@ -1,3 +1,4 @@
+import type { RunExecutionControl } from './runControl.js';
 import type { McpApprovalBinding } from './security/mcpApproval.js';
 import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
 
@@ -70,6 +71,7 @@ export type NativeToolExecutor = (
     approvalGranted?: boolean;
     gitDelivery?: { operationId: string; approvalRequestId: string };
     signal?: AbortSignal;
+    runControl?: RunExecutionControl;
   },
 ) => Promise<Output>;
 

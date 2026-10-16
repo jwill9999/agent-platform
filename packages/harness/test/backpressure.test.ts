@@ -227,13 +227,14 @@ describe('AbortSignal in toolDispatchNode', () => {
       data: 'ok',
     });
 
-    const node = createToolDispatchNode(makeToolDispatchCtx(executorFn));
-
-    // Abort after first call
-    executorFn.mockImplementationOnce(async () => {
-      controller.abort('client_disconnect');
-      return { type: 'tool_result', toolId: 'echo', data: 'first' };
-    });
+    const context = makeToolDispatchCtx(executorFn);
+    context.emitter = {
+      emit(event) {
+        if (event.type === 'tool_result') controller.abort('client_disconnect');
+      },
+      end() {},
+    };
+    const node = createToolDispatchNode(context);
 
     const state = makeState({
       llmOutput: {

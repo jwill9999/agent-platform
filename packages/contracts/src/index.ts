@@ -687,3 +687,4 @@ export {
 export * from './diagnostics.js';
 export * from './diagnosticReport.js';
 export * from './gitDelivery.js';
+export * from './runControl.js';

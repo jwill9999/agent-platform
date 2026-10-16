@@ -489,10 +489,16 @@ describe('context admission through API and SQLite', () => {
       'tool',
     ]);
   });
-  it('continues ordinary chat with an older Ask pending, then pairs a delayed approved result without rewriting rows', async () => {
+  it('omits authentic stopped pending intents from a fresh ordinary request without rewriting retained rows or authorizing their effects', async () => {
     const sessionId = await f.session();
     const approvalRequestId = await pending(f, sessionId);
     const before = listMessagesBySession(f.db, sessionId);
+    const active = await request(f.app).get(`/v1/sessions/${sessionId}/active-run`).expect(200);
+    const stopped = await request(f.app)
+      .post(`/v1/sessions/${sessionId}/runs/${active.body.data.id}/stop`)
+      .send({})
+      .expect(200);
+    expect(stopped.body.data.state).toBe('cancelled');
     stream.mockReturnValueOnce(response('Separate question answered'));
     await request(f.app)
       .post('/v1/chat')
@@ -502,6 +508,31 @@ describe('context admission through API and SQLite', () => {
     expect(JSON.stringify(stream.mock.calls[1]![0].messages)).not.toContain('reviewed-call');
     expect(f.effects).toBe(0);
     expect(listMessagesBySession(f.db, sessionId).slice(0, before.length)).toEqual(before);
+    await request(f.app)
+      .post(`/v1/approval-requests/${approvalRequestId}/approve`)
+      .send({})
+      .expect(409);
+    expect(f.effects).toBe(0);
+  });
+
+  it('blocks a concurrent request while Ask is pending, then pairs a delayed approved result across retained historical turns without rewriting rows', async () => {
+    const sessionId = await f.session();
+    const approvalRequestId = await pending(f, sessionId);
+    const before = listMessagesBySession(f.db, sessionId);
+    const conflict = await request(f.app)
+      .post('/v1/chat')
+      .send({ sessionId, message: 'Separate later question' })
+      .expect(409);
+    expect(conflict.body.error.code).toBe('RUN_CONFLICT');
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect(f.effects).toBe(0);
+    expect(listMessagesBySession(f.db, sessionId)).toEqual(before);
+    // Retained pre-Stop transcripts can contain later turns after an older Ask.
+    // Seed those historical rows without admitting another live controlled run;
+    // the original approval remains authentically bound to its original run.
+    appendMessage(f.db, { sessionId, role: 'user', content: 'Separate later question' });
+    appendMessage(f.db, { sessionId, role: 'assistant', content: 'Separate question answered' });
+    expect(listMessagesBySession(f.db, sessionId).slice(0, before.length)).toEqual(before);
     const delayedHistory = listMessagesBySession(f.db, sessionId);
     await request(f.app)
       .post(`/v1/approval-requests/${approvalRequestId}/approve`)
@@ -510,8 +541,8 @@ describe('context admission through API and SQLite', () => {
     await f.restart();
     stream.mockReturnValueOnce(response('Approved result explained'));
     await resume(f, sessionId, approvalRequestId);
-    expect(stream).toHaveBeenCalledTimes(3);
-    const projected = stream.mock.calls[2]![0].messages as Array<{
+    expect(stream).toHaveBeenCalledTimes(2);
+    const projected = stream.mock.calls[1]![0].messages as Array<{
       role: string;
       content: unknown;
     }>;
@@ -531,7 +562,7 @@ describe('context admission through API and SQLite', () => {
       .post('/v1/chat')
       .send({ sessionId, message: 'Follow up after resume' })
       .expect(200);
-    expect(stream).toHaveBeenCalledTimes(4);
+    expect(stream).toHaveBeenCalledTimes(3);
     await resume(f, sessionId, approvalRequestId);
     expect(f.effects).toBe(1);
   });
@@ -566,10 +597,20 @@ describe('context admission through API and SQLite', () => {
   });
 
   it.each(['foreign-session', 'changed-arguments'] as const)(
-    'refuses pending-history exceptions backed by %s provenance',
+    'refuses stopped pending-history exceptions backed by %s provenance on a fresh run',
     async (corruption) => {
       const sessionId = await f.session();
       const approvalRequestId = await pending(f, sessionId);
+      // Retire the authentic active authority through the public Stop API before
+      // testing a fresh request's independent history-provenance admission.
+      // Otherwise RUN_CONFLICT correctly refuses it before context is examined.
+      const active = await request(f.app).get(`/v1/sessions/${sessionId}/active-run`).expect(200);
+      const stopped = await request(f.app)
+        .post(`/v1/sessions/${sessionId}/runs/${active.body.data.id}/stop`)
+        .send({})
+        .expect(200);
+      expect(stopped.body.data.state).toBe('cancelled');
+      expect(f.effects).toBe(0);
       if (corruption === 'foreign-session') {
         const foreignId = await f.session();
         f.sqlite

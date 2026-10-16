@@ -45,6 +45,7 @@ export {
   type CommandRunner,
   type CommandRunnerAuditMetadata,
   type CommandRunnerCompletedResult,
+  type CommandRunnerUnknownResult,
   type CommandRunnerDeniedResult,
   type CommandRunnerApprovalRequiredResult,
   type CommandRunnerRequest,
@@ -185,3 +186,5 @@ export {
   sameMcpApprovalBinding,
   type McpApprovalBinding,
 } from './security/mcpApproval.js';
+
+export { RunStoppedError, type RunExecutionControl } from './runControl.js';

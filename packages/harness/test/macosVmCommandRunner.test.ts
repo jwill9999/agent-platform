@@ -79,9 +79,9 @@ describe('macOS VM command runner adapter', () => {
       expect.any(Function),
     );
     expect(result).toMatchObject({
-      status: 'denied',
-      code: 'MACOS_VM_RUNNER_UNAVAILABLE',
-      reason: 'macos_vm_runner_unavailable',
+      status: 'outcome_unknown',
+      code: 'COMMAND_OUTCOME_UNKNOWN',
+      reason: 'transport_lost',
     });
 
     await rm(workspaceRoot, { recursive: true, force: true });
@@ -245,9 +245,9 @@ describe('macOS VM command runner adapter', () => {
     });
 
     await expect(runner.run(request(workspaceRoot))).resolves.toMatchObject({
-      status: 'denied',
-      code: 'MACOS_VM_RUNNER_UNAVAILABLE',
-      reason: 'macos_vm_runner_process_failed',
+      status: 'outcome_unknown',
+      code: 'COMMAND_OUTCOME_UNKNOWN',
+      reason: 'transport_lost',
     });
 
     await rm(workspaceRoot, { recursive: true, force: true });

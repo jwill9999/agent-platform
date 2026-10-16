@@ -1,3 +1,4 @@
+import { invokeRunAction, type RunExecutionControl } from '../runControl.js';
 import {
   CodingRunQualityGateResultSchema,
   SensorEvidenceSchema,
@@ -25,7 +26,12 @@ type QualityGateProfile = 'test' | 'typecheck' | 'lint' | 'format' | 'docs' | 'b
 export type QualityGateExecutor = (
   toolId: string,
   args: Record<string, unknown>,
-  options?: { workspaceRoot?: string; pnpmBin?: string },
+  options?: {
+    workspaceRoot?: string;
+    pnpmBin?: string;
+    signal?: AbortSignal;
+    runControl?: RunExecutionControl;
+  },
 ) => Promise<Output | null>;
 
 export type ComputationalFindingCollectorResult = {
@@ -60,6 +66,8 @@ export type ComputationalSensorRunnerOptions = {
   workspaceRoot?: string;
   pnpmBin?: string;
   qualityGateExecutor?: QualityGateExecutor;
+  signal?: AbortSignal;
+  runControl?: RunExecutionControl;
 };
 
 export type ComputationalSensorRun = {
@@ -252,6 +260,8 @@ function parseToolEnvelope(output: Output): {
   errorCode?: string;
   result?: unknown;
 } {
+  if (output.type === 'error')
+    return { ok: false, message: output.message, errorCode: output.code };
   if (output.type !== 'tool_result')
     return { ok: false, message: 'Quality gate did not return a tool result.' };
   const data = output.data as {
@@ -294,19 +304,41 @@ async function runQualityGate(
 ): Promise<{ record: SensorRunRecord; result: SensorResult }> {
   const sensorId = sensorIdFor(profile);
   const executor = options.qualityGateExecutor ?? executeQualityGateTool;
-  const output = await executor(
-    QUALITY_GATE_TOOL_ID,
-    {
-      profile,
-      repoPath: input.repoPath,
-      timeoutMs: input.timeoutMs ?? input.executionLimits?.maxRuntimeMs,
-      maxOutputBytes: input.maxOutputBytes ?? input.executionLimits?.maxEvidenceBytes,
-    },
-    { workspaceRoot: options.workspaceRoot, pnpmBin: options.pnpmBin },
-  );
+  const execute = () =>
+    executor(
+      QUALITY_GATE_TOOL_ID,
+      {
+        profile,
+        repoPath: input.repoPath,
+        timeoutMs: input.timeoutMs ?? input.executionLimits?.maxRuntimeMs,
+        maxOutputBytes: input.maxOutputBytes ?? input.executionLimits?.maxEvidenceBytes,
+      },
+      {
+        workspaceRoot: options.workspaceRoot,
+        pnpmBin: options.pnpmBin,
+        signal: options.signal,
+        runControl: options.runControl,
+      },
+    );
+  // Built-in executor fences at its actual child start, after asynchronous path validation.
+  const output = options.qualityGateExecutor
+    ? await invokeRunAction(options.runControl, options.signal, 'sensor', execute)
+    : await execute();
   const envelope = output
     ? parseToolEnvelope(output)
     : { ok: false, message: 'Quality gate unavailable.' };
+
+  if (envelope.errorCode === 'COMMAND_OUTCOME_UNKNOWN') {
+    const result = SensorResultSchema.parse({
+      sensorId,
+      status: 'error',
+      summary: envelope.message,
+      findings: [],
+      completedAtMs: Date.now(),
+      metadata: { code: 'COMMAND_OUTCOME_UNKNOWN' },
+    });
+    return { result, record: qualityGateRecord(input, sensorId, result) };
+  }
 
   if (envelope.errorCode === 'QUALITY_GATE_DENIED') {
     const result = SensorResultSchema.parse({

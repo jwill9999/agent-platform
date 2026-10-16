@@ -116,3 +116,27 @@ it('authenticates BFF linkage only for a verified same-origin local deployment',
   );
   expect(fetcher.mock.calls[1]?.[1].headers['x-diagnostics-capability']).toBeUndefined();
 });
+
+it('forwards only valid run/execution identities and never the diagnostic capability to the renderer', async () => {
+  const id = '81ce397c-a87d-4f20-9e21-9e6edfa92322';
+  globalThis.fetch = vi.fn(
+    async () =>
+      new Response('', {
+        headers: {
+          'x-harness-run-id': id,
+          'x-harness-execution-id': 'invalid-id',
+          'x-diagnostics-capability': 'secret',
+        },
+      }),
+  ) as typeof fetch;
+  const { POST } = await import('../app/api/chat/route');
+  const result = await POST(
+    new Request('http://test.local/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: 'session-1', message: 'hello' }),
+    }),
+  );
+  expect(result.headers.get('x-harness-run-id')).toBe(id);
+  expect(result.headers.has('x-harness-execution-id')).toBe(false);
+  expect(result.headers.has('x-diagnostics-capability')).toBe(false);
+});

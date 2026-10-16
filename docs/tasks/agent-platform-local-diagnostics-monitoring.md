@@ -1,10 +1,15 @@
 # Durable local monitoring for later agent review
 
-**Beads:** `agent-platform-local-diagnostics-monitoring`, P1 OPEN/planning-only.
+**Beads:** `agent-platform-local-diagnostics-monitoring`, P1 OPEN; implementation authorized after Stop, still dependency-blocked.
 **Parent:** `agent-platform-llm-observability-export` (scope only).
 **Hard upstream:** acknowledged Stop `agent-platform-harness-r3.cancel`.
 **Hard downstream:** `agent-platform-local-mvp-stress-review`.
 [Plan](../planning/project-chat-stop-mvp.md); [M01–M06 verification](../testing/project-chat-stop-mvp.md).
+
+The working Stop implementation adds safe control/admission/settlement events to existing V1
+diagnostics. This does not implement the periodic resource sampler, retained recording preference,
+historical monitoring windows or M01–M06 below. Those remain unstarted; the
+[Stop results](../reviews/project-chat-stop-results.md) must not be used as monitoring sign-off.
 
 ## Outcome and bounded scope
 
@@ -52,12 +57,13 @@ review service is scheduled by this plan. The stored record exists even between 
 
 ## Delivery, tests and stopping point
 
-After owner approval, proposed feature/local-diagnostics-monitoring -> task/local-diagnostics-monitoring;
+Owner approved Stop followed by this delivery on 16 October. Planned branch chain remains
+feature/local-diagnostics-monitoring -> task/local-diagnostics-monitoring;
 expected contracts/store/API/CLI/desktop bridge tests and docs. Verify M01–M06, one connected browser
 and Electron recording/history journey, restart, storage/retention/privacy failures, and existing
 benchmark thresholds without normalization. The agent must locate a seeded issue using historical
 records alone. Failed coverage preflight blocks owner stress testing. Source/results critic,
 quality/hosted security/tests, full mirrors/readbacks, guarded feature integration, Beads readback and
 sync apply; protected staging has its own actual scan/VM/review/authority gates. Estimate 1–2 days,
-then revisit if the minimal capture grows into a dashboard or tracing system. No implementation is
-authorized here. Existing benchmark/readiness repairs stay closed; V2/V3 are separately gated.
+then revisit if the minimal capture grows into a dashboard or tracing system. Implementation is
+authorized but has not started; the Stop delivery dependency and declared gates remain. Existing benchmark/readiness repairs stay closed; V2/V3 are separately gated.

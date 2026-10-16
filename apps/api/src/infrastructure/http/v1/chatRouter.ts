@@ -1,3 +1,9 @@
+import {
+  getRunControlService,
+  type ControlledExecution,
+} from '../../../application/runControl/service.js';
+import { mapRunControlError } from './runControlRouter.js';
+import { captureInterruptedReply } from './interruptedReply.js';
 import { createGitDeliveryService } from '../../../application/gitDelivery/index.js';
 import { parseToolId } from '@agent-platform/agent-validation';
 import {
@@ -8,6 +14,7 @@ import {
   observeDiagnosticModelAttempt,
   observeDiagnosticTool,
   observeDiagnosticApproval,
+  observeDiagnosticRunControl,
 } from '../../diagnostics/observations.js';
 import type { DrizzleDb } from '@agent-platform/db';
 import {
@@ -255,6 +262,93 @@ async function acquireRuntimeContext(
   }
 }
 
+async function acquireControlledContext(
+  db: DrizzleDb,
+  session: SessionRecord,
+  options: ChatRouterOptions,
+  req: Request,
+  res: Response,
+  sessionLock: SessionLock,
+  runId: string,
+  sourceExecutionId?: string,
+) {
+  let execution: ControlledExecution;
+  try {
+    execution = getRunControlService(db, observeDiagnosticRunControl).open(
+      session,
+      runId,
+      sourceExecutionId,
+    );
+  } catch (error) {
+    mapRunControlError(error);
+  }
+  const { controller, signal } = execution;
+  res.setHeader('x-harness-run-id', execution.runId);
+  res.setHeader('x-harness-execution-id', runId);
+  res.once('close', () => {
+    if (!res.writableFinished) controller.abort('client_disconnect');
+  });
+  try {
+    const runtime = await execution.waitFor(
+      execution.invoke('setup', () =>
+        acquireRuntimeContext(db, session, options, req, sessionLock, signal),
+      ),
+    );
+    return { ...runtime, execution, controller, signal };
+  } catch (error) {
+    const reason =
+      signal.reason === 'user_stop'
+        ? 'user_stop'
+        : signal.reason === 'timeout'
+          ? 'timeout'
+          : signal.aborted
+            ? 'client_disconnect'
+            : 'execution_failed';
+    const record = execution.finish(
+      reason === 'execution_failed'
+        ? 'failed'
+        : reason === 'user_stop'
+          ? 'completed'
+          : 'interrupted',
+      reason,
+    );
+    failDiagnosticRun(signal, record.state === 'outcome_unknown');
+    if (!signal.aborted) throw error;
+    prepareNdjsonResponse(res);
+    emitStreamError(res, error, signal);
+    if (!res.writableEnded) res.end();
+    return undefined;
+  }
+}
+
+function finishControlledResponse(
+  execution: ControlledExecution,
+  waiting: boolean,
+  failed = false,
+) {
+  const reason =
+    execution.signal.reason === 'user_stop'
+      ? 'user_stop'
+      : execution.signal.reason === 'timeout'
+        ? 'timeout'
+        : execution.signal.aborted
+          ? 'client_disconnect'
+          : failed
+            ? 'execution_failed'
+            : 'none';
+  const state =
+    reason === 'user_stop'
+      ? 'completed'
+      : reason === 'execution_failed'
+        ? 'failed'
+        : reason !== 'none'
+          ? 'interrupted'
+          : waiting
+            ? 'waiting_for_approval'
+            : 'completed';
+  return execution.finish(state, reason);
+}
+
 function requiredSecretsMasterKey(): Buffer {
   const masterKeyB64 = process.env['SECRETS_MASTER_KEY'];
   if (!masterKeyB64) {
@@ -446,11 +540,22 @@ function emitStreamError(res: Response, err: unknown, signal?: AbortSignal): voi
   if (res.writableEnded) return;
 
   if (signal?.aborted) {
-    const reason = signal.reason === 'timeout' ? 'timeout' : 'client_disconnect';
+    const reason =
+      signal.reason === 'user_stop'
+        ? 'user_stop'
+        : signal.reason === 'timeout'
+          ? 'timeout'
+          : 'client_disconnect';
     const errorEvent =
       reason === 'timeout'
         ? { type: 'error' as const, code: 'TIMEOUT', message: 'Execution timeout exceeded' }
-        : { type: 'stream_aborted' as const, reason };
+        : reason === 'user_stop'
+          ? {
+              type: 'error' as const,
+              code: 'USER_STOP',
+              message: 'Stop acknowledged. Previously admitted effects may still be settling.',
+            }
+          : { type: 'stream_aborted' as const, reason };
     res.write(JSON.stringify(errorEvent) + '\n');
     return;
   }
@@ -721,6 +826,25 @@ function buildRejectedToolMessage(toolCall: ToolCallIntent, request: ApprovalReq
         : 'Human rejected tool execution.',
     }),
   };
+}
+
+/** A transcript observation only; never an effect receipt or proof that admitted work ended. */
+function interruptedApprovalMessage(
+  toolCall: ToolCallIntent,
+  approval: ApprovalRequest,
+): ChatMessage {
+  return approval.status === 'rejected'
+    ? buildRejectedToolMessage(toolCall, approval)
+    : {
+        role: 'tool',
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content: JSON.stringify({
+          error: 'RUN_INTERRUPTED_OUTCOME_UNKNOWN',
+          message:
+            'The approved action did not return a confirmed result. Inspect its effects before retrying; do not replay it automatically.',
+        }),
+      };
 }
 
 function extractImportantFiles(text: string): string[] {
@@ -1013,6 +1137,14 @@ function projectUserFacingEmitter(
 }
 
 function sanitizeProjectAssistantMessages(
+  messages: ChatMessage[],
+  projectContext: SessionProjectContext,
+): ChatMessage[];
+function sanitizeProjectAssistantMessages(
+  messages: ChatMessage[] | undefined,
+  projectContext: SessionProjectContext,
+): ChatMessage[] | undefined;
+function sanitizeProjectAssistantMessages(
   messages: ChatMessage[] | undefined,
   projectContext: SessionProjectContext,
 ): ChatMessage[] | undefined {
@@ -1150,6 +1282,7 @@ function createRuntimeToolDispatchNode({
       approvalRequests: {
         create: (request) => {
           const record = createApprovalRequest(db, { id: randomUUID(), ...request });
+          getRunControlService(db, observeDiagnosticRunControl).pause(request.runId);
           observeDiagnosticApproval(record.id, 'waiting');
           return record;
         },
@@ -1252,8 +1385,9 @@ async function emitRuntimeFailure(
   signal: AbortSignal,
   res: Response,
   err: unknown,
+  unknown = false,
 ) {
-  failDiagnosticRun(signal);
+  failDiagnosticRun(signal, unknown);
   await safePluginCall(() =>
     agentCtx.pluginDispatcher.onTaskEnd({
       sessionId,
@@ -1387,6 +1521,7 @@ async function dispatchResumedApproval({
   messages,
   resumeBuild,
   approvalHistory,
+  execution,
 }: {
   db: DrizzleDb;
   options: ChatRouterOptions;
@@ -1401,6 +1536,7 @@ async function dispatchResumedApproval({
   messages: ChatMessage[];
   resumeBuild: ReturnType<typeof buildResumeMessages>;
   approvalHistory: ReturnType<typeof approvalContext>;
+  execution: ControlledExecution;
 }) {
   let resumeMessages: ChatMessage[];
   let stopAfterDispatch = false;
@@ -1455,7 +1591,7 @@ async function dispatchResumedApproval({
     });
     dispatchState.llmOutput = { kind: 'tool_calls', calls: [toolCall] };
     const dispatchResult = await dispatchNode(dispatchState, {
-      configurable: { thread_id: sessionId, signal },
+      configurable: { thread_id: sessionId, signal, runControl: execution },
     });
     resumeMessages = dispatchResult.messages ?? [];
     stopAfterDispatch = dispatchResult.halted === true;
@@ -1494,41 +1630,58 @@ export async function handleSessionResume(
     return;
   }
 
+  // Refuse a premature or expired resume before changing its logical run's authority.
+  if (!['approved', 'rejected'].includes(approval.status))
+    throw new HttpError(
+      409,
+      'APPROVAL_NOT_DECIDED',
+      'Decide the approval before resuming this run.',
+    );
+  if (approval.expiresAtMs !== undefined && approval.expiresAtMs <= Date.now())
+    throw new HttpError(409, 'APPROVAL_EXPIRED', 'The approval expired. Start a new request.');
+
   const toolCall = parseExecutionPayload(approval);
   // Reject substituted commands/endpoints before opening a replacement connection.
   if (approval.status !== 'rejected') assertCurrentMcpApproval(db, session.agentId, toolCall);
 
-  const controller = new AbortController();
-  const { signal } = controller;
-  res.once('close', () => {
-    if (!res.writableFinished) controller.abort('client_disconnect');
-  });
-  const { agentCtx, modelCfg, timeoutMs, release } = await acquireRuntimeContext(
+  const runId = randomUUID();
+  const context = await acquireControlledContext(
     db,
     session,
     options,
     req,
+    res,
     sessionLock,
-    signal,
+    runId,
+    approval.runId,
   );
-
-  const runId = randomUUID();
+  if (!context) return;
+  const { agentCtx, modelCfg, timeoutMs, release, execution, controller, signal } = context;
+  let captured: ReturnType<typeof captureInterruptedReply> | undefined;
+  let resumedTranscript: { messages: ChatMessage[]; initialCount: number } | undefined;
+  let resumedPrefixPersisted = false;
+  let claimedForDispatch = false;
+  let dispatchStarted = false;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   let heartbeatId: ReturnType<typeof setInterval> | undefined;
 
   try {
     const claimed = claimResumedApproval(db, approvalRequestId, toolCall, agentCtx.agent.id, res);
-    if (!claimed) return;
+    if (!claimed) {
+      execution.finish('failed', 'execution_failed');
+      return;
+    }
     approval = claimed;
+    claimedForDispatch = true;
     const completeDiagnostics = beginDiagnosticRun(sessionId, runId);
     observeDiagnosticApproval(
       approvalRequestId,
       approval.status === 'rejected' ? 'failed' : 'started',
       approval.runId,
     );
-    await emitTaskStart(agentCtx, sessionId, runId);
     ({ timeoutId, heartbeatId } = startRuntimeResponse(res, controller, timeoutMs));
-    const emitter: OutputEmitter = createNdjsonEmitter(res);
+    captured = captureInterruptedReply(db, sessionId, createNdjsonEmitter(res), signal);
+    const emitter = captured.emitter;
 
     const projectContext = resolveSessionProjectContext(db, session);
     const resumeBuild = buildResumeMessages(
@@ -1544,7 +1697,12 @@ export async function handleSessionResume(
     const messages = resumeBuild.messages;
     const approvalHistory = approvalContext(db, sessionId, messages);
     const initialCount = messages.length - (resumeBuild.reconstructedToolCallContext ? 1 : 0);
+    resumedTranscript = { messages, initialCount };
+    await execution.waitFor(
+      execution.invoke('setup', () => emitTaskStart(agentCtx, sessionId, runId)),
+    );
 
+    dispatchStarted = true;
     const { resumeMessages, stopAfterDispatch, mcpHalt, nativeToolExecutor } =
       await dispatchResumedApproval({
         db,
@@ -1560,7 +1718,25 @@ export async function handleSessionResume(
         messages,
         resumeBuild,
         approvalHistory,
+        execution,
       });
+
+    if (
+      signal.aborted &&
+      !resumeMessages.some(
+        (message) => message.role === 'tool' && message.toolCallId === toolCall.id,
+      )
+    )
+      resumeMessages.push(interruptedApprovalMessage(toolCall, approval));
+
+    // A completed approved effect must remain paired in history even if the next model is stopped.
+    const resumedPrefix = sanitizeProjectAssistantMessages(
+      [...messages, ...resumeMessages],
+      projectContext,
+    );
+    persistNewMessages(db, sessionId, resumedPrefix, initialCount);
+    resumedPrefixPersisted = true;
+    const persistedPrefixCount = resumedPrefix.length;
 
     const graph = buildRuntimeGraph({
       db,
@@ -1588,13 +1764,18 @@ export async function handleSessionResume(
     const finalState: Pick<HarnessStateType, 'messages' | 'contextHalt' | 'mcpHalt'> =
       stopAfterDispatch
         ? { ...resumeState, mcpHalt }
-        : await graph.invoke(resumeState, { configurable: { thread_id: sessionId, signal } });
+        : await execution.waitFor(
+            graph.invoke(resumeState, {
+              configurable: { thread_id: sessionId, signal, runControl: execution },
+            }),
+          );
 
     const persistedMessages = sanitizeProjectAssistantMessages(
       finalState?.messages,
       projectContext,
     );
-    persistNewMessages(db, sessionId, persistedMessages, initialCount);
+    persistNewMessages(db, sessionId, persistedMessages, persistedPrefixCount);
+    captured.markSaved();
     refreshWorkingMemory({
       db,
       sessionId,
@@ -1603,7 +1784,18 @@ export async function handleSessionResume(
       userMessage: messages[resumeBuild.currentTurnStartIndex]?.content ?? '',
       newMessages: persistedMessages?.slice(initialCount) ?? [],
     });
-    completeDiagnostics();
+    const terminal = finishControlledResponse(
+      execution,
+      listApprovalRequests(db, { sessionId, limit: 1000, offset: 0 }).some(
+        (row) =>
+          row.runId === runId &&
+          row.resumedAtMs === undefined &&
+          ['pending', 'approved', 'rejected'].includes(row.status),
+      ),
+      Boolean(finalState.contextHalt || finalState.mcpHalt),
+    );
+    if (signal.aborted) failDiagnosticRun(signal, terminal.state === 'outcome_unknown');
+    else completeDiagnostics();
     await safePluginCall(() =>
       agentCtx.pluginDispatcher.onTaskEnd({
         sessionId,
@@ -1614,10 +1806,44 @@ export async function handleSessionResume(
       }),
     );
   } catch (err) {
+    if (claimedForDispatch && !dispatchStarted && isGitDeliveryTool(toolCall.name)) {
+      try {
+        // The hook may still settle later, but no dispatch owned this prepared operation.
+        // Recheck the claimed actor/binding; never cancel a foreign or already entered effect.
+        assertClaimedGitApproval(db, approval, toolCall, agentCtx.agent.id);
+        await createGitDeliveryService(db)
+          .chat({ sessionId, agentId: agentCtx.agent.id })
+          .cancel(toolCall.gitDeliveryBinding!.operationId, 'cancelled');
+      } catch {
+        // A changed actor or unavailable store retains preparation for inspection/expiry.
+      }
+    }
     if (!res.headersSent && err instanceof HttpError) {
+      execution.finish('failed', 'execution_failed');
       throw err;
     }
-    await emitRuntimeFailure(agentCtx, sessionId, runId, signal, res, err);
+    if (resumedTranscript && !resumedPrefixPersisted) {
+      const interruptedTool = interruptedApprovalMessage(toolCall, approval);
+      persistNewMessages(
+        db,
+        sessionId,
+        [...resumedTranscript.messages, interruptedTool],
+        resumedTranscript.initialCount,
+      );
+    }
+    captured?.save();
+    const terminal = signal.aborted
+      ? finishControlledResponse(execution, false)
+      : execution.finish('failed', 'execution_failed');
+    await emitRuntimeFailure(
+      agentCtx,
+      sessionId,
+      runId,
+      signal,
+      res,
+      err,
+      terminal.state === 'outcome_unknown',
+    );
   } finally {
     await closeRuntimeStream({ timeoutId, heartbeatId, release, agentCtx, res });
   }
@@ -1644,43 +1870,45 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         return;
       }
 
-      const controller = new AbortController();
-      const { signal } = controller;
-      res.once('close', () => {
-        if (!res.writableFinished) controller.abort('client_disconnect');
-      });
-      const { agentCtx, modelCfg, timeoutMs, release } = await acquireRuntimeContext(
+      const runId = randomUUID();
+      const context = await acquireControlledContext(
         db,
         session,
         options,
         req,
+        res,
         sessionLock,
-        signal,
+        runId,
       );
-
-      const runId = randomUUID();
+      if (!context) return;
+      const { agentCtx, modelCfg, timeoutMs, release, execution, controller, signal } = context;
+      let captured: ReturnType<typeof captureInterruptedReply> | undefined;
       const completeDiagnostics = beginDiagnosticRun(sessionId, runId);
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
       let heartbeatId: ReturnType<typeof setInterval> | undefined;
 
       try {
-        await safePluginCall(() =>
-          agentCtx.pluginDispatcher.onSessionStart({
-            sessionId,
-            agentId: session.agentId,
-            agent: agentCtx.agent,
-          }),
+        await execution.waitFor(
+          execution.invoke('setup', () =>
+            safePluginCall(() =>
+              agentCtx.pluginDispatcher.onSessionStart({
+                sessionId,
+                agentId: session.agentId,
+                agent: agentCtx.agent,
+              }),
+            ),
+          ),
         );
 
         ({ timeoutId, heartbeatId } = startRuntimeResponse(res, controller, timeoutMs));
         const projectContext = resolveSessionProjectContext(db, session);
-        const emitter: OutputEmitter = projectUserFacingEmitter(
-          createNdjsonEmitter(res),
-          projectContext,
-        );
+        captured = captureInterruptedReply(db, sessionId, createNdjsonEmitter(res), signal);
+        const emitter = projectUserFacingEmitter(captured.emitter, projectContext);
         const dispatcher = agentCtx.pluginDispatcher;
 
-        await emitTaskStart(agentCtx, sessionId, runId);
+        await execution.waitFor(
+          execution.invoke('setup', () => emitTaskStart(agentCtx, sessionId, runId)),
+        );
 
         const graph = buildRuntimeGraph({ db, agentCtx, runId, sessionId, emitter, options });
 
@@ -1699,9 +1927,11 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         });
 
         const finalState: Pick<HarnessStateType, 'messages' | 'contextHalt' | 'mcpHalt'> =
-          await graph.invoke(initialState, {
-            configurable: { thread_id: sessionId, signal },
-          });
+          await execution.waitFor(
+            graph.invoke(initialState, {
+              configurable: { thread_id: sessionId, signal, runControl: execution },
+            }),
+          );
 
         const persistedMessages = sanitizeProjectAssistantMessages(
           finalState?.messages,
@@ -1711,6 +1941,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           await emitFinalAssistantMessage(emitter, persistedMessages, messages.length);
         }
         persistNewMessages(db, sessionId, persistedMessages, messages.length);
+        captured.markSaved();
         refreshWorkingMemory({
           db,
           sessionId,
@@ -1719,7 +1950,18 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           userMessage: message,
           newMessages: persistedMessages?.slice(messages.length) ?? [],
         });
-        completeDiagnostics();
+        const terminal = finishControlledResponse(
+          execution,
+          listApprovalRequests(db, { sessionId, limit: 1000, offset: 0 }).some(
+            (row) =>
+              row.runId === runId &&
+              row.resumedAtMs === undefined &&
+              ['pending', 'approved', 'rejected'].includes(row.status),
+          ),
+          Boolean(finalState.contextHalt || finalState.mcpHalt),
+        );
+        if (signal.aborted) failDiagnosticRun(signal, terminal.state === 'outcome_unknown');
+        else completeDiagnostics();
         await safePluginCall(() =>
           dispatcher.onTaskEnd({
             sessionId,
@@ -1730,7 +1972,19 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           }),
         );
       } catch (err) {
-        await emitRuntimeFailure(agentCtx, sessionId, runId, signal, res, err);
+        captured?.save();
+        const terminal = signal.aborted
+          ? finishControlledResponse(execution, false)
+          : execution.finish('failed', 'execution_failed');
+        await emitRuntimeFailure(
+          agentCtx,
+          sessionId,
+          runId,
+          signal,
+          res,
+          err,
+          terminal.state === 'outcome_unknown',
+        );
       } finally {
         await closeRuntimeStream({ timeoutId, heartbeatId, release, agentCtx, res });
       }

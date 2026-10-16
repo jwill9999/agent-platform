@@ -80,6 +80,14 @@ function Probe({
     onGitReceiptDeleted: current.removeGitReceipt,
   });
 }
+function runDiscoveryCalls() {
+  return fetcher.mock.calls.filter(([url]) => url.endsWith('/active-run'));
+}
+function gitRestorationCalls() {
+  // Preserve the existing history/Git read budget: one new mandatory control read
+  // is independent of the ten-card pagination and must not conceal extra Git IO.
+  return fetcher.mock.calls.filter(([url]) => !url.endsWith('/active-run'));
+}
 async function render(session = 'session-a', project = 'project-a') {
   await act(async () => root.render(createElement(Probe, { session, project })));
 }
@@ -101,6 +109,7 @@ beforeEach(() => {
   pending = [];
   saved = { ...base };
   fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('/active-run')) return response(null);
     if (url.includes('/approval-requests/git-delivery?')) return response(inventory);
     if (url.includes('/approval-requests?')) return response(pending);
     if (url.endsWith('/messages'))
@@ -142,7 +151,8 @@ describe('retained Git chat restoration', () => {
     saved = { ...base, acknowledgedAtMs: 25 };
     inventory.approvals = [approval(saved)];
     await render();
-    expect(fetcher.mock.calls).toHaveLength(4);
+    expect(runDiscoveryCalls()).toHaveLength(1);
+    expect(gitRestorationCalls()).toHaveLength(4);
     await click(button('Check actual outcome'));
     expect(fetcher.mock.calls.at(-1)?.[0]).toContain('/reconcile');
     await click(container.querySelector('input')!);
@@ -199,17 +209,23 @@ describe('retained Git chat restoration', () => {
     expect(current.restorationStatus).toBe('restore-error');
     expect(current.messages).toHaveLength(0);
     expect(current.canSend).toBe(false);
-    expect(fetcher.mock.calls).toHaveLength(3);
+    expect(runDiscoveryCalls()).toHaveLength(1);
+    expect(gitRestorationCalls()).toHaveLength(3);
     expect(container.textContent).not.toContain('Approve Git operation');
   });
   it('does not fetch foreign Project receipt even with a valid session-shaped record', async () => {
     await render('session-a', 'project-b');
     expect(container.textContent).toContain('does not match');
-    expect(fetcher.mock.calls).toHaveLength(3);
+    expect(runDiscoveryCalls()).toHaveLength(1);
+    expect(gitRestorationCalls()).toHaveLength(3);
   });
   it('keeps failed inventory reads behind the history barrier', async () => {
     fetcher.mockImplementation(async (url: string) =>
-      url.includes('/git-delivery?') ? response(null, 503) : response([]),
+      url.endsWith('/active-run')
+        ? response(null)
+        : url.includes('/git-delivery?')
+          ? response(null, 503)
+          : response([]),
     );
     await render();
     expect(current.restorationStatus).toBe('restore-error');
@@ -219,9 +235,11 @@ describe('retained Git chat restoration', () => {
   it('ignores an obsolete A to B to A inventory response and an unmounted response', async () => {
     const delayed: Array<(value: Response) => void> = [];
     fetcher.mockImplementation(async (url: string) =>
-      url.includes('/git-delivery?')
-        ? new Promise<Response>((resolve) => delayed.push(resolve))
-        : response([]),
+      url.endsWith('/active-run')
+        ? response(null)
+        : url.includes('/git-delivery?')
+          ? new Promise<Response>((resolve) => delayed.push(resolve))
+          : response([]),
     );
     await render();
     await render('session-b', 'project-b');
@@ -291,6 +309,7 @@ describe('retained Git chat restoration', () => {
       recoveryReceipts: receipts.slice(500),
     };
     fetcher.mockImplementation(async (url: string) => {
+      if (url.endsWith('/active-run')) return response(null);
       if (url.includes('/approval-requests/git-delivery?')) return response(inventory);
       if (url.includes('/approval-requests?') || url.endsWith('/messages')) return response([]);
       const receipt = receipts.find((row) => url.endsWith(row.id));
@@ -298,11 +317,13 @@ describe('retained Git chat restoration', () => {
       return response(receipt);
     });
     await render();
-    expect(fetcher.mock.calls).toHaveLength(13);
+    expect(runDiscoveryCalls()).toHaveLength(1);
+    expect(gitRestorationCalls()).toHaveLength(13);
     expect(container.querySelectorAll('[data-testid="git-approval-card"]')).toHaveLength(10);
     expect(container.textContent).toContain('Git records 991–1000 of 1000');
     await click(button('Oldest Git records'));
-    expect(fetcher.mock.calls).toHaveLength(23);
+    expect(runDiscoveryCalls()).toHaveLength(1);
+    expect(gitRestorationCalls()).toHaveLength(23);
     expect(container.textContent).toContain(receipts[0]!.id);
     expect(container.textContent).toContain('Git records 1–10 of 1000');
     expect(fetcher.mock.calls.every(([, init]) => !init?.method)).toBe(true);
@@ -317,6 +338,7 @@ describe('retained Git chat restoration', () => {
     }));
     inventory = { approvals: [], recoveryReceipts: receipts };
     fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/active-run')) return response(null);
       if (url.includes('/approval-requests/git-delivery?')) return response(inventory);
       if (url.includes('/approval-requests?') || url.endsWith('/messages')) return response([]);
       const receipt = receipts.find((row) => url.endsWith(row.id));

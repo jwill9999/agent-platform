@@ -1,6 +1,7 @@
 # Stop and local monitoring — verification plan
 
-**Status:** Planned, no new product tests executed. Baseline and ownership:
+**Status:** Acceptance contract; implementation qualification in progress. Actual partial results and
+failures are in the [results report](../reviews/project-chat-stop-results.md). Baseline and ownership:
 [feature plan](../planning/project-chat-stop-mvp.md). Every S scenario is owned by
 `agent-platform-harness-r3.cancel`; M scenarios by `agent-platform-local-diagnostics-monitoring`;
 Q01 by `agent-platform-local-mvp-stress-review`. This is not a results report.
@@ -8,18 +9,22 @@ Q01 by `agent-platform-local-mvp-stress-review`. This is not a results report.
 ## Harnesses and evidence
 
 Unit/integration: strict contracts, app DB repositories and real API/harness with deterministic
-barriers. Proposed files: contracts `runControl.test.ts`, DB `runControl.test.ts`, API
+barriers. Implemented focused files include contracts `runControl.test.ts`, DB `runControl.test.ts`, API
 `runControl.integration.test.ts`, existing chat/approval tests and harness `backpressure.test.ts`.
-No new tests exist yet. Browser: Docker API/web/SQLite and inert provider/MCP fixtures, proposed
-`e2e/project-chat-stop.spec.ts`. Electron: real app/API/SQLite through proposed
+Additional actual API controls cover service uncertainty, provider abort identity, process restart
+and resumed-prefix persistence. Browser: Docker API/web/SQLite and inert provider/MCP fixtures,
+`e2e/project-chat-stop.spec.ts`. Electron: real app/API/SQLite through
 `apps/desktop/e2e/project-chat-stop.e2e.ts`; real VM fixture for a safe supported native cancellation
 journey. All fixtures own temp projects/DB/processes and clean only their own resources.
 
 Retain trace/screenshots/video where relevant, HTTP status/timing, typed control rows/versions,
 admitted attempt/approval IDs, fixture call/effect ledgers and late-marker results. Inspect persisted
 state and actual effects independently of UI or diagnostics. A missing event never proves no effect.
-Save successful and failing attempts, not only a green retry. Evidence contains no prompts, provider
-keys, private paths, tool contents or raw exceptions. Report coverage/truncation/health explicitly.
+Save successful and failing attempts, not only a green retry. Shareable product diagnostic reports
+exclude prompts, provider keys, private paths, tool contents and raw exceptions. Restricted synthetic
+test artifacts may contain owned fixture prompts, paths and tool data; keep them access-controlled,
+exclude real user secrets, and inspect and sanitize them before publication or sharing. Report
+coverage/truncation/health explicitly.
 
 | ID / requirements | Setup and action                                                                           | Expected result and independent proof                                                                                                                                                       | Layers                                                                 |
 | ----------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -73,11 +78,10 @@ Playwright config for the new Electron file; real desktop Node/native ABI must m
 startup follows existing Docker or supported desktop paths, never ad-hoc host web/API servers.
 Use existing diagnostic CLI and native exports; do not claim Docker bridge browser can access the
 private loopback diagnostics endpoint. Capture its reports through an owned trusted local API
-client; Electron proves the user export. Recheck current test selectors rather than assume these
-proposed paths exist. Exact-head hosted browser/Electron and required actual VM cannot be skipped.
+client; Electron proves the user export. Recheck current test selectors and recorded source before execution. Exact-head hosted browser/Electron and required actual VM cannot be skipped.
 
-A Stop result report is created at `docs/reviews/project-chat-stop-results.md` during implementation,
-not now. Monitoring uses `docs/reviews/local-diagnostics-monitoring-results.md`. Record all scenario
+The current Stop result report is [project-chat-stop-results](../reviews/project-chat-stop-results.md).
+Its partial scenario matrix does not mark this contract complete. Monitoring uses `docs/reviews/local-diagnostics-monitoring-results.md`. Record all scenario
 statuses/evidence and outstanding gaps. Independent critic inspects source plus actual reports and
 effects. Sonar/Problems fallback and actual hosted Sonar/CodeQL/security/review gates apply. Never
 normalize a failed benchmark, infer cancellation from an HTTP success alone, or claim planned cases
