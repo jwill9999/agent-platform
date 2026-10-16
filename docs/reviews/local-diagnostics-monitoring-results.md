@@ -39,8 +39,7 @@ Focused/regression qualification: contracts 35 passed; DB 38 passed; API 67 pass
 files, followed by one changed process fixture case passed (32.957 seconds); desktop 49 controls;
 web 14 controls; CLI 13 initial controls plus six subsequent health/coverage controls. These counts
 are scoped runs, not a single disjoint suite total. API/DB/contracts builds, desktop/web typecheck,
-touched-file lint/format and CLI syntax checks passed. Final integrated quality and normal push gates
-remain pending. SonarQube MCP/IDE Problems are unavailable with the gateway disabled; terminal
+touched-file lint/format and CLI syntax checks passed. Final integrated normal push gates remain pending at this checkpoint. SonarQube MCP/IDE Problems are unavailable with the gateway disabled; terminal
 fallback is used locally and actual hosted Sonar/CodeQL remain required.
 
 ### Connected browser and Electron
@@ -143,8 +142,21 @@ gates and bind actual pushed bytes to the reviewed candidate. Two process-fixtur
 storage-setup race are retained in their original logs; fixture repairs did not weaken product gates.
 Existing Stop failed attempts and an unexplained diagnostic export 503 remain in its own results.
 
+The first monitoring source commit `8772382a` exactly matched all54reviewed candidate files, but its
+normal push was rejected: cycles, five affected builds/types and contracts146 passed; desktop218/219
+failed before the remaining package suites qualified. The normal-shutdown test's ready-window double
+lacked `webContents.getURL()`, required to capture the trusted monitoring renderer origin. Bootstrap
+therefore threw/quit before the simulated shutdown. Focused reproduction retained the same failure.
+A test-only correction returns the same fixture renderer URL and asserts legitimate startup before
+all unchanged pending-child/repeated-quit checks. Six focused and all219desktop unit tests pass,
+along with strict touched-test typecheck/lint/format. No application/runtime change or E2E rerun is
+needed for that mock-contract repair. The failed push/log and reproduction remain retained;
+`main-lifecycle-monitoring-mock-repair-v2.json` binds exact source and results. A new unmodified
+normal push must still pass; neither this scoped pass nor the earlier source commit implies remote
+delivery or hosted qualification.
+
 Initial host free space was 58.44 GiB; Docker responded. Global configuration remains unchanged,
 with `MCP_DOCKER.enabled=false`. No Docker restart/prune, global registration change, paid model
-call, external diagnostic upload, scheduled agent or owner stress session occurred. Final source/results documentation critique, quality/push, full branch-specific mirrors, hosted checks,
+call, external diagnostic upload, scheduled agent or owner stress session occurred. Local source/results documentation reviews approved; normal quality/push, full branch-specific mirrors, hosted checks,
 reviews and actual authorized delivery remain required. Monitoring integration/staging merges
 retain their reserved owner-authority gates; stress readiness is not established by these tests.

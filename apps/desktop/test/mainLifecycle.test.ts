@@ -138,15 +138,21 @@ describe('Electron main startup and quit wiring', () => {
     const rendererStop = vi.fn(async () => {});
     mocks.backend.mockResolvedValue({ url: 'http://fixture', stop: backendStop });
     mocks.renderer.mockResolvedValue({ url: 'http://renderer', stop: rendererStop });
+    const getURL = vi.fn(() => 'http://renderer');
     mocks.windows.mockReturnValue({
       loadURL: async () => {},
       once: vi.fn(),
-      webContents: { setWindowOpenHandler: vi.fn(), on: vi.fn() },
+      webContents: { setWindowOpenHandler: vi.fn(), on: vi.fn(), getURL },
     });
     await import('../src/main/main.js');
     mocks.listeners.get('ready')?.();
     await flush();
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining('"phase":"window-ready"'));
+    expect(getURL).toHaveBeenCalledOnce();
+    expect(console.error).not.toHaveBeenCalledWith(
+      'Failed to start Agent Platform desktop shell. Retain runtime diagnostics.',
+    );
+    expect(mocks.quit).not.toHaveBeenCalled();
     quit();
     quit();
     await flush();

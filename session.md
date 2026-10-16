@@ -57,11 +57,19 @@ failure, ack8.849ms, genuine guest late effect retained as outcome_unknown2. Nat
 actual sample/48V1events/25correlated controls, enabled seven-day preference and shared V1/resource
 UUID; the separate V1 report has43events. Initial startup-navigation failure is retained; reviewed
 test-only owned-root load synchronization preceded this new attempt, with no changed deadlines/
-retries/product code. Independent actual artifact/source review approved, with zero actionable findings. Final source/results documentation critique,
+retries/product code. Independent actual artifact/source review approved, with zero actionable findings. Local source/results documentation review is approved;
 normal quality/commit/push, full nine-document branch-specific mirrors/readbacks and current-head
 hosted checks/security/review findings remain required. Monitoring feature/staging merges retain
 their reserved actual owner-authority gates. Passing local tests does not establish owner stress
 readiness; that also requires verified delivery and its recording/preflight checks.
+
+Normal commit8772382a matched all54reviewed candidate files, but its normal push was rejected after
+contracts146passed and desktop218/219failed. Cycles/fiveaffectedbuilds/typespassed; laterhooktests
+were incomplete. The ready-window test double lacked getURL, so new trusted-origin capture caused
+bootstrapquit before its shutdown scenario. Test-only accurateURLmock+startupassertions repaired it;
+focused6/full219desktop/type/lint/formatpass, with no productchange or weakenedshutdownassertions.
+Originalfailedpush/reproducer retained. Normalnewpush remains required; nothing is remotely delivered
+from that failedattempt. Source/result review of this bounded correction precedes publication.
 
 Evidence: `/Users/letuscode/.codex/local-diagnostics-monitoring-20261016`, with original API/benchmark
 receipts retained at `/Users/letuscode/.codex/project-chat-stop-implementation-20261016`.
