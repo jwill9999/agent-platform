@@ -70,6 +70,44 @@ Receipts: `pr339-a2b-independent-hosted-qualification.json`, selected failure re
 `pr339-a2b-hosted-review/failing-attempt-0`, and `desktop-port-probe/fixture-repair-review.json`.
 No merge, monitoring closure or stress readiness follows this checkpoint.
 
+## Subsequent exact hosted fixture qualification
+
+Actual pushed7a7831fa/treee673a432 completed CI38942508081 attempt1 and all nine executed check
+contexts successfully. Electron68 passed in14.6 minutes, with no retries/flaky cases; browser31
+ordinary plus one existing isolated-context prerequisite skip, Git5 and Stop5. Sonar live gateOK,
+zero unresolved issues, duplication0.9%, ratings1 and hotspots100%; no unresolved review threads or
+blocking reviews. All62 cumulative source hashes and the actual synthetic checkout tree match.
+
+A factual qualification error is corrected here: actual Sourcery checks117093719644 at a2b and
+117113393380 at7a7 both say the diff exceeds150,000 characters, not a weekly budget. Independent
+source review is retained; the hosted skip is not review coverage. The feature-target VM skip is
+not staging evidence. CodeQL analysis queries for the task and PR merge ref return no analyses;
+zero open alerts on that scoped ref is not fresh analysis. GitHub secret-scanning/dependency-alert
+APIs were unavailable, so no broad security-clean claim follows. Actual protected staging requires
+its own full scan, CodeQL/quality/reviews and signed real-VM gates.
+
+Benchmark artifact12064322746 belongs to actual7a7/run38942508081. Entire ZIP71,411 bytes SHA256
+`b1a4df1163a8085e3a6767edb75e88e80b731509835cfe988f2dc8823d9a6a4c` equals the API digest; its
+sole JSON SHA256 `caa059c4c49528d0f5de8427b3b13fc7f1685237314e1260d1a66a5844ad1ada` and CRC
+are verified. Independent nearest-rank recomputation of all nine vectors passes original20 ms
+relative/2 ms enqueue limits:900 measured/990 calls, maximum relative2.874497 ms/enqueue0.021693 ms.
+Healthy variants each retain1,540 events/zero loss/max pending56; locked variants reach256 with
+honest drops1,284/1,288/1,284. Six enabled companions are ready/one initial probe each, not periodic
+load capacity. Deterministic provider/nonretaining log sink and prior failures remain disclosed.
+
+PR339 subsequently merged at `ce3624dfac8c364ac447e75f9a740eaf31a5771b`; refreshed remote tree
+`e673a432b8c88983b671908776848fe31b698e0a` exactly equals reviewed7a7. This follow-up observed
+that merge and did not perform it. A documentation push after the merge recreated its deleted task
+ref; the retained task history now delivers only this two-document correction into the same feature
+through a separate PR. It is not part of merged PR339. Staging remains `cf5f0452` and no owner trial
+has started. Do not reuse closed-PR checks as qualification for this changed documentation head.
+
+The final source differs from this qualified7a7 checkpoint only to correct and record documentation.
+Normal documentation hooks, fresh exact-head hosted gates, completed full mirrors and expressly
+reserved integration remain required. Source/results critique, prior local connected/VM proofs and
+this hosted runtime evidence are reused with that explicit delta; no local runtime or benchmark
+repeat is justified. Monitoring and owner stress testing remain uncompleted until delivery gates.
+
 ## First hosted qualification and repair history
 
 PR339 is open into `feature/local-diagnostics-monitoring` at first pushed checkpoint
