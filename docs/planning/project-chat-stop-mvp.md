@@ -1,14 +1,14 @@
 # Shared harness Stop — bounded local MVP plan
 
-**Status:** Stop delivered through PR334 to its feature; owner-approved durable monitoring implementation is in progress. Protected staging and owner stress remain separate.
+**Status:** Stop and monitoring are feature-delivered. The owner has conditionally authorized protected staging integration; fresh staging gates and owner stress testing remain separate.
 **Date:** 16 October 2026.
-**Product baseline:** staging `cf5f04524c25c29635b0d84bda4e76282f28ddcb`, tree
+**Historical planning baseline:** staging `cf5f04524c25c29635b0d84bda4e76282f28ddcb`, tree
 `e4212ec7b8362cbd7fc25120d6dd856df8ad9691`. Planning starts from documentation head
 `369ae33440aff2c9e7067d28c02176390650448a`; that was the preimplementation runtime baseline.
 Early local tests used documentation ancestry `1b574dbc5fc9e0151d1ed8beac5a2ddc0f02c06e` with
 dirty Stop source on `task/project-chat-stop`; that historical commit alone does not identify the
 implementation. Final source identity comes from the reviewed file-hash receipt and immutable pushed
-revision in Beads/publication metadata. Current-head hosted qualification, review and any actual
+revision in canonical Beads and Git metadata. Current-head hosted qualification, review and any actual
 merge grant remain separate from this local implementation record.
 
 ## Outcome and owner decisions
@@ -21,8 +21,9 @@ added an interface-neutral API audit and durable recording for later agent revie
 the owner approved implementation of Stop, then durable monitoring, using Beads, independent critique
 and the agreed tests. That authorization covers routine implementation and repairs. The owner later
 explicitly authorized PR334 task-to-feature merge after checks/comments cleared; it completed at
-`a5d17683`. Other actual merges, release, paid calls, new voice/CLI clients and automatic remediation
-remain separately reserved.
+`a5d17683`. On 17 October the owner also authorized monitoring feature integration and protected
+staging delivery after current-head checks and review findings clear. Main promotion, release, paid
+calls, new voice/CLI clients and automatic remediation remain separately reserved.
 Actual progress and qualification gaps are in the [implementation record](../reviews/project-chat-stop-results.md).
 
 Stop is the first delivery. A separate small monitoring delivery must record normal use durably
@@ -202,9 +203,11 @@ These are estimates, not dates or authorization. Dashboard, voice/CLI clients, d
 full tracing, release accounts/distribution, universal hard cancellation and broad recovery are excluded.
 
 Stop DoD is S01–S15 plus affected quality/connected/diagnostic gates, independent source/result
-review, full documentation mirrors, resolved comments, exact-head feature integration and task
+review, current repository documentation, resolved comments, exact-head feature integration and task
 readback/sync. Monitor DoD is M01–M06 and historical evidence-only diagnosis. Owner trial is its own
 checkpoint, not a hidden unbounded Stop acceptance loop. Existing benchmark limits remain unchanged.
+External publication, mirrors and readbacks require an explicit owner request covering the destination
+and documents; historical publication evidence supplies no standing permission.
 Every actual result records source/version, pass/fail/skip/blocked/not-run and first-attempt evidence.
 Two focused repair iterations or two environment retries per recurring failure trigger evidence-backed
 replanning; no unchanged endless reruns or relaxed assertions. Default paid spend is zero.

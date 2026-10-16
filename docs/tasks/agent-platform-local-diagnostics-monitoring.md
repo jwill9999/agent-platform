@@ -8,7 +8,7 @@
 
 The delivered Stop implementation adds safe control/admission/settlement events to existing V1
 diagnostics. The periodic resource sampler, retained recording preference and historical monitoring
-windows are now implemented in the working tree with local M01–M06 evidence after verified Stop
+windows are feature-delivered with local M01–M06 evidence after verified Stop
 feature delivery at `a5d17683`; see [monitoring results](../reviews/local-diagnostics-monitoring-results.md). The
 [Stop results](../reviews/project-chat-stop-results.md), including passed local browser/Electron/VM
 evidence, must not be used as monitoring sign-off or owner stress-test readiness.
@@ -65,8 +65,11 @@ expected contracts/store/API/CLI/desktop bridge tests and docs. Verify M01–M06
 and Electron recording/history journey, restart, storage/retention/privacy failures, and existing
 benchmark thresholds without normalization. The agent must locate a seeded issue using historical
 records alone. Failed coverage preflight blocks owner stress testing. Source/results critic,
-quality/hosted security/tests, full mirrors/readbacks, guarded feature integration, Beads readback and
+quality/hosted security/tests, current repository documentation, guarded feature integration, Beads readback and
 sync apply; protected staging has its own actual scan/VM/review/authority gates. Estimate 1–2 days,
 then revisit if the minimal capture grows into a dashboard or tracing system. Implementation is
 authorized and in progress; Stop is CLOSED after owner-authorized PR334 feature merge/tree verification.
+The owner authorized protected staging integration on 17 October after all current-head checks and
+review findings clear. External publication/mirrors/readbacks require an explicit owner request
+covering the destination and documents; previous publication receipts remain historical evidence.
 The monitoring task retains its own M01–M06 and delivery gates. Existing benchmark/readiness repairs stay closed; V2/V3 are separately gated.

@@ -1,9 +1,32 @@
 # Durable local monitoring — implementation results
 
 **Task:** [agent-platform-local-diagnostics-monitoring](../tasks/agent-platform-local-diagnostics-monitoring.md), IN_PROGRESS.
-**Contract:** [M01–M06](../testing/project-chat-stop-mvp.md). **State:** local implementation qualification
-checkpoint; publication/hosted delivery receipts are tracked separately. No monitoring completion,
-staging qualification or owner stress-ready claim.
+**Contract:** [M01–M06](../testing/project-chat-stop-mvp.md). **State:** feature-delivered; protected
+staging qualification and the owner-trial preflight remain separate.
+
+## Current delivery checkpoint — 17 October 2026
+
+[PR340](https://github.com/jwill9999/agent-platform/pull/340) merged with an exact-head guard into
+`feature/local-diagnostics-monitoring` at `8836b3acbb05c3611693da6c63bec7afe80af917`. Its tree
+`0e8676755f3973c0cb26e735fcccb37a338366de` equals reviewed `4d0d33d4`; all nine executed feature
+checks passed, with 68 Electron tests, 31 ordinary browser tests plus one existing prerequisite
+skip, five Git and five Stop browser tests. Sonar is OK with zero open issues; no unresolved threads
+or blocking reviews. Sourcery skipped for its 250,000-character weekly budget; the feature-target VM
+skip is not staging evidence. Independent source review approved the actual two-document delta.
+
+The owner authorized protected staging integration after all current-head checks and review findings
+clear. Reconciliation against the actual qualified staging base and new full security analysis,
+CodeQL/quality checks, packaged macOS VM and resolved reviews remain required. Record actual later
+source/run/merge identities in canonical Beads and PR metadata; these feature checks do not qualify
+an untested future integration or owner stress session.
+
+The checkpoints below preserve earlier source-bound results, failures and coverage limits. Their
+old pending statuses, baseline refs and publication requirements are historical. Current repository
+documentation is canonical; new external publication, copies or readbacks require an explicit owner
+request covering the destination and documents. Previously created pages/receipts are retained, but
+no further publication or persistent publication artifacts are requested.
+
+## Historical source-bound qualification records
 
 ## Source and authority
 

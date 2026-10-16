@@ -1,3 +1,30 @@
+# Current handoff — Stop and monitoring staging integration
+
+PR340 merged into `feature/local-diagnostics-monitoring` at
+`8836b3acbb05c3611693da6c63bec7afe80af917`, tree `0e8676755f3973c0cb26e735fcccb37a338366de`,
+exactly matching reviewed `4d0d33d4`. All nine executed checks passed, including 68 Electron tests;
+Sonar is OK with zero open issues and there are no unresolved review threads or blocking reviews.
+The owner authorized protected staging delivery after all current-head checks and findings clear.
+
+The current task is reconciling the qualified staging handoff and publication policy before that
+promotion. Actual later source, PR/run identities, gates and merge state belong in canonical Beads
+`agent-platform-local-diagnostics-monitoring` and PR metadata. This checkpoint does not claim future
+protected qualification, staging delivery, monitoring closure or owner stress-test readiness.
+
+Repository documentation is canonical. External publication, mirrors and readbacks require an
+explicit owner request covering the destination and documents; old requirements are historical.
+Existing pages and evidence remain retained; no new external publication or generated publication
+artifacts are requested. Docker gateway remains disabled. Main, paused PR283/orchestration and dirty
+or unrelated work stay separate. The owner trial remains bounded by its own recording/app/disk
+preflight and stored-evidence review.
+
+## Preserved historical monitoring checkpoint
+
+The complete previous source follows unchanged. Its old pending states, staging refs and publication
+requirements are historical and do not override the current handoff or owner authority.
+
+<!-- markdownlint-disable MD025 -->
+
 # Current session — monitoring fixture qualification
 
 Stop [PR334](https://github.com/jwill9999/agent-platform/pull/334) merged under the owner's explicit
