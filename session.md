@@ -1,50 +1,88 @@
 # Stop implementation and durable monitoring handoff — 16 October 2026
 
-The owner approved bounded shared Stop, then durable monitoring, using Beads, implementation skill,
-independent critique and agreed tests. Stop source is on `task/project-chat-stop` into
-`feature/project-chat-stop`, based on staging `cf5f04524c25c29635b0d84bda4e76282f28ddcb` with
-reviewed planning ancestry. Early tests used documentation SHA
-`1b574dbc5fc9e0151d1ed8beac5a2ddc0f02c06e` plus dirty source; that historical SHA alone does not
-identify implementation. Use the reviewed source-hash receipt, immutable pushed revision and canonical
-Beads/publication metadata for actual PR, mirror and delivery state. Merge/release authority is separate.
+Owner-approved sequence remains Stop then durable monitoring, using Beads, implementation skill,
+independent critique and agreed tests. Current application checkpoint is 9044859d6499753f7d3b4ca0d328f50fdb423ec7
+(tree 178a103c9d61f1ae66ad9515daf2ade07a0284ff) on task/project-chat-stop into feature/project-chat-stop.
+Earlier dirty 1b574 ancestry and f9 browser 14/Electron 67/signed VM 1 are historical source-bound proof,
+not qualification of this DB application change. Immutable revision/PR/check/publication/delivery
+receipts carry actual state without a self-referential final-commit/merge claim.
 
-This is a partial local qualification checkpoint, 16 October 2026, 00:56 UTC.
-`agent-platform-harness-r3.cancel` remains IN_PROGRESS. Shared main-DB authority, headless read/Stop,
-approval/retry/sensor fencing, Project Chat and safe V1 diagnostic linkage are implemented/reviewed.
-Only Stop's obsolete global review-gate edge was removed; the gate and unrelated scopes remain.
-The [results](docs/reviews/project-chat-stop-results.md) record S01–S14 evidence and gaps;
-[verification](docs/testing/project-chat-stop-mvp.md) remains the acceptance contract.
+At 2026-10-16T04:14:45.364802+00:00, fresh 904 evidence is browser Current904 Docker browser16 passed Stop5/reply1/Git5/MCP5 with reviewed source/effect/artifact and recovered owned-cleanup evidence; no stress/load claim.; Electron Fresh current904 Electron67 passed first attempt in655.337seconds with no skipped/flaky/retried cases; Stop effects, diagnostics,503retry and Project restoration independently reviewed;20controlled-helper cases are included, signed realVM is separate.;
+actual signed VM Fresh current904 signed realmacOSVM Stop representative passed1/1 in48.556seconds;5.047msack, actual guest start/lateeffect and honest unknown, safe43-event report, selected49runtime bindings, signature and trace integrity independently reviewed.; unchanged normal push/full API Normal unchanged hooks passed cycles, six-package build/typecheck and 2206 tests, including full API525; exact atomic feature/task remote refs verified without bypass.. This update cannot
+render until all four terminal source/artifact-bound PASS receipts exist. Web 417/control 18 remain
+recorded, and 20 controlled-helper cases belong to Electron 67, not 20 actual VM executions.
 
-Passed recorded controls include 397 web cases, final pinned-fixture Docker Stop 5/5 (32.3 seconds),
-Git 49 and combined diagnostic/resumed-history 19, plus an adjacent browser context case. Earlier
-Electron Stop 5/six exports and signed real-VM Stop 1/1 (47.8 seconds, acknowledgement 8.180916 ms)
-passed independent artifact inspection; the older exploratory 88 ms capture is separate. The 20
-controlled-helper cases are part of full Electron 67, not 20 real-VM runs. Full build/typecheck/lint/
-cycles and the unchanged isolated 900-request benchmark also passed recorded snapshots. Earlier
-broad API failures and the exploratory mixed-source Electron 33 passed/3 failed/1 interrupted/30 unrun remain
-retained with fixes/dispositions, never rewritten as green retries.
+The first normal push retained 524 API passes/one healthy-store failure (drop 10); a fresh-worker
+repetition lost 24. Stop adds four required observations:14 events/request vs old 10,1540 vs1100/mode.
+Approved scheduling promotes a ready 32-event batch once from 250 ms to 0 and avoids in-flight timer
+storms; queue 256, batch 32, nonblocking record, FULL durability and all deadlines remain unchanged.
+Initial focused 22/1 exposed existing1000 ms-close/32-inflight accounting order, not confirmed durability;
+final 23 controls require exact eventual 300 losses and no double count/post-close acceptance.
+Unchanged900 benchmark after compiled-DB repair passed: all healthy 1540 retained/zero drops,
+maxPending 56, max relative p95 overhead18.114417 ms<=20 and enqueue p95 0.019042 ms<=2. Failed captures
+remain retained, alongside prior 64/3, mixed 33/3/1interrupted/30unrun and c0 partial 4/1+ownedSIGINT.
 
-Nine adjacent browser cases, final fresh Electron 67/current-source VM representative, full API/normal
-hooks and current-head hosted checks remain unqualified. Reply bootstrap hit the existing 100/min
-limiter; paced retry uses its actual reset header. Later global Docker RPC/readiness stalls require
-engine recovery and the owner's restart decision. Docker Stop itself passed; private Docker export 403
-proves denial only, with native diagnostic export evidence kept separate. Preserve all failures,
-thresholds and unknown data; do not infer a single connection/resource cause or waive gates.
+The unknown 503 cause is not relabelled as connection or Docker. Reviewed f9 test-only observer
+`087774e8` records failed HTTP status without body reads/additional requests; 11 controls preserve
+all product budgets. Native uncertainty requires exactly two nested unknown admissions/one fixed
+helper request, not proof of two commands/guest execution/termination. Real 503 retry positive and
+runtime Stop-negative remain distinct. Raw traces are not safe exports; selected hashes/CRC are not
+whole-tree/reproducible-build attestation. Both actual handled Git429s retain safe-read/no-replay proof.
 
-Source and scoped reviews support normal commit/push and draft PR hosted qualification while local
-Docker recovery proceeds. After commit/push, inspect actual current-head hosted checks, security and
-review comments; resolve findings, finish all required local/connected gates, complete six full
-immutable-source mirrors/readbacks and obtain any reserved actual merge grant. A draft PR or subset
-success is not ready/delivered. Published revision and readback receipts belong in source metadata/
-Beads rather than a self-referential commit claim here; preserve historical Notion notes/pages.
+Supported normal Docker restoration completed after finite native isolation, with engine/status/
+inventory and retained data/mount checks. Separate P1 [Docker MCP lifecycle](docs/tasks/agent-platform-docker-mcp-lifecycle.md)
+records one configured gateway/nine container-run clients, 28 Sonar/nine Terraform in two 34 s snapshots,
+missing owner/session binding and incomplete 153-event lifecycle coverage. No leak/sole cause/global
+repair claim or new hard Stop dependency follows. During the earlier read-only observation/restoration window, no global settings or foreign
+services were changed; later owner-authorized partial remediation is recorded separately below.
 
-Monitoring is explicitly authorized next, OPEN/dependency-blocked and **not started**. Stop's safe
-V1 run events are not periodic resource/history recording. M01–M06 and owner stress trial Q01 remain
-pending; notify the owner only when both actual deliveries qualify for that trial. No paid calls,
-new recurring schedule, production readiness, main promotion or paused orchestration resumption.
-PR283/four paused refs and unrelated dirty checkouts remain separate. The preservation receipt covers
-12 other checkouts and reconstructs original primary dirty work after two authorized journal rows;
-do not claim the whole current dirty diff hash is unchanged. Recheck the 20 GiB reserve before heavy work.
+At the pre-final 03:37 UTC snapshot, current 904 browser 16 passed all unchanged Stop 5/reply 1/Git 5/MCP 5
+cases with source/data/owned[] cleanup proof and one expected waiting->interrupted startup recovery;
+independent artifact approval and fresh full hooks/Electron 67/VM 1 were still pending. First 904 normal
+hook failed healthy relative p95 38.586750 ms with zero drops (API 524 pass/1 fail; other suites 1681 pass).
+The original 996.619 s Docker API build never started the app and had null cleanup inventory; the
+later recovered [] cleanup is separate. Owner containment/reload left zero launchers/one Sonar/no
+Terraform, then user removal made Terraform absent. Authorized four-field registration repairs and
+the existing 10-entry Sonar profile are preserved; the mistaken official Sonar 2.6 addition was fully
+removed back to that semantic baseline. After browser cleanup the attributed old stdio/no-client/
+ports/mounts Sonar orphan was gracefully stopped; actual count 0. Existing-profile verification first
+initially blocked before launch on wrong environment names; that 03:37 attempt did not qualify
+Sonar. The later approved saved-profile verification is distinct.
+Broader built-in/direct-plugin migration is recommended only, with gateway disabled; no new global
+migration authority or sole resource/Docker-cause claim follows. See dated results for full boundaries.
+
+Subsequently the contained 904 normal hook/push qualified 2206 tests with all six builds/typechecks,
+actual terminal 0 and exact clean task/feature remote refs; independent review approved the proof.
+Current browser 16/artifacts/effects/source and recovered owned [] cleanup are independently approved.
+Fresh Electron 67 and the signed actual VM 1 qualification are bound by the genuine reviewed
+terminal inputs `electron-9044859d-proof.json` and `vm-stop-real-9044859d-proof.json`. Earlier in-progress/review-pending
+states are dated interim snapshots only; this final section renders only after both real proofs
+exist. The broad raw report set has 50 reports: 49 healthy and one intentional unavailable/partial
+control, never 50 uniformly healthy captures. The final VM shows 5.047 ms acknowledgement, 43 safe
+zero-loss events, one provider/two nested unknown admissions and actual signed-helper/entitlement
+proof. The unchanged 4 GiB image was not freshly rehashed; no fresh whole-image attestation is claimed.
+The original Toolkit-profile Sonar verification now passed three actual OK reads through one pinned
+container/client and normal close; independent review approved it. This is not global singleton
+behavior, a new head analysis, permanent stability or original-root-cause proof. The earlier wrong
+prelaunch environment-name guard and temporary official-plugin add/complete undo remain historical.
+Gateway stays disabled; broader migration and actual merge remain reserved. Full mirrors are not claimed.
+
+The [results](docs/reviews/project-chat-stop-results.md) and
+[S01–S15/M01–M06/Q01 contract](docs/testing/project-chat-stop-mvp.md) govern delivery. Exact-head
+feature checks/comments/tree, final critic, seven full immutable mirrors/readbacks and Beads sync
+remain required. Protected staging separately requires genuine full scans/actual VM/protections/
+resolved findings plus the reserved actual merge grant. Hosted/publication/delivery status is pending
+at this source checkpoint; local evidence alone does not mean all-green/merged/delivered.
+
+Monitoring stays OPEN, authorized but unstarted/hard-dependent on delivered Stop; V1 events are not
+periodic recording. No owner stress trial until both deliveries/coverage qualify. Preserve PR283/four
+paused refs and main. Earlier primary reconstruction after two appends is historical. Latest
+read-only preservation finds 11/12 unrelated checkouts exact; primary changed concurrently through
+untracked documentation-skill removal/UI-evaluation status append. Its original journal prefix is
+exact with three total status appends; main/staging/four paused refs match. Preserve outside work
+as found; no restore/overwrite was performed and whole-primary equality is not claimed.
+Recheck 20GiB before heavy work. No paid calls, recurring schedule, distribution/production release or
+orchestration resumption is implied.
 
 The complete prior handoff follows unchanged as historical context; canonical Beads and this
 implementation checkpoint supersede its planning-only status.

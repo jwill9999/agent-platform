@@ -1,8 +1,8 @@
 # Investigate duplicate MCP containers and Docker stalls
 
-**Beads:** `agent-platform-docker-mcp-lifecycle`, P1 OPEN.
+**Beads:** `agent-platform-docker-mcp-lifecycle`, P1 IN_PROGRESS.
 **Discovered from:** `agent-platform-harness-r3.cancel`; this is an evidence link, not a new hard dependency.
-**Status:** Operational finding under read-only investigation; no configuration or lifecycle repair delivered.
+**Status:** Partial owner-authorized developer-tool containment/registration repairs applied and one saved-profile Sonar client verified. Original lifecycle/resource cause remains unresolved; this task is not closed.
 
 ## Observed problem
 
@@ -30,11 +30,57 @@ observed configuration explanation while leaving the precise lifecycle cause unr
 The first recovery addressed a real management hang. A subsequent supported normal stop deliberately
 created a finite native-test window; it was not another observed Docker crash. Normal start and
 desktop, engine and inventory probes later succeeded. Owned data directories and file sizes were
-retained. No force, reset, prune, volume removal or global setting change was performed.
+retained. During that original investigation/recovery window, no force, reset, prune, volume removal or global
+setting change was performed. Later explicitly authorized developer-tool configuration changes are
+recorded separately below; the original no-change statement is not a claim about all subsequent work.
 
 The application diagnostic queue failure reproduced while Docker was stopped. It is a separate
 bounded Stop repair, not evidence that Docker caused every failed test or that a slow connection
 explains missing diagnostic events.
+
+## Authorized partial remediation and current verification
+
+The owner authorized two containment switches: disable the Codex MCP gateway and disable the
+Terraform plugin. After the owner reloaded, the scoped observation found zero old launcher clients,
+one Sonar container and zero Terraform containers. The user then removed the Terraform plugin
+externally; absence is treated as removed/disabled, not a reason to recreate it. MCP_DOCKER remains
+explicitly false. These actions contain observed pressure; they do not prove the original cause.
+
+The owner also authorized four developer-tool registration repairs: correct the malformed standalone
+Playwright argument shape and disable that standalone while keeping its plugin enabled; disable the
+stale standalone computer-use registration; disable Claude's bundled GitHub server while retaining
+the curated GitHub plugin. These are developer-tool registrations, not application permission,
+security policy or product runtime changes. No broader migration is implied.
+
+The user's screenshot identified the existing Sonar Docker Toolkit saved profile, not a new Codex
+plugin. An official Sonar 2.6 plugin was briefly added during investigation, then only that addition
+was fully removed. Semantic configuration returned to the authorized four-field repair baseline;
+the existing profile's 10 entries remained unchanged. No Docker Hub logout or account change was
+performed. The gateway was not reenabled.
+
+After the owned browser project was down with actual [] container cleanup and retained data proof,
+the old gateway-labeled Sonar container 90c97003 was attributed to stdio with no live host client,
+ports or mounts and gracefully stopped. No broad container kill, reset, prune or volume removal
+occurred. Earlier duplicate counts alone remain insufficient to label every instance a leak.
+
+A wrong environment-name guard first blocked saved-profile verification before server launch; that
+failed prelaunch attempt remains recorded. Correct existing MCP credential names then allowed one
+direct pinned saved-profile Sonar client to make three actual quality-gate reads returning OK through
+one owned container, followed by normal close with none remaining. Independent review approved
+`sonar-profile-single-client-verification-v2.json`. This verifies the exercised one-client lifecycle,
+not an automated global singleton, intended simultaneous-client cardinality, permanent stability,
+new pull-request-head analysis or the original Docker/latency/OOM cause. Current-head quality gates
+remain separate.
+
+Evidence includes `docker-mcp-loop-containment-applied.json`,
+`docker-mcp-loop-after-owner-reload.json`, `sonar-old-gateway-orphan-stop.json`,
+`sonar-profile-prelaunch-credential-guard.json`,
+`sonar-profile-single-client-verification-v2.json` and
+`sonar-profile-single-client-independent-review.json` under the existing local evidence root.
+The current recommendation is to prefer Codex built-ins and selected direct plugins while keeping
+the gateway disabled. A broader tool migration is only a recommendation for owner review, not an
+authorized or delivered migration. Attribution/expected-cardinality work below remains unresolved;
+keep this operational task IN_PROGRESS. It is an evidence link, not a new hard Stop dependency.
 
 ## Bounded investigation and requirements
 

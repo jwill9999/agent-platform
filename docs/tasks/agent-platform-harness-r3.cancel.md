@@ -82,13 +82,18 @@ headless/API, approval/retry/sensor fences, Project Chat and safe V1 diagnostic 
 Early dirty-tree test provenance remains in the results; final identity is the reviewed file-hash
 receipt plus immutable pushed source/PR metadata in Beads and publication receipts.
 
-At the 16 October 2026, 00:56 UTC checkpoint, 397 web cases, five Docker Stop journeys, Git 49 and
-combined diagnostic/resumed-history 19 cases passed; independently inspected earlier Electron Stop
-and signed real-VM representative evidence is retained. Nine adjacent browser cases, final fresh
-Electron 67/current-source VM representative, full API/normal hooks and current hosted qualification
-remain required. Global Docker RPC stalls require engine recovery/owner restart decision; the
-existing limiter is unchanged. Normal push/draft PR qualification does not make the task ready,
-waive local gates or authorize a merge. Full mirrors/readbacks and final results review still apply.
+Current reviewed application 9044859d includes the bounded DB scheduling repair; final fresh source
+proofs must bind browser Current904 Docker browser16 passed Stop5/reply1/Git5/MCP5 with reviewed source/effect/artifact and recovered owned-cleanup evidence; no stress/load claim., Electron Fresh current904 Electron67 passed first attempt in655.337seconds with no skipped/flaky/retried cases; Stop effects, diagnostics,503retry and Project restoration independently reviewed;20controlled-helper cases are included, signed realVM is separate., actual signed VM
+Fresh current904 signed realmacOSVM Stop representative passed1/1 in48.556seconds;5.047msack, actual guest start/lateeffect and honest unknown, safe43-event report, selected49runtime bindings, signature and trace integrity independently reviewed. and unchanged normal push/API Normal unchanged hooks passed cycles, six-package build/typecheck and 2206 tests, including full API525; exact atomic feature/task remote refs verified without bypass.. Prior f9 browser 14/67/VM 1 results
+remain historical, not changed-source qualification. The 900-measurement benchmark after rebuilt DB
+passes unchanged20 ms/2 ms bounds with 1540 healthy events/mode, zero drops and maxPending 56; 23
+focused DB controls pass. Failed normal524/1, fresh-worker24 drops and22/1 timing-boundary attempts
+are retained. Actual1000 ms close can return before one owned 32-event loss settles; eventual exact
+accounting is tested without changing that boundary. Docker normal restoration completed; lifecycle
+ownership remains a separate IN_PROGRESS operational investigation, not a new hard dependency. Feature
+pipelines/reviews/tree, seven full mirrors/readbacks, final critique and task sync remain required;
+protected staging has separate scan/VM/protection/comment/actual merge authority gates. No delivery
+or stress-ready claim follows local proof.
 See the [implementation record](../reviews/project-chat-stop-results.md). Older September managed
 contract wording is historical and refined by this native scoped plan under ADR0005; broader scopes,
 PR283 and paused orchestration stay untouched. Monitoring and owner stress testing remain blocked

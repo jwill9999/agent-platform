@@ -90,7 +90,8 @@ private loopback diagnostics endpoint. Capture its reports through an owned trus
 client; Electron proves the user export. Recheck current test selectors and recorded source before execution. Exact-head hosted browser/Electron and required actual VM cannot be skipped.
 
 The current Stop result report is [project-chat-stop-results](../reviews/project-chat-stop-results.md).
-Its partial scenario matrix does not mark this contract complete. Monitoring uses `docs/reviews/local-diagnostics-monitoring-results.md`. Record all scenario
+Its updated S01–S15 local-proof matrix does not mark this contract delivered or waive
+hosted/current-head review, publication, integration or monitoring/stress gates. Monitoring uses `docs/reviews/local-diagnostics-monitoring-results.md`. Record all scenario
 statuses/evidence and outstanding gaps. Independent critic inspects source plus actual reports and
 effects. Sonar/Problems fallback and actual hosted Sonar/CodeQL/security/review gates apply. Never
 normalize a failed benchmark, infer cancellation from an HTTP success alone, or claim planned cases

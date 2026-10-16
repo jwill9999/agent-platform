@@ -8,8 +8,9 @@
 
 The working Stop implementation adds safe control/admission/settlement events to existing V1
 diagnostics. This does not implement the periodic resource sampler, retained recording preference,
-historical monitoring windows or M01–M06 below. Those remain unstarted; the
-[Stop results](../reviews/project-chat-stop-results.md) must not be used as monitoring sign-off.
+historical monitoring windows or M01–M06 below. Those remain unstarted and hard-dependent on actual Stop delivery; the
+[Stop results](../reviews/project-chat-stop-results.md), including passed local browser/Electron/VM
+evidence, must not be used as monitoring sign-off or owner stress-test readiness.
 
 ## Outcome and bounded scope
 

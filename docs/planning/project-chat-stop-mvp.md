@@ -162,23 +162,25 @@ Use real API/SQLite/harness, Docker browser, Electron and a mandatory real packa
 representative. Deterministic local provider/GitHub/MCP boundaries are declared fixtures; they imply
 no paid-provider, production-capacity or cloud-performance qualification.
 
-The initial host reserve failed at 11–13 GiB free; heavy work was held. After owner cleanup it passed
-at approximately 47 GiB, with about 40 GiB at the current preparation checkpoint. Recheck the 20 GiB
-reserve before each heavy build/VM launch and preserve unknown data. Full build/typecheck/lint and
-397 web tests passed on recorded source, and the final pinned-fixture Docker Stop suite passed
-5/5 with independently inspected control/effect/privacy artifacts. Git 49 and combined diagnostic/
-resumed-history 19 controls passed after the source/fixture repairs; one adjacent context browser
-case passed. Five earlier Electron Stop journeys/six exports and an earlier signed-VM Stop
-representative passed independent inspection. Those do not qualify the final fresh Electron 67 or
-current-source actual-VM representative. The 20 controlled-helper cases belong to Electron, not a
-20-case real-VM requirement.
+The original host reserve, Docker/RPC and diagnostic capture failures remain retained. Supported
+normal Docker restoration completed after the finite native-test window, without force/reset/prune,
+unknown-data deletion or configuration changes. Lifecycle ownership/cardinality remains unresolved
+in a separate linked IN_PROGRESS task, not a new hard Stop dependency. Recheck 20GiB before heavy runs;
+resource observations and successful restarts do not establish sole causes or permanent repair.
 
-At the 16 October 2026, 00:56 UTC local checkpoint, nine adjacent browser cases, fresh full Electron,
-current-source VM and full API/normal hooks remain unqualified. A reply bootstrap encountered the
-existing limiter and later global Docker RPCs stalled; engine recovery/owner restart decision is
-pending. Preserve attempts and actual reset timing; do not weaken limiters or infer a single cause.
-A normal push/draft PR may obtain hosted evidence while local recovery proceeds, but no outstanding
-acceptance gate, review or reserved merge grant is waived. See the results for exact evidence.
+Reviewed application 9044859d includes the bounded ready-batch scheduling repair. Four fresh terminal
+current-source proof inputs are mandatory: browser Current904 Docker browser16 passed Stop5/reply1/Git5/MCP5 with reviewed source/effect/artifact and recovered owned-cleanup evidence; no stress/load claim.; Electron Fresh current904 Electron67 passed first attempt in655.337seconds with no skipped/flaky/retried cases; Stop effects, diagnostics,503retry and Project restoration independently reviewed;20controlled-helper cases are included, signed realVM is separate.;
+actual signed VM Fresh current904 signed realmacOSVM Stop representative passed1/1 in48.556seconds;5.047msack, actual guest start/lateeffect and honest unknown, safe43-event report, selected49runtime bindings, signature and trace integrity independently reviewed.; full normal push/API Normal unchanged hooks passed cycles, six-package build/typecheck and 2206 tests, including full API525; exact atomic feature/task remote refs verified without bypass.. Earlier f9 browser 14/67/VM 1
+results are prior-source evidence only. The unchanged 900-request benchmark after compiled-DB repair
+retained 1540 healthy events per mode with zero drops/maxPending 56, relative p95 overhead18.114417 ms
+<=20 and enqueue p95 0.019042 ms<=2. Required events, buffers, durability and budgets were not relaxed.
+The 23 focused controls and retained22/1 deadline-order assertion are described in actual results.
+
+This plan does not mark acceptance delivered. Exact-head feature pipelines/reviews/tree verification,
+seven full immutable mirrors/readbacks, final critique and Beads sync remain feature-delivery gates.
+Protected staging has its separate actual full scans/VM/protections/comments and reserved merge
+permission. Monitoring/owner stress readiness remains blocked by both actual deliveries. The 20
+helper cases belong to Electron 67 and do not create a 20-case actual VM requirement.
 
 ## Effort, stopping point and delivery
 
