@@ -60,10 +60,15 @@ degraded/unclean coverage. No prompt/content/key/path upload or dashboard is add
 
 At the first local checkpoint, a fresh report-only reviewer located a deliberately held31-second
 model interval after unclean restart without source, fixture ground truth or live observation.
-The initial idle report was insufficient and remains retained. Correlation does not prove a provider
-or resource cause. Its original900-measurement/990 request benchmark passed20 ms/2 ms limits with
-zero healthy V1 loss; those old results do not qualify the newly shared hot path. One fresh unchanged
-benchmark with retained raw vectors and real process/restart report is required in the normal push.
+The initial idle report was insufficient and remains retained. Fresh source1c2 normal push passed
+1,532 tests across five affected packages, builds/types/cycles and the unchanged900-measurement/
+990-request benchmark. Independent review verified all nine raw vectors: maximum relative p95
+8.262 ms against20 ms and enqueue p95 0.014416 ms against2 ms, with zero healthy V1 loss. Resource
+phases cover initial probes, not periodic-load capacity. A fresh report-only reviewer independently
+located the31.060-second model interval and subsequent process boundary from saved data. Later
+comparison with separately withheld ground truth confirms the controlled seed was found; it is
+not a new performance bug or proof of a provider/resource cause. Receipts: normal-push proof,
+benchmark-independent-review and stored-window-review-03 assessment/disposition in the evidence root.
 
 MON-COUNTS/PROCESS-ID/CLOCK-COVERAGE/UTC-INPUT were repaired and independently reviewed. Existing
 [session-lock timeout ownership](docs/tasks/agent-platform-session-lock-timeout-ownership.md) is P2
@@ -73,8 +78,14 @@ unapproved mutex repair. Owner trial remains one active request per session.
 ## Remaining gates and owner boundary
 
 Independent local source/results reviews approve the repaired runtime and current connected/VM
-evidence. Final prose/source binding, normal commit/push including fresh benchmark/process checks,
-full mirrors and new-head hosted security/quality/reviews remain delivery gates. No monitoring
+evidence. Actual1c2 hosted Sonar passes all quality conditions (duplication1.0%, ratings1,
+hotspots100%) but still reports one S7785 startup-style finding. The final index-only correction
+uses a synchronous observer around the owned readiness Promise, preserving immediate nonblocking
+startup and the same fixed warning; independent exact-source review approved it. Normal affected
+API checks and new-head hosted Sonar/issues remain required. Existing fresh1c2 benchmark,
+connected/VM and saved-report evidence remain applicable with this explicit observer-only delta;
+they are not relabeled as exact-byte tests of the follow-up. Full mirrors and all new-head hosted
+security/quality/reviews remain delivery gates. No monitoring
 merge or stress-ready claim follows local passes. Monitoring feature/staging merges retain their
 reserved actual owner-authority gates; staging also needs its own full scan/VM/protections.
 

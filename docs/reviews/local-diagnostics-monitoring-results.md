@@ -33,7 +33,7 @@ retained as `pr339-sonar-opening.json` and the related four-file block receipts.
 rule/profile change, exclusion or threshold alteration is used. Other hosted jobs and review threads
 are inspected independently; a green check alone never resolves an actionable finding.
 
-Repairs are bounded: preserve nonblocking API startup with an async readiness helper, extract
+Repairs are bounded: preserve nonblocking API startup with a readiness observer, extract
 unchanged route-error translation and CLI parsers/renderers, native sequential bounded streaming,
 standalone UI/summary labels and spacing, exact cursor field sets, explicit safe page projections,
 and two concrete internal DB helpers for identical queue/RPC/cursor/metadata mechanics. Each store
@@ -74,10 +74,26 @@ ready; independent snapshots and baseline/guest-CPU limits remain explicit. Two 
 488 CRC members, source/runtime/served bindings, signed helper and owned VM cleanup were independently
 approved. No fresh 4 GiB image hash or load/capacity claim. Source/results from119below remain historical.
 
-Current gate: new-head hosted Sonar/duplication has not yet qualified the repaired source. One fresh
-900-measurement/990total benchmark with unchanged20 ms/2 ms thresholds, retained raw vectors and actual
-process/restart/private API controls is required through normal push. Full nine-document mirrors,
-all hosted tests/security/reviews and actual authorized delivery remain separate. No stress ready.
+Normal source1c2 push passed1,532 tests (contracts146/desktop223/web431/DB189/API543), five
+builds/types and cycles. The fresh unchanged benchmark passed900 measurements/990 requests, all nine
+raw vectors independently verified: worst relative p95 8.262 ms against20 ms, enqueue p95
+0.014416 ms against2 ms and zero healthy V1 loss. Initial resource probes do not establish periodic
+load capacity. The actual process/restart report was independently assessed without source, ground
+truth or live observation: model31,059.694 ms of request31,093.081 ms, active/unresolved/lock1 and
+waiters0, with a subsequent process boundary and explicit incomplete independent snapshots.
+Comparison only after assessment confirms the deliberately held31,029 ms fixture was localized;
+no real performance defect or causal resource/provider claim follows. Current receipts include
+`pr339-1c2-normal-push-proof.json`, `pr339-1c2-benchmark-independent-review.json`,
+`stored-window-review-03-assessment.json` and `monitoring-stored-review-v3-disposition.json`.
+
+Actual1c2 hosted Sonar passes all quality conditions, duplication1.0%/ratings1/hotspots100%, but one
+S7785 startup-style issue remains. The independently approved index-only follow-up changes the
+readiness observer from async to synchronous and attaches the same fixed failure warning to the
+owned start Promise, preserving nonblocking startup. Fresh normal API and new-head hosted checks
+remain required; prior source1c2 connected/VM/benchmark evidence remains applicable regression
+coverage with the explicit observer-only delta, not exact-byte retesting of the follow-up.
+Full nine-document mirrors, all hosted tests/security/reviews and actual authorized delivery remain
+separate. No stress-ready claim follows.
 Receipts: `pr339-db-contract-sonar-repair-freeze-v1.json`, API/CLI/desktop repair receipts,
 `connected-sonar.*` and `vm-monitoring-sonar.*` with their actual artifacts.
 

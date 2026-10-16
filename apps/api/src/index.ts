@@ -71,14 +71,12 @@ const monitoringRuntime =
         appVersion: process.env.DIAGNOSTICS_APP_VERSION,
       })
     : undefined;
-if (monitoringRuntime) void observeMonitoringReadiness(monitoringRuntime);
+if (monitoringRuntime) observeMonitoringReadiness(monitoringRuntime);
 
-async function observeMonitoringReadiness(runtime: MonitoringRuntime): Promise<void> {
-  try {
-    await runtime.start();
-  } catch {
+function observeMonitoringReadiness(runtime: MonitoringRuntime): void {
+  void runtime.start().catch(() => {
     log.warn('monitoring.degraded', { code: 'storage_unavailable' });
-  }
+  });
 }
 
 function observeDiagnosticReadiness(store: ReturnType<typeof createDiagnosticStore>): void {
