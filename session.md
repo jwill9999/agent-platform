@@ -1,69 +1,78 @@
-# Stop implementation and durable monitoring handoff — 16 October 2026
+# Current session — durable local monitoring
 
-[PR334](https://github.com/jwill9999/agent-platform/pull/334) targets `feature/project-chat-stop`.
-Stop remains IN_PROGRESS and unmerged. Durable monitoring is OPEN and unstarted behind actual Stop
-delivery. Owner stress testing is not ready. Keep the Docker gateway disabled and PR283/paused
-orchestration separate.
+Stop [PR334](https://github.com/jwill9999/agent-platform/pull/334) is merged into
+`feature/project-chat-stop` at `a5d17683961236f9cf089030be51b813845d85da` after the owner's explicit
+conditional merge grant. All nine executed exact-head feature checks passed on reviewed
+`e171362896ec4ecc8e47ad480a90b771d3d1be35`, with zero unresolved threads/blocking reviews and CLEAN.
+Actual merge tree `4d33908a24dbd170d1226b85e350b9d375325ad7` equals reviewed source. Canonical Stop
+is CLOSED/read back; Dolt push52357 completed. This is feature delivery, not protected staging
+promotion. Earlier failures and the unexplained diagnostic export503 remain in
+[Stop results](docs/reviews/project-chat-stop-results.md).
 
-## Current qualification
+The authorized [durable monitoring](docs/tasks/agent-platform-local-diagnostics-monitoring.md) task
+is IN_PROGRESS. Its dedicated `feature/local-diagnostics-monitoring` starts at current staging
+`cf5f0452` plus the qualified Stop dependency (fast-forward to `a5d17683`, pushed/read back).
+Current `task/local-diagnostics-monitoring` shares that base and carries the monitoring implementation.
+Local tests bind candidate file hashes; final publication must bind those to the actual pushed revision. The critic approved this branch sequence; no staging/main or paused-work merge follows.
 
-Application source `4f4ecaf505efc774a2bdb71c7f682a81f3b93ae0` passed all nine executed hosted
-feature checks, including browser and 67 desktop cases. Sonar is OK with zero open issues and no
-unresolved PR threads were present. Sourcery's budget skip is not code review; the feature-targeted
-VM skip is not staging qualification. Independent source and artifact reviews are retained.
+## Implementation and actual local qualification
 
-Fresh Docker browser qualification passed all 16 cases without retries or skips: Stop 5, reply 1,
-Git 5 and MCP 5. Actual persisted control/effect records show no admissions after Stop acknowledgement;
-late sensor effects remain unknown. Eleven available traces passed CRC checks; MCP deliberately
-records JSON rather than traces. Private browser403s prove denial, not successful diagnostic export.
-Owned cleanup restored defaults, retained data and left unrelated containers unchanged.
+A companion worker-owned SQLite resource store retains the recording preference and safe 30-second
+API-process/app-volume samples. Private recording/status/history API, diagnostic CLI and compact
+native Settings/history export use the shared backend. Default resource recording is OFF; enabling
+once persists across restart. Turning it OFF leaves existing V1 request/model/tool/Stop capture
+unchanged. Seven-day age retention is configurable1–90, but25,000samples at30seconds retain only
+about8.68 continuous days; no90-day coverage guarantee. Fixed32MiB pages/34MiB journal, queue256,
+200ms total window,5MiB output and2second store cleanup remain enforced. Independent snapshots,
+signed per-store cursors, missing/pruned/unclean coverage and unknown effects remain explicit.
 
-Local desktop qualification is a reviewed composite: 65 retained passes plus two focused passes,
-covering 67 unique cases with unchanged application/runtime bytes. The original full 65/67 failure
-remains failed. One model-key assertion matched two legitimate cards; both checks now target the
-exact created model. The other failure was a genuine native diagnostic-export503, followed by a
-healthy read. Passive timing capture in the focused run recorded successful exports at 13.164 and
-7.030ms; this does not establish or fix the earlier503 cause. No automatic retry, pre-export query,
-timeout increase or success-assertion removal was introduced. Exact two test-file hashes bind these
-initially uncommitted tests; subsequent commit/publication receipts must verify byte equality.
+Local scoped qualification: contracts35, DB38, API67 plus one changed process fixture, desktop49,
+web14 and CLI13+6 controls passed; these are overlapping scoped runs, not a total. Real storage
+ceiling/recovery, row/age bounds, private denial, held-HTTP cleanup and SIGKILL/restart passed.
+One actual managed Electron+separateChromium acceptance case passed without retry/skip/failure,
+using production30second sampling and realSQLite/Settings/SaveAs. It proves clean restart history,
+browser403 and resource-OFF while V1continues. Deterministic model wire/OS destination only; no
+Docker-browser-only/fullElectron-batch claim. Independent source and actual trace/effects review
+approved all44 application hashes and three trace ZIPs/549CRC members.
 
-The separate real VM journey through the signed macOS helper passed once:8.173ms Stop acknowledgement,
-actual guest late effect retained, outcome_unknown with two unresolved admissions, and 43 safe durable
-zero-loss events. Signature/entitlement, selected runtime bindings and all three trace ZIPs were
-independently reviewed. Development signing is not hardened; the 4 GiB image was not freshly rehashed.
-Fifty composite desktop reports contain 49 ready local reports and one intentional disabled partial;
-three prior-process attention flags are disclosed. Raw fixture artifacts remain restricted.
+M06 stored-only review located the intentional roughly31second model interval after restart from a
+neutral saved report without source/ground truth/live observation. Its active1/unresolved1/lockkey1
+sample is correlation, not cause; unclean/incomplete independent snapshots and missing provider/host
+details are retained. The earlier idle report was insufficient and remains retained. The unchanged
+900-measurement/990request benchmark passed20ms/2ms limits: worstrelative4.915041ms/enqueue.019958ms,
+healthy1540V1events/zeroLoss. Short phases record initial probes, not periodic30second ticks; separate
+functional tests cover the production cadence. No host throughput or stress capacity is claimed.
 
-The application 4f4 normal hooks passed 1,718 tests in its three affected packages; unchanged DB 172/Desktop 187 and
-contracts 139 results retain their source scope. The hosted benchmark independently passed900 measured
-requests / 990 with warm-ups: maximum relative p95 2.735ms against 20 ms and enqueue p95 0.0488ms against 2 ms;
-each healthy mode retained 1,540 events with zero loss. Earlier local and hosted performance failures
-remain evidence; no CPU/disk/GC/connection cause is asserted or threshold relaxed.
+MON-COUNTS/PROCESS-ID/CLOCK-COVERAGE/UTC-INPUT findings were fixed and independently approved.
+A pre-existing session-lock timeout ownership reproduction is recorded as P2 OPEN
+[follow-up](docs/tasks/agent-platform-session-lock-timeout-ownership.md), discovered-from monitoring.
+Actual API exposure remains unverified; no new hard dependency or unapproved mutex repair. Trial
+scope remains one active request per session. See [monitoring results](docs/reviews/local-diagnostics-monitoring-results.md)
+for original failed fixture/push attempts, source receipts and evidence limits.
 
-## Delivery and next work
+## Remaining delivery and owner boundary
 
-Delivery requires normal source/documentation push, current-head hosted qualification, full
-source-bound Notion readbacks and reconciled Beads. Publication receipts identify the actual mirrored
-revision, complete bodies and preserved notes/children; earlier cc9c4a20 mirrors remain retained.
-Actual task-to-feature and protected-staging merges remain reserved. Staging additionally requires
-its own completed full scan, actual packaged VM and live protection/review gates; main is excluded.
+The signed real-VM Stop case with recording enabled now passed46.417seconds/onecase (47.491-second suite), no retry/skip/
+failure, ack8.849ms, genuine guest late effect retained as outcome_unknown2. Native history saved one
+actual sample/48V1events/25correlated controls, enabled seven-day preference and shared V1/resource
+UUID; the separate V1 report has43events. Initial startup-navigation failure is retained; reviewed
+test-only owned-root load synchronization preceded this new attempt, with no changed deadlines/
+retries/product code. Independent actual artifact/source review approved, with zero actionable findings. Final source/results documentation critique,
+normal quality/commit/push, full nine-document branch-specific mirrors/readbacks and current-head
+hosted checks/security/review findings remain required. Monitoring feature/staging merges retain
+their reserved actual owner-authority gates. Passing local tests does not establish owner stress
+readiness; that also requires verified delivery and its recording/preflight checks.
 
-Evidence lives in `/Users/letuscode/.codex/project-chat-stop-implementation-20261016`, particularly
-`qualification-4f4ecaf5`, `pr334-sonar-4f4-qualification.json` and
-`pr334-benchmark-4f4-independent-qualification.json`. Canonical Beads is
-`/Users/letuscode/projects/agent-platform`. Stop and monitoring notes are read back and Dolt-synced at
-each recorded checkpoint; task closure requires actual declared delivery.
+Evidence: `/Users/letuscode/.codex/local-diagnostics-monitoring-20261016`, with original API/benchmark
+receipts retained at `/Users/letuscode/.codex/project-chat-stop-implementation-20261016`.
+Dolt40808 and62354 completed after the separate bug/label and local-qualification note readbacks. This checkpoint precedes monitoring mirror publication; full source-bound readbacks are required
+before final acceptance and their actual receipts belong in Beads/publication metadata.
 
-The saved 39-file monitoring feasibility map is read-only preparation, not implementation. After Stop
-delivery implement M01–M06: retained local resource recording and bounded historical review/export
-through shared private APIs and desktop/headless clients. Stress readiness requires both deliveries,
-restart-safe healthy recording and stored-only analysis of a seeded issue. No paid calls, recurring
-schedule, dashboard, distribution work or paused orchestration resumption is implied.
-
-Docker gateway remains explicitly false; Terraform is absent. One-client Toolkit Sonar verification
-is not permanent singleton stability or proof of the earlier loop's cause. No Docker Hub logout,
-pruning or unrelated configuration changes are included. Preserve dirty/unrelated checkouts and all
-four paused refs. The complete prior handoff follows unchanged as historical context.
+Docker gateway remains disabled and global configuration SHA256
+`5bf96ed01d13eca69e7f3009c4521323e1027b3802bb007350127d54aee1696f` unchanged. Initial hostfree58.44GiB;
+actual VM preflight rechecked the20GiB minimum. No Docker restart/prune, global/credential change, paid provider, cloud upload,
+scheduled review or owner trial. Keep PR283, paused orchestration branches/checkouts and unrelated
+work separate. The historical handoff below remains byte-exact; current status is this prefix.
 
 <!-- markdownlint-disable MD025 -->
 

@@ -4,6 +4,11 @@ import { pathToFileURL, URL } from 'node:url';
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
 import {
+  monitoringCommands,
+  parseMonitoringArguments,
+  renderMonitoringResponse,
+} from './monitoring.mjs';
+import {
   DiagnosticHealthSchema,
   DiagnosticScopeSchema,
   DiagnosticStoredEventSchema,
@@ -27,7 +32,7 @@ function projectList(input) {
 }
 const maxBytes = 5 * 1024 * 1024;
 const usage =
-  'Usage: pnpm diagnostics list [--json] | report (--request UUID | --session UUID [--run UUID]) [--json]';
+  'Usage: pnpm diagnostics list [--json] | report (--request UUID | --session UUID [--run UUID]) [--json] | monitoring-status [--json] | monitoring-set --enabled true|false --retention-days 1..90 [--json] | window --from UTC --to UTC [--session UUID] [--monitoring-cursor CURSOR] [--diagnostic-cursor CURSOR] [--limit 1..1000] [--json]';
 
 function parseArguments(args) {
   const [command, ...rest] = args;
@@ -115,7 +120,9 @@ export async function runDiagnostics(
   errors = process.stderr,
 ) {
   try {
-    const options = parseArguments(args);
+    const options = monitoringCommands.has(args[0])
+      ? parseMonitoringArguments(args)
+      : parseArguments(args);
     const { url, capability } = localEndpoint(env, options.command);
     const response = await globalThis.fetch(url, {
       method: 'POST',
@@ -125,7 +132,11 @@ export async function runDiagnostics(
       body: JSON.stringify(options.body),
     });
     const input = await readBounded(response);
-    if (options.command === 'list') {
+    if (options.monitoring) {
+      const text = renderMonitoringResponse(input, options);
+      if (Buffer.byteLength(text + '\n', 'utf8') > maxBytes) throw new Error('response_limit');
+      output.write(`${text}\n`);
+    } else if (options.command === 'list') {
       const list = projectList(input);
       const text = options.json
         ? JSON.stringify(list, null, 2)

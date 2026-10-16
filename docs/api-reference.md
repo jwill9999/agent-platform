@@ -8,7 +8,7 @@ The API server (`apps/api`) exposes a REST JSON API on port 3000. All resource e
 
 ## Authentication
 
-Single-user MVP — no authentication required. A stub middleware exists for future expansion.
+Ordinary single-user MVP resources require no account authentication. A stub middleware exists for future expansion. Private local diagnostic endpoints are a separate boundary: they require the exact loopback peer/Host and a main/server-held capability. They are not a public browser proxy or an account/session lookup service.
 
 ## Request Headers
 
@@ -19,7 +19,7 @@ Single-user MVP — no authentication required. A stub middleware exists for fut
 
 ## Rate Limiting
 
-All `/v1` endpoints are rate-limited via a dynamic rate limiter (express-rate-limit). Defaults: 100 requests per 60 s window. Configurable via `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX` env vars, and at runtime through the Settings API.
+Ordinary `/v1` resource endpoints are rate-limited via a dynamic rate limiter (express-rate-limit). Defaults: 100 requests per 60 s window. Configurable via `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX` env vars, and at runtime through the Settings API.
 
 ## Health Check
 
@@ -30,6 +30,28 @@ All `/v1` endpoints are rate-limited via a dynamic rate limiter (express-rate-li
 ```json
 { "status": "ok", "version": "1.0.0" }
 ```
+
+## Private local monitoring
+
+The [durable monitoring branch](tasks/agent-platform-local-diagnostics-monitoring.md) adds these
+local-capability-protected routes. See [actual qualification](reviews/local-diagnostics-monitoring-results.md)
+and the [usage/privacy guide](development/diagnostics.md); implementation is not staging or stress sign-off.
+These routes mount behind the existing diagnostic access guard, outside the ordinary public resource
+router/rate limiter. No capability is exposed to browser, voice/model input or renderer IPC.
+
+| Method | Path                                    | Input and meaning                                                                                                                                            |
+| ------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/v1/diagnostics/monitoring/status`     | Empty object; recording preference and both stores' current safe health, including unknown/unloaded preference                                               |
+| POST   | `/v1/diagnostics/monitoring/preference` | Exactly `samplingEnabled` boolean and `retentionDays` integer1–90; reply acknowledges the durable preference/version, not a queued write                     |
+| POST   | `/v1/diagnostics/monitoring/window`     | `window` with UTC epoch `fromMs` inclusive/`toMs` exclusive, positive range up to90days; optional session UUID, two opaque cursors and limit1–1000 per store |
+
+Window responses contain strict safe samples, V1 events, generated readable summary and explicit
+coverage. Two independent snapshots/cursors do not claim an atomic cross-store transaction. Pass each
+`nextCursor` or final `completedCursor` unchanged with the same window/filter to continue the other
+stream without replay; restart/pruning/scope mismatch invalidates affected cursors. Each combined read
+has a200ms budget and5MiB output cap. Incomplete/unknown/pruned/unclean history must remain visible.
+Resource recording is initially off and leaves existing V1 event capture unchanged. Retention is bounded
+by actual25,000 rows/32MiB pages/34MiB journal as well as configured age; see the guide for limits.
 
 ## Resource Endpoints (`/v1`)
 

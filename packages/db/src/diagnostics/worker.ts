@@ -1,11 +1,13 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import Database from 'better-sqlite3';
 import {
   DiagnosticEventSchema,
   DiagnosticScopeSchema,
+  DiagnosticWindowSchema,
+  type DiagnosticWindow,
   type DiagnosticEvent,
   type DiagnosticScope,
 } from '@agent-platform/contracts';
@@ -14,6 +16,7 @@ const options = workerData as { path: string; retentionDays: number; maxEvents: 
 const port = parentPort!;
 let db: Database.Database;
 let previousShutdownUnclean = false;
+const windowEpoch = randomUUID();
 function meta(key: string): number {
   return Number(
     (
@@ -163,6 +166,110 @@ function query(input: { scope: DiagnosticScope; cursor?: string; limit?: number 
     stats: stats(),
   };
 }
+function windowCursor(
+  window: DiagnosticWindow,
+  after: number,
+  snapshot: number,
+  done: boolean,
+): string {
+  const payload = Buffer.from(
+    JSON.stringify({
+      scope: JSON.stringify(window),
+      after,
+      snapshot,
+      prunedThrough: meta('pruned_through'),
+      epoch: windowEpoch,
+      done,
+    }),
+  ).toString('base64url');
+  return `${payload}.${sign(payload)}`;
+}
+function decodeWindow(
+  value: string,
+  window: DiagnosticWindow,
+): { after: number; snapshot: number; done: boolean } {
+  if (value.length > 2048) throw new Error('invalid_cursor');
+  const [payload, signature, extra] = value.split('.');
+  if (
+    !payload ||
+    !signature ||
+    extra ||
+    Buffer.byteLength(signature) !== Buffer.byteLength(sign(payload)) ||
+    !timingSafeEqual(Buffer.from(signature), Buffer.from(sign(payload)))
+  )
+    throw new Error('invalid_cursor');
+  const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<
+    string,
+    unknown
+  >;
+  if (
+    !data ||
+    Object.keys(data).sort().join(',') !== 'after,done,epoch,prunedThrough,scope,snapshot' ||
+    data.scope !== JSON.stringify(window) ||
+    data.epoch !== windowEpoch ||
+    typeof data.done !== 'boolean' ||
+    !Number.isSafeInteger(data.after) ||
+    !Number.isSafeInteger(data.snapshot) ||
+    !Number.isSafeInteger(data.prunedThrough) ||
+    Number(data.after) < 0 ||
+    Number(data.snapshot) < Number(data.after) ||
+    Number(data.snapshot) > maximum()
+  )
+    throw new Error('invalid_cursor');
+  if (meta('pruned_through') > Number(data.prunedThrough))
+    throw new Error(`expired_history:${earliest()}`);
+  return data as { after: number; snapshot: number; done: boolean };
+}
+function queryWindow(input: { window: DiagnosticWindow; cursor?: string; limit?: number }) {
+  db.transaction(prune)();
+  const window = DiagnosticWindowSchema.parse(input.window);
+  const limit = Math.max(1, Math.min(1000, Math.floor(input.limit ?? 1000)));
+  const bound = input.cursor
+    ? decodeWindow(input.cursor, window)
+    : { after: 0, snapshot: maximum(), done: false };
+  const filter = window.sessionId ? ' AND session_id = ?' : '';
+  const args: (string | number)[] = [
+    window.fromMs,
+    window.toMs,
+    bound.snapshot,
+    ...(window.sessionId ? [window.sessionId] : []),
+  ];
+  const observed = db
+    .prepare(
+      `SELECT min(observed_at) AS oldest,max(observed_at) AS newest FROM diagnostic_events WHERE observed_at >= ? AND observed_at < ? AND sequence <= ?${filter}`,
+    )
+    .get(...args) as { oldest: number | null; newest: number | null };
+  const records = bound.done
+    ? []
+    : rows(
+        `SELECT sequence,content FROM diagnostic_events WHERE observed_at >= ? AND observed_at < ? AND sequence <= ?${filter} AND sequence > ? ORDER BY sequence LIMIT ?`,
+        [...args, bound.after, limit + 1],
+      );
+  const truncated = records.length > limit;
+  const events = records.slice(0, limit),
+    after = events.at(-1)?.sequence ?? bound.after;
+  return {
+    window,
+    events,
+    snapshotSequence: bound.snapshot,
+    earliestSequence: earliest(),
+    truncated,
+    ...(truncated
+      ? { nextCursor: windowCursor(window, after, bound.snapshot, false) }
+      : { completedCursor: windowCursor(window, after, bound.snapshot, true) }),
+    coverage: {
+      oldestObservedAtMs: observed.oldest,
+      newestObservedAtMs: observed.newest,
+      gaps: 0,
+      historyMayBeMissing:
+        meta('pruned') > 0 ||
+        meta('dropped') > 0 ||
+        previousShutdownUnclean ||
+        observed.oldest === null,
+    },
+    stats: stats(),
+  };
+}
 function append(input: { events: DiagnosticEvent[]; dropped: number }) {
   if (!Array.isArray(input.events) || input.events.length > 32) throw new Error('invalid_batch');
   const insert = db.prepare(
@@ -210,6 +317,7 @@ try {
     throw new Error('storage_limited');
   db.pragma('synchronous = FULL');
   db.exec(`CREATE TABLE IF NOT EXISTS diagnostic_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,event_id TEXT NOT NULL UNIQUE,request_id TEXT NOT NULL,session_id TEXT,run_id TEXT,observed_at INTEGER NOT NULL,content TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS diagnostic_time ON diagnostic_events(observed_at,sequence);
     CREATE INDEX IF NOT EXISTS diagnostic_request ON diagnostic_events(request_id,sequence);
     CREATE INDEX IF NOT EXISTS diagnostic_session ON diagnostic_events(session_id,run_id,sequence);
     CREATE TABLE IF NOT EXISTS diagnostic_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
@@ -262,6 +370,8 @@ function executeCommand(message: WorkerMessage): unknown {
   switch (message.type) {
     case 'append':
       return append(message.input as Parameters<typeof append>[0]);
+    case 'queryWindow':
+      return queryWindow(message.input as Parameters<typeof queryWindow>[0]);
     case 'query':
       return query(message.input as Parameters<typeof query>[0]);
     case 'list':

@@ -1,8 +1,33 @@
 # Shared harness Stop implementation and qualification
 
-**Date:** 16 October 2026. **Beads:** `agent-platform-harness-r3.cancel`, IN_PROGRESS.
+**Date:** 16 October 2026. **Beads:** `agent-platform-harness-r3.cancel`, CLOSED after verified PR334 feature delivery.
 
-## Current local and hosted qualification — 16 October 2026
+## Current delivery — PR334 merged into feature
+
+The owner explicitly authorized PR334 merge after checks/comments cleared. Fresh exact-head
+`e171362896ec4ecc8e47ad480a90b771d3d1be35` had all nine executed checks SUCCESS, CLEAN merge state,
+zero unresolved threads and no blocking reviews. The guarded merge commit is
+`a5d17683961236f9cf089030be51b813845d85da`; actual feature tree
+`4d33908a24dbd170d1226b85e350b9d375325ad7` exactly equals reviewed source. Stop is CLOSED/read back,
+and Dolt push52357 completed. Monitoring is now IN_PROGRESS under its existing implementation grant.
+Protected staging, monitoring completion and stress readiness remain separate.
+
+Final hosted CI38857783473 attempt1 passed Electron67, ordinary browser31 plus one existing optional
+skip, Git5 and Stop5. Independent benchmark artifact12028602317 digest/CRC/run/head/raw vectors passed:
+900 measured/990 total, max relative p954.655ms<=20, enqueue0.023905ms<2, healthy1540 per repetition
+and zero loss. Sonar was OK/zero open issues; current PR ref had zero open CodeQL alerts. Feature VM
+and Sourcery budget skips are disclosed and do not supply staging qualification or code review.
+All five final changed test/document bytes were verified against earlier reviewed working-tree hashes;
+normal push187 desktop tests passed. Seven documents plus20 ordered historical session parts had full
+body/revision/hash/destination readbacks, with human notes and child relationships preserved.
+
+Evidence in the original Stop root: `pr334-authorized-merge-preflight.json`,
+`pr334-authorized-merge.json`, `pr334-merged-feature-tree.json`,
+`pr334-e171-independent-terminal-qualification.json`, `pr334-e171-source-equality-and-normal-push.json`
+and `publication-update-e1713628/publication-e1713628.json` plus its completion index. The following
+checkpoint predates final e171 publication/CI and PR334 merge; its pending statements are historical.
+
+## Historical local and hosted qualification — application4f4
 
 Application 4f4ecaf5 passed all nine executed feature checks; hosted desktop 67 and browser31 plus
 one existing optional context skip, Git 5 and Stop 5 passed. Sonar is OK/zero open issues; no unresolved

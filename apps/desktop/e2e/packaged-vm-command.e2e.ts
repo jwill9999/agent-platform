@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   RunControlRecordSchema,
+  projectMonitoringReport,
   type DiagnosticReport,
   type RunControlRecord,
 } from '@agent-platform/contracts';
@@ -317,6 +318,119 @@ test.describe('packaged Electron macOS VM command runner', () => {
   });
 });
 
+async function enableStopMonitoring(page: Page, fixture: VmFixture): Promise<number> {
+  // firstWindow observes construction; do not interrupt main's initial loadURL.
+  await page.waitForURL(
+    (url) => url.origin === `http://127.0.0.1:${fixture.rendererPort}` && url.pathname === '/',
+    { waitUntil: 'load', timeout: 30_000 },
+  );
+  const fromMs = Date.now() - 1000;
+  await page.goto(`http://127.0.0.1:${fixture.rendererPort}/settings/workspace`);
+  await expect(page.getByRole('heading', { name: 'Local monitoring', exact: true })).toBeVisible();
+  await expect(page.getByText('Resource recording: Off.', { exact: false })).toBeVisible();
+  await page.getByLabel('Record local resource samples').check();
+  await page.getByLabel('Retention age in whole days (1–90)').fill('7');
+  await page.getByRole('button', { name: 'Save monitoring preference', exact: true }).click();
+  await expect(
+    page.getByText('Monitoring preference saved locally.', { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByText('Resource recording: Enabled.', { exact: false })).toBeVisible();
+  await page.goto(`http://127.0.0.1:${fixture.rendererPort}`);
+  return fromMs;
+}
+
+async function exportStopMonitoring(
+  page: Page,
+  fixture: VmFixture,
+  fromMs: number,
+  sessionId: string,
+  acknowledged: RunControlRecord,
+) {
+  const toMs = Date.now();
+  await page.goto(`http://127.0.0.1:${fixture.rendererPort}/settings/workspace`);
+  await page.getByLabel('From (UTC, inclusive)').fill(new Date(fromMs).toISOString());
+  await page.getByLabel('To (UTC, exclusive)').fill(new Date(toMs).toISOString());
+  await page.getByRole('button', { name: 'Save monitoring history', exact: true }).click();
+  await expect(page.getByText('Monitoring history saved locally.', { exact: false })).toBeVisible();
+  const text = readFileSync(join(fixture.tempRoot, 'stop-monitoring-history.json'), 'utf8');
+  expect(Buffer.byteLength(text)).toBeLessThanOrEqual(5 * 1024 * 1024);
+  for (const value of [
+    STOP_GUEST_COMMAND,
+    fixture.projectDir,
+    HOST_ONLY_CANARY_VALUE,
+    E2E_SECRETS_MASTER_KEY,
+    'sk-test-key',
+    'x-diagnostics-capability',
+  ])
+    expect(text).not.toContain(value);
+  const report = projectMonitoringReport(JSON.parse(text), {
+    window: { fromMs, toMs },
+    limit: 1000,
+  });
+  for (const health of [report.monitoring.health, report.diagnostics.health])
+    expect(health).toMatchObject({ state: 'ready', pending: 0, dropped: 0, conflicts: 0 });
+  expect(report.monitoring.health.preference).toMatchObject({
+    samplingEnabled: true,
+    retentionDays: 7,
+  });
+  expect(report.monitoring.health.preference!.version).toBeGreaterThan(0);
+  expect(report.monitoring.truncated).toBe(false);
+  expect(report.diagnostics.truncated).toBe(false);
+  expect(report.monitoring.samples.length).toBeGreaterThanOrEqual(1);
+  const events = report.diagnostics.events
+    .map(({ event }) => event)
+    .filter((event) => event.sessionId === sessionId);
+  expect(events.length).toBeGreaterThan(0);
+  const processId = report.diagnostics.health.processInstanceId;
+  expect(report.monitoring.health.processInstanceId).toBe(processId);
+  expect(events.every((event) => event.processInstanceId === processId)).toBe(true);
+  expect(
+    report.monitoring.samples.every(({ sample }) => sample.processInstanceId === processId),
+  ).toBe(true);
+  const controls = events.filter((event) => event.control?.logicalRunId === acknowledged.id);
+  for (const stage of ['requested', 'acknowledged'])
+    expect(
+      controls.some(
+        (event) => event.control?.stage === stage && event.control.reason === 'user_stop',
+      ),
+    ).toBe(true);
+  expect(
+    controls.some(
+      (event) => event.control?.state === 'outcome_unknown' && event.control.reason === 'user_stop',
+    ),
+  ).toBe(true);
+  expect(
+    controls.filter(
+      (event) =>
+        event.control?.stage === 'admitted' && event.control.version > acknowledged.version,
+    ),
+  ).toEqual([]);
+  const file = 'stop-monitoring-history.json';
+  const path = test.info().outputPath(file);
+  writeFileSync(path, text, { mode: 0o600 });
+  await test.info().attach('stop-monitoring-history', { path, contentType: 'application/json' });
+  return {
+    file,
+    sha256: sha256(text),
+    bytes: Buffer.byteLength(text),
+    window: report.monitoring.window,
+    actualSessionId: sessionId,
+    logicalRunId: acknowledged.id,
+    sampleCount: report.monitoring.samples.length,
+    diagnosticEventCount: report.diagnostics.events.length,
+    correlatedControlCount: controls.length,
+    processInstanceId: processId,
+    preference: report.monitoring.health.preference,
+    coverage: {
+      combined: report.coverage,
+      monitoring: report.monitoring.coverage,
+      diagnostics: report.diagnostics.coverage,
+    },
+    limitations:
+      'Window export may include other sessions; assertions bind the actual Stop session and logical run. Resource samples measure the API process/app volume, not guest CPU. Initial CPU baseline may be unavailable; coverage gaps remain disclosed.',
+  };
+}
+
 test(`approved packaged command remains honestly unknown after Stop with its late effect preserved (${process.env.AGENT_PLATFORM_E2E_PACKAGED_VM_RESOURCES_DIR ? 'signed real VM' : 'controlled helper fixture'})`, async () => {
   test.setTimeout(120_000);
   const sourceProvenance = captureStopSourceProvenance();
@@ -351,11 +465,13 @@ test(`approved packaged command remains honestly unknown after Stop with its lat
   let acknowledgementMs: number | undefined;
   let runnerStatus: unknown;
   let servedRuntimeVerified = false;
+  let monitoringArtifact: Awaited<ReturnType<typeof exportStopMonitoring>> | undefined;
   let durableDiagnosticArtifact: { file: string; sha256: string; bytes: number } | undefined;
   try {
     app = await launchVmFixture(fixture, {
       command: STOP_GUEST_COMMAND,
       providerURL: provider.baseURL,
+      monitoringHistoryPath: join(fixture.tempRoot, 'stop-monitoring-history.json'),
     });
     await configureJourneyModel(fixture);
     verifyStopServedRuntime(sourceProvenance);
@@ -363,6 +479,7 @@ test(`approved packaged command remains honestly unknown after Stop with its lat
     await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
     tracing = true;
     const page = await app.firstWindow();
+    const monitoringFromMs = await enableStopMonitoring(page, fixture);
     await openProject(page);
     if (fixture.realVmRuntimeDir) runnerStatus = startRealVmRunner(fixture);
     await expect(page.getByLabel('Project command status: Commands ready')).toBeVisible({
@@ -509,6 +626,19 @@ test(`approved packaged command remains honestly unknown after Stop with its lat
     );
     expect(approval).toMatchObject({ status: 'approved', resumedAtMs: expect.any(Number) });
     expect(provider.requests).toHaveLength(1);
+    monitoringArtifact = await exportStopMonitoring(
+      page,
+      fixture,
+      monitoringFromMs,
+      approval!.sessionId,
+      acknowledged!,
+    );
+    expect(provider.requests).toHaveLength(1);
+    expect(readFileSync(startedFile, 'utf8')).toBe('started\n');
+    expect(readFileSync(lateFile, 'utf8')).toBe('late\n');
+    expect((await readVmRunControl(fixture, approval!.sessionId, acknowledged!.id)).state).toBe(
+      'outcome_unknown',
+    );
     if (fixture.realVmRuntimeDir)
       writeVmEvidence(fixture, 'stop-outcome-unknown-late-effect', runnerStatus);
   } finally {
@@ -552,6 +682,7 @@ test(`approved packaged command remains honestly unknown after Stop with its lat
             sourceProvenance,
             servedRuntimeVerified,
             durableDiagnosticArtifact: durableDiagnosticArtifact ?? null,
+            monitoringArtifact: monitoringArtifact ?? null,
             acknowledgementMs,
             acknowledged,
             finalRecord,
@@ -602,6 +733,15 @@ function captureStopSourceProvenance() {
   const knownPaths = [
     'apps/desktop/e2e/packaged-vm-command.e2e.ts',
     'apps/desktop/dist/main/main.js',
+    'apps/desktop/src/main/monitoringExport.ts',
+    'apps/desktop/dist/main/monitoringExport.js',
+    'apps/desktop/src/main/monitoringTransport.ts',
+    'apps/desktop/dist/main/monitoringTransport.js',
+    'apps/api/src/infrastructure/diagnostics/monitoringRuntime.ts',
+    'apps/api/dist/infrastructure/diagnostics/monitoringRuntime.js',
+    'packages/contracts/src/monitoring.ts',
+    'packages/contracts/dist/monitoring.js',
+    'apps/web/components/settings/local-monitoring.tsx',
     'apps/api/src/application/runControl/service.ts',
     'apps/api/dist/application/runControl/service.js',
     'apps/api/src/infrastructure/http/v1/chatRouter.ts',
@@ -631,7 +771,7 @@ function captureStopSourceProvenance() {
     readFileSync(join(repoRoot, nextRoot, 'app-build-manifest.json'), 'utf8'),
   ) as { pages?: Record<string, unknown> };
   // Hook code is bundled: bind the actual served page/layout JS chunks rather than inventing one source-file counterpart.
-  for (const page of ['/layout', '/page']) {
+  for (const page of ['/layout', '/page', '/settings/workspace/page']) {
     const entries = manifest.pages?.[page];
     if (!Array.isArray(entries) || entries.length > 128)
       throw new Error('Missing or unbounded renderer provenance manifest');
@@ -1650,6 +1790,7 @@ async function launchVmFixture(
     command?: string;
     providerURL?: string;
     workspaceRoot?: string;
+    monitoringHistoryPath?: string;
   } = {},
 ): Promise<ElectronApplication> {
   const app = await electron.launch({
@@ -1664,6 +1805,13 @@ async function launchVmFixture(
         join(fixture.tempRoot, 'waiting-diagnostics.json'),
         join(fixture.tempRoot, 'finished-diagnostics.json'),
       ]),
+      ...(options.monitoringHistoryPath
+        ? {
+            AGENT_PLATFORM_DESKTOP_TEST_SAVE_MONITORING_PATHS: JSON.stringify([
+              options.monitoringHistoryPath,
+            ]),
+          }
+        : {}),
       WORKSPACE_ROOT: options.workspaceRoot ?? join(fixture.tempRoot, 'workspace'),
       AGENT_OPENAI_API_KEY: 'sk-test-key',
       AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',

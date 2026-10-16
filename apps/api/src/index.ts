@@ -1,13 +1,16 @@
 import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import {
   createDiagnosticStore,
+  createMonitoringStore,
   closeDatabase,
   openDatabase,
   recoverGitDeliveryOperations,
   runSeed,
 } from '@agent-platform/db';
 import { consumeDiagnosticAccess } from './infrastructure/diagnostics/localAccess.js';
+import { createMonitoringRuntime } from './infrastructure/diagnostics/monitoringRuntime.js';
 
 import type { HarnessStateType, ToolCallIntent } from '@agent-platform/harness';
 
@@ -32,10 +35,12 @@ if (sqlitePath) {
 
 const diagnosticsRequested = Boolean(process.env.DIAGNOSTICS_LOCAL_CAPABILITY);
 const diagnosticAccess = consumeDiagnosticAccess(process.env);
+const diagnosticProcessInstanceId = randomUUID();
 const diagnosticStore =
   sqlitePath && diagnosticAccess
     ? createDiagnosticStore({
         path: join(dirname(sqlitePath), 'diagnostics.sqlite'),
+        processInstanceId: diagnosticProcessInstanceId,
         retentionDays:
           process.env.DIAGNOSTICS_RETENTION_DAYS === undefined
             ? undefined
@@ -48,6 +53,25 @@ const diagnosticStore =
     : undefined;
 // Register observers synchronously; diagnostic readiness must not delay server.listen.
 if (diagnosticStore) observeDiagnosticReadiness(diagnosticStore);
+const monitoringStore =
+  sqlitePath && diagnosticAccess
+    ? createMonitoringStore({
+        path: join(dirname(sqlitePath), 'monitoring.sqlite'),
+        processInstanceId: diagnosticProcessInstanceId,
+      })
+    : undefined;
+const monitoringRuntime =
+  monitoringStore && sqlitePath
+    ? createMonitoringRuntime({
+        store: monitoringStore,
+        appDataPath: dirname(sqlitePath),
+        appVersion: process.env.DIAGNOSTICS_APP_VERSION,
+      })
+    : undefined;
+if (monitoringRuntime)
+  void monitoringRuntime.start().catch(() => {
+    log.warn('monitoring.degraded', { code: 'storage_unavailable' });
+  });
 
 function observeDiagnosticReadiness(store: ReturnType<typeof createDiagnosticStore>): void {
   void store.ready
@@ -68,6 +92,11 @@ const app = createApp({
           store: diagnosticStore,
           access: diagnosticAccess,
           appVersion: process.env.DIAGNOSTICS_APP_VERSION,
+          ...(monitoringStore && monitoringRuntime
+            ? {
+                monitoring: { store: monitoringStore, runtime: monitoringRuntime },
+              }
+            : {}),
         },
       }
     : {}),
@@ -89,10 +118,16 @@ server.listen(port, host, () => {
   scheduler?.start();
 });
 
+let shuttingDown = false;
 function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
   scheduler?.stop();
+  monitoringRuntime?.stop();
+  // Observers close independently of long-lived HTTP streams/server.close's drain callback.
+  const observerCleanup = Promise.allSettled([diagnosticStore?.close(), monitoringStore?.close()]);
   server.close(async () => {
-    await diagnosticStore?.close().catch(() => undefined);
+    await observerCleanup;
     if (dbHandle) {
       closeDatabase(dbHandle.sqlite);
       log.info('db.closed');

@@ -1,14 +1,15 @@
 # Durable local monitoring for later agent review
 
-**Beads:** `agent-platform-local-diagnostics-monitoring`, P1 OPEN; implementation authorized after Stop, still dependency-blocked.
+**Beads:** `agent-platform-local-diagnostics-monitoring`, P1 IN_PROGRESS; owner-authorized implementation after verified Stop delivery.
 **Parent:** `agent-platform-llm-observability-export` (scope only).
 **Hard upstream:** acknowledged Stop `agent-platform-harness-r3.cancel`.
 **Hard downstream:** `agent-platform-local-mvp-stress-review`.
 [Plan](../planning/project-chat-stop-mvp.md); [M01–M06 verification](../testing/project-chat-stop-mvp.md).
 
-The working Stop implementation adds safe control/admission/settlement events to existing V1
-diagnostics. This does not implement the periodic resource sampler, retained recording preference,
-historical monitoring windows or M01–M06 below. Those remain unstarted and hard-dependent on actual Stop delivery; the
+The delivered Stop implementation adds safe control/admission/settlement events to existing V1
+diagnostics. The periodic resource sampler, retained recording preference and historical monitoring
+windows are now implemented in the working tree with local M01–M06 evidence after verified Stop
+feature delivery at `a5d17683`; see [monitoring results](../reviews/local-diagnostics-monitoring-results.md). The
 [Stop results](../reviews/project-chat-stop-results.md), including passed local browser/Electron/VM
 evidence, must not be used as monitoring sign-off or owner stress-test readiness.
 
@@ -21,7 +22,7 @@ workflow. Enable recording once with a retained local preference; use the same b
 headless clients. Do not make monitoring a renderer lifetime, console-only stream or optional manual
 stress script. Review from stored evidence must work after the app/API has restarted.
 
-Proposed capture: retain request/model/tool/approval/Stop metadata and admissions/settlements at
+Implemented capture, still pending final delivery qualification: retain request/model/tool/approval/Stop metadata and admissions/settlements at
 boundaries, plus numeric API process CPU deltas/RSS, event-loop p95/max, owned-run queue/admitted counts
 and free app-volume disk every 30 seconds while enabled. Record metric source, units, interval,
 process/version and safe generated IDs; monotonic durations and UTC window timestamps serve different
@@ -67,4 +68,5 @@ records alone. Failed coverage preflight blocks owner stress testing. Source/res
 quality/hosted security/tests, full mirrors/readbacks, guarded feature integration, Beads readback and
 sync apply; protected staging has its own actual scan/VM/review/authority gates. Estimate 1–2 days,
 then revisit if the minimal capture grows into a dashboard or tracing system. Implementation is
-authorized but has not started; the Stop delivery dependency and declared gates remain. Existing benchmark/readiness repairs stay closed; V2/V3 are separately gated.
+authorized and in progress; Stop is CLOSED after owner-authorized PR334 feature merge/tree verification.
+The monitoring task retains its own M01–M06 and delivery gates. Existing benchmark/readiness repairs stay closed; V2/V3 are separately gated.

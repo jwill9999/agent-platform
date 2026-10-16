@@ -3,6 +3,9 @@ import { randomUUID } from 'node:crypto';
 import {
   DiagnosticEventSchema,
   DiagnosticScopeSchema,
+  DiagnosticWindowSchema,
+  type DiagnosticWindow,
+  type DiagnosticWindowPage,
   type DiagnosticEvent,
   type DiagnosticStore,
   type DiagnosticHealth,
@@ -29,7 +32,12 @@ export class DiagnosticStoreError extends Error {
   }
 }
 
-export type DiagnosticStoreOptions = { path: string; retentionDays?: number; maxEvents?: number };
+export type DiagnosticStoreOptions = {
+  path: string;
+  retentionDays?: number;
+  maxEvents?: number;
+  processInstanceId?: string;
+};
 type Stats = Pick<
   DiagnosticHealth,
   | 'pruned'
@@ -59,7 +67,7 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
     pruned: 0,
     acknowledgedSequence: 0,
     lastAcknowledgedAtMs: null,
-    processInstanceId: randomUUID(),
+    processInstanceId: options.processInstanceId ?? randomUUID(),
     previousShutdownUnclean: false,
   };
   const queue: DiagnosticEvent[] = [];
@@ -117,7 +125,10 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         calls.delete(id);
-        const reason = type === 'query' || type === 'list' ? 'read_timeout' : 'storage_unavailable';
+        const reason =
+          type === 'query' || type === 'queryWindow' || type === 'list'
+            ? 'read_timeout'
+            : 'storage_unavailable';
         reject(new Error(reason));
         disable(reason);
         void worker?.terminate();
@@ -189,6 +200,8 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
   const maxEvents = options.maxEvents ?? 10000;
   if (
     !options.path ||
+    (options.processInstanceId !== undefined &&
+      !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(options.processInstanceId)) ||
     !Number.isInteger(retentionDays) ||
     retentionDays < 1 ||
     retentionDays > 90 ||
@@ -296,6 +309,20 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
         ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}),
         health: { ...health },
       };
+    },
+    async queryWindow(window: DiagnosticWindow, input = {}): Promise<DiagnosticWindowPage> {
+      const checked = DiagnosticWindowSchema.parse(window);
+      await ready;
+      let page: Omit<DiagnosticWindowPage, 'health'> & { stats: Stats };
+      try {
+        page = (await rpc('queryWindow', { window: checked, ...input })) as typeof page;
+      } catch (error) {
+        throw new DiagnosticStoreError(error instanceof Error ? error.message : 'unavailable');
+      }
+      update(page.stats);
+      const { stats, ...result } = page;
+      void stats; // Worker accounting is projected into health above, never exported separately.
+      return { ...result, health: { ...health } };
     },
     async listRecent(input = {}): Promise<DiagnosticStoredEvent[]> {
       await ready;

@@ -196,6 +196,36 @@ export const DiagnosticReportSchema = z
   .strict();
 export type DiagnosticReport = z.infer<typeof DiagnosticReportSchema>;
 
+export const DiagnosticWindowSchema = z
+  .object({ fromMs: count, toMs: count, sessionId: id.optional() })
+  .strict()
+  .refine(
+    (window) => window.toMs > window.fromMs && window.toMs - window.fromMs <= 90 * 86400000,
+    'Window must be positive and at most 90 days.',
+  );
+export type DiagnosticWindow = z.infer<typeof DiagnosticWindowSchema>;
+export const DiagnosticWindowPageSchema = z
+  .object({
+    window: DiagnosticWindowSchema,
+    events: z.array(DiagnosticStoredEventSchema).max(1000),
+    snapshotSequence: count,
+    earliestSequence: count,
+    nextCursor: z.string().min(1).max(2048).optional(),
+    completedCursor: z.string().min(1).max(2048).optional(),
+    truncated: z.boolean(),
+    health: DiagnosticHealthSchema,
+    coverage: z
+      .object({
+        oldestObservedAtMs: count.nullable(),
+        newestObservedAtMs: count.nullable(),
+        historyMayBeMissing: z.boolean(),
+        gaps: count,
+      })
+      .strict(),
+  })
+  .strict();
+export type DiagnosticWindowPage = z.infer<typeof DiagnosticWindowPageSchema>;
+
 /**
  * Implementations are observational and must never participate in execution admission.
  * Idempotence/conflict detection covers retained events only. After pruning, an event ID
@@ -209,6 +239,10 @@ export interface DiagnosticStore {
     scope: DiagnosticScope,
     options?: { cursor?: string; limit?: number },
   ): Promise<DiagnosticPage>;
+  queryWindow(
+    window: DiagnosticWindow,
+    options?: { cursor?: string; limit?: number },
+  ): Promise<DiagnosticWindowPage>;
   listRecent(options?: { limit?: number }): Promise<DiagnosticStoredEvent[]>;
   prune(): Promise<void>;
   health(): DiagnosticHealth;
