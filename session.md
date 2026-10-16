@@ -1,10 +1,23 @@
 ## Shared skills cleanup — 16 October 2026
 
 Owner requested home-only reusable skills and removal of automatic Notion documentation publishing.
-The five shared skills remain under `~/.codex/skills`; repository copies and generated publication
-files are removed. PR333 now carries only the repository publishing-policy cleanup, pending review
-and checks. Beads: `agent-platform-ui-evaluation-skill`. No runtime or paused orchestration changes.
-Existing Notion pages are retained; no further mirroring is requested.
+PR333 completed all ten executed feature checks and its review, with zero unresolved threads, and
+merged into `feature/ui-evaluation` at `e65f5de2fff2657d69623a9e0a1c352934edeff8` on 16 October.
+Protected staging PR336 is open for its own checks/review; this is not staging delivery.
+
+The five shared skills remain under `~/.codex/skills`; the home and repository documentation
+publishers are removed. Current read-only verification found no `documentation` or
+`agent-platform-documentation` skill installed in Codex home or its discovery directory. Portable
+skills defer to the current project policy and do not impose a Notion destination. Task approval,
+tool access, older plans and home skills cannot authorize external copies without an explicit owner
+request covering the destination and documents. The repository documentation guide, shared
+instructions and older autonomy plans/task instructions now state that boundary consistently.
+
+Beads: `agent-platform-ui-evaluation-skill`, still in progress through staging integration. PR336
+review repairs are on `task/ui-evaluation-review-fixes`; actual source integration and fresh hosted
+checks remain required. No runtime, global configuration, main or paused orchestration changes.
+Existing Notion pages and notes are retained; no external mirroring or generated publication/readback
+files are requested or created. Historical session content below remains unchanged.
 
 ---
 

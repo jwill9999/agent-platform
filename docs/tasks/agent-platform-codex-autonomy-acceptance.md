@@ -26,8 +26,10 @@ and denied-effect coverage and inspect required CI. Actual outcomes remain in th
 ## Definition of done and sign-off
 
 Requirements in plan and Beads acceptance match; upstream closed; bounded changes independently
-reviewed, appropriate local gates and preservation checks pass, full changed-document mirrors read
-back, scoped branch pushed. Required executed current-head CI passes and owner gets concrete code-review material. This segment tip remains open pending owner acceptance and merge; no merge is authorized.
+reviewed, appropriate local gates and preservation checks pass, repository documentation is
+validated, scoped branch pushed. External publication and readback are required only when the owner
+explicitly requests the destination and documents; prior Notion requirements are historical.
+Required executed current-head CI passes and owner gets concrete code-review material. This segment tip remains open pending owner acceptance and merge; no merge is authorized.
 Record exact head, findings/dispositions, checks and gaps in [results](../reviews/codex-developer-autonomy.md).
 No pilot/paid gateway/automation/global edits. Completion is not claimed in advance.
 

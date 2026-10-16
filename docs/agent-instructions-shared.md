@@ -259,8 +259,10 @@ See `decisions.md` for the full locked decision table and ADRs in [docs/adr/](ad
 
 For documentation creation or updates, follow the
 [documentation skill](../.agents/skills/documentation/SKILL.md). Repository documents are canonical;
-external publication is performed only when explicitly requested. Routine changes do not require
-Notion mirrors or generated publication payload/readback files. Create new reusable skills under
+external publication requires an explicit owner request covering the destination and documents.
+Task approval, publication-tool access, home-installed skills and older plans do not grant that
+permission. Routine changes do not require Notion mirrors or generated publication payload/readback
+files; older mandatory-publication wording is historical and superseded for new work. Create new reusable skills under
 `$CODEX_HOME/skills` (default `~/.codex/skills`), not in this repository, unless the owner requests
 another destination. Existing project-specific skills remain in place.
 
