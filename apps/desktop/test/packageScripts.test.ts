@@ -63,6 +63,16 @@ describe('desktop package scripts', () => {
     expect(preloadBuilder).toContain(
       'savePartial: (failure) => ipcRenderer.invoke(savePartialDiagnosticReportIpcChannel, failure)',
     );
+    for (const [method, channel, parameter] of [
+      ['getMonitoringStatus', 'getMonitoringStatusIpcChannel', ''],
+      ['setMonitoringPreference', 'setMonitoringPreferenceIpcChannel', 'input'],
+      ['saveMonitoringReport', 'saveMonitoringReportIpcChannel', 'input'],
+    ]) {
+      expect(preloadBuilder).toContain(`'${channel}'`);
+      expect(preloadBuilder).toContain(
+        `${method}: (${parameter}) => ipcRenderer.invoke(${channel}${parameter ? ', input' : ''})`,
+      );
+    }
     expect(preloadBuilder).toContain('saveWorkspaceResourceIpcChannel');
     expect(preloadBuilder).toContain(
       'saveResourceAs: (request) => ipcRenderer.invoke(saveWorkspaceResourceIpcChannel, request)',

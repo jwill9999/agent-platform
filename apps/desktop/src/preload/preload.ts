@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import {
   desktopBridgeApiName,
+  getMonitoringStatusIpcChannel,
+  setMonitoringPreferenceIpcChannel,
+  saveMonitoringReportIpcChannel,
   saveDiagnosticReportIpcChannel,
   savePartialDiagnosticReportIpcChannel,
   createProjectFolderIpcChannel,
@@ -36,6 +39,18 @@ import {
 
 const desktopApi = {
   diagnostics: {
+    getMonitoringStatus: () =>
+      ipcRenderer.invoke(getMonitoringStatusIpcChannel) as ReturnType<
+        AgentPlatformDesktopApi['diagnostics']['getMonitoringStatus']
+      >,
+    setMonitoringPreference: (input) =>
+      ipcRenderer.invoke(setMonitoringPreferenceIpcChannel, input) as ReturnType<
+        AgentPlatformDesktopApi['diagnostics']['setMonitoringPreference']
+      >,
+    saveMonitoringReport: (input) =>
+      ipcRenderer.invoke(saveMonitoringReportIpcChannel, input) as ReturnType<
+        AgentPlatformDesktopApi['diagnostics']['saveMonitoringReport']
+      >,
     saveReport: (scope) =>
       ipcRenderer.invoke(saveDiagnosticReportIpcChannel, scope) as ReturnType<
         AgentPlatformDesktopApi['diagnostics']['saveReport']

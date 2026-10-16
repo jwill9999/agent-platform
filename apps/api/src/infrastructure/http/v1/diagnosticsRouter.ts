@@ -2,6 +2,7 @@ import {
   DiagnosticScopeSchema,
   DiagnosticReportSchema,
   type DiagnosticStore,
+  type MonitoringStore,
 } from '@agent-platform/contracts';
 import { getSession, DiagnosticStoreError, type DrizzleDb } from '@agent-platform/db';
 import { buildDiagnosticReport } from '@agent-platform/plugin-observability';
@@ -10,6 +11,8 @@ import { z } from 'zod';
 import { hasDiagnosticAccess, type DiagnosticAccess } from '../../diagnostics/localAccess.js';
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
+import type { MonitoringRuntime } from '../../diagnostics/monitoringRuntime.js';
+import { createMonitoringRouter } from './monitoringRouter.js';
 
 const reportInput = z
   .object({ scope: DiagnosticScopeSchema, cursor: z.string().max(2048).optional() })
@@ -21,6 +24,7 @@ export function createDiagnosticsRouter(
   store: DiagnosticStore,
   access: DiagnosticAccess,
   configuredAppVersion = '0.0.0',
+  monitoring?: { store: MonitoringStore; runtime: MonitoringRuntime },
 ): Router {
   const router = Router();
   const version = DiagnosticReportSchema.shape.appVersion.safeParse(configuredAppVersion);
@@ -34,6 +38,7 @@ export function createDiagnosticsRouter(
     }
     next();
   });
+  if (monitoring) router.use('/monitoring', createMonitoringRouter(store, monitoring));
   router.post(
     '/report',
     asyncHandler(async (req, res) => {

@@ -1,6 +1,6 @@
 # Shared harness Stop — bounded local MVP plan
 
-**Status:** Owner-approved for Stop, then durable monitoring implementation; qualification in progress.
+**Status:** Stop delivered through PR334 to its feature; owner-approved durable monitoring implementation is in progress. Protected staging and owner stress remain separate.
 **Date:** 16 October 2026.
 **Product baseline:** staging `cf5f04524c25c29635b0d84bda4e76282f28ddcb`, tree
 `e4212ec7b8362cbd7fc25120d6dd856df8ad9691`. Planning starts from documentation head
@@ -19,8 +19,10 @@ permissions, acknowledgement and state contract. No control authority lives sole
 The owner requested current-source planning and independent critique before implementation, then
 added an interface-neutral API audit and durable recording for later agent reviews. On 16 October
 the owner approved implementation of Stop, then durable monitoring, using Beads, independent critique
-and the agreed tests. That authorization covers routine implementation and repairs. Merge, release,
-paid calls, new voice/CLI clients and automatic remediation remain separately reserved.
+and the agreed tests. That authorization covers routine implementation and repairs. The owner later
+explicitly authorized PR334 task-to-feature merge after checks/comments cleared; it completed at
+`a5d17683`. Other actual merges, release, paid calls, new voice/CLI clients and automatic remediation
+remain separately reserved.
 Actual progress and qualification gaps are in the [implementation record](../reviews/project-chat-stop-results.md).
 
 Stop is the first delivery. A separate small monitoring delivery must record normal use durably
@@ -131,13 +133,13 @@ legacy Git/non-Git data, row-limit pressure, migration rollback/failure and cras
 
 ## Task, document and branch manifest
 
-| Work / title                | Beads and canonical spec                                                                               | Order / branch mapping                                                                                                                                                                                                                                                                                              |
-| --------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Plan shared Stop            | [agent-platform-project-chat-stop-plan](../tasks/agent-platform-project-chat-stop-plan.md)             | Reviewed planning ancestry retained from `task/project-chat-stop-plan` and the earlier documentation segment. Current Stop implementation is described below; a planning PR is not Stop delivery.                                                                                                                   |
-| Audit client independence   | [agent-platform-harness-interface-audit](../tasks/agent-platform-harness-interface-audit.md)           | Source audit in this planning branch; [findings](../reviews/harness-interface-audit.md). No broad repair allocation.                                                                                                                                                                                                |
-| Implement acknowledged Stop | [agent-platform-harness-r3.cancel](../tasks/agent-platform-harness-r3.cancel.md)                       | Owner-approved and IN_PROGRESS: `task/project-chat-stop` into `feature/project-chat-stop`, from staging cf5f0452 while retaining reviewed planning ancestry. Reviewed source hashes and the actual pushed revision/PR state are recorded in Beads and publication metadata; local qualification is not integration. |
-| Durable local monitoring    | [agent-platform-local-diagnostics-monitoring](../tasks/agent-platform-local-diagnostics-monitoring.md) | Explicitly owner-approved after Stop, still OPEN/dependency-blocked and unstarted. Proposed `feature/local-diagnostics-monitoring` then `task/local-diagnostics-monitoring`; separate acceptance and source review required.                                                                                        |
-| Owner stress/review         | [agent-platform-local-mvp-stress-review](../tasks/agent-platform-local-mvp-stress-review.md)           | Hard-blocked by Stop and monitoring; run only on actual qualified integrated revision. No code feature branch required for evidence-only trial; any repair follows a scoped task.                                                                                                                                   |
+| Work / title                | Beads and canonical spec                                                                               | Order / branch mapping                                                                                                                                                                                                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plan shared Stop            | [agent-platform-project-chat-stop-plan](../tasks/agent-platform-project-chat-stop-plan.md)             | Reviewed planning ancestry retained from `task/project-chat-stop-plan` and the earlier documentation segment. Current Stop implementation is described below; a planning PR is not Stop delivery.                                                                                                             |
+| Audit client independence   | [agent-platform-harness-interface-audit](../tasks/agent-platform-harness-interface-audit.md)           | Source audit in this planning branch; [findings](../reviews/harness-interface-audit.md). No broad repair allocation.                                                                                                                                                                                          |
+| Implement acknowledged Stop | [agent-platform-harness-r3.cancel](../tasks/agent-platform-harness-r3.cancel.md)                       | CLOSED after owner-authorized PR334 merge into `feature/project-chat-stop` at `a5d17683`; actual tree exactly equals independently reviewed `e1713628`. Staging remains separate. Original staging/planning ancestry and all prior evidence are retained.                                                     |
+| Durable local monitoring    | [agent-platform-local-diagnostics-monitoring](../tasks/agent-platform-local-diagnostics-monitoring.md) | Explicitly owner-approved after Stop; IN_PROGRESS after verified PR334 feature delivery and Stop closure. Current `feature/local-diagnostics-monitoring` carries the qualified Stop dependency; `task/local-diagnostics-monitoring` is active. Separate M01–M06 acceptance and source review remain required. |
+| Owner stress/review         | [agent-platform-local-mvp-stress-review](../tasks/agent-platform-local-mvp-stress-review.md)           | Hard-blocked by Stop and monitoring; run only on actual qualified integrated revision. No code feature branch required for evidence-only trial; any repair follows a scoped task.                                                                                                                             |
 
 Other artifacts: [verification](../testing/project-chat-stop-mvp.md), [independent critique](../reviews/project-chat-stop-plan-review.md),
 [ADR0005](../adr/0005-native-codex-development.md), [message flow](../architecture/message-flow.md),
@@ -147,10 +149,10 @@ working docs checkout `/Users/letuscode/.codex/worktrees/git-delivery-plan/agent
 Older [MVP reliability plan](mvp-reliability/plan.md) remains historical/broader; this contract refines
 only Stop and the explicit later monitoring/trial requirements, not the whole modernization program.
 
-Stop is IN_PROGRESS under the owner's 16 October implementation approval. Its completed V1
-upstream remains closed; only Stop's obsolete hard review-gate edge was removed. The global gate,
-parent R3/R2, reconciliation, dashboards and paused orchestration remain unchanged. Monitoring is
-OPEN and authorized after Stop; the owner trial remains blocked by both actual deliveries. No broad
+Stop is CLOSED after verified owner-authorized feature delivery. Its completed V1 upstream remains
+closed; only Stop's obsolete hard review-gate edge was removed. The global gate, parent R3/R2,
+reconciliation, dashboards and paused orchestration remain unchanged. Monitoring is IN_PROGRESS;
+the owner trial remains blocked by monitoring delivery and the actual recording preflight. No broad
 parent auto-closure or unrelated status change follows this bounded task.
 
 ## Verification and feasibility
@@ -168,19 +170,26 @@ unknown-data deletion or configuration changes. Lifecycle ownership/cardinality 
 in a separate linked IN_PROGRESS task, not a new hard Stop dependency. Recheck 20GiB before heavy runs;
 resource observations and successful restarts do not establish sole causes or permanent repair.
 
-Reviewed application 9044859d includes the bounded ready-batch scheduling repair. Four fresh terminal
-current-source proof inputs are mandatory: browser Current904 Docker browser16 passed Stop5/reply1/Git5/MCP5 with reviewed source/effect/artifact and recovered owned-cleanup evidence; no stress/load claim.; Electron Fresh current904 Electron67 passed first attempt in655.337seconds with no skipped/flaky/retried cases; Stop effects, diagnostics,503retry and Project restoration independently reviewed;20controlled-helper cases are included, signed realVM is separate.;
-actual signed VM Fresh current904 signed realmacOSVM Stop representative passed1/1 in48.556seconds;5.047msack, actual guest start/lateeffect and honest unknown, safe43-event report, selected49runtime bindings, signature and trace integrity independently reviewed.; full normal push/API Normal unchanged hooks passed cycles, six-package build/typecheck and 2206 tests, including full API525; exact atomic feature/task remote refs verified without bypass.. Earlier f9 browser 14/67/VM 1
-results are prior-source evidence only. The unchanged 900-request benchmark after compiled-DB repair
-retained 1540 healthy events per mode with zero drops/maxPending 56, relative p95 overhead18.114417 ms
-<=20 and enqueue p95 0.019042 ms<=2. Required events, buffers, durability and budgets were not relaxed.
-The 23 focused controls and retained22/1 deadline-order assertion are described in actual results.
+### Current delivery and retained historical evidence
 
-This plan does not mark acceptance delivered. Exact-head feature pipelines/reviews/tree verification,
-seven full immutable mirrors/readbacks, final critique and Beads sync remain feature-delivery gates.
-Protected staging has its separate actual full scans/VM/protections/comments and reserved merge
-permission. Monitoring/owner stress readiness remains blocked by both actual deliveries. The 20
-helper cases belong to Electron 67 and do not create a 20-case actual VM requirement.
+PR334 source `e171362896ec4ecc8e47ad480a90b771d3d1be35` passed all nine executed exact-head
+feature checks and independent source/results review, with zero unresolved comments. Hosted Electron
+67, browser31 plus one existing optional skip, Git5 and Stop5 passed. The final900/990 benchmark passed
+unchanged20ms relative/2ms enqueue limits with healthy zero loss. Full seven documents plus20 historical
+session parts were published/read back. Owner-authorized guarded merge produced feature commit
+`a5d17683961236f9cf089030be51b813845d85da`, whose tree exactly equals reviewed source. Canonical Stop
+is CLOSED/read back/synced. Local signed real-VM evidence and exact source/test provenance remain
+in the [Stop results](../reviews/project-chat-stop-results.md).
+
+Earlier904,4f4, failed local and hosted benchmark, launcher and65/67 Electron attempts remain dated
+historical evidence in that result record. Current qualification does not establish a cause for the
+original diagnostic503 or previous performance failures. The signed realVM is distinct from controlled
+helper Electron cases, and development signing does not qualify release packaging.
+
+Monitoring now has its own [result record](../reviews/local-diagnostics-monitoring-results.md) and
+M01–M06 gates. Protected staging still requires its actual full scans, VM, protections/comments and
+explicit merge authority. Neither Stop feature delivery nor source review establishes monitoring,
+owner stress or production readiness.
 
 ## Effort, stopping point and delivery
 

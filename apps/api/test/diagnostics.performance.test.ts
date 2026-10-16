@@ -1,11 +1,13 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { once } from 'node:events';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import type { DiagnosticStore } from '@agent-platform/contracts';
+import type { DiagnosticStore, MonitoringHealth } from '@agent-platform/contracts';
 import {
   closeDatabase,
   createDiagnosticStore,
+  createMonitoringStore,
   DEFAULT_AGENT_ID,
   openDatabase,
   runSeed,
@@ -19,6 +21,7 @@ const Database = createRequire(new URL('../../../packages/db/package.json', impo
 import request from 'supertest';
 import { expect, it, vi } from 'vitest';
 import { createApp } from '../src/infrastructure/http/createApp.js';
+import { createMonitoringRuntime } from '../src/infrastructure/diagnostics/monitoringRuntime.js';
 
 const percentile95 = (values: number[]) =>
   [...values].sort((a, b) => a - b)[Math.ceil(values.length * 0.95) - 1] ?? 0;
@@ -63,6 +66,14 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
       residentBytesBefore: number;
       residentBytesAfter: number;
       observedGcDurationsMs: number[];
+      resourceMonitoring: {
+        enabledAtMs: number | null;
+        measurementStartedAtMs: number;
+        samplingStoppedAtMs: number | null;
+        health: MonitoringHealth | null;
+        retainedSamples: number;
+        intervals: Array<{ observedAtMs: number; intervalMs: number }>;
+      };
     }
   > = {};
   let captureActiveSample: (() => void) | undefined;
@@ -81,7 +92,7 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
       provider: 'deterministic fixture',
       logSink: 'non-retaining no-op; production serialization still runs',
       observationScope:
-        'Warm-up plus measured requests; process CPU includes worker threads. GC records are asynchronously observed and may be incomplete. Observations never adjust durations or pass criteria.',
+        'Warm-up plus measured requests; process CPU includes worker threads. Enabled modes include the real companion worker, initial resource probe and observer. Short phases may contain no periodic 30-second tick; this is not a comparative periodic-tick overhead or stress qualification. GC records are asynchronously observed and may be incomplete. Observations never adjust durations or pass criteria.',
     };
     const json = JSON.stringify(evidence, null, 2);
     // Always retain numerical evidence, including partial measurements on assertion failure.
@@ -131,6 +142,14 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
           residentBytesBefore: 0,
           residentBytesAfter: 0,
           observedGcDurationsMs: [] as number[],
+          resourceMonitoring: {
+            enabledAtMs: null as number | null,
+            measurementStartedAtMs: 0,
+            samplingStoppedAtMs: null as number | null,
+            health: null as MonitoringHealth | null,
+            retainedSamples: 0,
+            intervals: [] as Array<{ observedAtMs: number; intervalMs: number }>,
+          },
         });
         const initialLogCalls = logCalls;
         captureActiveSample = () => {
@@ -140,21 +159,43 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
         runSeed(db);
         // Fixture-only setting: same existing limiter in all modes, enough for warm-up +100 requests.
         updateSettings(db, { rateLimits: { max: 1000, windowMs: 60000 } });
+        const processInstanceId = randomUUID();
         const store: DiagnosticStore | undefined =
           mode === 'disabled'
             ? undefined
-            : createDiagnosticStore({ path: join(directory, `${key}-diagnostics.sqlite`) });
-        await store?.ready;
-        if (store) expect(store.health().state).toBe('ready');
+            : createDiagnosticStore({
+                path: join(directory, `${key}-diagnostics.sqlite`),
+                processInstanceId,
+              });
+        const resourceStore =
+          mode === 'disabled'
+            ? undefined
+            : createMonitoringStore({
+                path: join(directory, `${key}-monitoring.sqlite`),
+                processInstanceId,
+              });
+        const resourceRuntime = resourceStore
+          ? createMonitoringRuntime({ store: resourceStore, appDataPath: directory })
+          : undefined;
         let lock: ReturnType<typeof openDatabase>['sqlite'] | undefined;
         cleanups.push(async () => {
+          resourceRuntime?.stop();
           if (lock?.open) {
             lock.exec('ROLLBACK');
             lock.close();
           }
           await store?.close();
+          await resourceStore?.close();
           closeDatabase(sqlite);
         });
+        await resourceStore?.ready;
+        if (resourceStore) {
+          await resourceStore.setPreference({ samplingEnabled: true, retentionDays: 7 });
+          expect(resourceStore.health().preference?.samplingEnabled).toBe(true);
+          sample.resourceMonitoring.enabledAtMs = Date.now();
+        }
+        await store?.ready;
+        if (store) expect(store.health().state).toBe('ready');
         if (mode === 'locked') {
           lock = new Database(join(directory, `${key}-diagnostics.sqlite`));
           lock.exec('BEGIN IMMEDIATE');
@@ -179,6 +220,9 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
                 diagnostics: {
                   store,
                   access: { capability: 'a'.repeat(64), host: '127.0.0.1:3000' },
+                  ...(resourceStore && resourceRuntime
+                    ? { monitoring: { store: resourceStore, runtime: resourceRuntime } }
+                    : {}),
                 },
               }
             : {}),
@@ -217,6 +261,7 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
         cleanups.push(async () => gc.disconnect());
         const initialCpu = process.cpuUsage();
         const windowStarted = performance.now();
+        sample.resourceMonitoring.measurementStartedAtMs = Date.now();
         sample.residentBytesBefore = process.memoryUsage().rss;
         captureActiveSample = () => {
           sample.observedGcDurationsMs.push(...gc.takeRecords().map((entry) => entry.duration));
@@ -237,6 +282,8 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
         cleanups.push(async () => {
           eventLoop.disable();
         });
+        // Preference is already durable; start the actual observer/initial probe inside this phase.
+        await resourceRuntime?.start();
         for (let index = 0; index < 110; index++) {
           // A fresh session keeps the measured workload identical instead of growing history.
           const session = await client
@@ -255,6 +302,8 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
           if (index >= 10) durations.push(elapsed);
         }
         eventLoop.disable();
+        resourceRuntime?.stop();
+        sample.resourceMonitoring.samplingStoppedAtMs = resourceRuntime ? Date.now() : null;
         sample.status = 'verifying';
         publishMeasurements();
         // Freeze the measurement window before durable-history verification and cleanup.
@@ -262,6 +311,28 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
         captureActiveSample = undefined;
         expect(Number(eventLoop.count)).toBeGreaterThan(0);
         expect(providerCalls).toBe(110);
+        if (resourceStore) {
+          await resourceStore.flush();
+          expect(resourceStore.health()).toMatchObject({
+            state: 'ready',
+            pending: 0,
+            dropped: 0,
+            conflicts: 0,
+          });
+          const resources = await resourceStore.queryWindow({
+            fromMs: sample.resourceMonitoring.enabledAtMs!,
+            toMs: Date.now() + 1,
+          });
+          expect(resources.samples.length).toBeGreaterThanOrEqual(1);
+          expect(resources.truncated).toBe(false);
+          expect(resourceStore.health().acknowledgedSequence).toBe(resources.samples.length);
+          sample.resourceMonitoring.health = resourceStore.health();
+          sample.resourceMonitoring.retainedSamples = resources.samples.length;
+          sample.resourceMonitoring.intervals = resources.samples.map(({ sample }) => ({
+            observedAtMs: sample.observedAtMs,
+            intervalMs: sample.intervalMs,
+          }));
+        }
         let retainedEvents = 0;
         if (store) {
           expect(enqueue.length).toBeGreaterThanOrEqual(110 * 4);

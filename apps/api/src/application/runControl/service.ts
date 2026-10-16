@@ -130,6 +130,7 @@ export class ControlledExecution implements RunExecutionControl {
     // The helper calls the action synchronously and converts only synchronous throws
     // to rejections; the original promise remains tracked through actual settlement.
     const result = invokeAction(action);
+    this.owner.trackAdmission();
     this.owner.observeCurrent(this, 'admitted', kind);
     return Promise.resolve(result).then(
       (value) => {
@@ -161,6 +162,9 @@ export class ControlledExecution implements RunExecutionControl {
       outcome,
       nowMs: Date.now(),
     });
+    // A transport callback can settle while its effect remains unknown. Those admitted
+    // effects remain unresolved, just as they do in the durable control ledger.
+    if (outcome !== 'unknown') this.owner.trackSettlement();
     this.owner.observe({
       record,
       stage: 'settled',
@@ -216,8 +220,23 @@ export class ControlledExecution implements RunExecutionControl {
 }
 
 export class RunControlService {
+  private unresolvedAdmissions = 0;
   private readonly executions = new Map<string, Set<ControlledExecution>>();
   private readonly latestExecutions = new Map<string, string>();
+  /** Process-owned counters only; unresolved effects from prior processes remain historical evidence. */
+  monitoringMetrics(): { activeRuns: number; admittedUnresolvedAttempts: number } {
+    let activeRuns = 0;
+    for (const owners of this.executions.values()) {
+      if ([...owners].some((owner) => !owner.ended)) activeRuns++;
+    }
+    return { activeRuns, admittedUnresolvedAttempts: this.unresolvedAdmissions };
+  }
+  trackAdmission(): void {
+    this.unresolvedAdmissions++;
+  }
+  trackSettlement(): void {
+    this.unresolvedAdmissions--;
+  }
   constructor(
     readonly db: DrizzleDb,
     private readonly observer: Observe = () => {},

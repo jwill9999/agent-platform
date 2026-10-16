@@ -1,6 +1,6 @@
 # Acknowledged Stop for shared harness runs
 
-**Beads:** `agent-platform-harness-r3.cancel`, P1 IN_PROGRESS; owner-approved implementation, not completed.
+**Beads:** `agent-platform-harness-r3.cancel`, P1 CLOSED after verified owner-authorized PR334 task-to-feature delivery.
 **Parent:** `agent-platform-harness-r3`, still deferred. **Plan:** [bounded Stop](../planning/project-chat-stop-mvp.md).
 
 ## Task requirements
@@ -31,7 +31,7 @@ New queued monitoring and owner stress tasks depend on this task; they do not bl
 ## Implementation and paths
 
 Implementation uses `feature/project-chat-stop` from qualified staging `cf5f0452`, with
-`task/project-chat-stop` retaining the reviewed planning ancestry. The feature is not merged. Work packages within this one task: main DB
+`task/project-chat-stop` retaining the reviewed planning ancestry. PR334 merged into that feature at `a5d17683961236f9cf089030be51b813845d85da`; its tree exactly equals reviewed `e1713628`. Work packages within this one task: main DB
 control/schema + contracts; shared control service/routes + dispatch/approval fencing; client state,
 safe diagnostics and connected acceptance. A two-day feasibility checkpoint precedes UI expansion.
 
@@ -82,19 +82,22 @@ headless/API, approval/retry/sensor fences, Project Chat and safe V1 diagnostic 
 Early dirty-tree test provenance remains in the results; final identity is the reviewed file-hash
 receipt plus immutable pushed source/PR metadata in Beads and publication receipts.
 
-Application 4f4ecaf5 passed all executed hosted feature checks and fresh browser 16. Reviewed local
+Historical local qualification checkpoint (application 4f4ecaf5): it passed all executed hosted feature checks and fresh browser 16. Reviewed local
 Electron coverage is 65 retained passes plus two focused passes,67 unique cases; the original65/67
 batch remains failed. Exact model-card assertions and passive export timing are test-only changes.
 The original diagnostic-export503 cause remains unknown, despite later and focused successful reads.
 The actual signed-helper VM Stop case passed once with 8.173ms acknowledgement, truthful unknown late
 work and 43 safe zero-loss events. Source/runtime, effects, privacy probes and artifacts were
-independently reviewed; source-bound receipts retain exact dirty-test provenance and must bind later
-pushed byte equality after commit and push. Earlier904/performance failures and their coverage limits remain historical evidence.
+independently reviewed. Exact dirty-test provenance is retained; the later pushed `e1713628` equality
+and normal-push proof completed in `pr334-e171-source-equality-and-normal-push.json` under
+`/Users/letuscode/.codex/project-chat-stop-implementation-20261016`. Earlier904/performance failures
+and their coverage limits remain historical evidence.
 
-Final current-head CI/reviews, full mirrors/readbacks, owner acceptance and actual guarded merges
-remain delivery requirements. No task close, monitoring start or stress-ready claim follows local
-proof alone. Keep PR283, broader parent/recovery scope and paused orchestration separate.
+Final current-head feature CI/reviews, full mirrors/readbacks and explicit owner acceptance passed;
+the guarded PR334 merge/tree verification completed and Beads is CLOSED/read back/synced. Protected
+staging remains separately unqualified/unmerged for this feature. Monitoring may now start under its
+existing authorization; no stress-ready claim follows Stop delivery alone. Keep PR283, broader parent/recovery scope and paused orchestration separate.
 See the [implementation record](../reviews/project-chat-stop-results.md). Older September managed
 contract wording is historical and refined by this native scoped plan under ADR0005; broader scopes,
-PR283 and paused orchestration stay untouched. Monitoring and owner stress testing remain blocked
-by their declared dependencies; no completion or stress-ready claim is made.
+PR283 and paused orchestration stay untouched. Monitoring is now IN_PROGRESS; owner stress testing remains blocked until its own declared
+monitoring delivery and recording preflight pass. No full baseline/stress-ready claim is made.

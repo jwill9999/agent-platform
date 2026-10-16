@@ -39,6 +39,9 @@ writeFileSync(
 const { contextBridge, ipcRenderer } = require("electron");
 
 const desktopBridgeApiName = ${JSON.stringify(desktopBridge.desktopBridgeApiName)};
+const getMonitoringStatusIpcChannel = ${JSON.stringify(desktopBridge.getMonitoringStatusIpcChannel)};
+const setMonitoringPreferenceIpcChannel = ${JSON.stringify(desktopBridge.setMonitoringPreferenceIpcChannel)};
+const saveMonitoringReportIpcChannel = ${JSON.stringify(desktopBridge.saveMonitoringReportIpcChannel)};
 const saveDiagnosticReportIpcChannel = ${JSON.stringify(desktopBridge.saveDiagnosticReportIpcChannel)};
 const savePartialDiagnosticReportIpcChannel = ${JSON.stringify(desktopBridge.savePartialDiagnosticReportIpcChannel)};
 const resetLocalDataIpcChannel = ${JSON.stringify(desktopBridge.resetLocalDataIpcChannel)};
@@ -94,6 +97,9 @@ const workspaceWebViewUpdatedIpcChannel = ${JSON.stringify(
 
 const desktopApi = {
   diagnostics: {
+    getMonitoringStatus: () => ipcRenderer.invoke(getMonitoringStatusIpcChannel),
+    setMonitoringPreference: (input) => ipcRenderer.invoke(setMonitoringPreferenceIpcChannel, input),
+    saveMonitoringReport: (input) => ipcRenderer.invoke(saveMonitoringReportIpcChannel, input),
     saveReport: (scope) => ipcRenderer.invoke(saveDiagnosticReportIpcChannel, scope),
     savePartial: (failure) => ipcRenderer.invoke(savePartialDiagnosticReportIpcChannel, failure),
   },
@@ -163,6 +169,18 @@ function loadDesktopBridgeContract() {
 
   return {
     desktopBridgeApiName: readExportedStringConst(sourceFile, 'desktopBridgeApiName'),
+    getMonitoringStatusIpcChannel: readExportedStringConst(
+      sourceFile,
+      'getMonitoringStatusIpcChannel',
+    ),
+    setMonitoringPreferenceIpcChannel: readExportedStringConst(
+      sourceFile,
+      'setMonitoringPreferenceIpcChannel',
+    ),
+    saveMonitoringReportIpcChannel: readExportedStringConst(
+      sourceFile,
+      'saveMonitoringReportIpcChannel',
+    ),
     saveDiagnosticReportIpcChannel: readExportedStringConst(
       sourceFile,
       'saveDiagnosticReportIpcChannel',
