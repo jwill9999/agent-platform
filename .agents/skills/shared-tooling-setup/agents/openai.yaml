@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Shared Tooling Setup'
+  short_description: 'Share skills and configure Codex MCP access'
+  default_prompt: 'Use $shared-tooling-setup to install or share the requested skills and configure only their approved MCP dependencies.'

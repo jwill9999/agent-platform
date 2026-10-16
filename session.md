@@ -17,8 +17,13 @@ references stay together when copied or linked through another coding interface'
 mechanism. The installed Codex copy is verified against this versioned source; Agent Platform
 acceptance and diagnostic rules remain in its project QA guidance.
 
-Skill Creator validation, direct Markdown on seven files, formatting, relative skill references and
-diff checks pass. All five installed/source files match. The ten routing cases passed desk review;
+Skill Creator validation, direct Markdown on eleven files, formatting, relative skill references and
+diff checks pass. Five skills are installed under `~/.codex/skills` with matching versioned source and discovery links
+under `~/.agents/skills`. The new `shared-tooling-setup` skill records portable skill installation and
+requested MCP setup/validation. No MCP configuration or existing connection is changed.
+The portable planning, implementation and critique skills use distinct names to avoid replacing the
+project-specific originals. Existing shared Beads and Playwright guidance remains untouched.
+All thirteen installed/source files match. The ten routing cases passed desk review;
 this is not independent agent forward-testing. Normal hooks, immutable-source mirrors/readbacks and
 task-to-feature PR delivery remain separate delivery steps at this source checkpoint. No product code or runtime tests changed. This side task does not change
 the other agent's active checkout, Stop/monitoring task status or paused orchestration work. No

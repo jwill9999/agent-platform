@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Portable Feature Planning'
+  short_description: 'Bound feature plans using real code and tests'
+  default_prompt: 'Use $portable-feature-planning to prepare a bounded, source-backed feature plan for this project.'
