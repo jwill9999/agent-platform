@@ -42,7 +42,7 @@ not independently reproduce those audits or publication readbacks.
 
 Portable delivery references, verified on 16 October 2026:
 
-- [PR330 merge record](https://github.com/jwill9999/agent-platform/pull/330) records the staging
+- [PR330 merge record](https://github.com/jwill9999/agent-platform/pull/330) records the 15 October staging
   squash at [cf5f0452](https://github.com/jwill9999/agent-platform/commit/cf5f04524c25c29635b0d84bda4e76282f28ddcb).
   [PR331](https://github.com/jwill9999/agent-platform/pull/331) records reviewed repair source
   [ce959c78](https://github.com/jwill9999/agent-platform/commit/ce959c78b78a3d4717347d6a5734d0c0fc6f6a37)
