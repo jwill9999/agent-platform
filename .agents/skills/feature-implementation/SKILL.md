@@ -27,7 +27,7 @@ Use [documentation](../documentation/SKILL.md) and
    Check independent backend state/effects for product journeys and disclose fixtures/limits.
    Apply the diagnostic review checkpoints below to changes that exercise Agent Platform runs.
    Fix actionable findings within authorized scope; re-review changed semantics as needed.
-6. Update/read back Beads, session and full documentation mirrors. Commit/push only scoped work,
+6. Update/read back Beads, session and required repository documentation. Commit/push only scoped work,
    open the appropriate segment-tip PR and inspect all latest exact-head hosted checks/review findings.
    Continue normal repairs through green required tests/pipelines without another routine grant.
 7. Return concrete tested revision/diff/checks/limitations for final owner acceptance. Passing CI or

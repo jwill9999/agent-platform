@@ -1,37 +1,10 @@
-## Side-task handoff: selective UI evaluation guidance — 16 October 2026
+## Shared skills cleanup — 16 October 2026
 
-**Task:** `agent-platform-ui-evaluation-skill`, IN_PROGRESS.
-
-**Branch:** `task/ui-evaluation` into `feature/ui-evaluation`, based on staging `cf5f0452`.
-
-**Scope:** Portable UI evaluation guidance, an explicitly requested user-level Codex installation,
-and a versioned repository copy authorized by the owner in a side discussion.
-
-The new UI evaluation skill selects layout, changed-control accessibility and frontend investigation
-modules only for relevant changes. Backend-only work retains API/diagnostic gates; full accessibility
-audits are separately scoped. The existing Playwright QA skill links conditionally to the router.
-See [task spec](docs/tasks/agent-platform-ui-evaluation-skill.md) for requirements and routing cases.
-
-The portable core has no Agent Platform, Beads or sibling-skill dependency. Its three relative
-references stay together when copied or linked through another coding interface's supported skill
-mechanism. The installed Codex copy is verified against this versioned source; Agent Platform
-acceptance and diagnostic rules remain in its project QA guidance.
-
-Skill Creator validation, direct Markdown on eleven files, formatting, relative skill references and
-diff checks pass. Five skills are installed under `~/.codex/skills` with matching versioned source and discovery links
-under `~/.agents/skills`. The new `shared-tooling-setup` skill records portable skill installation and
-requested MCP setup/validation. No MCP configuration or existing connection is changed.
-The portable planning, implementation and critique skills use distinct names to avoid replacing the
-project-specific originals. Existing shared Beads and Playwright guidance remains untouched.
-All thirteen installed/source files match. The ten routing cases passed desk review;
-this is not independent agent forward-testing. Normal hooks, immutable-source mirrors/readbacks and
-task-to-feature PR delivery remain separate delivery steps at this source checkpoint. No product code or runtime tests changed. This side task does not change
-the other agent's active checkout, Stop/monitoring task status or paused orchestration work. No
-subagents are used. No merge, stress readiness, unrelated global configuration or additional tool installation is
-authorized by these docs.
-
-The earlier handoff below is retained verbatim as historical context; it is not the active side-task
-instruction or permission to continue its work.
+Owner requested home-only reusable skills and removal of automatic Notion documentation publishing.
+The five shared skills remain under `~/.codex/skills`; repository copies and generated publication
+files are removed. PR333 now carries only the repository publishing-policy cleanup, pending review
+and checks. Beads: `agent-platform-ui-evaluation-skill`. No runtime or paused orchestration changes.
+Existing Notion pages are retained; no further mirroring is requested.
 
 ---
 

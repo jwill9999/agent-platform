@@ -1,4 +1,0 @@
-interface:
-  display_name: 'Selective UI Evaluation'
-  short_description: 'Select useful UI checks for the current change'
-  default_prompt: 'Use $ui-evaluation to select and review only the relevant evidence for this change.'

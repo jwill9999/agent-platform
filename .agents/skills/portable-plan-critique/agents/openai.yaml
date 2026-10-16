@@ -1,4 +1,0 @@
-interface:
-  display_name: 'Portable Plan Critique'
-  short_description: 'Review plans independently against source evidence'
-  default_prompt: 'Use $portable-plan-critique to independently assess this plan against its requirements, code and verification evidence.'
