@@ -126,6 +126,17 @@ Reuse current logs, audit records and test helpers before adding instrumentation
 
 Use isolated projects, databases, identities and ports. Keep artifacts scoped and sanitized: exclude credentials and unrelated user content, bound captured data, and keep generated reports outside lint/build input paths. Detailed backend assertions belong where they add confidence to the claimed journey; page-only rendering tests need not manufacture backend coverage. Missing telemetry is a finding to scope, not automatic authorization for a new observability platform.
 
+## Selective UI evaluation
+
+For a change to rendered appearance or interaction, or an explicit evaluation request, use
+[UI evaluation](../ui-evaluation/SKILL.md) to select relevant layout, changed-control accessibility
+or frontend investigation modules. Review their evidence after the focused journey and before
+completion. Backend-only and documentation changes do not trigger a visual audit. This selection
+supplements the acceptance gates here; it does not waive required browser/Electron/backend proof.
+The evaluation skill is portable. Agent Platform's Beads tracking, connected backend assertions and
+[implementation diagnostic checkpoints](../feature-implementation/SKILL.md#diagnostic-feedback-checkpoints)
+remain project-specific requirements here.
+
 ## CI And Artifacts
 
 - Configure traces on first retry or retain traces on failure.
