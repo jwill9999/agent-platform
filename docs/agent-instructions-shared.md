@@ -258,9 +258,11 @@ See `decisions.md` for the full locked decision table and ADRs in [docs/adr/](ad
 ## Reference Documentation
 
 For documentation creation or updates, follow the
-[documentation skill](../.agents/skills/documentation/SKILL.md) and its linked
-[Notion publishing skill](../.agents/skills/agent-platform-documentation/SKILL.md). Update and verify
-both repository and Notion copies within the authorized scope; explicitly report pending publication.
+[documentation skill](../.agents/skills/documentation/SKILL.md). Repository documents are canonical;
+external publication is performed only when explicitly requested. Routine changes do not require
+Notion mirrors or generated publication payload/readback files. Create new reusable skills under
+`$CODEX_HOME/skills` (default `~/.codex/skills`), not in this repository, unless the owner requests
+another destination. Existing project-specific skills remain in place.
 
 | Document                                                          | Contents                                                                                                     |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |

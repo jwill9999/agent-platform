@@ -32,11 +32,13 @@ See the [official OpenAI skill authoring guide](https://learn.chatgpt.com/docs/b
 
 ## Documentation workflow
 
-Use [documentation](documentation/SKILL.md) for repository locations and authoritative records, then
-[agent-platform-documentation](agent-platform-documentation/SKILL.md) for publishing the changed
-material to Notion. The latter is bundled here with its destination map, so it does not depend on a
-personal skill installation. Planning, critique and implementation already enter through the
-documentation workflow; read-only roles return publication instructions to an authorized publisher.
+Use [documentation](documentation/SKILL.md) for repository locations and authoritative records.
+External publication is performed only when explicitly requested. Routine changes do not require
+Notion mirrors or generated publication files.
+
+Keep the existing project-specific skills here. Create new reusable skills in the owner's Codex home
+skills directory (`$CODEX_HOME/skills`, default `~/.codex/skills`), not in this repository. Use supported
+discovery links for other coding interfaces when requested; do not create another source copy here.
 
 ## Native development default
 

@@ -25,7 +25,7 @@ reviewed work but does not imply absent tools. Delegate with clear ownership and
 
 Use Beads for task state and ordinary native Git/MCP/CLI paths for authorized delivery. Preserve
 repository branch chaining, meaningful security/regression checks, relevant connected product QA,
-full Notion documentation mirrors/readback, and exact-head CI evidence. Fix failures within scope,
+required repository documentation/readback, and exact-head CI evidence. Fix failures within scope,
 record limits, and return the tested diff for final owner acceptance. Merge/release authority is
 separate and must be actually granted; green CI alone grants none.
 

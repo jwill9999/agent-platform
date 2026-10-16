@@ -1,3 +1,13 @@
+## Shared skills cleanup — 16 October 2026
+
+Owner requested home-only reusable skills and removal of automatic Notion documentation publishing.
+The five shared skills remain under `~/.codex/skills`; repository copies and generated publication
+files are removed. PR333 now carries only the repository publishing-policy cleanup, pending review
+and checks. Beads: `agent-platform-ui-evaluation-skill`. No runtime or paused orchestration changes.
+Existing Notion pages are retained; no further mirroring is requested.
+
+---
+
 # Git delivery qualification handoff — 15 October 2026
 
 Live task state is authoritative in Beads `agent-platform-git-delivery-verification` and PR330. This checkpoint records the reviewed repair; later checks, merges and cleanup are recorded there. All older handoffs below are historical and do not override current owner authority or live delivery state.
