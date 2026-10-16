@@ -15,6 +15,7 @@ let current: Hook;
 let root: Root;
 let container: HTMLDivElement;
 let calls: Call[];
+let controlFetch: (url: string, init?: RequestInit) => Promise<Response>;
 let renderSnapshots: Array<{
   session: string | null;
   messages: string[];
@@ -107,16 +108,19 @@ async function send(message = 'Hello') {
 
 beforeEach(() => {
   calls = [];
+  controlFetch = async () => envelope(null);
   renderSnapshots = [];
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: RequestInit) =>
-      url.includes('/approval-requests/git-delivery?')
-        ? Promise.resolve(envelope({ approvals: [], recoveryReceipts: [] }))
-        : new Promise<Response>((resolve, reject) => {
-            calls.push({ url, init, resolve, reject });
-          }),
+      url.includes('/active-run') || /\/runs\//.test(url)
+        ? controlFetch(url, init)
+        : url.includes('/approval-requests/git-delivery?')
+          ? Promise.resolve(envelope({ approvals: [], recoveryReceipts: [] }))
+          : new Promise<Response>((resolve, reject) => {
+              calls.push({ url, init, resolve, reject });
+            }),
     ),
   );
   container = document.createElement('div');
@@ -450,6 +454,133 @@ describe('mounted chat session lifecycle', () => {
     },
   );
 
+  it.each(['COMMAND_OUTCOME_UNKNOWN', 'HTTP_OUTCOME_UNKNOWN', 'DOWNLOAD_OUTCOME_UNKNOWN'])(
+    'retains %s action uncertainty for streamed and HTTP resume errors without replay',
+    async (code) => {
+      for (const route of ['stream', 'http'] as const) {
+        const start = calls.length;
+        const postStart = posts().length;
+        await select(`${code}-${route}`, true);
+        await restore(start, 'assistant', [approval()]);
+        let result!: ChatAdmission;
+        await act(async () => {
+          result = current.decideApproval('approval-1', 'approve');
+        });
+        const operation = accepted(result);
+        await respond(post(postStart), envelope({}));
+        await act(async () => {
+          post(postStart + 1).resolve(
+            route === 'http'
+              ? new Response(
+                  JSON.stringify({ error: { code, message: 'Private transport detail' } }),
+                  {
+                    status: 409,
+                  },
+                )
+              : stream({ type: 'error', code, message: 'Private transport detail' }),
+          );
+          await operation.completion;
+        });
+        const card = required(Object.values(current.approvalEventsByMessage).flat(), 0);
+        expect(card.status).toBe('not_completed');
+        expect(card.error).toContain('may have taken effect');
+        expect(card.error).toContain('Inspect its effects');
+        expect(card.error).toContain('cannot be retried');
+        expect(card.error).not.toContain('Private transport detail');
+        if (route === 'stream') {
+          expect(Object.values(current.toolEventsByMessage).flat()).toContainEqual({
+            type: 'error',
+            code,
+            message: 'Private transport detail',
+          });
+        }
+        expect(current.decideApproval('approval-1', 'approve')).toEqual({
+          accepted: false,
+          reason: 'invalid-approval',
+        });
+        expect(posts()).toHaveLength(postStart + 2);
+      }
+    },
+  );
+
+  it.each(['MODEL_FAILED', 'RUN_CANCELLED'])(
+    'retains a confirmed action when the following model reports %s',
+    async (code) => {
+      let saved: unknown = null;
+      controlFetch = async () => envelope(saved);
+      await select('confirmed', true);
+      await restore(0, 'assistant', [approval()]);
+      let result!: ChatAdmission;
+      await act(async () => {
+        result = current.decideApproval('approval-1', 'approve');
+      });
+      const operation = accepted(result);
+      await respond(post(0), envelope({}));
+      await act(async () => {
+        const runId = '81ce397c-a87d-4f20-9e21-9e6edfa92322';
+        saved = {
+          id: runId,
+          sessionId: 'confirmed',
+          processInstanceId: '99ce397c-a87d-4f20-9e21-9e6edfa92322',
+          state: 'outcome_unknown',
+          reason: 'user_stop',
+          version: 3,
+          createdAtMs: 1,
+          updatedAtMs: 2,
+          inFlight: 1,
+        };
+        const response = stream(
+          { type: 'tool_result', toolId: 'server:tool', data: { ok: true } },
+          { type: 'error', code, message: 'Following model did not complete' },
+        );
+        response.headers.set('x-harness-run-id', runId);
+        post(1).resolve(response);
+        await operation.completion;
+      });
+      expect(current.runControl?.state).toBe('outcome_unknown');
+      expect(required(Object.values(current.approvalEventsByMessage).flat(), 0).status).toBe(
+        'executed',
+      );
+      expect(Object.values(current.toolEventsByMessage).flat()).toContainEqual({
+        type: 'result',
+        toolId: 'server:tool',
+        data: { ok: true },
+        status: 'success',
+      });
+      expect(posts()).toHaveLength(2);
+    },
+  );
+
+  it('restores durable uncertainty without inventing a completed or replayable native approval', async () => {
+    controlFetch = async () =>
+      envelope({
+        id: '81ce397c-a87d-4f20-9e21-9e6edfa92322',
+        sessionId: 'uncertain-saved',
+        processInstanceId: '99ce397c-a87d-4f20-9e21-9e6edfa92322',
+        state: 'outcome_unknown',
+        reason: 'execution_failed',
+        version: 3,
+        createdAtMs: 1,
+        updatedAtMs: 2,
+        inFlight: 1,
+      });
+    await select('uncertain-saved', true);
+    // The backend pending-only approval query excludes the already-approved action.
+    // Its durable logical run still exposes uncertainty after a full reload.
+    await restore(0, 'saved-native-failure', []);
+    expect(call(1).url).toContain('status=pending');
+    expect(current.runControl?.state).toBe('outcome_unknown');
+    expect(current.runControlStatusText).toContain('Run outcome is unknown');
+    expect(current.runControlStatusText).toContain('inspect effects');
+    expect(current.approvalEventsByMessage).toEqual({});
+    expect(current.canDecideApproval).toBe(false);
+    expect(current.decideApproval('old-native-approval', 'approve')).toEqual({
+      accepted: false,
+      reason: 'invalid-approval',
+    });
+    expect(posts()).toHaveLength(0);
+  });
+
   it('preserves a controlled stream error and context-limit refusal without replay', async () => {
     await select('new');
     const operation = await send();
@@ -466,5 +597,113 @@ describe('mounted chat session lifecycle', () => {
     expect(text()).toContain('The context limit was reached.');
     expect(current.status).toBe('ready');
     expect(posts()).toHaveLength(1);
+  });
+});
+
+describe('chat integration with shared Stop authority', () => {
+  it('does not mistake the previous terminal fallback for settlement of a new request awaiting headers', async () => {
+    const oldId = '81ce397c-a87d-4f20-9e21-9e6edfa92322';
+    const newId = '99ce397c-a87d-4f20-9e21-9e6edfa92322';
+    let saved = {
+      id: oldId,
+      sessionId: 'A',
+      processInstanceId: newId,
+      state: 'cancelled',
+      version: 2,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+      reason: 'user_stop',
+      inFlight: 0,
+    };
+    controlFetch = async () => envelope(saved);
+    await select('A');
+    expect(current.canSend).toBe(true);
+    const next = await send('new request after stopped run');
+    expect(next.isCurrent()).toBe(true);
+    expect(current.status).toBe('streaming');
+    expect(current.runControl).toBeNull();
+    saved = { ...saved, id: newId, state: 'completed', reason: 'none' };
+    await respond(
+      post(0),
+      new Response(JSON.stringify({ type: 'text', content: 'Fresh response' }) + '\n', {
+        headers: { 'x-harness-run-id': newId, 'content-type': 'application/x-ndjson' },
+      }),
+    );
+    await next.completion;
+    expect(text()).toContain('Fresh response');
+    expect(current.runControl?.id).toBe(newId);
+  });
+
+  it('uses the logical identity, releases an uncertain stream without cancelling it, and fences stale approval actions', async () => {
+    const id = '81ce397c-a87d-4f20-9e21-9e6edfa92322';
+    const nextId = '99ce397c-a87d-4f20-9e21-9e6edfa92322';
+    const base = {
+      id,
+      sessionId: 'A',
+      processInstanceId: nextId,
+      state: 'running',
+      version: 1,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+      reason: 'none',
+      inFlight: 1,
+    };
+    let saved: unknown = null;
+    const stops: string[] = [];
+    controlFetch = async (url, init) => {
+      if (init?.method === 'POST') {
+        stops.push(url);
+        saved = { ...base, state: 'outcome_unknown', reason: 'user_stop', version: 3 };
+      }
+      return envelope(saved);
+    };
+    await select('A');
+    const first = await send();
+    let oldController!: ReadableStreamDefaultController<Uint8Array>;
+    const oldBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        oldController = controller;
+      },
+    });
+    saved = base;
+    await respond(
+      post(0),
+      new Response(oldBody, {
+        headers: { 'x-harness-run-id': id, 'content-type': 'application/x-ndjson' },
+      }),
+    );
+    expect(current.canStop).toBe(true);
+    expect(current.runControl?.id).toBe(id);
+    await act(async () => {
+      expect(await current.stop()).toBe(true);
+    });
+    expect(stops).toEqual([`/api/v1/sessions/A/runs/${id}/stop`]);
+    expect(current.status).toBe('ready');
+    expect(current.canSend).toBe(true);
+    expect(current.runControlStatusText).toContain('Admitted work may still finish');
+    expect(current.decideApproval('old-approval', 'approve')).toEqual({
+      accepted: false,
+      reason: 'invalid-approval',
+    });
+    saved = { ...base, id: nextId };
+    const second = await send('new independent request');
+    await respond(
+      post(1),
+      new Response(JSON.stringify({ type: 'text', content: 'New visible response' }) + '\n', {
+        headers: { 'x-harness-run-id': nextId, 'content-type': 'application/x-ndjson' },
+      }),
+    );
+    await second.completion;
+    await act(async () => {
+      oldController.enqueue(
+        new TextEncoder().encode(
+          JSON.stringify({ type: 'text', content: 'Late obsolete answer' }) + '\n',
+        ),
+      );
+      oldController.close();
+      await first.completion;
+    });
+    expect(text()).toContain('New visible response');
+    expect(text()).not.toContain('Late obsolete answer');
   });
 });

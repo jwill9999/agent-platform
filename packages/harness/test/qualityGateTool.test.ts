@@ -135,17 +135,12 @@ describe('quality gate tool', () => {
   });
 
   it('times out long-running allowed profiles', async () => {
-    const data = toolResult(
-      await executeQualityGateTool(
-        QUALITY_GATE_IDS.runQualityGate,
-        { profile: 'lint', repoPath, timeoutMs: 50 },
-        { workspaceRoot, pnpmBin: pnpmBin() },
-      ),
+    const output = await executeQualityGateTool(
+      QUALITY_GATE_IDS.runQualityGate,
+      { profile: 'lint', repoPath, timeoutMs: 50 },
+      { workspaceRoot, pnpmBin: pnpmBin() },
     );
-
-    expect(data.ok).toBe(false);
-    expect(data.result).toMatchObject({ timedOut: true, exitCode: null });
-    expect(data.error).toMatchObject({ code: 'QUALITY_GATE_TIMEOUT' });
+    expect(output).toMatchObject({ type: 'error', code: 'COMMAND_OUTCOME_UNKNOWN' });
   });
 
   it('truncates large output tails', async () => {

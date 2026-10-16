@@ -1,3 +1,10 @@
+import type { RunnableConfig } from '@langchain/core/runnables';
+import {
+  abortReason,
+  assertRunActive,
+  isRunInterruption,
+  type RunExecutionControl,
+} from '../runControl.js';
 import { END } from '@langchain/langgraph';
 import type {
   SensorAgentProfile,
@@ -315,14 +322,33 @@ export function createSensorCheckNode(options: SensorCheckNodeOptions = {}) {
   const maxFeedbackChars = options.maxFeedbackChars ?? DEFAULT_MAX_FEEDBACK_CHARS;
   const repeatedFailureLimit = options.repeatedFailureLimit ?? DEFAULT_REPEATED_FAILURE_LIMIT;
 
-  return async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
+  return async (
+    state: HarnessStateType,
+    config?: RunnableConfig,
+  ): Promise<Partial<HarnessStateType>> => {
     const trigger = resolveTrigger(state);
     if (!trigger) return {};
 
-    const run = await runSensors(buildSensorInput(state, trigger), {
-      ...options.runnerOptions,
-      qualityGateExecutor: options.runnerOptions?.qualityGateExecutor,
-    });
+    const signal = config?.configurable?.signal as AbortSignal | undefined;
+    const runControl = config?.configurable?.runControl as RunExecutionControl | undefined;
+    let run;
+    try {
+      assertRunActive(runControl, signal);
+      run = await runSensors(buildSensorInput(state, trigger), {
+        ...options.runnerOptions,
+        qualityGateExecutor: options.runnerOptions?.qualityGateExecutor,
+        signal,
+        runControl,
+      });
+      assertRunActive(runControl, signal);
+    } catch (error) {
+      if (!isRunInterruption(error, signal)) throw error;
+      return {
+        halted: true,
+        llmOutput: null,
+        trace: [{ type: 'stream_aborted', reason: abortReason(signal, error) }],
+      };
+    }
     const clearRequestedTrigger = state.sensorRequestedTrigger
       ? { sensorRequestedTrigger: undefined }
       : {};
@@ -361,6 +387,24 @@ export function createSensorCheckNode(options: SensorCheckNodeOptions = {}) {
       return {
         ...clearRequestedTrigger,
         halted: true,
+        sensorResults: run.results,
+        sensorAttempts: attempts,
+        sensorLastTrigger: trigger,
+        trace,
+      };
+    }
+
+    if (run.results.some((result) => result.metadata?.code === 'COMMAND_OUTCOME_UNKNOWN')) {
+      await safeEmit(options.emitter, {
+        type: 'error',
+        code: 'COMMAND_OUTCOME_UNKNOWN',
+        message:
+          'A quality command may still have running work. Check its outcome before starting another action.',
+      });
+      return {
+        ...clearRequestedTrigger,
+        halted: true,
+        llmOutput: null,
         sensorResults: run.results,
         sensorAttempts: attempts,
         sensorLastTrigger: trigger,

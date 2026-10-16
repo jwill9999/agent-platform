@@ -42,7 +42,7 @@ export type TraceEvent =
   | { type: 'deadline_exceeded'; elapsedMs: number; deadlineMs: number }
   | { type: 'plan_failed'; reason: string }
   | { type: 'security_warning'; detail: string }
-  | { type: 'stream_aborted'; reason: 'client_disconnect' | 'timeout' }
+  | { type: 'stream_aborted'; reason: 'client_disconnect' | 'timeout' | 'user_stop' }
   | {
       type: 'context_window';
       contextTokens: number;

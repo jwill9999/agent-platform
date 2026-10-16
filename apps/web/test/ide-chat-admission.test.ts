@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { Agent, ProjectDesktopRecord } from '@agent-platform/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IDEWithChat } from '../components/ide/ide-with-chat';
-import type { ChatAdmission } from '../hooks/use-harness-chat';
+import type { ApprovalCardState, ChatAdmission } from '../hooks/use-harness-chat';
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn<(...args: unknown[]) => ChatAdmission>(),
   sessionId: null as string | null,
   setError: vi.fn(),
+  decide: vi.fn(),
+  canDecideApproval: false,
+  approvals: {} as Record<string, ApprovalCardState[]>,
   messages: [
     { id: 'existing', role: 'user', parts: [{ type: 'text', text: 'Existing conversation' }] },
   ],
@@ -47,8 +50,9 @@ vi.mock('../hooks/use-harness-chat', () => ({
       thinkingByMessage: {},
       toolEventsByMessage: {},
       workspaceEventsByMessage: {},
-      approvalEventsByMessage: {},
-      decideApproval: vi.fn(),
+      approvalEventsByMessage: mocks.approvals,
+      decideApproval: mocks.decide,
+      canDecideApproval: mocks.canDecideApproval,
       canSend: Boolean(sessionId),
     };
   },
@@ -131,6 +135,11 @@ const agent: Agent = {
 let root: Root;
 let container: HTMLDivElement;
 beforeEach(async () => {
+  mocks.canDecideApproval = false;
+  mocks.approvals = {};
+  mocks.messages = [
+    { id: 'existing', role: 'user', parts: [{ type: 'text', text: 'Existing conversation' }] },
+  ];
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true });
   vi.resetAllMocks();
   mocks.sessionId = null;
@@ -218,6 +227,42 @@ async function switchToBeta() {
 }
 
 describe('mounted IDE chat caller admission', () => {
+  it('disables historical approval actions until the shared hook admits decisions', async () => {
+    mocks.messages = [
+      {
+        id: 'pending-assistant',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Review action' }],
+      },
+    ];
+    mocks.approvals = {
+      'pending-assistant': [
+        {
+          type: 'approval_required',
+          approvalRequestId: 'pending-approval',
+          toolName: 'fixture:effect',
+          argsPreview: {},
+          status: 'pending',
+        },
+      ],
+    };
+    await act(async () => root.render(createElement(IDEWithChat)));
+    const deny = () =>
+      [...container.querySelectorAll('button')].find(
+        (button) => button.textContent?.trim() === 'Deny',
+      )!;
+    expect(deny()).toBeDefined();
+    expect(deny().disabled).toBe(true);
+    await act(async () => deny().click());
+    expect(mocks.decide).not.toHaveBeenCalled();
+    mocks.canDecideApproval = true;
+    await act(async () => root.render(createElement(IDEWithChat)));
+    expect(deny().disabled).toBe(false);
+    await act(async () => deny().click());
+    expect(mocks.decide).toHaveBeenCalledTimes(1);
+    expect(mocks.decide).toHaveBeenCalledWith('pending-approval', 'reject');
+  });
+
   it('keeps a refused draft and clears it only when synchronous admission accepts', async () => {
     mocks.send.mockReturnValueOnce({ accepted: false, reason: 'busy' });
     await draft('Keep my draft');

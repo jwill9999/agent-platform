@@ -1781,23 +1781,27 @@ describe('POST /v1/chat (session-aware)', () => {
     }
   });
 
-  it('preserves unresolved pending approval history for shared admission instead of silently dropping it', async () => {
+  it('refuses a conflicting turn while retaining the unresolved approval and its history', async () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
       process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
-      await createPendingToolApproval(app, sessionId);
+      const { approvalRequestId } = await createPendingToolApproval(app, sessionId);
+      const calls = mockToolCalls.mock.calls.length;
 
-      mockToolCalls.mockReturnValueOnce('I can continue without replaying pending tool calls');
-      await request(app)
+      const conflict = await request(app)
         .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Continue without approving yet' })
+        .expect(409);
+      expect(conflict.body.error.code).toBe('RUN_CONFLICT');
+      expect(mockToolCalls.mock.calls).toHaveLength(calls);
+      const pending = await request(app)
+        .get(`/v1/approval-requests/${approvalRequestId}`)
         .expect(200);
-
-      const followUpState = getLastChatPromptState();
-      expect(followUpState.messages?.some((message) => message.toolCalls?.length)).toBe(true);
+      expect(pending.body.data).toMatchObject({ id: approvalRequestId, status: 'pending' });
+      expect(pending.body.data.resumedAtMs).toBeUndefined();
     } finally {
       restoreChatEnv(envSnap);
       await closeFixture(app, sqlite);

@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { SessionProjectBindingResultSchema } from '@agent-platform/contracts';
 import {
   _electron as electron,
   type ElectronApplication,
   type Locator,
   type Page,
+  type Response,
 } from 'playwright';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
@@ -181,8 +183,8 @@ test.describe('Electron Project access', () => {
         expect(probe.stdout).toBe('');
       }
 
-      await selectActiveAgent(page, 'Personal assistant');
-      await selectActiveAgent(page, 'Coding');
+      await selectActiveAgent(page, 'Personal assistant', createdProject.id);
+      await selectActiveAgent(page, 'Coding', createdProject.id);
       await page.getByRole('button', { name: 'Workspaces' }).click();
       await expect(page.getByRole('button', { name: /^Chat\b/ })).toBeVisible();
 
@@ -671,20 +673,121 @@ async function expectSimplifiedWorkspaceEntry(page: Page): Promise<void> {
   }
 }
 
-async function selectActiveAgent(page: Page, name: string): Promise<void> {
+async function selectActiveAgent(page: Page, name: string, projectId: string): Promise<void> {
   const agentSelector = page.getByRole('combobox', { name: 'Active agent' });
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await agentSelector.click();
-    const option = page.getByRole('option', { name }).first();
-    await expect(option).toBeVisible();
-    try {
-      await option.click({ force: true, timeout: 5_000 });
-      await expect(agentSelector).toContainText(name);
+  const ready = page
+    .getByRole('status')
+    .filter({ hasText: 'Press Enter to send, Shift+Enter for new line' });
+  await expect(ready).toBeVisible();
+  await expect(page.getByPlaceholder('Ask about this Project...')).toBeEnabled();
+  await expect(agentSelector).toBeEnabled();
+  if ((await agentSelector.textContent())?.includes(name)) {
+    await expect(agentSelector).toContainText(name);
+    test.info().annotations.push({
+      type: 'project-agent-readiness',
+      description: JSON.stringify({ projectId, name, alreadySelected: true, restored: true }),
+    });
+    return;
+  }
+  const agentsResponse = await page.request.get(new URL('/api/v1/agents', page.url()).href);
+  expect(agentsResponse.ok()).toBe(true);
+  const agents = (await agentsResponse.json()).data as Array<{ id: string; name: string }>;
+  const candidates = agents.filter((agent) => agent.name === name);
+  expect(candidates).toHaveLength(1);
+  const agentId = candidates[0]!.id;
+  await agentSelector.click();
+  const option = page.getByRole('option', { name, exact: true });
+  await expect(option).toBeVisible();
+  const observed: Array<{
+    sessionId: string;
+    resource: string;
+    status: number;
+    transfer: 'pending' | 'completed' | 'failed';
+  }> = [];
+  let truncated = false;
+  let selectedBinding: { sessionId: string; created: boolean } | undefined;
+  const observe = (response: Response) => {
+    if (response.request().method() !== 'GET') return;
+    const match = /^\/api\/v1\/sessions\/([^/]+)\/(messages|active-run)$/.exec(
+      new URL(response.url()).pathname,
+    );
+    if (!match) return;
+    if (observed.length >= 20) {
+      truncated = true;
       return;
-    } catch (error) {
-      await page.keyboard.press('Escape').catch(() => undefined);
-      if (attempt === 2) throw error;
     }
+    const row = {
+      sessionId: match[1]!,
+      resource: match[2]!,
+      status: response.status(),
+      transfer: 'pending' as 'pending' | 'completed' | 'failed',
+    };
+    observed.push(row);
+    void response.finished().then(
+      (error) => {
+        row.transfer = error ? 'failed' : 'completed';
+      },
+      () => {
+        row.transfer = 'failed';
+      },
+    );
+  };
+  // Capture before clicking: reused-session history may finish while the binding
+  // body is being parsed; a new session legitimately has no history GET.
+  page.on('response', observe);
+  const started = performance.now();
+  const binding = page
+    .waitForResponse((response) => {
+      if (
+        new URL(response.url()).pathname !== '/api/v1/sessions/project' ||
+        response.request().method() !== 'POST'
+      )
+        return false;
+      const body = response.request().postDataJSON();
+      return body?.projectId === projectId && body?.agentId === agentId;
+    })
+    .then(async (response) => {
+      expect(response.ok()).toBe(true);
+      const result = SessionProjectBindingResultSchema.parse((await response.json()).data);
+      expect(result.session).toMatchObject({ projectId, agentId, mode: 'project' });
+      selectedBinding = { sessionId: result.session.id, created: result.created };
+      return result;
+    });
+  try {
+    const [result] = await Promise.all([binding, option.click({ timeout: 5_000 })]);
+    const required = result.created ? ['active-run'] : ['messages', 'active-run'];
+    await expect
+      .poll(
+        () =>
+          required.filter((resource) =>
+            observed.some(
+              (row) =>
+                row.sessionId === result.session.id &&
+                row.resource === resource &&
+                row.status >= 200 &&
+                row.status < 300 &&
+                row.transfer === 'completed',
+            ),
+          ),
+        { timeout: Math.max(1, 30_000 - (performance.now() - started)) },
+      )
+      .toEqual(required);
+    await expect(agentSelector).toContainText(name);
+    await expect(agentSelector).toBeEnabled();
+    await expect(ready).toBeVisible();
+    await expect(page.getByPlaceholder('Ask about this Project...')).toBeEnabled();
+  } finally {
+    page.off('response', observe);
+    test.info().annotations.push({
+      type: 'project-agent-readiness',
+      description: JSON.stringify({
+        projectId,
+        agentId,
+        binding: selectedBinding,
+        observed,
+        truncated,
+      }),
+    });
   }
 }
 

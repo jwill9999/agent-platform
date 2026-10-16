@@ -561,25 +561,11 @@ function observeDiagnosticDownload(
       finish();
       return;
     }
-    // Retain only known error codes, never arbitrary response contents or headers.
-    void response
-      .json()
-      .then((body: unknown) => {
-        const code = (body as { error?: { code?: unknown } } | null)?.error?.code;
-        if (
-          typeof code === 'string' &&
-          [
-            'DIAGNOSTICS_DENIED',
-            'INVALID_SCOPE',
-            'DIAGNOSTICS_UNAVAILABLE',
-            'REPORT_TOO_LARGE',
-            'SCOPE_MISMATCH',
-          ].includes(code)
-        )
-          attempt.code = code;
-      })
-      .catch(() => undefined)
-      .finally(() => reject(new Error(`Diagnostic export returned HTTP ${response.status()}`)));
+    // Playwright buffers response bodies and cannot own/cancel their reader. A
+    // failed browser download may never finish its body; classify the real HTTP
+    // failure immediately without reading arbitrary content or replaying it.
+    attempt.responseCode = 'unavailable';
+    reject(new Error(`Diagnostic export returned HTTP ${response.status()}`));
   };
   const onRequestFailed = (request: Request) => {
     if (!matches(request)) return;
@@ -597,7 +583,7 @@ function observeDiagnosticDownload(
       .then((visible) => {
         if (!visible) return;
         attempt.visibleFailure = true;
-        // Let an observed HTTP failure retain its bounded allowlisted code first.
+        // The observed HTTP failure is already classified without a body read.
         if (typeof attempt.status === 'number' && attempt.status >= 400) return;
         reject(new Error('Diagnostic export displayed its failure status'));
       })

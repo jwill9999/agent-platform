@@ -80,6 +80,12 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
     resolveReady = resolve;
   });
   let flushTimer: ReturnType<typeof setTimeout> | undefined;
+  let urgentFlushScheduled = false;
+  function clearScheduledFlush(): void {
+    if (flushTimer) clearTimeout(flushTimer);
+    flushTimer = undefined;
+    urgentFlushScheduled = false;
+  }
   const update = (stats: Stats) => {
     if (health.state === 'closed') return;
     const dropped = Math.max(stats.dropped, health.dropped);
@@ -96,7 +102,7 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
     health.dropped += queue.length;
     queue.length = 0;
     health.pending = 0;
-    if (flushTimer) clearTimeout(flushTimer);
+    clearScheduledFlush();
     for (const call of calls.values()) {
       clearTimeout(call.timer);
       call.reject(new Error(reason));
@@ -121,11 +127,22 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
     });
   }
   function schedule(): void {
-    if (flushTimer || !accepting || health.state === 'disabled') return;
-    flushTimer = setTimeout(() => {
-      flushTimer = undefined;
-      void flush();
-    }, 250);
+    // An active append already drains the remaining queue; do not create timer/waiter storms.
+    if (!accepting || inflight || health.state === 'disabled' || health.state === 'closed') return;
+    const urgent = queue.length >= 32;
+    if (flushTimer) {
+      if (!urgent || urgentFlushScheduled) return;
+      clearScheduledFlush();
+    }
+    urgentFlushScheduled = urgent;
+    flushTimer = setTimeout(
+      () => {
+        flushTimer = undefined;
+        urgentFlushScheduled = false;
+        void flush();
+      },
+      urgent ? 0 : 250,
+    );
     flushTimer.unref();
   }
   async function flush(): Promise<void> {
@@ -136,6 +153,7 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
       return;
     }
     if (!queue.length || health.state === 'disabled' || health.state === 'closed') return;
+    clearScheduledFlush();
     const batch = queue.splice(0, 32);
     inflight = (async () => {
       try {
@@ -299,7 +317,7 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
     async close() {
       if (!accepting) return;
       accepting = false;
-      if (flushTimer) clearTimeout(flushTimer);
+      clearScheduledFlush();
       let timeout: ReturnType<typeof setTimeout> | undefined;
       let shutdownFailure: DiagnosticHealth['reason'] | undefined;
       try {

@@ -489,7 +489,7 @@ describe('real MCP chat and durable approval boundary', () => {
         events.some(
           (event) =>
             event.phase === 'request' &&
-            event.outcome === 'failed' &&
+            event.outcome === 'unknown' &&
             event.errorCode === 'tool_error',
         ),
       ).toBe(true);

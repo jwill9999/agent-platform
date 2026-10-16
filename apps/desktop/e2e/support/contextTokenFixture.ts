@@ -188,17 +188,43 @@ export async function launchContextTokenFixture(
           getBuiltinModule(id: string): typeof import('node:diagnostics_channel');
         }
       ).getBuiltinModule('node:diagnostics_channel');
-      const observed: Array<{ status?: number; errorName?: string; errorCode?: string }> = [];
+      const observed: Array<{
+        status?: number;
+        errorName?: string;
+        errorCode?: string;
+        elapsedMs?: number;
+      }> = [];
+      const starts = new WeakMap<object, number>();
+      let trackedRequests = 0;
       (
         globalThis as typeof globalThis & { __contextTokenNativeTransport?: typeof observed }
       ).__contextTokenNativeTransport = observed;
-      const owned = (request: unknown) => {
+      const owned = (request: unknown): request is object => {
         if (!request || typeof request !== 'object') return false;
         const row = request as { origin?: unknown; path?: unknown };
         return String(row.origin) === origin && row.path === '/v1/diagnostics/report';
       };
       // Observe only transport metadata. Never inspect headers, capability, scope or body.
       // A diagnostics-channel subscriber must never throw into the observed execution.
+      subscribe('undici:request:create', (message) => {
+        try {
+          const row = message as { request?: unknown };
+          if (!owned(row?.request) || trackedRequests >= 10) return;
+          const startedAt = performance.now();
+          if (!Number.isFinite(startedAt) || startedAt < 0) return;
+          starts.set(row.request, startedAt);
+          trackedRequests++;
+        } catch {
+          // Observation cannot alter the request outcome.
+        }
+      });
+      const elapsed = (request: object): { elapsedMs?: number } => {
+        const startedAt = starts.get(request);
+        starts.delete(request);
+        if (startedAt === undefined) return {};
+        const elapsedMs = performance.now() - startedAt;
+        return Number.isFinite(elapsedMs) && elapsedMs >= 0 ? { elapsedMs } : {};
+      };
       subscribe('undici:request:headers', (message) => {
         try {
           const row = message as { request?: unknown; response?: { statusCode?: unknown } };
@@ -211,7 +237,7 @@ export async function launchContextTokenFixture(
             status >= 100 &&
             status <= 599
           )
-            observed.push({ status });
+            observed.push({ status, ...elapsed(row.request) });
         } catch {
           // Observation cannot alter the request outcome.
         }
@@ -226,6 +252,7 @@ export async function launchContextTokenFixture(
           const name = String(row.error?.name);
           const code = String(row.error?.code);
           observed.push({
+            ...elapsed(row.request),
             errorName: ['Error', 'TypeError', 'RangeError', 'AbortError', 'TimeoutError'].includes(
               name,
             )

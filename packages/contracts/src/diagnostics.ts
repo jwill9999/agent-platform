@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RunControlStateSchema, RunControlReasonSchema } from './runControl.js';
 
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const duration = z.number().finite().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -31,6 +32,7 @@ export const DiagnosticPhaseSchema = z.enum([
   'approval',
   'connection',
   'storage',
+  'control',
 ]);
 export const DiagnosticOutcomeSchema = z.enum([
   'started',
@@ -85,6 +87,18 @@ export const DiagnosticEventSchema = z
     inputTokens: count.optional(),
     outputTokens: count.optional(),
     contextDecision: ContextDecisionMetadataSchema.optional(),
+    control: z
+      .object({
+        logicalRunId: id,
+        state: RunControlStateSchema,
+        reason: RunControlReasonSchema,
+        stage: z.enum(['requested', 'acknowledged', 'admitted', 'settled', 'state']),
+        version: count.min(1),
+        inFlight: count,
+        kind: z.enum(['model', 'tool', 'sensor', 'setup']).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type DiagnosticEvent = z.infer<typeof DiagnosticEventSchema>;

@@ -241,7 +241,11 @@ describe('toolDispatchNode', () => {
 
     const result = await node(state);
 
-    expect(nativeExecutor).toHaveBeenCalledWith('echo', { text: 'hi' });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      'echo',
+      { text: 'hi' },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(result.messages).toHaveLength(1);
     expect(result.messages![0]).toMatchObject({
       role: 'tool',
@@ -274,9 +278,13 @@ describe('toolDispatchNode', () => {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    expect(nativeExecutor).toHaveBeenCalledWith('sys_file_exists', {
-      path: expectedPath,
-    });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      'sys_file_exists',
+      {
+        path: expectedPath,
+      },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it('passes canonical /workspace paths as mounted host project paths to native file tools', async () => {
@@ -299,10 +307,14 @@ describe('toolDispatchNode', () => {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    expect(nativeExecutor).toHaveBeenCalledWith('sys_write_file', {
-      path: expectedPath,
-      content: 'done',
-    });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      'sys_write_file',
+      {
+        path: expectedPath,
+        content: 'done',
+      },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it('blocks project write tools while AGENTS.md onboarding is not approved', async () => {
@@ -399,7 +411,11 @@ describe('toolDispatchNode', () => {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    expect(nativeExecutor).toHaveBeenCalledWith('sys_file_exists', { path: expectedPath });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      'sys_file_exists',
+      { path: expectedPath },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it('passes canonical /workspace paths as mounted host project paths to bash tools', async () => {
@@ -431,7 +447,7 @@ describe('toolDispatchNode', () => {
       {
         command: `mkdir -p ${expectedDir} && touch ${expectedPath}`,
       },
-      { approvalGranted: true },
+      expect.objectContaining({ approvalGranted: true, signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -580,7 +596,7 @@ describe('toolDispatchNode', () => {
       {
         command: 'ls /workspace/generated',
       },
-      { approvalGranted: true },
+      expect.objectContaining({ approvalGranted: true, signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -603,10 +619,14 @@ describe('toolDispatchNode', () => {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    expect(nativeExecutor).toHaveBeenCalledWith('sys_append_file', {
-      path: expectedPath,
-      content: 'notes.txt',
-    });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      'sys_append_file',
+      {
+        path: expectedPath,
+        content: 'notes.txt',
+      },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it('formats approved shell command failures for human-readable follow-up', async () => {
@@ -1222,11 +1242,15 @@ describe('toolDispatchNode', () => {
       }),
     );
 
-    expect(nativeExecutor).toHaveBeenCalledWith(BROWSER_TOOL_IDS.navigate, {
-      sessionId: 'browser-session-1',
-      url: 'https://example.com',
-      approved: true,
-    });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      BROWSER_TOOL_IDS.navigate,
+      {
+        sessionId: 'browser-session-1',
+        url: 'https://example.com',
+        approved: true,
+      },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it('gates registry tools that explicitly require approval', async () => {
@@ -1335,7 +1359,11 @@ describe('toolDispatchNode', () => {
       }),
     );
 
-    expect(nativeExecutor).toHaveBeenCalledWith('echo', { text: 'hi' });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      'echo',
+      { text: 'hi' },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(auditLog.logStart).toHaveBeenCalledWith('echo', { text: 'hi' }, 'agent-1', '', 'low');
     expect(auditLog.logComplete).toHaveBeenCalledWith(
       'audit-low',

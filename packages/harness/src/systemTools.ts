@@ -1,3 +1,4 @@
+import { assertRunActive, type RunExecutionControl } from './runControl.js';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -251,7 +252,13 @@ const MAX_BASH_TIMEOUT_MS = 120_000;
 async function handleBash(
   toolId: string,
   args: Record<string, unknown>,
-  options: { cwd: string; commandRunner: CommandRunner; approvalGranted?: boolean },
+  options: {
+    cwd: string;
+    commandRunner: CommandRunner;
+    approvalGranted?: boolean;
+    signal?: AbortSignal;
+    runControl?: RunExecutionControl;
+  },
 ): Promise<Output> {
   const command = stringArg(args, 'command');
   if (!command.trim()) {
@@ -279,6 +286,8 @@ async function handleBash(
   const timeoutMs = Math.min(Math.max(rawTimeout, 1000), MAX_BASH_TIMEOUT_MS);
   const result = await options.commandRunner.run({
     command,
+    signal: options.signal,
+    runControl: options.runControl,
     cwd: options.cwd,
     env: { mode: 'inherit', variables: {} },
     timeoutMs,
@@ -369,6 +378,7 @@ export function createSystemToolExecutor(options?: {
     args: Record<string, unknown>,
     executionOptions,
   ): Promise<Output> => {
+    assertRunActive(executionOptions?.runControl, executionOptions?.signal);
     if (isGitDeliveryTool(toolId)) {
       const authority = executionOptions?.gitDelivery;
       return executeGitDeliveryTool(
@@ -385,6 +395,8 @@ export function createSystemToolExecutor(options?: {
           cwd: workspaceRoot,
           commandRunner,
           approvalGranted: executionOptions?.approvalGranted,
+          signal: executionOptions?.signal,
+          runControl: executionOptions?.runControl,
         });
       case ids.readFile:
         return handleReadFile(toolId, args);
@@ -405,34 +417,46 @@ export function createSystemToolExecutor(options?: {
     // Low-risk tools (async, read-only I/O)
     const lowResult = await executeLowRiskTool(toolId, args);
     if (lowResult) return lowResult;
+    assertRunActive(executionOptions?.runControl, executionOptions?.signal);
 
     // Medium-risk tools (async, write I/O + network)
-    const mediumResult = await executeMediumRiskTool(toolId, args);
+    const mediumResult = await executeMediumRiskTool(toolId, args, {
+      signal: executionOptions?.signal,
+      runControl: executionOptions?.runControl,
+    });
     if (mediumResult) return mediumResult;
+    assertRunActive(executionOptions?.runControl, executionOptions?.signal);
 
     const codingEditResult = await executeCodingEditTool(toolId, args, { workspaceRoot });
     if (codingEditResult) return codingEditResult;
+    assertRunActive(executionOptions?.runControl, executionOptions?.signal);
 
     const gitResult = await executeGitTool(toolId, args, {
       workspaceRoot,
       defaultRepoPath: options?.defaultRepoPath,
     });
     if (gitResult) return gitResult;
+    assertRunActive(executionOptions?.runControl, executionOptions?.signal);
 
     const qualityGateResult = await executeQualityGateTool(toolId, args, {
+      signal: executionOptions?.signal,
+      runControl: executionOptions?.runControl,
       workspaceRoot,
       defaultRepoPath: options?.defaultRepoPath,
     });
     if (qualityGateResult) return qualityGateResult;
+    assertRunActive(executionOptions?.runControl, executionOptions?.signal);
 
     const repoDiscoveryResult = await executeRepoDiscoveryTool(toolId, args, {
       workspaceRoot,
       defaultRepoPath: options?.defaultRepoPath,
     });
     if (repoDiscoveryResult) return repoDiscoveryResult;
+    assertRunActive(executionOptions?.runControl, executionOptions?.signal);
 
     const memoryResult = await executeMemoryTool(toolId, args, options?.memory);
     if (memoryResult) return memoryResult;
+    assertRunActive(executionOptions?.runControl, executionOptions?.signal);
 
     const browserResult = await executeBrowserTool(toolId, args, { manager: browserManager });
     if (browserResult) return browserResult;

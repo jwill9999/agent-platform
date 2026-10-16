@@ -44,7 +44,7 @@ function statusIcon(status: ApprovalCardState['status']) {
 }
 
 export function ApprovalCard({ approval, onDecision }: Props) {
-  const disabled = isBusy(approval.status);
+  const disabled = isBusy(approval.status) || !onDecision;
   const showActions = canDecide(approval.status);
   const display = displayApproval(approval);
 

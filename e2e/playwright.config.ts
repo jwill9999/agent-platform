@@ -23,7 +23,7 @@ export default defineConfig({
     {
       name: 'chromium',
       testIgnore:
-        /(?:mcp-(?:onboarding|chat)|chat-reply-reliability|github-read-responsiveness|git-delivery-[a-z-]+)\.spec\.ts/,
+        /(?:mcp-(?:onboarding|chat)|chat-reply-reliability|github-read-responsiveness|git-delivery-[a-z-]+|project-chat-stop)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },
     },
     {
@@ -56,6 +56,14 @@ export default defineConfig({
       name: 'git-delivery',
       testMatch: /git-delivery-[a-z-]+\.spec\.ts/,
       dependencies: ['mcp-onboarding'],
+      fullyParallel: false,
+      workers: 1,
+      use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },
+    },
+    {
+      name: 'project-chat-stop',
+      testMatch: /project-chat-stop\.spec\.ts/,
+      dependencies: ['git-delivery'],
       fullyParallel: false,
       workers: 1,
       use: { ...devices['Desktop Chrome'], ...ciBrowserChannel },

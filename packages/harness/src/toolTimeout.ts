@@ -1,3 +1,4 @@
+import { assertRunActive } from './runControl.js';
 /**
  * Per-tool execution timeout wrapper.
  *
@@ -33,17 +34,16 @@ export async function withToolTimeout<T>(
   toolName: string,
   parentSignal?: AbortSignal,
 ): Promise<T> {
-  if (parentSignal?.aborted) {
-    throw new ToolTimeoutError(toolName, timeoutMs);
-  }
+  assertRunActive(undefined, parentSignal);
 
   const controller = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
-      controller.abort();
-      reject(new ToolTimeoutError(toolName, timeoutMs));
+      const error = new ToolTimeoutError(toolName, timeoutMs);
+      controller.abort(error);
+      reject(error);
     }, timeoutMs);
   });
 
@@ -51,18 +51,24 @@ export async function withToolTimeout<T>(
   const parentPromise = parentSignal
     ? new Promise<never>((_, reject) => {
         const handler = () => {
-          controller.abort();
-          reject(new ToolTimeoutError(toolName, timeoutMs));
+          controller.abort(parentSignal.reason);
+          try {
+            assertRunActive(undefined, parentSignal);
+          } catch (error) {
+            reject(error);
+          }
         };
         parentSignal.addEventListener('abort', handler, { once: true });
         parentCleanup = () => parentSignal.removeEventListener('abort', handler);
       })
     : undefined;
 
-  const racers: Promise<T>[] = [fn(controller.signal), timeoutPromise];
-  if (parentPromise) racers.push(parentPromise);
-
   try {
+    const racers: Promise<T>[] = [timeoutPromise];
+    if (parentPromise) racers.push(parentPromise);
+    // Build the race before invoking user code, including synchronous throws/aborts.
+    const work = Promise.resolve().then(() => fn(controller.signal));
+    racers.push(work);
     return await Promise.race(racers);
   } finally {
     if (timeoutId !== undefined) clearTimeout(timeoutId);

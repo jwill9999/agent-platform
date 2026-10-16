@@ -1,3 +1,226 @@
+# Stop implementation and durable monitoring handoff — 16 October 2026
+
+[PR334](https://github.com/jwill9999/agent-platform/pull/334) targets `feature/project-chat-stop`.
+Stop remains IN_PROGRESS and unmerged. Durable monitoring is OPEN and unstarted behind actual Stop
+delivery. Owner stress testing is not ready. Keep the Docker gateway disabled and PR283/paused
+orchestration separate.
+
+## Current qualification
+
+Application source `4f4ecaf505efc774a2bdb71c7f682a81f3b93ae0` passed all nine executed hosted
+feature checks, including browser and 67 desktop cases. Sonar is OK with zero open issues and no
+unresolved PR threads were present. Sourcery's budget skip is not code review; the feature-targeted
+VM skip is not staging qualification. Independent source and artifact reviews are retained.
+
+Fresh Docker browser qualification passed all 16 cases without retries or skips: Stop 5, reply 1,
+Git 5 and MCP 5. Actual persisted control/effect records show no admissions after Stop acknowledgement;
+late sensor effects remain unknown. Eleven available traces passed CRC checks; MCP deliberately
+records JSON rather than traces. Private browser403s prove denial, not successful diagnostic export.
+Owned cleanup restored defaults, retained data and left unrelated containers unchanged.
+
+Local desktop qualification is a reviewed composite: 65 retained passes plus two focused passes,
+covering 67 unique cases with unchanged application/runtime bytes. The original full 65/67 failure
+remains failed. One model-key assertion matched two legitimate cards; both checks now target the
+exact created model. The other failure was a genuine native diagnostic-export503, followed by a
+healthy read. Passive timing capture in the focused run recorded successful exports at 13.164 and
+7.030ms; this does not establish or fix the earlier503 cause. No automatic retry, pre-export query,
+timeout increase or success-assertion removal was introduced. Exact two test-file hashes bind these
+initially uncommitted tests; subsequent commit/publication receipts must verify byte equality.
+
+The separate real VM journey through the signed macOS helper passed once:8.173ms Stop acknowledgement,
+actual guest late effect retained, outcome_unknown with two unresolved admissions, and 43 safe durable
+zero-loss events. Signature/entitlement, selected runtime bindings and all three trace ZIPs were
+independently reviewed. Development signing is not hardened; the 4 GiB image was not freshly rehashed.
+Fifty composite desktop reports contain 49 ready local reports and one intentional disabled partial;
+three prior-process attention flags are disclosed. Raw fixture artifacts remain restricted.
+
+The application 4f4 normal hooks passed 1,718 tests in its three affected packages; unchanged DB 172/Desktop 187 and
+contracts 139 results retain their source scope. The hosted benchmark independently passed900 measured
+requests / 990 with warm-ups: maximum relative p95 2.735ms against 20 ms and enqueue p95 0.0488ms against 2 ms;
+each healthy mode retained 1,540 events with zero loss. Earlier local and hosted performance failures
+remain evidence; no CPU/disk/GC/connection cause is asserted or threshold relaxed.
+
+## Delivery and next work
+
+Delivery requires normal source/documentation push, current-head hosted qualification, full
+source-bound Notion readbacks and reconciled Beads. Publication receipts identify the actual mirrored
+revision, complete bodies and preserved notes/children; earlier cc9c4a20 mirrors remain retained.
+Actual task-to-feature and protected-staging merges remain reserved. Staging additionally requires
+its own completed full scan, actual packaged VM and live protection/review gates; main is excluded.
+
+Evidence lives in `/Users/letuscode/.codex/project-chat-stop-implementation-20261016`, particularly
+`qualification-4f4ecaf5`, `pr334-sonar-4f4-qualification.json` and
+`pr334-benchmark-4f4-independent-qualification.json`. Canonical Beads is
+`/Users/letuscode/projects/agent-platform`. Stop and monitoring notes are read back and Dolt-synced at
+each recorded checkpoint; task closure requires actual declared delivery.
+
+The saved 39-file monitoring feasibility map is read-only preparation, not implementation. After Stop
+delivery implement M01–M06: retained local resource recording and bounded historical review/export
+through shared private APIs and desktop/headless clients. Stress readiness requires both deliveries,
+restart-safe healthy recording and stored-only analysis of a seeded issue. No paid calls, recurring
+schedule, dashboard, distribution work or paused orchestration resumption is implied.
+
+Docker gateway remains explicitly false; Terraform is absent. One-client Toolkit Sonar verification
+is not permanent singleton stability or proof of the earlier loop's cause. No Docker Hub logout,
+pruning or unrelated configuration changes are included. Preserve dirty/unrelated checkouts and all
+four paused refs. The complete prior handoff follows unchanged as historical context.
+
+<!-- markdownlint-disable MD025 -->
+
+# Stop planning and durable monitoring handoff — 16 October 2026
+
+Current owner request is planning-only: review existing acknowledged Stop, obtain independent
+critique, then present a bounded plan before implementation. Subsequent owner refinements require
+shared harness capabilities for future voice/CLI clients, a focused audit of existing APIs, and
+persistent local evidence from ordinary use for later agent/owner reviews and Beads triage.
+
+Canonical plan: [shared Stop MVP](docs/planning/project-chat-stop-mvp.md). Verification:
+[S01–S14/M01–M06/Q01](docs/testing/project-chat-stop-mvp.md). Existing Stop task is
+`agent-platform-harness-r3.cancel`; planning task `agent-platform-project-chat-stop-plan`;
+source audit `agent-platform-harness-interface-audit`; queued durable capture
+`agent-platform-local-diagnostics-monitoring`; blocked owner trial `agent-platform-local-mvp-stress-review`.
+The audit/review/specs and actual planning checks are linked by the plan manifest.
+
+Staging remains cf5f04524c25c29635b0d84bda4e76282f28ddcb. Current documentation task
+`task/project-chat-stop-plan` chains from pushed 369ae334 on `task/post-git-handoff-review`,
+inside `feature/local-mvp-handoff-review`. PR332 is the earlier docs segment, not a Stop implementation.
+Future code feature/task branches are proposed only, to start from actual qualified staging after
+owner approval; no new product code, client, paid call, merge or production claim follows now.
+
+Source review confirms existing backend chat/approval/Git/MCP/context/diagnostic APIs are substantially
+shared; missing active logical-run discovery and durable Stop must be application-owned. Stop must
+bypass the execution mutex, fence every provider/tool/retry/resumed approval admission, preserve
+already-admitted effects and distinguish acknowledgement from confirmed termination. Diagnostics
+are observational, never authority. Current V1 already persists safe history; the separate monitoring
+task adds ordinary-use resource/queue capture, restart-safe review windows and visible coverage gaps.
+No external dashboard, broad tracing, SDK upgrade or scheduled daily agent has been activated.
+
+The owner trial is proposed after both Stop and durable monitoring are actually qualified: thirty
+minutes, disposable projects, at most two sessions/twenty requests, default zero paid spend. An
+agent must demonstrate review of a seeded issue from saved data without live observation first.
+Docker29.8.0 was reachable; host free space about13GiB is below proposed20GiB test reserve, so resource
+preflight remains a later execution requirement. No Stop or monitoring product tests have run.
+
+Distinct source-aware critic approved the corrected eight substantive files with zero actionable
+findings; STOP-C1–C10 dispositions belong to the linked review report. This is planning approval,
+not implementation authority or a runtime test result. All substantive
+planning documents require complete source-bound Notion publication/readback before handoff is done.
+Implementation and scoped Stop review-gate reconciliation await owner acceptance. Global review-gate,
+R3/recovery/dashboard scope, main, PR283/four paused refs and dirty unrelated work stay separate.
+
+The complete previous session body below is retained byte-for-byte; its dated permissions/states
+are historical. Live canonical Beads records supersede stale backlog statuses in those older notes.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — Git delivery complete, next local MVP priority under review
+
+Reviewed on 15 October 2026. Beads remains authoritative for task status and dependencies.
+This handoff supersedes the pending-delivery wording in every historical checkpoint below.
+
+## Delivered development baseline
+
+Protected [PR330](https://github.com/jwill9999/agent-platform/pull/330) is merged into staging at
+`cf5f04524c25c29635b0d84bda4e76282f28ddcb`. Its tree
+`e4212ec7b8362cbd7fc25120d6dd856df8ad9691` exactly matches reviewed source `ce959c78`
+and the tested integration `e40c27ed`. PR329 and repair PR331 were delivered to the feature
+before the guarded staging squash. No admin bypass or main promotion occurred.
+
+All fourteen executed current-head checks and five expected workflows succeeded, with no
+unresolved review threads or blocking reviews. Independent reviews qualified the actual
+full Promptfoo analysis (eight batches), 61 first-attempt Electron tests, five first-attempt Git
+browser journeys, and nineteen first-attempt packaged macOS VM tests. Ordinary browser coverage
+passed 31 cases with one existing optional context prerequisite skip. Seven Git diagnostic exports
+and ten packaged-VM diagnostic bodies were reviewed for correlation, durability, loss and privacy.
+The Git unknown-outcome restart report honestly retains `unfinishedPriorProcess=true`; exactly one
+PR-create effect and no replay were verified. Deterministic external provider/GitHub/SSH boundaries
+remain disclosed; Git, SQLite, approvals, application and renderer are real.
+
+All 900 benchmark timings were independently checked against unchanged bounds: maximum relative
+p95 overhead 3.504090 ms versus 20 ms, enqueue p95 0.014071 ms versus 2 ms. Sonar is OK with 31
+existing minor code smells, no major/critical findings, bugs or vulnerabilities; scoped CodeQL has
+zero open alerts. Sourcery skipped PR330 because its diff exceeded 150,000 characters; independent
+source reviews supply the recorded review evidence. Large browser/Electron artifacts were qualified
+by downloaded-member CRC/SHA and API/run identity, without claiming whole outer-ZIP verification.
+Earlier failures, their diagnostic limits and unproven historical causes remain retained.
+
+`agent-platform-git-delivery-verification` is closed and Dolt-synced. The four complete changed
+document mirrors were read back at `ce959c78` across 24 pages; their source bytes are identical in
+staging. Evidence: `/Users/letuscode/.codex/git-delivery-implementation-20261014`, particularly
+`git-delivery-completion.json`, `pr330-staging-tree-qualification.json`,
+`pr330-81-combined-independent-qualification.json`, `git-delivery-cleanup-execution.json`,
+`git-delivery-final-independent-delivery-audit.json` and `pr331-publication-ce959c78.json`.
+
+## Branches and retained work
+
+Seven delivered local and remote Git-delivery branches were removed using exact guards after
+verification; eight local/remote recovery tags retain their commits. At the reviewed remote snapshot,
+six branches remain: main, staging and the four paused orchestration branches below. This handoff
+update uses separate temporary documentation branches; those are not new product implementation.
+
+- `feature/harness-backlog-review` at `583da680`.
+- `task/harness-readiness-reconciliation` at `5b796b74`.
+- `task/pilot-active-budget` at `ee3a160f`.
+- `task/test-runner-offline-adapter` at `e1222b19`.
+
+PR283 remains open, draft, labeled paused orchestration and unmerged. Preserve its branch links,
+all unique/dirty unrelated worktrees and the main tip. The prior preservation audit checked twelve
+worktrees, with only four authorized primary Beads status-journal appends; the original dirty diff
+was reconstructed and the real primary index remained unchanged. This documentation task may append
+its own recorded status change; do not claim the whole current primary diff hash is unchanged.
+No prototype resumption, pilot, release/distribution work or paid model call is authorized here.
+
+## Current work and next-priority recommendation
+
+Current housekeeping: `agent-platform-post-git-handoff-review`,
+[specification](docs/tasks/agent-platform-post-git-handoff-review.md). It updates this handoff,
+reviews the live backlog and publishes source-bound mirrors. Its task and feature branches are
+`task/post-git-handoff-review` and `feature/local-mvp-handoff-review`. Documentation validation,
+push, full mirror readbacks and the documentation PR are recorded in that task; this snapshot does
+not claim these new documentation changes are already in staging. All previous history follows
+unchanged. This task does not implement a new product feature or grant a new protected merge.
+
+The owner's immediate goal remains a working single-user local MVP. Distribution and its
+architecture/account model belong to phase two. The live review found sixty open, eight in-progress
+and twenty-four deferred records before creating this housekeeping task; counts alone are not a
+reliable implementation queue. Some records are stale or intentionally broad: the direct-file policy
+repair has merged PR271/source evidence despite its in-progress status; the open merge-resolver
+record overlaps delivered Git journeys; diagnostics V1 is complete while the broader export/dashboard
+record stays open. Do not auto-close those records or revive their old scopes from this review.
+
+Recommended discussion order, not an approved implementation schedule:
+
+1. **Acknowledged Stop for connected Project Chat** — `agent-platform-harness-r3.cancel`.
+   Add a run/session-scoped user stop action, backend acknowledgement, prevention of subsequent
+   dispatch, and an honest stopping/stopped/completed/unknown result. Preserve already-completed
+   effects and approval boundaries. Current chat code drains obsolete streams deliberately; losing
+   display ownership is not server cancellation. The API already forwards disconnect/timeout abort
+   signals, but the composer exposes no explicit run-scoped Stop action. This gives direct control
+   over the model/tool/Git work now available in the MVP. Start with this one bounded task; do not
+   absorb the broader recovery, dashboard, framework migration or orchestration backlog.
+2. **Keyless Ollama selection** — `agent-platform-est0`. The web considers a keyless Ollama config
+   usable, while an explicit chat model override is rejected by the API's stored-key check. This is
+   still visible in current source and is a small, concrete local-model usability fix. Do not add a
+   new provider, model download manager or credential bypass for providers that require keys.
+3. **Focused read-only PR review** — `agent-platform-5zg`. Build on the delivered commit/push/PR
+   flow with summary, changed files, checks and comments plus GitHub fallback. Keep merge/comment
+   mutation actions and a general embedded browser out of the first slice.
+
+Evidence paths checked at staging `cf5f0452`: `apps/web/hooks/use-harness-chat.ts`,
+`apps/web/components/chat/chat-input.tsx`,
+`apps/api/src/infrastructure/http/v1/chatRouter.ts`, `apps/web/lib/modelSelection.ts`,
+`apps/web/components/project/project-git-github-panel.tsx`, and their linked Beads specifications.
+This was a source/backlog review, not a new reproduction or acceptance run.
+
+The Stop proposal still has an open historical review-gate dependency and an existing planning-only
+specification. Rebase its plan and dependency disposition onto today's code with the planning skill
+and independent critique before owner implementation approval. Keep existing edges until explicitly
+reviewed; a recommendation is not readiness or permission to implement. No new-feature work starts
+from this handoff request alone. Broader Git epic `agent-platform-ii1` and journey remainder
+`agent-platform-7vf` remain open; the delivered bounded MVP does not close them.
+
+<!-- markdownlint-disable MD025 -->
+
 # Git delivery qualification handoff — 15 October 2026
 
 Live task state is authoritative in Beads `agent-platform-git-delivery-verification` and PR330. This checkpoint records the reviewed repair; later checks, merges and cleanup are recorded there. All older handoffs below are historical and do not override current owner authority or live delivery state.

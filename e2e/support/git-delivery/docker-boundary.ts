@@ -125,7 +125,7 @@ f.mkdirSync(process.argv[1],{mode:0o700});`,
       remote,
       write: (path: string, value: string) => write(`${directory}/${path}`, value),
       ledger: () => JSON.parse(exec(['cat', `${boundary}/state/ledger.json`])),
-      loseNextCreateResponse: () =>
+      loseNextCreateResponse: () => {
         write(
           `${boundary}/state/config.json`,
           JSON.stringify({
@@ -134,7 +134,8 @@ f.mkdirSync(process.argv[1],{mode:0o700});`,
             currentBranch: branch,
             loseCreateResponseOnce: true,
           }),
-        ),
+        );
+      },
       close,
     };
   } catch (error) {

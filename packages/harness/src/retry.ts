@@ -6,6 +6,8 @@
  */
 
 import { randomInt } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { assertRunActive, type RunExecutionControl } from './runControl.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,29 +43,31 @@ export async function withRetry<T>(
   fn: () => Promise<T>,
   config: RetryConfig,
   onRetry?: RetryCallback,
+  options?: { signal?: AbortSignal; runControl?: RunExecutionControl },
 ): Promise<T> {
-  let lastError: unknown;
+  async function runAttempt(attempt: number, lastError?: unknown): Promise<T> {
+    if (attempt < config.maxAttempts) {
+      assertRunActive(options?.runControl, options?.signal);
+      try {
+        return await fn();
+      } catch (err) {
+        assertRunActive(options?.runControl, options?.signal);
+        if (!config.isRetryable(err)) {
+          throw err;
+        }
 
-  for (let attempt = 0; attempt < config.maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
+        const isLastAttempt = attempt >= config.maxAttempts - 1;
+        if (isLastAttempt) throw err;
 
-      if (!config.isRetryable(err)) {
-        throw err;
+        const delayMs = computeDelay(attempt, config);
+        onRetry?.(attempt + 1, err, delayMs);
+        await sleep(delayMs, undefined, { signal: options?.signal });
+        return runAttempt(attempt + 1, err);
       }
-
-      const isLastAttempt = attempt >= config.maxAttempts - 1;
-      if (isLastAttempt) break;
-
-      const delayMs = computeDelay(attempt, config);
-      onRetry?.(attempt + 1, err, delayMs);
-      await sleep(delayMs);
     }
+    throw lastError;
   }
-
-  throw lastError;
+  return runAttempt(0);
 }
 
 // ---------------------------------------------------------------------------
@@ -76,10 +80,6 @@ function computeDelay(attempt: number, config: RetryConfig): number {
   const rand = randomInt(0, 1_000_001) / 1_000_000; // 0..1 inclusive
   const jitter = exponential * config.jitterFactor * (rand * 2 - 1);
   return Math.max(0, Math.round(exponential + jitter));
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ---------------------------------------------------------------------------

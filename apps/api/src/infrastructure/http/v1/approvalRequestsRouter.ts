@@ -16,6 +16,7 @@ import {
   countApprovalRequests,
   expireApprovalRequest,
   getApprovalRequest,
+  getRunForExecution,
   getGitDeliveryOperation,
   listApprovalRequests,
   listRetainedGitDeliveryApprovals,
@@ -227,6 +228,14 @@ export function createApprovalRequestsRouter(db: DrizzleDb): Router {
       const id = requireParam(req.params, 'id');
       const body = parseBody(ApprovalRequestDecisionBodySchema, req.body ?? {});
       try {
+        const approval = getApprovalRequest(db, id);
+        const run = getRunForExecution(db, approval.runId);
+        if (run && !['running', 'waiting_for_approval'].includes(run.state))
+          throw new HttpError(
+            409,
+            'APPROVAL_RUN_STOPPED',
+            'This run is no longer eligible to execute. Start a new request.',
+          );
         res.json({ data: approveApprovalRequest(db, id, decideAtNow(), body.reason) });
       } catch (error) {
         mapApprovalError(error);

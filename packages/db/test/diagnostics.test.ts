@@ -108,6 +108,60 @@ describe('SQLite diagnostic adapter conformance', () => {
     expect((await store.query({ requestId })).events).toHaveLength(256);
     expect(store.health().pending).toBe(0);
   });
+  it('retains every accepted identity across repeated batch promotion and explicit drains', async () => {
+    const { store, path } = fixture();
+    await store.ready;
+    const requestId = randomUUID();
+    const accepted: string[] = [];
+    for (let burst = 0; burst < 22; burst++) {
+      for (let index = 0; index < 70; index++) {
+        const next = event(store, { requestId });
+        expect(store.record(next)).toBe(true);
+        accepted.push(next.eventId);
+      }
+      await store.flush();
+      expect(store.health()).toMatchObject({ state: 'ready', pending: 0, dropped: 0 });
+    }
+    const inspect = new Database(path);
+    try {
+      const rows = inspect
+        .prepare('SELECT event_id FROM diagnostic_events ORDER BY sequence')
+        .all() as Array<{ event_id: string }>;
+      expect(rows.map((row) => row.event_id)).toEqual(accepted);
+      expect(rows).toHaveLength(1540);
+    } finally {
+      inspect.close();
+    }
+  });
+  it('eventually counts held-writer overflow and deadline-boundary in-flight loss exactly once', async () => {
+    const { store, path } = fixture();
+    await store.ready;
+    const lock = new Database(path);
+    lock.exec('BEGIN IMMEDIATE');
+    try {
+      const accepted: boolean[] = [];
+      for (let index = 0; index < 300; index++) accepted.push(store.record(event(store)));
+      expect(accepted.filter(Boolean)).toHaveLength(256);
+      expect(store.health()).toMatchObject({ pending: 256, dropped: 44, reason: 'queue_full' });
+      await store.close();
+      expect(store.health()).toMatchObject({
+        state: 'closed',
+        pending: 0,
+        reason: 'shutdown_timeout',
+      });
+      // The unchanged 1000ms close deadline does not wait for its rejected RPC catch.
+      // At return, one owned batch can still be unaccounted; that is not proof of durability.
+      expect([0, 32]).toContain(300 - store.health().dropped);
+      expect(store.record(event(store))).toBe(false);
+      await store.flush(); // Observe the already-owned logical RPC settlement, not native I/O.
+      expect(store.health().dropped).toBe(300);
+      await store.close();
+      expect(store.health().dropped).toBe(300);
+    } finally {
+      lock.exec('ROLLBACK');
+      lock.close();
+    }
+  });
   it('does not block the main event loop on a held writer; retries once and discloses loss', async () => {
     const { store, path } = fixture();
     await store.ready;
