@@ -1,108 +1,118 @@
-# Current session — durable local monitoring qualification
+# Current session — monitoring fixture qualification
 
-Stop [PR334](https://github.com/jwill9999/agent-platform/pull/334) merged by the owner's explicit
+Stop [PR334](https://github.com/jwill9999/agent-platform/pull/334) merged under the owner's explicit
 conditional grant into `feature/project-chat-stop` at `a5d17683961236f9cf089030be51b813845d85da`.
-All nine executed feature checks passed on reviewed `e1713628`; zero unresolved threads/blocking
-reviews and CLEAN. Actual tree `4d33908a24dbd170d1226b85e350b9d375325ad7` equals reviewed source.
-Stop is CLOSED/read back/synced in canonical Beads. This is feature delivery, not staging promotion.
+Its tree matches reviewed `e1713628`; all nine executed checks passed with no unresolved findings.
+Stop is CLOSED/read back/synced. This is feature delivery, not staging promotion.
 
 [Monitoring](docs/tasks/agent-platform-local-diagnostics-monitoring.md) remains IN_PROGRESS in
 [PR339](https://github.com/jwill9999/agent-platform/pull/339), `task/local-diagnostics-monitoring`
-into `feature/local-diagnostics-monitoring`. The dedicated feature starts at staging `cf5f0452`
-plus the qualified Stop dependency (fast-forward to `a5d17683`). Main/staging and PR283/paused
-orchestration remain separate. This document records local candidate qualification; actual pushed
-revision, latest checks and full mirror receipts are recorded in Beads, PR and publication metadata.
+into `feature/local-diagnostics-monitoring`. The feature starts at staging `cf5f0452` plus the
+qualified Stop dependency. This source checkpoint records the repair and retained evidence; current
+pushed revision, terminal gates and publication receipts are recorded in canonical Beads and PR
+metadata. Main, staging and paused PR283/orchestration remain separate.
 
-## Actual delivery checkpoints
+## Hosted result and bounded fixture repair
 
-First monitoring source `11927e4fb984a9b333d699509382d5b3ddbde101`, tree
-`5b8896851c0856df5febbba032d358aea331c91f`, pushed with normal hooks: five affected builds/types,
-cycles and 1,526 tests passed (contracts 146/desktop 219/web 431/DB 187/API 543). All 55 committed hashes
-matched reviewed source. Earlier877push failed on a ready-window mock missing getURL; the test-only
-correction strengthened startup checks and preserved shutdown assertions. Its failure/reproduction
-remain retained. Historical Stop benchmark failures, failed native batch and unexplained503 remain
-in [Stop results](docs/reviews/project-chat-stop-results.md).
+Actual source `a2b867dfbc6aef38b2f16e6aede51e078413f24d`, tree
+`3bb0592a6fd411bd769e2aa4e2629c902e620f45`, passed all nine executed hosted feature checks in
+CI `38936644754` attempt1. Sonar is OK with zero open issues, duplication1.0%, all ratings1 and
+hotspots100%. No unresolved threads or blocking reviews. Sourcery's weekly-budget skip and the
+feature-target VM skip are limitations, not code review or staging qualification.
 
-Hosted Sonar rejected119 with18findings and 6.8%new duplicated lines above3% (reliabilityD).
-Raw issues and actual duplication blocks are retained. Source-aware reviewed repairs now use small
-API/CLI/UI helpers, native sequential bounded streaming, exact cursor key sets/safe projections and
-two internal SQLite helpers for identical RPC/queue/cursor/metadata mechanics. No suppression,
-dismissal, profile/exclusion or threshold change. Each store retains strict schemas, independent
-HMAC/epochs/snapshots/pruning, queue256including in-flight/batch32,200 ms reads, durable preference,
-health cloning and its original one-/two-second close policy. Current repaired application hashes
-are frozen in `pr339-sonar-application-candidate.json`; hosted clearance requires the actual new head.
+Clean readiness was withheld despite CI success: Electron reported67 passed plus one flaky
+network-block permission-policy case. Its first attempt expected Open folder within five seconds,
+but the actual renderer URL served Chromium's DevTools discovery page. API health and startup
+renderer/window phases were already ready. No policy mutation, model call, approval, audit or file
+effect occurred. The retry passed; the first failure stays retained. Browser passed31 general cases
+plus one existing isolated-context prerequisite skip, Git5 and Stop5.
 
-Current repaired-source qualification: contracts 35/DB 42, desktop 53/web 14 and CLI13 scoped controls
-pass; API startup/private-window9 plus held-HTTP shutdown1 passed. Builds/types/lint/format pass in
-owned scopes. Counts overlap; they are not a single suite total. Fresh rebuilt managed Electron plus
-separate Chromium passed41.107 seconds (41.553-second suite), no retry/skip/failure. Actual 30-second
-sampling, native SaveAs/cancel, private browser403, exact history across clean restart and resource
-OFF while V1continues are verified. All 49 source/158 compiled bindings and three ZIPs/487 CRC members
-were independently approved. This is one coupled journey, not Docker-only or a full Electron batch.
+Source tracing found that the fixture released its backend/renderer ports before Playwright opened
+OS-selected Node inspector and Chromium debug listeners. Those listeners can choose the released
+renderer port. The reviewed fixture-only repair jointly allocates four distinct held ports and
+passes explicit debugger flags; the existing two-port API remains unchanged. An actual disposable
+Electron42.0.1/Playwright1.59.1 probe verified the flag override, loopback listeners, expected app
+content and owned cleanup. Two probe-collection errors are retained separately. Nine allocator
+controls, types, lint and formatting pass; exact source review approved all three test/helper files.
+Original permission/effect assertions, deadlines and retry settings remain intact. The original
+network-block journey now passed on its first actual application attempt: one case,5.399 seconds,
+retries0/skips0. Persisted network:block, zero approvals, one denied sys_bash audit, unchanged file,
+two controlled model requests and28 safe backend events were verified, with clean exit/owned-group
+cleanup and unchanged runtime bytes. Preflight/discovery stops launched no application and remain
+retained separately. Fresh current-head hosted coverage remains required; latest actual results are
+in Beads and the [results record](docs/reviews/local-diagnostics-monitoring-results.md).
+No application runtime, permission, sampler, storage or security-policy code changes in this repair.
 
-Fresh signed real-VM Stop passed44.816 seconds (46.174-second suite), no retry/skip/failure;
-ack6.538 ms, genuine started/late effects and final outcome_unknown/two in-flight attempts, zero
-post-ack admissions or replay. Native history has one honest baseline sample/48 V1events/25 controls,
-enabled seven-day preference and shared V1/resource UUID; session V1 report has 43 events/zero loss.
-Two unique ZIPs/488 CRC members, source/runtime/served bindings and owned VM cleanup were independently
-approved. Retained signed helper verified; large pinned image was not freshly byte-hashed. No guest
-CPU, periodic-cadence or capacity claim comes from that baseline sample.
+This prevents the fixture's own debugger collision opportunity; released ports can still be taken
+by another process. Production HTTP readiness accepts a response without authenticating server
+identity. Separate P2 [renderer identity](docs/tasks/agent-platform-renderer-readiness-identity.md)
+remains OPEN, discovered from monitoring, with no implementation authority or demonstrated capability
+breach. The owner-trial preflight now requires visibly identifying the actual application and
+working recording/export, not merely HTTP success. A load wait alone is not this repair.
 
-## Monitoring contract and diagnostic review
+## Qualified implementation evidence
 
-Resource recording defaults OFF; enabling once persists across restart and captures API-process
+First119 source normal hooks passed1,526 tests before hosted Sonar rejected18 findings/6.8%
+duplication. Independently reviewed source repairs and two internal SQLite helpers preserved strict
+schemas, bounded queues/reads/cleanup, independent snapshots and private access. No issue dismissal,
+rule/profile/exclusion or threshold change. Normal1c2 push passed five affected builds/types/cycles
+and1,532 tests (contracts146/desktop223/web431/DB189/API543). Final observer-only a2b follow-up passed
+normal API build/types/cycles and543 tests, including actual periodic sampling/SIGKILL restart and
+bounded worker close while HTTP drain is held. Existing earlier failures remain retained.
+
+Current a2b hosted benchmark artifact12062956123 was independently verified against its API digest,
+full small ZIP hash, CRC and all nine raw vectors:900 measured/990 total requests; maximum relative
+p95 overhead5.211 ms against20 ms and enqueue p95 0.052888 ms against2 ms, zero healthy capture loss.
+The local required-hook benchmark also passed. Enabled phases capture initial probes, not periodic
+load capacity. No unchanged manual benchmark repeat is needed for this fixture-only repair.
+
+Fresh1c2 managed Electron plus separate Chromium passed41.107 seconds without retry/skip/failure,
+proving actual30-second sampling, native SaveAs/cancel, private browser403, exact history after
+restart and resource OFF while V1 continues. Signed real-VM Stop passed44.816 seconds, ack6.538 ms,
+truthful outcome_unknown/two in-flight attempts, genuine started/late effects, zero post-ack
+admissions and no replay. Source/effects/ZIP/cleanup review approved the actual evidence. These are
+applicable regression proofs with the explicit observer/test-launcher deltas, not relabeled as
+exact-byte tests of later source. Actual current-head protected staging VM remains a separate gate.
+
+A fresh report-only reviewer located the deliberately held31.060-second model interval and later
+process boundary using only stored metadata, without source, live observation or fixture ground
+truth. The separate post-assessment comparison confirms the controlled seed was found, with
+incomplete coverage/independent snapshots and causal uncertainty preserved. This is not a new
+performance bug or proof of a provider/resource cause. Original insufficient idle report retained.
+
+## Contract, publication and remaining delivery
+
+Resource recording defaults OFF; enabling once persists across restart and samples API-process
 CPU/RSS/event-loop, distinct active/unresolved/lock counts and app-volume free space every30 seconds.
-Existing V1 request/model/tool/Stop capture remains unchanged when resources are OFF. Default age
-seven days is configurable1–90, but25,000 samples retain only about8.68 continuous days at30 seconds;
-32 MiB pages/34 MiB journal,5 MiB window output and 2second monitoring cleanup are fixed bounds.
-Private API/CLI/native export retain independent snapshots, signed cursors and missing/pruned/
-degraded/unclean coverage. No prompt/content/key/path upload or dashboard is added.
+V1 request/model/tool/Stop capture continues independently. Seven-day retention is configurable1–90,
+but25,000 samples cover only about8.68 continuous days;32 MiB pages/34 MiB journal,5 MiB output,
+200 ms window reads and2s monitoring close remain fixed. No host/provider/container totals, prompt,
+secret or path upload, dashboard, paid provider call or recurring agent is added.
 
-At the first local checkpoint, a fresh report-only reviewer located a deliberately held31-second
-model interval after unclean restart without source, fixture ground truth or live observation.
-The initial idle report was insufficient and remains retained. Fresh source1c2 normal push passed
-1,532 tests across five affected packages, builds/types/cycles and the unchanged900-measurement/
-990-request benchmark. Independent review verified all nine raw vectors: maximum relative p95
-8.262 ms against20 ms and enqueue p95 0.014416 ms against2 ms, with zero healthy V1 loss. Resource
-phases cover initial probes, not periodic-load capacity. A fresh report-only reviewer independently
-located the31.060-second model interval and subsequent process boundary from saved data. Later
-comparison with separately withheld ground truth confirms the controlled seed was found; it is
-not a new performance bug or proof of a provider/resource cause. Receipts: normal-push proof,
-benchmark-independent-review and stored-window-review-03 assessment/disposition in the evidence root.
+The existing P2 [session-lock timeout](docs/tasks/agent-platform-session-lock-timeout-ownership.md)
+is OPEN, with real API exposure unverified and no unapproved mutex repair. Owner trial remains one
+active request per session. Monitoring/stress tasks do not close from a green retry or local pass.
 
-MON-COUNTS/PROCESS-ID/CLOCK-COVERAGE/UTC-INPUT were repaired and independently reviewed. Existing
-[session-lock timeout ownership](docs/tasks/agent-platform-session-lock-timeout-ownership.md) is P2
-OPEN/discovered-from monitoring; actual API exposure remains unverified, no hard dependency or
-unapproved mutex repair. Owner trial remains one active request per session.
+All nine substantive a2b mirrors plus twenty ordered session parts were fully read back:29 pages,
+620,566 canonical source bytes, existing identities/notes preserved. Receipts are under
+`publication-update-a2b867df`; the earlier119 partial publication remains historical. The new fixture
+repair, updated results/handoff, renderer-identity spec and stress preflight require current source-
+bound full mirror/readbacks before acceptance. Preserve/reuse existing page and part identities.
 
-## Remaining gates and owner boundary
+Normal affected desktop gates, fresh hosted checks and findings review, complete publication and
+actual owner-authorized feature/staging integration remain required. Monitoring merges retain their
+reserved authority; staging also needs actual full security analysis, packaged VM and protections.
+Owner stress testing is NOT ready before actual delivery and preflight. No trial has started.
+Evidence: `/Users/letuscode/.codex/local-diagnostics-monitoring-20261016`; original Stop/API receipts
+remain under `/Users/letuscode/.codex/project-chat-stop-implementation-20261016`.
 
-Independent local source/results reviews approve the repaired runtime and current connected/VM
-evidence. Actual1c2 hosted Sonar passes all quality conditions (duplication1.0%, ratings1,
-hotspots100%) but still reports one S7785 startup-style finding. The final index-only correction
-uses a synchronous observer around the owned readiness Promise, preserving immediate nonblocking
-startup and the same fixed warning; independent exact-source review approved it. Normal affected
-API checks and new-head hosted Sonar/issues remain required. Existing fresh1c2 benchmark,
-connected/VM and saved-report evidence remain applicable with this explicit observer-only delta;
-they are not relabeled as exact-byte tests of the follow-up. Full mirrors and all new-head hosted
-security/quality/reviews remain delivery gates. No monitoring
-merge or stress-ready claim follows local passes. Monitoring feature/staging merges retain their
-reserved actual owner-authority gates; staging also needs its own full scan/VM/protections.
-
-Notion publication is partial/on hold: four119branch mirrors (API/guide/plan/Stopresults) fully read
-back; five documents and all 20historical session parts are not published. Preserve/reuse those four
-actual IDs and all historical notes/pages; complete source-bound readbacks precede final acceptance.
-Evidence: `/Users/letuscode/.codex/local-diagnostics-monitoring-20261016`; original API/benchmark
-receipts also remain under `/Users/letuscode/.codex/project-chat-stop-implementation-20261016`.
-Latest synced qualification notes include Dolt40974 terminalPushcomplete. Beads remains authoritative.
-
-Docker gateway is disabled; global SHA256
-`5bf96ed01d13eca69e7f3009c4521323e1027b3802bb007350127d54aee1696f` remains unchanged. Host has passed
-the20 GiB VM reserve. No restart/prune, global credentials/settings change, paid model, upload,
-scheduled agent or owner stress session. Current owner trial is blocked by actual monitoring
-delivery/preflight. Full original history below stays434140 bytes/SHA256
-`2cd9dd3144d9585ae20a50150cf1ed9a06588f04bcd8c368ade566405da35f8c`; prior current prefixes remain
-in immutable Git history and retained evidence.
+Docker gateway is disabled; config SHA256
+`5bf96ed01d13eca69e7f3009c4521323e1027b3802bb007350127d54aee1696f` is unchanged. Readbacks found
+Docker29.8.2 responsive, the dev VM runner online/idle and host reserve above20 GiB. Recheck before
+trial. No restart/prune, globals change, retained-work deletion, paused orchestration or pilot.
+The full original history below remains434140 bytes/SHA256
+`2cd9dd3144d9585ae20a50150cf1ed9a06588f04bcd8c368ade566405da35f8c`; prior prefixes remain in Git
+and retained evidence. Beads is authoritative for current task status and completed synchronization.
 
 <!-- markdownlint-disable MD025 -->
 

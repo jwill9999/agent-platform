@@ -23,7 +23,7 @@ import { expect, test, type TestInfo } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 
 import { JOURNEY_CALL_ID, JOURNEY_MODEL, startJourneyProvider } from './support/providerJourney.js';
-import { getDesktopPorts } from './support/runtime.js';
+import { getDesktopLaunchPorts } from './support/runtime.js';
 import { attemptFixtureCleanup, releaseOwnedVmFixture } from './support/vmFixtureTeardown.js';
 import {
   attemptStartupEvidenceAttachment,
@@ -88,6 +88,8 @@ type VmFixtureHealth = 'ready' | 'failed';
 
 type VmFixture = {
   backendPort: number;
+  nodeInspectorPort: number;
+  chromiumDebuggerPort: number;
   startup: ReturnType<typeof createStartupEvidence>;
   evidenceDir?: string;
   heartbeatTimer?: NodeJS.Timeout;
@@ -1737,7 +1739,8 @@ async function createVmFixture(options: { health: VmFixtureHealth }): Promise<Vm
   const evidenceDir = process.env.AGENT_PLATFORM_E2E_EVIDENCE_DIR;
   const projectDir = join(tempRoot, 'client', 'packaged-vm-project');
   const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
-  const { backendPort, rendererPort } = await getDesktopPorts();
+  const { backendPort, rendererPort, nodeInspectorPort, chromiumDebuggerPort } =
+    await getDesktopLaunchPorts();
   const realPackagedResourcesDir =
     options.health === 'ready'
       ? process.env.AGENT_PLATFORM_E2E_PACKAGED_VM_RESOURCES_DIR
@@ -1771,6 +1774,8 @@ async function createVmFixture(options: { health: VmFixtureHealth }): Promise<Vm
 
   return {
     backendPort,
+    nodeInspectorPort,
+    chromiumDebuggerPort,
     startup: createStartupEvidence(backendPort, rendererPort),
     evidenceDir,
     heartbeatTimer,
@@ -1795,7 +1800,11 @@ async function launchVmFixture(
 ): Promise<ElectronApplication> {
   const app = await electron.launch({
     cwd: desktopDir,
-    args: ['.'],
+    args: [
+      `--inspect=${fixture.nodeInspectorPort}`,
+      `--remote-debugging-port=${fixture.chromiumDebuggerPort}`,
+      '.',
+    ],
     env: {
       ...process.env,
       LANGCHAIN_TRACING_V2: 'false',

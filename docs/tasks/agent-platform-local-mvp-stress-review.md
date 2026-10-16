@@ -14,6 +14,12 @@ ready, can read a prior run after restart, and an agent can identify a seeded de
 without witnessing it. Capture-health gaps must be visible. No manual symptom report is needed for
 routine evidence retention; if recording fails, postpone trial and fix its owning task first.
 
+Visibly confirm the actual Agent Platform workspace and working recording/export, not merely an
+HTTP success or a renderer-ready startup phase. PR339's retained first Electron attempt loaded a
+debugger discovery page at the expected renderer URL. Its fixture port repair does not authenticate
+production server identity; the separate P2 [readiness follow-up](agent-platform-renderer-readiness-identity.md)
+remains OPEN. If unexpected content is shown, postpone the trial and preserve the failed evidence.
+
 ## Proposed bounded workload
 
 One 30-minute local session: five-minute preflight, twenty-minute exercise, five-minute export/check.

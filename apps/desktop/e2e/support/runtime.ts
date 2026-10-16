@@ -38,12 +38,11 @@ export function getOpenPort(): Promise<number> {
   });
 }
 
-/** Reserve both ports together so the OS cannot reuse the first for the second.
+/** Hold every reservation together so our own allocations cannot reuse a released port.
  * Reservations end before child processes bind; unrelated processes can still race us.
  */
-export async function getDesktopPorts(): Promise<{ backendPort: number; rendererPort: number }> {
-  const backend = createServer();
-  const renderer = createServer();
+async function reservePorts(count: 2 | 4): Promise<number[]> {
+  const servers = Array.from({ length: count }, () => createServer());
   const listen = (server: ReturnType<typeof createServer>) =>
     new Promise<number>((resolvePort, reject) => {
       server.once('error', reject);
@@ -54,14 +53,33 @@ export async function getDesktopPorts(): Promise<{ backendPort: number; renderer
       });
     });
   try {
-    const backendPort = await listen(backend);
-    const rendererPort = await listen(renderer);
-    return { backendPort, rendererPort };
+    return await Promise.all(servers.map(listen));
   } finally {
     await Promise.all(
-      [backend, renderer].map(
+      servers.map(
         (server) => new Promise<void>((resolveClose) => server.close(() => resolveClose())),
       ),
     );
   }
+}
+
+export async function getDesktopPorts(): Promise<{ backendPort: number; rendererPort: number }> {
+  const ports = await reservePorts(2);
+  return { backendPort: ports[0]!, rendererPort: ports[1]! };
+}
+
+/** Explicit inspector ports prevent Playwright's ephemeral debuggers taking an app port. */
+export async function getDesktopLaunchPorts(): Promise<{
+  backendPort: number;
+  rendererPort: number;
+  nodeInspectorPort: number;
+  chromiumDebuggerPort: number;
+}> {
+  const ports = await reservePorts(4);
+  return {
+    backendPort: ports[0]!,
+    rendererPort: ports[1]!,
+    nodeInspectorPort: ports[2]!,
+    chromiumDebuggerPort: ports[3]!,
+  };
 }

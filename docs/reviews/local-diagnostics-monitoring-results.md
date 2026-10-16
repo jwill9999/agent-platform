@@ -19,6 +19,57 @@ assignments are procedurally read-only; no inherited-tool isolation is claimed. 
 must leave existing V1 capture and permission/control semantics unchanged. Evidence lives outside
 source inputs at `/Users/letuscode/.codex/local-diagnostics-monitoring-20261016`.
 
+## Current hosted checkpoint and fixture finding
+
+Exact a2b source completed CI38936644754 attempt1 with nine executed checks successful, Sonar OK/
+zero open issues and no unresolved review threads. Ordinary browser31 plus one isolated-context
+prerequisite skip, Git5 and Stop5 passed. Electron reported67 passed plus one flaky case, so clean
+qualification was withheld. The first network-block permission-policy attempt loaded DevTools
+HTTP discovery at renderer44341 despite healthy API and renderer/window-ready phases. Its original
+five-second Open folder assertion failed before any provider request, policy mutation, approval,
+audit or file change. The retry is retained as a retry, not a clean original pass.
+
+Selected first-attempt screenshot/traces/evaluation/startup records are retained with exact hashes
+and member/inner ZIP CRCs:149,859 range-read bytes from artifact12062354035. The full617 MB archive
+was not independently hashed; its digest is API-reported only. Parent and independent reviewer
+confirmed the actual wrong content. Raw synthetic fixture traces stay private.
+
+The fixture-only repair jointly allocates backend, renderer, Node inspector and Chromium debug
+ports, then passes explicit debug flags. Existing two-port consumers are unchanged. An actual
+Electron42.0.1/Playwright1.59.1 disposable probe verified override behavior, distinct loopback binds,
+expected app content and cleanup; both earlier probe-collection failures remain retained. Exact
+three-file source review and nine allocation/failure-cleanup/real-bind controls pass. No product
+runtime, permission/effect assertion, timeout or retry-policy change. The original network-block
+case passed on its first actual application attempt:1passed, retries0/skips0,5.399-second test/
+5.794-second suite/6.518-second supervisor. Actual persisted network:block, zero approvals, one denied
+sys_bash audit, unchanged file, two deterministic model requests/no errors, five messages and28 safe
+backend events were verified. Window-ready1885 ms, stop-confirmed4511 ms/exit0, unchanged runtime/
+source and absent owned process group. Both identical225-member trace ZIP copies pass CRC/hash.
+The preflight binding correction and zero-test discovery invocation launched no application; their
+raw evidence is retained separately. Receipt `desktop-port-probe/network-block-qualification.json`
+SHA256 `509d3caf19bef982d8d9fc7f8a03ca4d3a3bda75d91a5212d62caba2d0392443` binds the three exact
+fixture hashes, final a2b application source and compiled index emit. This is local macOS/controlled
+provider evidence, not hosted Linux or real-VM qualification. Fresh current-head hosted coverage
+remains required before acceptance.
+
+Released ports still admit an unrelated-process race. Production readiness's arbitrary HTTP-success
+acceptance is separately recorded P2 OPEN [renderer identity](../tasks/agent-platform-renderer-readiness-identity.md),
+with no observed monitoring capability disclosure or implicit production fix. Independent critique
+accepts the bounded fixture remedy while requiring actual UI/recording/export identity in owner-
+trial preflight. A load wait alone would have accepted the wrong page and is not used as a remedy.
+
+The hosted benchmark is independently approved: artifact12062956123 ZIP SHA256
+`21d77fe6865b46e80f593c31035cea43dc3c2572d9b0e1c01095aeb39c2efa44` matches the API digest;
+sole JSON CRC/hash and all nine vectors verified.900 measurements/990 total requests, maximum
+relative p95 5.211346 ms against20 ms, enqueue p95 0.052888 ms against2 ms; three healthy modes
+retain1,540 events each/zero drops. Six enabled companions retain their initial sample. No periodic
+load/capacity claim; the fixture-only change does not invalidate that measured request path.
+The synthetic checkout tree equals reviewed a2b. Future changed-head checks remain separate.
+
+Receipts: `pr339-a2b-independent-hosted-qualification.json`, selected failure receipt under
+`pr339-a2b-hosted-review/failing-attempt-0`, and `desktop-port-probe/fixture-repair-review.json`.
+No merge, monitoring closure or stress readiness follows this checkpoint.
+
 ## First hosted qualification and repair history
 
 PR339 is open into `feature/local-diagnostics-monitoring` at first pushed checkpoint
