@@ -1,7 +1,7 @@
 # PR336 opt-in publication — staging qualification checkpoint
 
-Owner authorized merging PR337 into the existing feature and requalifying PR336, without merging
-PR336 into staging. [PR337](https://github.com/jwill9999/agent-platform/pull/337) merged at
+Owner authorized PR337 feature integration and PR336 requalification, then approved protected
+staging delivery once all current-head checks and review findings clear. [PR337](https://github.com/jwill9999/agent-platform/pull/337) merged at
 `af8e33fded09dbbfdf253ecc571ae377027475ef`; its tree exactly equals reviewed `64e5115b`.
 All nine executed feature checks passed, including 61 Electron tests; Sonar is OK with zero issues.
 The four original PR336 threads were resolved only after verifying those fixes in its actual head.
@@ -19,7 +19,7 @@ owner request covering the destination and documents. Task approval, tool access
 historical plans supply no standing publication permission. Existing external pages are retained;
 no new publication or generated readback artifacts are requested. The old VM attempt stopped during
 dependency installation after network/DNS errors; it supplies no packaged-VM qualification.
-New protected checks must qualify the actual reconciled source before any later staging approval.
+New protected checks must qualify the actual reconciled source before the authorized staging merge.
 
 ## Preserved historical sources
 
