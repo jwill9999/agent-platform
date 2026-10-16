@@ -74,6 +74,105 @@ describe('private monitoring transport', () => {
       ),
     ).rejects.toThrow('could not be read');
   });
+  it('accepts exactly the byte cap across sequential chunks and releases its reader', async () => {
+    const text = '{"safe":true}';
+    const chunks = [
+      new TextEncoder().encode(text),
+      new Uint8Array(maximumMonitoringBytes - text.length).fill(32),
+    ];
+    let index = 0;
+    let inPull = 0;
+    let maximumPulls = 0;
+    const body = new ReadableStream<Uint8Array>(
+      {
+        async pull(controller) {
+          inPull++;
+          maximumPulls = Math.max(maximumPulls, inPull);
+          await Promise.resolve();
+          if (index < chunks.length) controller.enqueue(chunks[index++]!);
+          else controller.close();
+          inPull--;
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const parse = vi.fn((value) => value);
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(body));
+    expect(await monitoringPost('window', {}, parse, { ...config, fetchImpl })).toEqual({
+      safe: true,
+    });
+    expect(maximumPulls).toBe(1);
+    expect(index).toBe(2);
+    expect(parse).toHaveBeenCalledOnce();
+    expect(body.locked).toBe(false);
+  });
+  it('handles many tiny chunks without recursion overflow or losing order', async () => {
+    const encoded = new TextEncoder().encode(JSON.stringify({ value: 'x'.repeat(4096) }));
+    let index = 0;
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          if (index < encoded.length) controller.enqueue(encoded.subarray(index, ++index));
+          else controller.close();
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(body));
+    expect(await monitoringPost('window', {}, (value) => value, { ...config, fetchImpl })).toEqual({
+      value: 'x'.repeat(4096),
+    });
+    expect(body.locked).toBe(false);
+  });
+  it('waits for oversized-stream cancellation before rejecting and releasing its reader', async () => {
+    let completeCancel!: () => void;
+    const cancellation = new Promise<void>((resolve) => {
+      completeCancel = resolve;
+    });
+    const cancel = vi.fn(() => cancellation);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(maximumMonitoringBytes + 1));
+      },
+      cancel,
+    });
+    const parse = vi.fn();
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(body));
+    let settled = false;
+    const result = monitoringPost('window', {}, parse, { ...config, fetchImpl }).catch(
+      (error: unknown) => {
+        settled = true;
+        return error;
+      },
+    );
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+    expect(settled).toBe(false);
+    // Native iterator releases its private reader immediately, but awaits cancellation before rejection.
+    expect(body.locked).toBe(false);
+    completeCancel();
+    expect(await result).toBeInstanceOf(Error);
+    expect(parse).not.toHaveBeenCalled();
+    expect(body.locked).toBe(false);
+  });
+  it('releases its reader after a partial stream fails without projecting partial data', async () => {
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          if (++pulls === 1) controller.enqueue(new TextEncoder().encode('{'));
+          else controller.error(new Error('PRIVATE_READ_CANARY'));
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const parse = vi.fn();
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(body));
+    await expect(monitoringPost('window', {}, parse, { ...config, fetchImpl })).rejects.toThrow(
+      'could not be read',
+    );
+    expect(parse).not.toHaveBeenCalled();
+    expect(body.locked).toBe(false);
+  });
   it('cancels an oversized stream and does not invoke the projector', async () => {
     const cancel = vi.fn();
     const parse = vi.fn();

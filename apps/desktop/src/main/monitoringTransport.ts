@@ -24,26 +24,18 @@ export function monitoringApi(deps: MonitoringTransportDependencies): URL {
 }
 
 async function readBounded(response: Response): Promise<unknown> {
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('Monitoring response was empty.');
+  const body = response.body;
+  if (!body) throw new Error('Monitoring response was empty.');
   const chunks: Uint8Array[] = [];
   let bytes = 0;
-  try {
-    // Sequential bounded reads apply backpressure before retaining each next chunk.
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      bytes += chunk.value.byteLength;
-      if (bytes > maximumMonitoringBytes) {
-        await reader.cancel();
-        throw new Error('Monitoring response exceeds its safe size limit.');
-      }
-      chunks.push(chunk.value);
-    }
-    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
-  } finally {
-    reader.releaseLock();
+  // Native iteration reads sequentially and awaits cancellation/release on early exit.
+  for await (const chunk of body) {
+    bytes += chunk.byteLength;
+    if (bytes > maximumMonitoringBytes)
+      throw new Error('Monitoring response exceeds its safe size limit.');
+    chunks.push(chunk);
   }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
 }
 
 export async function monitoringPost<T>(

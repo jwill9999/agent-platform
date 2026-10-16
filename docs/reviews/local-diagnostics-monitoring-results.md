@@ -19,7 +19,69 @@ assignments are procedurally read-only; no inherited-tool isolation is claimed. 
 must leave existing V1 capture and permission/control semantics unchanged. Evidence lives outside
 source inputs at `/Users/letuscode/.codex/local-diagnostics-monitoring-20261016`.
 
-## Local qualification
+## First hosted qualification and repair history
+
+PR339 is open into `feature/local-diagnostics-monitoring` at first pushed checkpoint
+`11927e4fb984a9b333d699509382d5b3ddbde101`, tree `5b8896851c0856df5febbba032d358aea331c91f`.
+Normal hooks passed five affected builds/types/cycles and 1,526tests: contracts 146/desktop 219/web 431/
+DB 187/API 543; all 55committed hashes matched the reviewed candidate. That local push is successful,
+while the earlier877push failure remains retained. It does not qualify subsequent repair source.
+
+Actual hosted Sonar rejected119:18open findings and 6.8%new duplicated lines above3%; reliabilityD,
+security/maintainability/hotspot conditions otherwise pass. Raw API/issue/duplication blocks are
+retained as `pr339-sonar-opening.json` and the related four-file block receipts. No issue dismissal,
+rule/profile change, exclusion or threshold alteration is used. Other hosted jobs and review threads
+are inspected independently; a green check alone never resolves an actionable finding.
+
+Repairs are bounded: preserve nonblocking API startup with an async readiness helper, extract
+unchanged route-error translation and CLI parsers/renderers, native sequential bounded streaming,
+standalone UI/summary labels and spacing, exact cursor field sets, explicit safe page projections,
+and two concrete internal DB helpers for identical queue/RPC/cursor/metadata mechanics. Each store
+retains its own strict schemas, health/preference/configuration, HMAC/epoch/snapshot/prune fences,
+queue256including in-flight/batch32/read 200 ms and existing one-/two-second shutdown policies.
+DB helper source review and fresh queue/storage/cursor/process,900-measurement benchmark, coupled
+recording journey and signed-VM Stop qualification are required before those changes can inherit a
+new delivery claim. Prior119results below remain the original local checkpoint.
+
+Documentation publication is explicitly partial: four new branch-specific119mirrors (API reference,
+diagnostics guide, plan and Stop results) have full body/revision/hash/destination readbacks. Five
+other documents and all 20historical session parts remain unpublished/on hold until final repair
+source is pushed. Preserve/reuse those four exact page IDs; historical mirrors/notes are untouched.
+Receipt: `publication-preparation/partial-publication-11927e4f-hold.json`.
+
+## Repaired-source local qualification checkpoint
+
+All repair groups passed independent source review: API startup/error helpers; native sequential
+transport/UI; CLI helpers; contracts and the two internal store/worker helpers. Scoped controls pass:
+contracts 35, DB 42 including real physical limits/queue/deadlines/cursors, desktop 53, web 14, CLI13,
+and API 9 plus held-HTTP shutdown1. Counts overlap, and normal full package gates remain separate.
+All 49 application/test/workflow source hashes are frozen in `pr339-sonar-application-candidate.json`.
+
+A fresh supported rebuild and connected journey passed once:41.107-second test/41.553-second suite/
+42.555-second supervisor, no retry/skip/failure. Actual sample interval30000.471 ms; enabled seven-day
+preference, exact prior 2 samples/36 events after restart and fixed 3 samples after Off while events grow
+to53. All four safe reports are ready, zero loss/pending/conflict/prune, explicit independent
+snapshots. Private browser403, native SaveAs/cancel, three deterministic model replies and owned
+cleanup pass. Independent review rehashed49 source/158 compiled bindings and three ZIPs/487 CRC members.
+
+The fresh signed VM case passed once:44.816-second test/46.174-second suite/47.853-second supervisor,
+no retry/skip/failure. Stop acknowledged in6.538 ms, final outcome_unknown with two in-flight attempts,
+one genuine started and late guest effect, one provider request/no errors and no post-ack admission
+or replay. Native history50,389 bytes/SHA599572851d1ba8dfd9519ff309877110fa91edd47f5886e5ad9b348483d91277
+contains one baseline sample/48 events/25correlated controls with the same V1/resource process UUID;
+original session V1 report43 events/42,341 bytes is an exact subset, durable/zero loss. Both stores are
+ready; independent snapshots and baseline/guest-CPU limits remain explicit. Two unique trace ZIPs/
+488 CRC members, source/runtime/served bindings, signed helper and owned VM cleanup were independently
+approved. No fresh 4 GiB image hash or load/capacity claim. Source/results from119below remain historical.
+
+Current gate: new-head hosted Sonar/duplication has not yet qualified the repaired source. One fresh
+900-measurement/990total benchmark with unchanged20 ms/2 ms thresholds, retained raw vectors and actual
+process/restart/private API controls is required through normal push. Full nine-document mirrors,
+all hosted tests/security/reviews and actual authorized delivery remain separate. No stress ready.
+Receipts: `pr339-db-contract-sonar-repair-freeze-v1.json`, API/CLI/desktop repair receipts,
+`connected-sonar.*` and `vm-monitoring-sonar.*` with their actual artifacts.
+
+## First local qualification checkpoint
 
 These are source-bound working-tree results, not a committed revision or hosted qualification.
 Original receipts are retained: monitoring/API/benchmark receipts under
@@ -116,12 +178,12 @@ trace and startup/cleanup evidence remain retained as `vm-monitoring.*` and its 
 The test-only correction waits for the exact owned initial root URL to finish loading before
 navigating to Settings. It retains the original navigation/test/Stop deadlines and every VM/effect/
 privacy assertion; there is no retry loop or product change. The critic approved exact corrected test `bdc5b0a8`; a new actual signed-VM attempt passed
-one case in46.417seconds (47.491-second suite/48.447seconds supervised), zero retries/skips/failures, no signals and owned
+one case in46.417 seconds (47.491-second suite/48.447 seconds supervised), zero retries/skips/failures, no signals and owned
 group absent. The same real guest produced one started effect and one late effect; Stop acknowledged
-in8.849ms and final state remained `outcome_unknown` with two in-flight attempts. Provider fixture
+in8.849 ms and final state remained `outcome_unknown` with two in-flight attempts. Provider fixture
 was called once with no errors; no replay/new post-ack admissions were permitted. Native Settings
 saved an enabled seven-day preference and native history export retained one actual initial resource
-sample,48V1events/25correlated controls and shared V1/resource process identity for the actual session
+sample,48 V1events/25correlated controls and shared V1/resource process identity for the actual session
 and logical run. Independent snapshots are explicit and combined coverage was not incomplete; this
 short window makes no periodic/guest-CPU claim. Existing V1 export retained43safe events. Exact
 source/compiled/global bytes were unchanged through the attempt. Retained helper signature verified;
@@ -142,13 +204,13 @@ gates and bind actual pushed bytes to the reviewed candidate. Two process-fixtur
 storage-setup race are retained in their original logs; fixture repairs did not weaken product gates.
 Existing Stop failed attempts and an unexplained diagnostic export 503 remain in its own results.
 
-The first monitoring source commit `8772382a` exactly matched all54reviewed candidate files, but its
-normal push was rejected: cycles, five affected builds/types and contracts146 passed; desktop218/219
+The first monitoring source commit `8772382a` exactly matched all 54reviewed candidate files, but its
+normal push was rejected: cycles, five affected builds/types and contracts 146 passed; desktop 218/219
 failed before the remaining package suites qualified. The normal-shutdown test's ready-window double
 lacked `webContents.getURL()`, required to capture the trusted monitoring renderer origin. Bootstrap
 therefore threw/quit before the simulated shutdown. Focused reproduction retained the same failure.
 A test-only correction returns the same fixture renderer URL and asserts legitimate startup before
-all unchanged pending-child/repeated-quit checks. Six focused and all219desktop unit tests pass,
+all unchanged pending-child/repeated-quit checks. Six focused and all 219desktop unit tests pass,
 along with strict touched-test typecheck/lint/format. No application/runtime change or E2E rerun is
 needed for that mock-contract repair. The failed push/log and reproduction remain retained;
 `main-lifecycle-monitoring-mock-repair-v2.json` binds exact source and results. A new unmodified

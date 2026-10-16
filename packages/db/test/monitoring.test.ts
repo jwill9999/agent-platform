@@ -62,6 +62,10 @@ it('acks retained preferences only after worker ready and keeps safe samples acr
   await store.flush();
   const page = await store.queryWindow({ fromMs: observedAtMs - 1, toMs: observedAtMs + 1 });
   expect(page.samples.map((row) => row.sample)).toEqual([value]);
+  expect(page).not.toHaveProperty('stats');
+  const cloned = store.health();
+  cloned.preference!.retentionDays = 1;
+  expect(store.health().preference?.retentionDays).toBe(90);
   expect(page.health.pending).toBe(0);
   expect(page.completedCursor).toBeTruthy();
   expect(statSync(path).mode & 0o777).toBe(0o600);
@@ -297,6 +301,7 @@ it('uses UTC min/max for V1 events without mislabelling asynchronous equal or re
   await store.flush();
   const page = await store.queryWindow({ fromMs: now + 60000, toMs: now + 110000, sessionId });
   expect(page.events.map((row) => row.event.observedAtMs)).toEqual(times);
+  expect(page).not.toHaveProperty('stats');
   expect(page.coverage).toEqual({
     oldestObservedAtMs: now + 70000,
     newestObservedAtMs: now + 100000,

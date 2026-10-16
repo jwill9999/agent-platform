@@ -10,7 +10,10 @@ import {
   runSeed,
 } from '@agent-platform/db';
 import { consumeDiagnosticAccess } from './infrastructure/diagnostics/localAccess.js';
-import { createMonitoringRuntime } from './infrastructure/diagnostics/monitoringRuntime.js';
+import {
+  createMonitoringRuntime,
+  type MonitoringRuntime,
+} from './infrastructure/diagnostics/monitoringRuntime.js';
 
 import type { HarnessStateType, ToolCallIntent } from '@agent-platform/harness';
 
@@ -68,10 +71,15 @@ const monitoringRuntime =
         appVersion: process.env.DIAGNOSTICS_APP_VERSION,
       })
     : undefined;
-if (monitoringRuntime)
-  void monitoringRuntime.start().catch(() => {
+if (monitoringRuntime) void observeMonitoringReadiness(monitoringRuntime);
+
+async function observeMonitoringReadiness(runtime: MonitoringRuntime): Promise<void> {
+  try {
+    await runtime.start();
+  } catch {
     log.warn('monitoring.degraded', { code: 'storage_unavailable' });
-  });
+  }
+}
 
 function observeDiagnosticReadiness(store: ReturnType<typeof createDiagnosticStore>): void {
   void store.ready

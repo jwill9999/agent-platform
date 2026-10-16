@@ -113,6 +113,36 @@ async function readBounded(response) {
   }
 }
 
+function renderList(input, json) {
+  const list = projectList(input);
+  if (json) return JSON.stringify(list, null, 2);
+  return [
+    `Recent local diagnostic events (${list.health.state}; ${list.health.dropped} dropped, ${list.health.pending} pending).`,
+    ...list.events.map(({ sequence, event }) => {
+      const session = event.sessionId ? `; session ${event.sessionId}` : '';
+      const run = event.runId ? `; run ${event.runId}` : '';
+      return `${renderDiagnosticObservation(sequence, event)}${session}${run}`;
+    }),
+  ].join('\n');
+}
+
+function renderResponse(input, options) {
+  if (options.monitoring) {
+    const text = renderMonitoringResponse(input, options);
+    if (Buffer.byteLength(text + '\n', 'utf8') > maxBytes) throw new Error('response_limit');
+    return text;
+  }
+  if (options.command === 'list') return renderList(input, options.json);
+  const report = projectDiagnosticReport(input);
+  if (JSON.stringify(report.scope) !== JSON.stringify(options.body.scope)) {
+    // Compare fields independently of property insertion order.
+    const fields = ['requestId', 'sessionId', 'runId'];
+    if (fields.some((key) => report.scope[key] !== options.body.scope[key]))
+      throw new Error('scope_mismatch');
+  }
+  return options.json ? JSON.stringify(report, null, 2) : report.summary;
+}
+
 export async function runDiagnostics(
   args,
   env = process.env,
@@ -132,33 +162,7 @@ export async function runDiagnostics(
       body: JSON.stringify(options.body),
     });
     const input = await readBounded(response);
-    if (options.monitoring) {
-      const text = renderMonitoringResponse(input, options);
-      if (Buffer.byteLength(text + '\n', 'utf8') > maxBytes) throw new Error('response_limit');
-      output.write(`${text}\n`);
-    } else if (options.command === 'list') {
-      const list = projectList(input);
-      const text = options.json
-        ? JSON.stringify(list, null, 2)
-        : [
-            `Recent local diagnostic events (${list.health.state}; ${list.health.dropped} dropped, ${list.health.pending} pending).`,
-            ...list.events.map(({ sequence, event }) => {
-              const session = event.sessionId ? `; session ${event.sessionId}` : '';
-              const run = event.runId ? `; run ${event.runId}` : '';
-              return `${renderDiagnosticObservation(sequence, event)}${session}${run}`;
-            }),
-          ].join('\n');
-      output.write(`${text}\n`);
-    } else {
-      const report = projectDiagnosticReport(input);
-      if (JSON.stringify(report.scope) !== JSON.stringify(options.body.scope)) {
-        // Compare fields independently of property insertion order.
-        const fields = ['requestId', 'sessionId', 'runId'];
-        if (fields.some((key) => report.scope[key] !== options.body.scope[key]))
-          throw new Error('scope_mismatch');
-      }
-      output.write(`${options.json ? JSON.stringify(report, null, 2) : report.summary}\n`);
-    }
+    output.write(`${renderResponse(input, options)}\n`);
     return 0;
   } catch (error) {
     // Never print server bodies, URLs, environment values or library error details.

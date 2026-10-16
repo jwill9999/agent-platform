@@ -32,6 +32,10 @@ function desktopBridge(): MonitoringBridge | undefined {
     ? (candidate as MonitoringBridge)
     : undefined;
 }
+function recordingLabel(preference: MonitoringStatus['monitoring']['preference'] | undefined) {
+  if (!preference) return 'Unknown';
+  return preference.samplingEnabled ? 'Enabled' : 'Off';
+}
 function timestamp(value: number | null | undefined): string {
   return value === null || value === undefined ? 'Unknown' : new Date(value).toISOString();
 }
@@ -206,7 +210,7 @@ export function LocalMonitoring() {
     setMessage('');
   }
   const preference = status?.monitoring.preference;
-  const recording = preference ? (preference.samplingEnabled ? 'Enabled' : 'Off') : 'Unknown';
+  const recording = recordingLabel(preference);
   return (
     <section className="mx-auto max-w-5xl space-y-4 p-6" aria-labelledby={`${id}-title`}>
       <h2 id={`${id}-title`} className="text-lg font-semibold">
@@ -262,7 +266,7 @@ export function LocalMonitoring() {
                   type="checkbox"
                   checked={enabled}
                   onChange={(event) => setEnabled(event.target.checked)}
-                />
+                />{' '}
                 Record local resource samples
               </label>
               <label htmlFor={`${id}-days`} className="block">

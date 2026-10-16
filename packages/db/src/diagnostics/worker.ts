@@ -1,7 +1,8 @@
+import { captureMetadata, windowCursorCodec, attachCaptureWorker } from './captureWorker.js';
 import { parentPort, workerData } from 'node:worker_threads';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import Database from 'better-sqlite3';
 import {
   DiagnosticEventSchema,
@@ -17,38 +18,14 @@ const port = parentPort!;
 let db: Database.Database;
 let previousShutdownUnclean = false;
 const windowEpoch = randomUUID();
-function meta(key: string): number {
-  return Number(
-    (
-      db.prepare('SELECT value FROM diagnostic_meta WHERE key = ?').get(key) as
-        | { value: string }
-        | undefined
-    )?.value ?? 0,
-  );
-}
-function setMeta(key: string, value: number | string): void {
-  db.prepare(
-    'INSERT INTO diagnostic_meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
-  ).run(key, String(value));
-}
-function maximum(): number {
-  return Number(
-    (
-      db.prepare("SELECT seq FROM sqlite_sequence WHERE name='diagnostic_events'").get() as
-        | { seq: number }
-        | undefined
-    )?.seq ?? 0,
-  );
-}
-function earliest(): number {
-  return Number(
-    (
-      db.prepare('SELECT min(sequence) AS value FROM diagnostic_events').get() as {
-        value: number | null;
-      }
-    ).value ?? 0,
-  );
-}
+const { meta, setMeta, maximum, earliest, sign } = captureMetadata(() => db, 'diagnostics');
+const windowCursors = windowCursorCodec({
+  epoch: windowEpoch,
+  sign,
+  maximum,
+  earliest,
+  prunedThrough: () => meta('pruned_through'),
+});
 function stats() {
   return {
     pruned: meta('pruned'),
@@ -89,14 +66,6 @@ function where(scope: DiagnosticScope): { sql: string; values: string[] } {
   return scope.runId
     ? { sql: 'session_id = ? AND run_id = ?', values: [scope.sessionId, scope.runId] }
     : { sql: 'session_id = ?', values: [scope.sessionId] };
-}
-function sign(payload: string): string {
-  const secret = (
-    db.prepare("SELECT value FROM diagnostic_meta WHERE key='cursor_secret'").get() as {
-      value: string;
-    }
-  ).value;
-  return createHmac('sha256', secret).update(payload).digest('base64url');
 }
 function cursor(scope: DiagnosticScope, after: number, snapshot: number): string {
   const payload = Buffer.from(
@@ -172,53 +141,10 @@ function windowCursor(
   snapshot: number,
   done: boolean,
 ): string {
-  const payload = Buffer.from(
-    JSON.stringify({
-      scope: JSON.stringify(window),
-      after,
-      snapshot,
-      prunedThrough: meta('pruned_through'),
-      epoch: windowEpoch,
-      done,
-    }),
-  ).toString('base64url');
-  return `${payload}.${sign(payload)}`;
+  return windowCursors.encode(JSON.stringify(window), after, snapshot, done);
 }
-function decodeWindow(
-  value: string,
-  window: DiagnosticWindow,
-): { after: number; snapshot: number; done: boolean } {
-  if (value.length > 2048) throw new Error('invalid_cursor');
-  const [payload, signature, extra] = value.split('.');
-  if (
-    !payload ||
-    !signature ||
-    extra ||
-    Buffer.byteLength(signature) !== Buffer.byteLength(sign(payload)) ||
-    !timingSafeEqual(Buffer.from(signature), Buffer.from(sign(payload)))
-  )
-    throw new Error('invalid_cursor');
-  const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<
-    string,
-    unknown
-  >;
-  if (
-    !data ||
-    Object.keys(data).sort().join(',') !== 'after,done,epoch,prunedThrough,scope,snapshot' ||
-    data.scope !== JSON.stringify(window) ||
-    data.epoch !== windowEpoch ||
-    typeof data.done !== 'boolean' ||
-    !Number.isSafeInteger(data.after) ||
-    !Number.isSafeInteger(data.snapshot) ||
-    !Number.isSafeInteger(data.prunedThrough) ||
-    Number(data.after) < 0 ||
-    Number(data.snapshot) < Number(data.after) ||
-    Number(data.snapshot) > maximum()
-  )
-    throw new Error('invalid_cursor');
-  if (meta('pruned_through') > Number(data.prunedThrough))
-    throw new Error(`expired_history:${earliest()}`);
-  return data as { after: number; snapshot: number; done: boolean };
+function decodeWindow(value: string, window: DiagnosticWindow) {
+  return windowCursors.decode(value, JSON.stringify(window));
 }
 function queryWindow(input: { window: DiagnosticWindow; cursor?: string; limit?: number }) {
   db.transaction(prune)();
@@ -386,22 +312,4 @@ function executeCommand(message: WorkerMessage): unknown {
   }
 }
 
-function failureReason(error: unknown): string {
-  const messageText = error instanceof Error ? error.message : '';
-  if (messageText.startsWith('expired_history:')) return messageText;
-  if (messageText === 'invalid_cursor') return 'invalid_cursor';
-  const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : '';
-  if (code === 'SQLITE_BUSY') return 'busy';
-  if (code === 'SQLITE_FULL') return 'storage_limited';
-  return 'storage_unavailable';
-}
-
-port.on('message', (message: WorkerMessage) => {
-  try {
-    const result = executeCommand(message);
-    port.postMessage({ id: message.id, result });
-    if (message.type === 'close') port.close();
-  } catch (error) {
-    port.postMessage({ id: message.id, error: failureReason(error) });
-  }
-});
+attachCaptureWorker(port, executeCommand);

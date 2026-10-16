@@ -196,6 +196,10 @@ function validatePage(page: MonitoringPage | DiagnosticWindowPage): void {
     previous = sequence;
   }
 }
+function samplingLabel(preference: MonitoringPreference | null): string {
+  if (preference === null) return 'unknown';
+  return preference.samplingEnabled ? 'enabled' : 'disabled';
+}
 /** Generate all readable prose from strict safe metadata, never a server-provided summary. */
 export function renderMonitoringReport(report: MonitoringReport): string {
   const lines = [
@@ -203,7 +207,7 @@ export function renderMonitoringReport(report: MonitoringReport): string {
     `UTC window: ${report.monitoring.window.fromMs} to ${report.monitoring.window.toMs} (exclusive).`,
     `Independent snapshots: samples ${report.monitoring.snapshotSequence}; events ${report.diagnostics.snapshotSequence}. No atomic cross-database snapshot is claimed.`,
     `Coverage: ${report.coverage.incomplete ? 'incomplete' : 'recorded page'}; samples ${report.monitoring.samples.length}, events ${report.diagnostics.events.length}.`,
-    `Sampling: ${report.monitoring.health.preference?.samplingEnabled === true ? 'enabled' : report.monitoring.health.preference ? 'disabled' : 'unknown'}; state ${report.monitoring.health.state}; reason ${report.monitoring.health.reason}; pending ${report.monitoring.health.pending}; dropped ${report.monitoring.health.dropped}; pruned ${report.monitoring.health.pruned}.`,
+    `Sampling: ${samplingLabel(report.monitoring.health.preference)}; state ${report.monitoring.health.state}; reason ${report.monitoring.health.reason}; pending ${report.monitoring.health.pending}; dropped ${report.monitoring.health.dropped}; pruned ${report.monitoring.health.pruned}.`,
     'CPU is API-process user/system microseconds over each monotonic interval; RSS/disk are bytes and event-loop values milliseconds. Child/provider/container/host totals are not implied.',
     'Observations can identify suspect intervals, not establish a cause. Missing data does not prove an action was absent.',
     'Retention is bounded by age, 25,000 rows and physical storage. At 30-second intervals the row cap holds about 8.68 days; a 90-day age setting is not a 90-day coverage guarantee.',
@@ -214,8 +218,6 @@ export function renderMonitoringReport(report: MonitoringReport): string {
   ] as const) {
     lines.push(
       `${name} coverage: oldest/newest ${page.coverage.oldestObservedAtMs ?? 'unknown'}/${page.coverage.newestObservedAtMs ?? 'unknown'} ms; gaps ${page.coverage.gaps}; history may be missing ${page.coverage.historyMayBeMissing}; previous shutdown unclean ${page.health.previousShutdownUnclean}.`,
-    );
-    lines.push(
       `${name} health: state ${page.health.state}; reason ${page.health.reason}; pending ${page.health.pending}; dropped ${page.health.dropped}; conflicts ${page.health.conflicts}; pruned ${page.health.pruned}; last durable acknowledgement ${page.health.lastAcknowledgedAtMs ?? 'unknown'} ms.`,
     );
   }

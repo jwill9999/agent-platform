@@ -99,25 +99,29 @@ export function createMonitoringRouter(
         });
         res.type('json').send(body);
       } catch (error) {
-        if (error instanceof HttpError) throw error;
-        if (error instanceof Error && error.message === 'monitoring_report_limit')
-          throw new HttpError(
-            413,
-            'MONITORING_REPORT_TOO_LARGE',
-            'Reduce the diagnostic window page size',
-          );
-        // Never return storage paths, SQL or raw exception text.
-        if (typeof error === 'object' && error !== null && 'code' in error) {
-          if (error.code === 'invalid_cursor')
-            throw new HttpError(400, 'INVALID_CURSOR', 'Invalid diagnostic window cursor');
-          if (error.code === 'expired_history')
-            throw new HttpError(410, 'HISTORY_EXPIRED', 'Diagnostic window history has expired');
-        }
-        throw unavailable();
+        throw monitoringReadError(error);
       }
     }),
   );
   return router;
+}
+
+function monitoringReadError(error: unknown): HttpError {
+  if (error instanceof HttpError) return error;
+  if (error instanceof Error && error.message === 'monitoring_report_limit')
+    return new HttpError(
+      413,
+      'MONITORING_REPORT_TOO_LARGE',
+      'Reduce the diagnostic window page size',
+    );
+  // Never return storage paths, SQL or raw exception text.
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    if (error.code === 'invalid_cursor')
+      return new HttpError(400, 'INVALID_CURSOR', 'Invalid diagnostic window cursor');
+    if (error.code === 'expired_history')
+      return new HttpError(410, 'HISTORY_EXPIRED', 'Diagnostic window history has expired');
+  }
+  return unavailable();
 }
 
 function invalidInput(): HttpError {
