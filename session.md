@@ -31,10 +31,39 @@ Earlier failures, their diagnostic limits and unproven historical causes remain 
 
 `agent-platform-git-delivery-verification` is closed and Dolt-synced. The four complete changed
 document mirrors were read back at `ce959c78` across 24 pages; their source bytes are identical in
-staging. Evidence: `/Users/letuscode/.codex/git-delivery-implementation-20261014`, particularly
+staging. The detailed receipts below are **owner-local, non-portable evidence**, retained at
+`/Users/letuscode/.codex/git-delivery-implementation-20261014`, particularly
 `git-delivery-completion.json`, `pr330-staging-tree-qualification.json`,
 `pr330-81-combined-independent-qualification.json`, `git-delivery-cleanup-execution.json`,
 `git-delivery-final-independent-delivery-audit.json` and `pr331-publication-ce959c78.json`.
+These files are not published GitHub artifacts. Their independent-review, cleanup and Notion
+readback details require access to the owner's retained receipts; the shared references below do
+not independently reproduce those audits or publication readbacks.
+
+Portable delivery references, verified on 16 October 2026:
+
+- [PR330 merge record](https://github.com/jwill9999/agent-platform/pull/330) records the staging
+  squash at [cf5f0452](https://github.com/jwill9999/agent-platform/commit/cf5f04524c25c29635b0d84bda4e76282f28ddcb).
+  [PR331](https://github.com/jwill9999/agent-platform/pull/331) records reviewed repair source
+  [ce959c78](https://github.com/jwill9999/agent-platform/commit/ce959c78b78a3d4717347d6a5734d0c0fc6f6a37)
+  merged into the feature at `81ffb8c0db1e1887941b946ba680f3300d4066b7`.
+- [CI run 38783960723](https://github.com/jwill9999/agent-platform/actions/runs/38783960723)
+  and [full Promptfoo run 38783960722](https://github.com/jwill9999/agent-platform/actions/runs/38783960722)
+  completed successfully on that PR330 head `81ffb8c0`. The CI run exposes the verify, Docker,
+  browser, Electron and packaged-macOS-VM job results; retained downloadable artifacts depend on
+  GitHub access and retention. A successful run summary alone does not reproduce the local audits.
+- The [tested integration commit e40c27ed](https://github.com/jwill9999/agent-platform/commit/e40c27ed2828962273747f596d15f815cfc2396d)
+  and both source/staging commits above share tree `e4212ec7b8362cbd7fc25120d6dd856df8ad9691`.
+  Readers with repository access can independently query those immutable Git objects with GitHub CLI:
+
+  ```bash
+  gh api repos/jwill9999/agent-platform/git/commits/ce959c78b78a3d4717347d6a5734d0c0fc6f6a37 --jq .tree.sha
+  gh api repos/jwill9999/agent-platform/git/commits/e40c27ed2828962273747f596d15f815cfc2396d --jq .tree.sha
+  gh api repos/jwill9999/agent-platform/git/commits/cf5f04524c25c29635b0d84bda4e76282f28ddcb --jq .tree.sha
+  ```
+
+  Each command must return `e4212ec7b8362cbd7fc25120d6dd856df8ad9691` to confirm the recorded tree
+  equality. This checks source identity separately from CI status and owner-local evidence.
 
 ## Branches and retained work
 
