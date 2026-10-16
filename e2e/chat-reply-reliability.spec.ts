@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { holdReplyRead } from '../apps/desktop/e2e/support/chatReplyFixture.js';
 
@@ -229,6 +230,47 @@ test('Docker saved Project restores both reads before sending and keeps the comp
     expect(errors).toEqual([]);
     await history.close();
     await approvals.close();
+    // This deliberate multi-navigation scenario tests another full bootstrap.
+    // Pace that safe read boundary using the real default limiter, never replay chat.
+    const budgetUrl = new URL('/api/v1/settings', page.url()).href;
+    // Browser-context requests use this renderer/BFF origin and its forwarded
+    // client identity; direct fixture API setup has a separate limiter bucket.
+    const reopenBudget = await page.request.get(budgetUrl);
+    expect([200, 429]).toContain(reopenBudget.status());
+    const budgetHeader = reopenBudget.headers()['ratelimit'];
+    const remaining = Number(budgetHeader?.match(/remaining=(\d+)/)?.[1]);
+    const reset = Number(budgetHeader?.match(/reset=(\d+)/)?.[1]);
+    expect(Number.isFinite(remaining) && Number.isFinite(reset)).toBe(true);
+    if (remaining < 40) {
+      const waitMs = reset * 1000 + 100;
+      expect(waitMs).toBeLessThanOrEqual(61_000);
+      await test.info().attach('reopen-request-budget-pacing', {
+        body: JSON.stringify({
+          status: reopenBudget.status(),
+          url: reopenBudget.url(),
+          browserOrigin: new URL(page.url()).origin,
+          transport: 'browser-context request through renderer BFF',
+          rateHeader: budgetHeader,
+          remaining,
+          waitMs,
+        }),
+        contentType: 'application/json',
+      });
+      await delay(waitMs);
+      const recovered = await page.request.get(budgetUrl);
+      expect(recovered.ok()).toBe(true);
+      await test.info().attach('reopen-request-budget-recovered', {
+        body: JSON.stringify({
+          url: recovered.url(),
+          status: recovered.status(),
+          rateHeader: recovered.headers()['ratelimit'],
+        }),
+        contentType: 'application/json',
+      });
+      expect(
+        Number(recovered.headers()['ratelimit']?.match(/remaining=(\d+)/)?.[1]),
+      ).toBeGreaterThanOrEqual(40);
+    }
     await page.goto(`/?projectId=${projectId}&sessionId=${sessionId}`);
     await expect(page.getByText(finalText, { exact: true })).toHaveCount(1);
     await expect(page.getByText(finalText, { exact: true })).toBeVisible();

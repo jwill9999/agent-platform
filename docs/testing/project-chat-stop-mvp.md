@@ -50,6 +50,15 @@ SDK internal retry0, diagnostic attempts matching actual HTTP starts, no post-fe
 migration/limit controls in S10: legacy unbound approvals cannot execute, missing/pruned fences never
 resume, protected row limits fail closed, settled retention safe. Raw previous events remain readable.
 
+S15 (STOP-1/4/6) verifies observation does not starve explicit control: two stable active views make
+at most 26 passive/discovery control GETs in 60 seconds, including their initial reads. Active and
+approval-waiting views poll; terminal/null idle views cease. Honor actual 429 retry/reset deadlines
+without early passive requests; reject invalid header values safely. Verify immediate Stop, changed
+identity, explicit refresh and final settlement reads, plus stale-selection/backoff isolation. Keep
+fresh admission/approval checks and existing rate limits. Deliberate navigation bursts in connected
+fixtures may wait for their observed budget/reset before a planned action; never replay a mutation,
+infer success from 429, or substitute fixture pacing for this production polling guard.
+
 ## Monitoring and historical-review acceptance
 
 | ID  | Input/actions                                                                                                 | Required evidence                                                                                                                                                                                                                  |
@@ -62,7 +71,7 @@ resume, protected row limits fail closed, settled retention safe. Raw previous e
 | M06 | Give agent only stored window/report for seeded issue after app restart, no live observer                     | Agent identifies suspect interval and evidence-backed candidate, states coverage/confidence, deduplicates existing Beads issue; no unsupported cause/automatic repair; instrumentation overhead and existing benchmark limits pass |
 
 Q01: owner performs [30-minute trial](../tasks/agent-platform-local-mvp-stress-review.md) only after
-S01–S14 and M01–M06 meet their declared delivery gates. Export a before/after snapshot and safe
+S01–S15 and M01–M06 meet their declared delivery gates. Export a before/after snapshot and safe
 resource history, including failures. Analyse at end and again from saved data later; link issues
 and severity/next evidence in Beads. A failed recording preflight postpones the trial, not the Stop
 feature's already satisfied tests. Production capacity, external billing and third-party dashboards

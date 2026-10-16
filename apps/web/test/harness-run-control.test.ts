@@ -141,7 +141,7 @@ describe('shared harness run control', () => {
           }),
     );
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(5_000);
     });
     await act(async () => {
       await current.stop();
@@ -199,7 +199,7 @@ describe('shared harness run control', () => {
       response(record({ state: 'cancelled', reason: 'user_stop', version: 2 })),
     );
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(5_000);
     });
     expect(current.runControlStatusText).toContain('nothing has been rolled back');
     const count = fetcher.mock.calls.length;
@@ -207,5 +207,174 @@ describe('shared harness run control', () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
     expect(fetcher).toHaveBeenCalledTimes(count);
+  });
+
+  it.each(['running', 'waiting_for_approval'])(
+    'keeps two %s views within 26 passive reads over 60 seconds',
+    async (state) => {
+      vi.useFakeTimers();
+      fetcher.mockImplementation(async (url: string) =>
+        response(record({ state, sessionId: url.includes('/sessions/B/') ? 'B' : 'A' })),
+      );
+      await act(async () => {
+        root.render(
+          createElement('div', null, createElement(Probe), createElement(Probe, { session: 'B' })),
+        );
+      });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(fetcher).toHaveBeenCalledTimes(26);
+      expect(fetcher.mock.calls.every(([, init]) => !init.method)).toBe(true);
+    },
+  );
+
+  it('does not poll an idle null record', async () => {
+    vi.useFakeTimers();
+    fetcher.mockImplementation(async () => response(null));
+    await render();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(current.runControlReady).toBe(true);
+  });
+
+  it.each<{ headers: Record<string, string>; delay: number }>([
+    {
+      headers: { 'retry-after': '12', ratelimit: 'limit=100, remaining=0, reset=20' },
+      delay: 20_000,
+    },
+    { headers: { 'retry-after': 'Fri, 16 Oct 2026 00:00:08 GMT' }, delay: 8_000 },
+    {
+      headers: { 'retry-after': '-1', ratelimit: 'limit=100, remaining=0, reset=NaN' },
+      delay: 5_000,
+    },
+    { headers: { 'retry-after': 'Infinity', ratelimit: 'reset=0' }, delay: 5_000 },
+  ])(
+    'honors a safe passive 429 delay of $delay ms and clears errors only after success',
+    async ({ headers, delay }) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-16T00:00:00Z'));
+      fetcher.mockImplementationOnce(
+        async () => new Response('private upstream details', { status: 429, headers }),
+      );
+      await render();
+      expect(current.runControlReady).toBe(false);
+      expect(current.runControlError).toContain('termination is not confirmed');
+      expect(current.runControlError).not.toContain('private upstream');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(delay - 1);
+      });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(current.runControlError).toBeNull();
+      expect(current.runControlReady).toBe(true);
+    },
+  );
+
+  it('immediately reads normal stream settlement while its passive GET is backed off', async () => {
+    vi.useFakeTimers();
+    await render({ busy: true });
+    fetcher.mockImplementationOnce(
+      async () => new Response(null, { status: 429, headers: { 'retry-after': '60' } }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(current.runControlError).toContain('unavailable');
+    const settledAt = Date.now();
+    fetcher.mockImplementation(async () => response(record({ state: 'completed', version: 2 })));
+    await render({ busy: false });
+    expect(Date.now()).toBe(settledAt);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(current.runControl?.state).toBe('completed');
+    expect(current.runControlError).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it('performs explicit refresh immediately during passive backoff without cached authority', async () => {
+    vi.useFakeTimers();
+    fetcher.mockImplementationOnce(
+      async () => new Response(null, { status: 429, headers: { 'retry-after': '60' } }),
+    );
+    await render();
+    expect(current.runControlReady).toBe(false);
+    fetcher.mockImplementation(async () => response(record({ state: 'completed' })));
+    await act(async () => current.retryRunControl());
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(current.runControlReady).toBe(true);
+    expect(current.runControl?.state).toBe('completed');
+    expect(current.canStop).toBe(false);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('dispatches Stop immediately during passive backoff and immediately refreshes settlement', async () => {
+    vi.useFakeTimers();
+    await render();
+    fetcher.mockImplementationOnce(
+      async () => new Response(null, { status: 429, headers: { 'retry-after': '30' } }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(current.runControlError).toContain('unavailable');
+    const beforeStop = fetcher.mock.calls.length;
+    fetcher.mockImplementation(async (_url: string, init?: RequestInit) =>
+      response(
+        record({ state: init?.method === 'POST' ? 'stop_requested' : 'cancelled', version: 2 }),
+      ),
+    );
+    await act(async () => {
+      expect(await current.stop()).toBe(true);
+    });
+    expect(fetcher.mock.calls.slice(beforeStop).map(([, init]) => init?.method ?? 'GET')).toEqual([
+      'POST',
+      'GET',
+    ]);
+    expect(current.runControl?.state).toBe('cancelled');
+    expect(current.runControlError).toBeNull();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(beforeStop + 2);
+  });
+
+  it('isolates a stale 429 from the next selection and immediately discovers explicit identities', async () => {
+    vi.useFakeTimers();
+    let late!: (value: Response) => void;
+    fetcher.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          late = resolve;
+        }),
+    );
+    await render();
+    fetcher.mockImplementation(async () =>
+      response(record({ sessionId: 'B', state: 'completed' })),
+    );
+    await render({ session: 'B' });
+    await act(async () => {
+      late(new Response(null, { status: 429, headers: { 'retry-after': '60' } }));
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(current.runControl?.sessionId).toBe('B');
+    expect(current.runControlError).toBeNull();
+    fetcher.mockImplementation(async () => response(record({ sessionId: 'B', id: secondId })));
+    await render({ session: 'B', id: secondId, epoch: 1 });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(current.runControl?.id).toBe(secondId);
   });
 });

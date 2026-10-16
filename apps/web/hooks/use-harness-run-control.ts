@@ -7,6 +7,7 @@ import { apiPath } from '@/lib/apiClient';
 const ACTIVE = new Set(['running', 'waiting_for_approval', 'stop_requested']);
 const STOPPABLE = new Set(['running', 'waiting_for_approval']);
 const CONTROL_TIMEOUT_MS = 5_000;
+const PASSIVE_POLL_MS = 5_000;
 const CONTROL_ERROR =
   'Run status is unavailable. Retry Stop or check the local API; termination is not confirmed.';
 
@@ -17,6 +18,27 @@ type ControlView = {
   stopPending: boolean;
   ready: boolean;
 };
+
+class PassiveRateLimitError extends Error {
+  constructor(readonly retryDelayMs: number) {
+    super(CONTROL_ERROR);
+  }
+}
+
+function passiveRetryDelay(headers: Headers): number {
+  const retryAfter = headers.get('retry-after')?.trim();
+  const seconds = retryAfter && /^\d+(?:\.\d+)?$/.test(retryAfter) ? Number(retryAfter) : NaN;
+  const date = retryAfter && !Number.isFinite(seconds) ? Date.parse(retryAfter) : NaN;
+  const reset = Number(
+    headers.get('ratelimit')?.match(/(?:^|[,;]\s*)reset=(\d+(?:\.\d+)?)(?=$|[,;\s])/)?.[1],
+  );
+  const delays = [seconds * 1000, date - Date.now(), reset * 1000].filter(
+    (delay) => Number.isFinite(delay) && delay >= 0,
+  );
+  // Saturate at the platform timer range so an untrusted header cannot overflow
+  // into a hot retry loop. Explicit Stop/identity/refresh never use this timer.
+  return Math.min(2_147_483_647, Math.max(PASSIVE_POLL_MS, ...delays));
+}
 
 async function readControl(path: string, sessionId: string, runId?: string, stop = false) {
   const controller = new AbortController();
@@ -37,6 +59,8 @@ async function readControl(path: string, sessionId: string, runId?: string, stop
             ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
             : {}),
         });
+        if (!stop && response.status === 429)
+          throw new PassiveRateLimitError(passiveRetryDelay(response.headers));
         if (!response.ok) throw new Error(CONTROL_ERROR);
         const body: unknown = await response.json();
         const value = body && typeof body === 'object' && 'data' in body ? body.data : undefined;
@@ -140,6 +164,7 @@ export function useHarnessRunControl(
     let timer: ReturnType<typeof setTimeout> | undefined;
     const poll = async () => {
       let active = busy;
+      let delayMs = PASSIVE_POLL_MS;
       try {
         const path = runId
           ? apiPath('sessions', sessionId, 'runs', runId)
@@ -147,17 +172,21 @@ export function useHarnessRunControl(
         const record = await readControl(path, sessionId, runId ?? undefined);
         if (disposed) return;
         if (busy && !runId && record?.id === precedingRunId) {
-          timer = setTimeout(() => void poll(), 1_000);
+          timer = setTimeout(() => void poll(), PASSIVE_POLL_MS);
           return;
         }
         accept(record);
         active = record ? ACTIVE.has(record.state) : busy;
-      } catch {
+      } catch (error) {
         if (disposed) return;
         accept(latest.current.record, CONTROL_ERROR);
         active ||= Boolean(latest.current.record && ACTIVE.has(latest.current.record.state));
+        if (error instanceof PassiveRateLimitError) {
+          delayMs = error.retryDelayMs;
+          active = true;
+        }
       }
-      if (!disposed && active) timer = setTimeout(() => void poll(), 1_000);
+      if (!disposed && active) timer = setTimeout(() => void poll(), delayMs);
     };
     void poll();
     return () => {

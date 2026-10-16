@@ -69,6 +69,13 @@ that the new Stop source is absent.
 
 ## Minimal control design
 
+Client observation must leave room for explicit operations within the existing API rate budget.
+Use bounded passive status polling, initially every five seconds for active or waiting runs, and
+honor server rate-limit backoff. Idle or settled views stop passive polling. Mount, changed identity,
+settlement and explicit refresh still read current authority immediately; an explicit Stop is not
+delayed by the passive timer. Observation never caches permission or raises/exempts a rate limit.
+S15 verifies the two-view read budget and backoff; this is not a complete application load test.
+
 Use the installed TypeScript/LangGraph/AI SDK and SQLite stack; no SDK migration or managed workflow
 prototype. Add an application-owned run-control repository in the main app DB, separate from
 `diagnostics.sqlite`, and a small in-process registry of owned controllers and admitted work.
@@ -148,7 +155,7 @@ parent auto-closure or unrelated status change follows this bounded task.
 
 ## Verification and feasibility
 
-[S01–S14/M01–M06/Q01](../testing/project-chat-stop-mvp.md) remain the acceptance contract. Actual
+[S01–S15/M01–M06/Q01](../testing/project-chat-stop-mvp.md) remain the acceptance contract. Actual
 partial results, failures, repairs and unexecuted gates are in the
 [results report](../reviews/project-chat-stop-results.md), including a scenario-by-scenario matrix.
 Use real API/SQLite/harness, Docker browser, Electron and a mandatory real packaged macOS VM
@@ -183,7 +190,7 @@ Monitoring: **1–2 additional days** after Stop, then one **30-minute owner tri
 These are estimates, not dates or authorization. Dashboard, voice/CLI clients, distributed execution,
 full tracing, release accounts/distribution, universal hard cancellation and broad recovery are excluded.
 
-Stop DoD is S01–S14 plus affected quality/connected/diagnostic gates, independent source/result
+Stop DoD is S01–S15 plus affected quality/connected/diagnostic gates, independent source/result
 review, full documentation mirrors, resolved comments, exact-head feature integration and task
 readback/sync. Monitor DoD is M01–M06 and historical evidence-only diagnosis. Owner trial is its own
 checkpoint, not a hidden unbounded Stop acceptance loop. Existing benchmark limits remain unchanged.

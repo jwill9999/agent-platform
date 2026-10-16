@@ -24,7 +24,6 @@ for (const scenario of [
 ] as const satisfies readonly GitChatScenario[]) {
   test(`Docker chat Git delivery ${scenario} preserves review, hidden-rail recovery and real effects`, async ({
     page,
-    request,
   }, info) => {
     // Existing shared API limiter: up to two observed one-minute resets, never mutation retries.
     test.setTimeout(180_000);
@@ -36,8 +35,13 @@ for (const scenario of [
       await info.attach(name, { path, contentType: 'application/json' });
     };
     const pace = async (minimum: number) => {
-      const response = await request.get(`${apiURL}/v1/settings`);
-      expect(response.ok()).toBe(true);
+      const rendererOrigin = page.url().startsWith('http')
+        ? new URL(page.url()).origin
+        : new URL(info.project.use.baseURL ?? 'http://127.0.0.1:3001').origin;
+      // Probe the actual renderer/BFF path, not the direct fixture setup bucket.
+      const budgetUrl = `${rendererOrigin}/api/v1/settings`;
+      const response = await page.request.get(budgetUrl);
+      expect([200, 429]).toContain(response.status());
       const header = response.headers()['ratelimit'];
       const remaining = Number(header?.match(/remaining=(\d+)/)?.[1]);
       const reset = Number(header?.match(/reset=(\d+)/)?.[1]);
@@ -45,8 +49,26 @@ for (const scenario of [
       if (remaining < minimum) {
         const waitMs = reset * 1000 + 100;
         expect(waitMs).toBeLessThanOrEqual(61_000);
-        await attachJson('request-budget-pacing', { remaining, waitMs });
+        await attachJson('request-budget-pacing', {
+          url: response.url(),
+          rendererOrigin,
+          transport: 'browser-context request through renderer BFF',
+          status: response.status(),
+          rateHeader: header,
+          remaining,
+          waitMs,
+        });
         await delay(waitMs);
+        const recovered = await page.request.get(budgetUrl);
+        expect(recovered.ok()).toBe(true);
+        await attachJson('request-budget-recovered', {
+          url: recovered.url(),
+          status: recovered.status(),
+          rateHeader: recovered.headers()['ratelimit'],
+        });
+        expect(
+          Number(recovered.headers()['ratelimit']?.match(/remaining=(\d+)/)?.[1]),
+        ).toBeGreaterThanOrEqual(minimum);
       }
     };
     await pace(90);

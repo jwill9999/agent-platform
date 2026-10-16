@@ -44,7 +44,7 @@ config, broad router refactor, unrelated dashboard or production architecture ch
 
 ## Tests and Gherkin E2E Strategy
 
-[Verification S01–S14](../testing/project-chat-stop-mvp.md) owns the exact requirement mapping,
+[Verification S01–S15](../testing/project-chat-stop-mvp.md) owns the exact requirement mapping,
 fixtures, actions, expected UI/backend/effects, privacy and evidence. Unit/integration are necessary;
 headless contract, connected browser/Electron and a real packaged VM representative are mandatory.
 External providers are declared deterministic boundaries; no paid calls implied.
