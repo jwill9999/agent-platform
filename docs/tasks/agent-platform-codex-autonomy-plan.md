@@ -104,8 +104,10 @@ authorized and created. Do not present proposed task titles as existing tickets.
 4. Identify tests to retain, update or add; map each scenario to requirements and its future task.
 5. Review the complete proposed material independently and retain findings/dispositions. R1 is an
    outline review and does not replace that future review of the detailed planning outputs.
-6. Publish the planning documents and their Notion mirrors with readback; update Beads references
-   and report the reviewable result to the owner. Keep this task open until those outputs exist.
+6. Save and validate the repository planning documents, update Beads references and report the
+   reviewable result to the owner. External publication and readback require an explicit owner
+   request covering the destination and documents; the original Notion delivery is historical,
+   not standing authorization for new work.
 
 Future plan, verification material and review belong in `docs/planning/`, `docs/testing/` and
 `docs/reviews/`; future implementation task specs belong in `docs/tasks/<real-issue-id>.md`.
@@ -144,7 +146,8 @@ coverage. This planning task does not execute the future verification scenarios.
 The complete planning package has a file-by-file disposition inventory, replacement policy,
 implementation task/dependency breakdown, requirement-to-test mapping, feasible environments,
 preservation/rollback and activation strategy, global follow-up boundary, independent review and
-linked verified publications. Beads and specifications agree. Planned tests are clearly distinguished
+linked verified repository documents. External copies and readbacks are included only when
+explicitly requested under the current publication policy. Beads and specifications agree. Planned tests are clearly distinguished
 from executed evidence. The owner can review one concrete end-to-end proposal.
 
 This task is not done merely because this initial specification or its outline review exists.

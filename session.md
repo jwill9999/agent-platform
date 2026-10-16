@@ -1,3 +1,67 @@
+# PR336 opt-in publication — staging qualification checkpoint
+
+Owner authorized PR337 feature integration and PR336 requalification, then approved protected
+staging delivery once all current-head checks and review findings clear. [PR337](https://github.com/jwill9999/agent-platform/pull/337) merged at
+`af8e33fded09dbbfdf253ecc571ae377027475ef`; its tree exactly equals reviewed `64e5115b`.
+All nine executed feature checks passed, including 61 Electron tests; Sonar is OK with zero issues.
+The four original PR336 threads were resolved only after verifying those fixes in its actual head.
+
+Staging advanced independently to `8d8d72a5` through PR335. Its only conflict with the reviewed
+feature was this handoff. `task/ui-evaluation-staging-reconcile` retains both parent histories and
+resolves that conflict by keeping both complete unique prefixes plus their identical shared history.
+No application, test, dependency, workflow, protection or paused orchestration behavior changes.
+The actual subsequent head, review and hosted qualification are recorded in canonical Beads
+`agent-platform-ui-evaluation-skill` and PR336/follow-up PR metadata; this source checkpoint does not
+claim that its future checks or staging delivery have completed.
+
+Repository records remain canonical. External publication, copies and readbacks require an explicit
+owner request covering the destination and documents. Task approval, tool access, home skills and
+historical plans supply no standing publication permission. Existing external pages are retained;
+no new publication or generated readback artifacts are requested. The old VM attempt stopped during
+dependency installation after network/DNS errors; it supplies no packaged-VM qualification.
+New protected checks must qualify the actual reconciled source before the authorized staging merge.
+
+## Preserved historical sources
+
+The dated checkpoints below are historical, including their old pending statuses and publication
+requirements. Their unique prefixes remain byte-for-byte intact; the common historical body is
+stored once. Prefix plus common body reconstructs each complete previous source exactly:
+
+- Feature `af8e33fd`: 1575 prefix bytes/SHA256 `fa4f6a9747777bff4be64e9b3211def66cf4c8d42f1c9c69467fafb8c2aa5dd1`;
+  complete prior body 424342 bytes/SHA256 `7cef9bd1effe3b9d60206feeb7a2f28f07abd0268506e770f772e9f32d014b82`.
+- Staging `8d8d72a5`: 10129 prefix bytes/SHA256 `eb45ffbfb089229bcf67e1d937ead89c5d1966208475c67c9cb428a956396283`;
+  complete prior body 432896 bytes/SHA256 `f8e9bb6169be58504de8a67262a6f7832474c70ac08181a0f3f45ec2f7307bf1`.
+- Shared `cf5f0452` body: 422767 bytes/SHA256 `7d49c0a28f75fbd2ebfefc5e6665290fca4524010133164463e392ef2df60f84`.
+
+<!-- markdownlint-disable MD025 -->
+
+## Archived feature checkpoint at af8e33fd
+
+## Shared skills cleanup — 16 October 2026
+
+Owner requested home-only reusable skills and removal of automatic Notion documentation publishing.
+PR333 completed all ten executed feature checks and its review, with zero unresolved threads, and
+merged into `feature/ui-evaluation` at `e65f5de2fff2657d69623a9e0a1c352934edeff8` on 16 October.
+Protected staging PR336 is open for its own checks/review; this is not staging delivery.
+
+The five shared skills remain under `~/.codex/skills`; the home and repository documentation
+publishers are removed. Current read-only verification found no `documentation` or
+`agent-platform-documentation` skill installed in Codex home or its discovery directory. Portable
+skills defer to the current project policy and do not impose a Notion destination. Task approval,
+tool access, older plans and home skills cannot authorize external copies without an explicit owner
+request covering the destination and documents. The repository documentation guide, shared
+instructions and older autonomy plans/task instructions now state that boundary consistently.
+
+Beads: `agent-platform-ui-evaluation-skill`, still in progress through staging integration. PR336
+review repairs are on `task/ui-evaluation-review-fixes`; actual source integration and fresh hosted
+checks remain required. No runtime, global configuration, main or paused orchestration changes.
+Existing Notion pages and notes are retained; no external mirroring or generated publication/readback
+files are requested or created. Historical session content below remains unchanged.
+
+---
+
+## Archived staging checkpoint at 8d8d72a5
+
 # Current handoff — Git delivery complete, next local MVP priority under review
 
 Reviewed on 15 October 2026. Beads remains authoritative for task status and dependencies.
@@ -134,6 +198,8 @@ from this handoff request alone. Broader Git epic `agent-platform-ii1` and journ
 `agent-platform-7vf` remain open; the delivered bounded MVP does not close them.
 
 <!-- markdownlint-disable MD025 -->
+
+## Shared historical session body at cf5f0452
 
 # Git delivery qualification handoff — 15 October 2026
 
