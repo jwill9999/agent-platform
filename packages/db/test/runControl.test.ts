@@ -144,6 +144,35 @@ describe('durable shared run control', () => {
     ).toMatchObject({ state: 'outcome_unknown', reason: 'execution_failed', inFlight: 1 });
     expect(() => begin(run)).toThrow('run_not_running');
   });
+  it.each(['timeout', 'client_disconnect', 'process_interrupted'] as const)(
+    'preserves %s across uncertain effect settlement without inventing user Stop',
+    (reason) => {
+      const run = create();
+      const attemptId = begin(run);
+      settleRunAttempt(ctx.db, { id: attemptId, runId: run.id, outcome: 'unknown', nowMs: 110 });
+      expect(
+        finishControlledRun(ctx.db, {
+          runId: run.id,
+          sessionId: run.sessionId,
+          state: 'outcome_unknown',
+          reason,
+          nowMs: 115,
+        }),
+      ).toMatchObject({ state: 'outcome_unknown', reason, inFlight: 1 });
+      settleRunAttempt(ctx.db, { id: attemptId, runId: run.id, outcome: 'succeeded', nowMs: 120 });
+      const settled = finishControlledRun(ctx.db, {
+        runId: run.id,
+        sessionId: run.sessionId,
+        state: 'completed',
+        reason: 'none',
+        nowMs: 125,
+      });
+      expect(settled).toMatchObject({ state: 'completed', reason, inFlight: 0, settledAtMs: 125 });
+      expect(settled.stopAcknowledgedAtMs).toBeUndefined();
+      expect(getRunForExecution(ctx.db, run.executionId)).toEqual(settled);
+      expect(stop(run, 130)).toEqual(settled);
+    },
+  );
   it('keeps genuine failure distinct and refuses false cancellation without user Stop', () => {
     const run = create();
     expect(() =>

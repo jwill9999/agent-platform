@@ -26,7 +26,7 @@ export class RunControlError extends Error {
   }
 }
 const activeStates = ['running', 'waiting_for_approval', 'stop_requested'];
-const settledStates = ['completed', 'cancelled', 'failed'];
+const settledStates = new Set<RunControlState>(['completed', 'cancelled', 'failed']);
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_SETTLED = 10_000;
 const MAX_UNRESOLVED = 1_000;
@@ -243,7 +243,7 @@ export function beginRunAttempt(
   validateMetadata(input.id, input.nowMs);
   write(db, (tx) => {
     const run = getRunForExecution(tx, input.executionId);
-    if (!run || run.id !== input.runId || run.state !== 'running')
+    if (run?.id !== input.runId || run.state !== 'running')
       throw new RunControlError('run_not_running');
     const count = tx
       .select({ value: sql<number>`count(*)` })
@@ -293,6 +293,17 @@ export function settleRunAttempt(
     return requireRun(tx, row.sessionId, row.id);
   });
 }
+function finishReason(
+  current: RunControlRecord,
+  state: RunControlState,
+  reason: RunControlReason | undefined,
+): RunControlReason {
+  if (state === 'failed' && reason === 'execution_failed') return 'execution_failed';
+  if (current.stopAcknowledgedAtMs !== undefined) return 'user_stop';
+  if (reason === undefined || (current.state === 'outcome_unknown' && reason === 'none'))
+    return current.reason;
+  return reason;
+}
 export function finishControlledRun(
   db: DrizzleDb,
   input: {
@@ -305,7 +316,7 @@ export function finishControlledRun(
 ): RunControlRecord {
   return write(db, (tx) => {
     const current = requireRun(tx, input.sessionId, input.runId);
-    if (settledStates.includes(current.state)) return current;
+    if (settledStates.has(current.state)) return current;
     if (input.state === 'running' || input.state === 'stop_requested')
       throw new RunControlError('run_invalid_transition');
     if (current.state === 'interrupted') return current;
@@ -320,18 +331,13 @@ export function finishControlledRun(
     )
       state = 'cancelled';
     else if (state === 'cancelled') throw new RunControlError('run_invalid_transition');
-    let reason =
-      input.reason === undefined || (current.state === 'outcome_unknown' && input.reason === 'none')
-        ? current.reason
-        : input.reason;
-    if (current.stopAcknowledgedAtMs !== undefined) reason = 'user_stop';
-    if (state === 'failed' && input.reason === 'execution_failed') reason = 'execution_failed';
+    const reason = finishReason(current, state, input.reason);
     tx.update(runs)
       .set({
         state,
         reason,
         updatedAtMs: input.nowMs,
-        settledAtMs: settledStates.includes(state) ? input.nowMs : null,
+        settledAtMs: settledStates.has(state) ? input.nowMs : null,
         version: current.version + 1,
       })
       .where(eq(runs.id, current.id))

@@ -158,7 +158,7 @@ async function switchAwayAndBackWithoutCancelling(
   await ctx.page.locator(`a[href="/?projectId=${ctx.projectId}"]`).click();
   const menu = ctx.page.getByRole('button', { name: 'Open sessions menu', exact: true });
   await expect(menu).toBeEnabled();
-  const title = original.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const title = original.title.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   const selectOriginal = async () => {
     await menu.click();
     await ctx.page.getByRole('menuitem', { name: new RegExp(`^${title}`) }).click();
@@ -196,80 +196,89 @@ async function switchAwayAndBackWithoutCancelling(
   };
 }
 
+async function runSensorStopJourney(ctx: StopJourneyContext) {
+  ctx.prepareSensorFiles();
+  await ctx.provider.enqueue({
+    kind: 'tool',
+    name: 'sys_run_quality_gate',
+    args: { profile: 'typecheck', repoPath: ctx.projectPath, timeoutMs: 30000 },
+  });
+  await ctx.provider.enqueue({ kind: 'text', text: 'FORBIDDEN_POST_STOP_SENSOR_CONTINUATION' });
+  await submit(ctx);
+  const approvalButton = ctx.page
+    .getByTestId('approval-card')
+    .getByRole('button', { name: 'Approve', exact: true });
+  await expect
+    .poll(async () => {
+      if (ctx.readSensorMarker().started > 0) return 'started';
+      return (await approvalButton.count()) > 0 ? 'approval' : 'waiting';
+    })
+    .toMatch(/^(started|approval)$/);
+  if (ctx.readSensorMarker().started === 0) await approvalButton.click();
+  await expect.poll(() => ctx.readSensorMarker().started).toBe(1);
+  await expect
+    .poll(() =>
+      ctx.snapshot().attempts.some((row) => row.kind === 'sensor' && row.outcome === 'running'),
+    )
+    .toBe(true);
+  expect(ctx.readSensorMarker().finished).toBe(0);
+  const stopped = await clickStop(ctx, 'outcome_unknown');
+  expect(ctx.readSensorMarker().finished).toBe(0);
+  ctx.releaseSensor();
+  await expect.poll(() => ctx.readSensorMarker().finished, { timeout: 15000 }).toBe(1);
+  expect(ctx.readSensorMarker().started).toBe(1);
+  expect(ctx.provider.requests).toHaveLength(1);
+  expect(
+    ctx.snapshot().attempts.filter((row) => row.run_id === stopped.id && row.kind === 'sensor'),
+  ).toHaveLength(1);
+  expect(JSON.stringify(ctx.snapshot().messages.filter((row) => row.role === 'tool'))).not.toMatch(
+    /Quality gate .* passed\./,
+  );
+  expect(
+    ctx
+      .snapshot()
+      .attempts.filter((row) => row.run_id === stopped.id && row.kind === 'sensor')
+      .every((row) => row.outcome === 'unknown'),
+  ).toBe(true);
+  expect((await current(ctx))?.state).toBe('outcome_unknown');
+  await expect(
+    ctx.page.getByRole('status').filter({ hasText: 'Run outcome is unknown.' }),
+  ).toBeVisible();
+  await verifyStopReport(ctx, 'sensor-stopped', stopped.id, 'outcome_unknown');
+  ctx.evidence.sensor = {
+    marker: ctx.readSensorMarker(),
+    state: await current(ctx),
+    physicalLateEffectPreserved: true,
+  };
+}
+
+async function runProviderFailureJourney(ctx: StopJourneyContext) {
+  await ctx.provider.enqueue({ kind: 'error', status: 400 });
+  await submit(ctx);
+  const failed = await waitForState(ctx, ['failed']);
+  expect(failed.reason).toBe('execution_failed');
+  await expect(ctx.page.getByRole('button', { name: 'Stop run', exact: true })).toHaveCount(0);
+  await expect(input(ctx.page)).toBeEnabled();
+  expect(ctx.provider.requests).toHaveLength(1);
+  expect(ctx.readEffect()).toBe('original-safe-fixture');
+  const report = await ctx.exportReport('failure');
+  if (report) expect(report.events.some(({ event }) => event.outcome === 'failed')).toBe(true);
+  ctx.evidence.failure = { record: failed, report };
+}
+
+const standaloneJourneys: Partial<
+  Record<StopScenario, (ctx: StopJourneyContext) => Promise<void>>
+> = {
+  'sensor-stop': runSensorStopJourney,
+  'provider-failure': runProviderFailureJourney,
+};
+
 /** UI is real, API/SQLite/effects are independently inspected; only the model endpoint is scripted. */
 export async function runStopJourney(ctx: StopJourneyContext, scenario: StopScenario) {
   ctx.writeEffect('original-safe-fixture');
-  if (scenario === 'sensor-stop') {
-    ctx.prepareSensorFiles();
-    await ctx.provider.enqueue({
-      kind: 'tool',
-      name: 'sys_run_quality_gate',
-      args: { profile: 'typecheck', repoPath: ctx.projectPath, timeoutMs: 30000 },
-    });
-    await ctx.provider.enqueue({ kind: 'text', text: 'FORBIDDEN_POST_STOP_SENSOR_CONTINUATION' });
-    await submit(ctx);
-    const approvalButton = ctx.page
-      .getByTestId('approval-card')
-      .getByRole('button', { name: 'Approve', exact: true });
-    await expect
-      .poll(async () =>
-        ctx.readSensorMarker().started > 0
-          ? 'started'
-          : (await approvalButton.count()) > 0
-            ? 'approval'
-            : 'waiting',
-      )
-      .toMatch(/^(started|approval)$/);
-    if (ctx.readSensorMarker().started === 0) await approvalButton.click();
-    await expect.poll(() => ctx.readSensorMarker().started).toBe(1);
-    await expect
-      .poll(() =>
-        ctx.snapshot().attempts.some((row) => row.kind === 'sensor' && row.outcome === 'running'),
-      )
-      .toBe(true);
-    expect(ctx.readSensorMarker().finished).toBe(0);
-    const stopped = await clickStop(ctx, 'outcome_unknown');
-    expect(ctx.readSensorMarker().finished).toBe(0);
-    ctx.releaseSensor();
-    await expect.poll(() => ctx.readSensorMarker().finished, { timeout: 15000 }).toBe(1);
-    expect(ctx.readSensorMarker().started).toBe(1);
-    expect(ctx.provider.requests).toHaveLength(1);
-    expect(
-      ctx.snapshot().attempts.filter((row) => row.run_id === stopped.id && row.kind === 'sensor'),
-    ).toHaveLength(1);
-    expect(
-      JSON.stringify(ctx.snapshot().messages.filter((row) => row.role === 'tool')),
-    ).not.toMatch(/Quality gate .* passed\./);
-    expect(
-      ctx
-        .snapshot()
-        .attempts.filter((row) => row.run_id === stopped.id && row.kind === 'sensor')
-        .every((row) => row.outcome === 'unknown'),
-    ).toBe(true);
-    expect((await current(ctx))?.state).toBe('outcome_unknown');
-    await expect(
-      ctx.page.getByRole('status').filter({ hasText: 'Run outcome is unknown.' }),
-    ).toBeVisible();
-    await verifyStopReport(ctx, 'sensor-stopped', stopped.id, 'outcome_unknown');
-    ctx.evidence.sensor = {
-      marker: ctx.readSensorMarker(),
-      state: await current(ctx),
-      physicalLateEffectPreserved: true,
-    };
-    return;
-  }
-  if (scenario === 'provider-failure') {
-    await ctx.provider.enqueue({ kind: 'error', status: 400 });
-    await submit(ctx);
-    const failed = await waitForState(ctx, ['failed']);
-    expect(failed.reason).toBe('execution_failed');
-    await expect(ctx.page.getByRole('button', { name: 'Stop run', exact: true })).toHaveCount(0);
-    await expect(input(ctx.page)).toBeEnabled();
-    expect(ctx.provider.requests).toHaveLength(1);
-    expect(ctx.readEffect()).toBe('original-safe-fixture');
-    const report = await ctx.exportReport('failure');
-    if (report) expect(report.events.some(({ event }) => event.outcome === 'failed')).toBe(true);
-    ctx.evidence.failure = { record: failed, report };
+  const standalone = standaloneJourneys[scenario];
+  if (standalone) {
+    await standalone(ctx);
     return;
   }
 

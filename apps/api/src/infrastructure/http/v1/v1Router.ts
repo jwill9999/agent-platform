@@ -1,4 +1,4 @@
-import { diagnosticRetry } from '../../diagnostics/observations.js';
+import { diagnosticRetry, observeDiagnosticRunControl } from '../../diagnostics/observations.js';
 import type { DrizzleDb } from '@agent-platform/db';
 import { loadSettings } from '@agent-platform/db';
 import {
@@ -28,7 +28,6 @@ import { createDynamicRateLimiter } from '../dynamicRateLimiter.js';
 import { createInProcessSessionLock } from '../sessionLock.js';
 import { getRunControlService } from '../../../application/runControl/service.js';
 import { createRunControlRouter } from './runControlRouter.js';
-import { observeDiagnosticRunControl } from '../../diagnostics/observations.js';
 
 export type V1RouterOptions = {
   chat?: Pick<

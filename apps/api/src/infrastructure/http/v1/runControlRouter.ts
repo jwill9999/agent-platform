@@ -2,23 +2,23 @@ import { Router, type Request } from 'express';
 import { z } from 'zod';
 import { getSession, RunControlError, type DrizzleDb } from '@agent-platform/db';
 import type { RunControlService } from '../../../application/runControl/service.js';
-import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
 import { parseBody, requireParam } from './routerUtils.js';
 
 export function mapRunControlError(error: unknown): never {
   if (error instanceof RunControlError) {
-    const status = error.code === 'run_not_found' ? 404 : error.code === 'run_capacity' ? 503 : 409;
+    let status = 409;
+    if (error.code === 'run_not_found') status = 404;
+    else if (error.code === 'run_capacity') status = 503;
+    const messages: Partial<Record<RunControlError['code'], string>> = {
+      run_not_found: 'Run unavailable. Legacy approvals require a new request.',
+      run_not_running: 'This run is no longer eligible to execute.',
+      run_conflict: 'This session already has an active run.',
+    };
     throw new HttpError(
       status,
       error.code.toUpperCase(),
-      error.code === 'run_not_found'
-        ? 'Run unavailable. Legacy approvals require a new request.'
-        : error.code === 'run_not_running'
-          ? 'This run is no longer eligible to execute.'
-          : error.code === 'run_conflict'
-            ? 'This session already has an active run.'
-            : 'Run control is temporarily unavailable.',
+      messages[error.code] ?? 'Run control is temporarily unavailable.',
     );
   }
   throw new HttpError(
@@ -70,39 +70,30 @@ export function createRunControlRouter(db: DrizzleDb, service: RunControlService
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
-  router.get(
-    '/:id/active-run',
-    asyncHandler(async (req, res) => {
-      try {
-        res.json({ data: service.current(requireParam(req.params, 'id')) ?? null });
-      } catch (error) {
-        mapRunControlError(error);
-      }
-    }),
-  );
-  router.get(
-    '/:id/runs/:runId',
-    asyncHandler(async (req, res) => {
-      const runId = z.string().uuid().parse(req.params['runId']);
-      try {
-        res.json({ data: service.require(requireParam(req.params, 'id'), runId) });
-      } catch (error) {
-        mapRunControlError(error);
-      }
-    }),
-  );
-  router.post(
-    '/:id/runs/:runId/stop',
-    asyncHandler(async (req, res) => {
-      admitStopOrigin(req);
-      parseBody(z.object({}).strict(), req.body ?? {});
-      const runId = z.string().uuid().parse(req.params['runId']);
-      try {
-        res.json({ data: service.stop(requireParam(req.params, 'id'), runId) });
-      } catch (error) {
-        mapRunControlError(error);
-      }
-    }),
-  );
+  router.get('/:id/active-run', (req, res) => {
+    try {
+      res.json({ data: service.current(requireParam(req.params, 'id')) ?? null });
+    } catch (error) {
+      mapRunControlError(error);
+    }
+  });
+  router.get('/:id/runs/:runId', (req, res) => {
+    const runId = z.string().uuid().parse(req.params['runId']);
+    try {
+      res.json({ data: service.require(requireParam(req.params, 'id'), runId) });
+    } catch (error) {
+      mapRunControlError(error);
+    }
+  });
+  router.post('/:id/runs/:runId/stop', (req, res) => {
+    admitStopOrigin(req);
+    parseBody(z.object({}).strict(), req.body ?? {});
+    const runId = z.string().uuid().parse(req.params['runId']);
+    try {
+      res.json({ data: service.stop(requireParam(req.params, 'id'), runId) });
+    } catch (error) {
+      mapRunControlError(error);
+    }
+  });
   return router;
 }

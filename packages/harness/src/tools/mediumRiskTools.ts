@@ -239,6 +239,23 @@ async function handleCreateDirectory(
   }
 }
 
+function requestHeaders(args: Record<string, unknown>): Record<string, string> {
+  let headers: Record<string, string> = {};
+  if (typeof args.headers === 'string' && args.headers.trim()) {
+    try {
+      const parsed: unknown = JSON.parse(args.headers);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        headers = parsed as Record<string, string>;
+      }
+    } catch {
+      /* ignore malformed header JSON — proceed with empty headers */
+    }
+  } else if (typeof args.headers === 'object' && args.headers !== null) {
+    headers = args.headers as Record<string, string>;
+  }
+  return headers;
+}
+
 async function handleHttpRequest(
   toolId: string,
   args: Record<string, unknown>,
@@ -255,19 +272,7 @@ async function handleHttpRequest(
   }
 
   const method = stringArg(args, 'method', 'GET').toUpperCase();
-  let headers: Record<string, string> = {};
-  if (typeof args.headers === 'string' && args.headers.trim()) {
-    try {
-      const parsed: unknown = JSON.parse(args.headers);
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        headers = parsed as Record<string, string>;
-      }
-    } catch {
-      /* ignore malformed header JSON — proceed with empty headers */
-    }
-  } else if (typeof args.headers === 'object' && args.headers !== null) {
-    headers = args.headers as Record<string, string>;
-  }
+  const headers = requestHeaders(args);
   const body = typeof args.body === 'string' ? args.body : undefined;
   const timeoutMs = typeof args.timeout_ms === 'number' ? args.timeout_ms : HTTP_TIMEOUT_MS;
 

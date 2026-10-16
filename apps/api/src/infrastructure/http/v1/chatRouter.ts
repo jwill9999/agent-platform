@@ -57,6 +57,8 @@ import type {
   PromptMemoryBundle,
   ProjectRecord,
   ProjectAccessPolicy,
+  RunControlReason,
+  RunControlState,
   SensorAgentProfile,
   SessionRecord,
   Tool as ContractTool,
@@ -262,16 +264,41 @@ async function acquireRuntimeContext(
   }
 }
 
-async function acquireControlledContext(
-  db: DrizzleDb,
-  session: SessionRecord,
-  options: ChatRouterOptions,
-  req: Request,
-  res: Response,
-  sessionLock: SessionLock,
-  runId: string,
-  sourceExecutionId?: string,
-) {
+type ControlledContextInput = {
+  db: DrizzleDb;
+  session: SessionRecord;
+  options: ChatRouterOptions;
+  req: Request;
+  res: Response;
+  sessionLock: SessionLock;
+  runId: string;
+  sourceExecutionId?: string;
+};
+
+function controlledResponseReason(signal: AbortSignal, failed = false): RunControlReason {
+  if (signal.reason === 'user_stop') return 'user_stop';
+  if (signal.reason === 'timeout') return 'timeout';
+  if (signal.aborted) return 'client_disconnect';
+  return failed ? 'execution_failed' : 'none';
+}
+
+function controlledResponseState(reason: RunControlReason, waiting: boolean): RunControlState {
+  if (reason === 'user_stop') return 'completed';
+  if (reason === 'execution_failed') return 'failed';
+  if (reason !== 'none') return 'interrupted';
+  return waiting ? 'waiting_for_approval' : 'completed';
+}
+
+async function acquireControlledContext({
+  db,
+  session,
+  options,
+  req,
+  res,
+  sessionLock,
+  runId,
+  sourceExecutionId,
+}: ControlledContextInput) {
   let execution: ControlledExecution;
   try {
     execution = getRunControlService(db, observeDiagnosticRunControl).open(
@@ -296,22 +323,8 @@ async function acquireControlledContext(
     );
     return { ...runtime, execution, controller, signal };
   } catch (error) {
-    const reason =
-      signal.reason === 'user_stop'
-        ? 'user_stop'
-        : signal.reason === 'timeout'
-          ? 'timeout'
-          : signal.aborted
-            ? 'client_disconnect'
-            : 'execution_failed';
-    const record = execution.finish(
-      reason === 'execution_failed'
-        ? 'failed'
-        : reason === 'user_stop'
-          ? 'completed'
-          : 'interrupted',
-      reason,
-    );
+    const reason = controlledResponseReason(signal, true);
+    const record = execution.finish(controlledResponseState(reason, false), reason);
     failDiagnosticRun(signal, record.state === 'outcome_unknown');
     if (!signal.aborted) throw error;
     prepareNdjsonResponse(res);
@@ -326,27 +339,8 @@ function finishControlledResponse(
   waiting: boolean,
   failed = false,
 ) {
-  const reason =
-    execution.signal.reason === 'user_stop'
-      ? 'user_stop'
-      : execution.signal.reason === 'timeout'
-        ? 'timeout'
-        : execution.signal.aborted
-          ? 'client_disconnect'
-          : failed
-            ? 'execution_failed'
-            : 'none';
-  const state =
-    reason === 'user_stop'
-      ? 'completed'
-      : reason === 'execution_failed'
-        ? 'failed'
-        : reason !== 'none'
-          ? 'interrupted'
-          : waiting
-            ? 'waiting_for_approval'
-            : 'completed';
-  return execution.finish(state, reason);
+  const reason = controlledResponseReason(execution.signal, failed);
+  return execution.finish(controlledResponseState(reason, waiting), reason);
 }
 
 function requiredSecretsMasterKey(): Buffer {
@@ -535,28 +529,24 @@ async function safePluginCall(fn: () => Promise<void>): Promise<void> {
   }
 }
 
+function abortedStreamEvent(signal: AbortSignal) {
+  if (signal.reason === 'timeout')
+    return { type: 'error' as const, code: 'TIMEOUT', message: 'Execution timeout exceeded' };
+  if (signal.reason === 'user_stop')
+    return {
+      type: 'error' as const,
+      code: 'USER_STOP',
+      message: 'Stop acknowledged. Previously admitted effects may still be settling.',
+    };
+  return { type: 'stream_aborted' as const, reason: 'client_disconnect' as const };
+}
+
 /** Build and write an NDJSON error event when the stream is still writable. */
 function emitStreamError(res: Response, err: unknown, signal?: AbortSignal): void {
   if (res.writableEnded) return;
 
   if (signal?.aborted) {
-    const reason =
-      signal.reason === 'user_stop'
-        ? 'user_stop'
-        : signal.reason === 'timeout'
-          ? 'timeout'
-          : 'client_disconnect';
-    const errorEvent =
-      reason === 'timeout'
-        ? { type: 'error' as const, code: 'TIMEOUT', message: 'Execution timeout exceeded' }
-        : reason === 'user_stop'
-          ? {
-              type: 'error' as const,
-              code: 'USER_STOP',
-              message: 'Stop acknowledged. Previously admitted effects may still be settling.',
-            }
-          : { type: 'stream_aborted' as const, reason };
-    res.write(JSON.stringify(errorEvent) + '\n');
+    res.write(JSON.stringify(abortedStreamEvent(signal)) + '\n');
     return;
   }
 
@@ -1601,19 +1591,17 @@ async function dispatchResumedApproval({
   return { resumeMessages, stopAfterDispatch, mcpHalt, nativeToolExecutor };
 }
 
-export async function handleSessionResume(
-  db: DrizzleDb,
-  options: ChatRouterOptions,
-  sessionLock: SessionLock,
-  req: Request,
-  res: Response,
-): Promise<void> {
-  const sessionId = z.string().min(1).parse(req.params['id']);
-  const { approvalRequestId } = parseBody(SessionResumeBodySchema, req.body);
-
-  const session = getSession(db, sessionId);
-  if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
-
+function loadResumableApproval({
+  db,
+  session,
+  approvalRequestId,
+  res,
+}: {
+  db: DrizzleDb;
+  session: SessionRecord;
+  approvalRequestId: string;
+  res: Response;
+}) {
   let approval: ApprovalRequest;
   try {
     approval = getApprovalRequest(db, approvalRequestId);
@@ -1621,7 +1609,7 @@ export async function handleSessionResume(
     mapResumeApprovalError(error);
   }
 
-  if (approval.sessionId !== sessionId) {
+  if (approval.sessionId !== session.id) {
     throw new HttpError(404, 'NOT_FOUND', 'Approval request not found for session');
   }
 
@@ -1644,8 +1632,117 @@ export async function handleSessionResume(
   // Reject substituted commands/endpoints before opening a replacement connection.
   if (approval.status !== 'rejected') assertCurrentMcpApproval(db, session.agentId, toolCall);
 
+  return { approval, toolCall };
+}
+
+type ResumedTranscript = { messages: ChatMessage[]; initialCount: number };
+
+function preserveInterruptedApprovalPairing(
+  signal: AbortSignal,
+  messages: ChatMessage[],
+  toolCall: ToolCallIntent,
+  approval: ApprovalRequest,
+): void {
+  if (
+    signal.aborted &&
+    !messages.some((message) => message.role === 'tool' && message.toolCallId === toolCall.id)
+  )
+    messages.push(interruptedApprovalMessage(toolCall, approval));
+}
+
+async function handleResumeFailure({
+  db,
+  sessionId,
+  runId,
+  approval,
+  toolCall,
+  agentCtx,
+  execution,
+  signal,
+  res,
+  err,
+  claimedForDispatch,
+  dispatchStarted,
+  resumedTranscript,
+  resumedPrefixPersisted,
+  captured,
+}: {
+  db: DrizzleDb;
+  sessionId: string;
+  runId: string;
+  approval: ApprovalRequest;
+  toolCall: ToolCallIntent;
+  agentCtx: AgentContext;
+  execution: ControlledExecution;
+  signal: AbortSignal;
+  res: Response;
+  err: unknown;
+  claimedForDispatch: boolean;
+  dispatchStarted: boolean;
+  resumedTranscript?: ResumedTranscript;
+  resumedPrefixPersisted: boolean;
+  captured?: ReturnType<typeof captureInterruptedReply>;
+}): Promise<void> {
+  if (claimedForDispatch && !dispatchStarted && isGitDeliveryTool(toolCall.name)) {
+    try {
+      // The hook may still settle later, but no dispatch owned this prepared operation.
+      // Recheck the claimed actor/binding; never cancel a foreign or already entered effect.
+      assertClaimedGitApproval(db, approval, toolCall, agentCtx.agent.id);
+      await createGitDeliveryService(db)
+        .chat({ sessionId, agentId: agentCtx.agent.id })
+        .cancel(toolCall.gitDeliveryBinding!.operationId, 'cancelled');
+    } catch {
+      // A changed actor or unavailable store retains preparation for inspection/expiry.
+    }
+  }
+  if (!res.headersSent && err instanceof HttpError) {
+    execution.finish('failed', 'execution_failed');
+    throw err;
+  }
+  if (resumedTranscript && !resumedPrefixPersisted) {
+    const interruptedTool = interruptedApprovalMessage(toolCall, approval);
+    persistNewMessages(
+      db,
+      sessionId,
+      [...resumedTranscript.messages, interruptedTool],
+      resumedTranscript.initialCount,
+    );
+  }
+  captured?.save();
+  const terminal = signal.aborted
+    ? finishControlledResponse(execution, false)
+    : execution.finish('failed', 'execution_failed');
+  await emitRuntimeFailure(
+    agentCtx,
+    sessionId,
+    runId,
+    signal,
+    res,
+    err,
+    terminal.state === 'outcome_unknown',
+  );
+}
+
+export async function handleSessionResume(
+  db: DrizzleDb,
+  options: ChatRouterOptions,
+  sessionLock: SessionLock,
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const sessionId = z.string().min(1).parse(req.params['id']);
+  const { approvalRequestId } = parseBody(SessionResumeBodySchema, req.body);
+
+  const session = getSession(db, sessionId);
+  if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
+
+  const resumable = loadResumableApproval({ db, session, approvalRequestId, res });
+  if (!resumable) return;
+  let { approval } = resumable;
+  const { toolCall } = resumable;
+
   const runId = randomUUID();
-  const context = await acquireControlledContext(
+  const context = await acquireControlledContext({
     db,
     session,
     options,
@@ -1653,12 +1750,12 @@ export async function handleSessionResume(
     res,
     sessionLock,
     runId,
-    approval.runId,
-  );
+    sourceExecutionId: approval.runId,
+  });
   if (!context) return;
   const { agentCtx, modelCfg, timeoutMs, release, execution, controller, signal } = context;
   let captured: ReturnType<typeof captureInterruptedReply> | undefined;
-  let resumedTranscript: { messages: ChatMessage[]; initialCount: number } | undefined;
+  let resumedTranscript: ResumedTranscript | undefined;
   let resumedPrefixPersisted = false;
   let claimedForDispatch = false;
   let dispatchStarted = false;
@@ -1721,13 +1818,7 @@ export async function handleSessionResume(
         execution,
       });
 
-    if (
-      signal.aborted &&
-      !resumeMessages.some(
-        (message) => message.role === 'tool' && message.toolCallId === toolCall.id,
-      )
-    )
-      resumeMessages.push(interruptedApprovalMessage(toolCall, approval));
+    preserveInterruptedApprovalPairing(signal, resumeMessages, toolCall, approval);
 
     // A completed approved effect must remain paired in history even if the next model is stopped.
     const resumedPrefix = sanitizeProjectAssistantMessages(
@@ -1806,44 +1897,23 @@ export async function handleSessionResume(
       }),
     );
   } catch (err) {
-    if (claimedForDispatch && !dispatchStarted && isGitDeliveryTool(toolCall.name)) {
-      try {
-        // The hook may still settle later, but no dispatch owned this prepared operation.
-        // Recheck the claimed actor/binding; never cancel a foreign or already entered effect.
-        assertClaimedGitApproval(db, approval, toolCall, agentCtx.agent.id);
-        await createGitDeliveryService(db)
-          .chat({ sessionId, agentId: agentCtx.agent.id })
-          .cancel(toolCall.gitDeliveryBinding!.operationId, 'cancelled');
-      } catch {
-        // A changed actor or unavailable store retains preparation for inspection/expiry.
-      }
-    }
-    if (!res.headersSent && err instanceof HttpError) {
-      execution.finish('failed', 'execution_failed');
-      throw err;
-    }
-    if (resumedTranscript && !resumedPrefixPersisted) {
-      const interruptedTool = interruptedApprovalMessage(toolCall, approval);
-      persistNewMessages(
-        db,
-        sessionId,
-        [...resumedTranscript.messages, interruptedTool],
-        resumedTranscript.initialCount,
-      );
-    }
-    captured?.save();
-    const terminal = signal.aborted
-      ? finishControlledResponse(execution, false)
-      : execution.finish('failed', 'execution_failed');
-    await emitRuntimeFailure(
-      agentCtx,
+    await handleResumeFailure({
+      db,
       sessionId,
       runId,
+      approval,
+      toolCall,
+      agentCtx,
+      execution,
       signal,
       res,
       err,
-      terminal.state === 'outcome_unknown',
-    );
+      claimedForDispatch,
+      dispatchStarted,
+      resumedTranscript,
+      resumedPrefixPersisted,
+      captured,
+    });
   } finally {
     await closeRuntimeStream({ timeoutId, heartbeatId, release, agentCtx, res });
   }
@@ -1871,7 +1941,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
       }
 
       const runId = randomUUID();
-      const context = await acquireControlledContext(
+      const context = await acquireControlledContext({
         db,
         session,
         options,
@@ -1879,7 +1949,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         res,
         sessionLock,
         runId,
-      );
+      });
       if (!context) return;
       const { agentCtx, modelCfg, timeoutMs, release, execution, controller, signal } = context;
       let captured: ReturnType<typeof captureInterruptedReply> | undefined;

@@ -119,22 +119,17 @@ export class ControlledExecution implements RunExecutionControl {
       nowMs: Date.now(),
     });
     // No await or diagnostic callback between the committed fence and the actual invocation.
-    let result: Promise<T>;
-    try {
-      result = action();
-    } catch (error) {
-      result = Promise.reject(error);
-    }
+    // The executor calls the action synchronously, converts synchronous throws to
+    // rejections, and adopts the original promise through its actual settlement.
+    const result = new Promise<T>((resolve) => resolve(action()));
     this.owner.observeCurrent(this, 'admitted', kind);
     return Promise.resolve(result).then(
       (value) => {
         const effect = kind === 'tool' || kind === 'sensor';
-        const outcome =
-          uncertainResult(value) || (effect && this.signal.aborted && failedResult(value))
-            ? 'unknown'
-            : failedResult(value)
-              ? 'failed'
-              : 'succeeded';
+        let outcome: 'unknown' | 'failed' | 'succeeded' = 'succeeded';
+        if (uncertainResult(value) || (effect && this.signal.aborted && failedResult(value)))
+          outcome = 'unknown';
+        else if (failedResult(value)) outcome = 'failed';
         this.settle(id, kind, started, outcome, outcome === 'failed');
         return value;
       },

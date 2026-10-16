@@ -30,21 +30,25 @@ export async function startStopProvider({ model, port = 0, observe = () => {} })
       releases.delete(index);
     }
   };
+  const readRequest = async (req) => {
+    if (req.method !== 'POST' || req.url !== '/v1/chat/completions')
+      throw new Error('Unexpected Stop provider route');
+    let bytes = 0;
+    const chunks = [];
+    for await (const chunk of req) {
+      bytes += chunk.length;
+      if (bytes > 512_000) throw new Error('Stop provider body exceeds limit');
+      chunks.push(chunk);
+    }
+    const body = JSON.parse(Buffer.concat(chunks).toString());
+    if (body.model !== model || body.stream !== true || !Array.isArray(body.messages))
+      throw new Error('Unexpected Stop provider model/mode');
+    return body;
+  };
   const server = createServer((req, res) => {
     void (async () => {
       try {
-        if (req.method !== 'POST' || req.url !== '/v1/chat/completions')
-          throw new Error('Unexpected Stop provider route');
-        let bytes = 0;
-        const chunks = [];
-        for await (const chunk of req) {
-          bytes += chunk.length;
-          if (bytes > 512_000) throw new Error('Stop provider body exceeds limit');
-          chunks.push(chunk);
-        }
-        const body = JSON.parse(Buffer.concat(chunks).toString());
-        if (body.model !== model || body.stream !== true || !Array.isArray(body.messages))
-          throw new Error('Unexpected Stop provider model/mode');
+        const body = await readRequest(req);
         const index = requests.length;
         requests.push(body);
         observe({ kind: 'request', body });

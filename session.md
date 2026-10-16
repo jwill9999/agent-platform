@@ -1,7 +1,17 @@
 # Stop implementation and durable monitoring handoff — 16 October 2026
 
+**Latest follow-up — 16 October 2026, 04:27 UTC:** [Stop PR334](https://github.com/jwill9999/agent-platform/pull/334)
+is open. All seven complete mirrors at `cc9c4a20` passed 27 readbacks; initial hosted Sonar failed
+with 60 findings. Bounded independently reviewed source repairs are now awaiting fresh qualification;
+the last qualified `9044859d` application and its local results below are historical for the changed
+code. The SQLite migration remains exact; its PL/SQL constant recommendation needs narrow reviewed
+nonapplicability disposition. No suppression or scan-policy change is applied. New tests/current-head
+CI/connected diagnostics and updated results remain required. Monitoring is still unstarted behind
+actual Stop delivery; owner stress testing is not ready. Keep the Docker gateway disabled and PR283/
+paused orchestration untouched.
+
 Owner-approved sequence remains Stop then durable monitoring, using Beads, implementation skill,
-independent critique and agreed tests. Current application checkpoint is 9044859d6499753f7d3b4ca0d328f50fdb423ec7
+independent critique and agreed tests. Last qualified application checkpoint is 9044859d6499753f7d3b4ca0d328f50fdb423ec7
 (tree 178a103c9d61f1ae66ad9515daf2ade07a0284ff) on task/project-chat-stop into feature/project-chat-stop.
 Earlier dirty 1b574 ancestry and f9 browser 14/Electron 67/signed VM 1 are historical source-bound proof,
 not qualification of this DB application change. Immutable revision/PR/check/publication/delivery

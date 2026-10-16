@@ -26,9 +26,9 @@ export async function dockerStopProvider(apiURL: string, model: string) {
   )
     throw new Error('Stop API URL does not match selected Compose container');
   const source = readFileSync(new URL('./provider.mjs', import.meta.url), 'utf8');
-  const runner = `
+  const runner = String.raw`
 import { createInterface } from 'node:readline';
-const emit=(event)=>process.stdout.write(JSON.stringify(event)+'\\n');
+const emit=(event)=>process.stdout.write(JSON.stringify(event)+'\n');
 if(process.env.OLLAMA_BASE_URL!=='http://127.0.0.1:11434/v1')throw new Error('Stop loopback provider overlay required');
 const fixture=await startStopProvider({model:process.argv[1],port:11434,observe:emit});
 const input=createInterface({input:process.stdin});
@@ -122,8 +122,8 @@ emit({kind:'ready'});
   } catch (error) {
     try {
       await close();
-    } catch (cleanup) {
-      throw new AggregateError([error, cleanup], 'Stop provider setup/cleanup failed');
+    } catch (error_) {
+      throw new AggregateError([error, error_], 'Stop provider setup/cleanup failed');
     }
     throw error;
   }

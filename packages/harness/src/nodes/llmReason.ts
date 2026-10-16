@@ -618,6 +618,56 @@ async function emitContextHalt(
   await emitter?.emit({ type: 'error', code, message: messages[code] });
 }
 
+type ModelAttemptInput = {
+  model: ReturnType<typeof createLanguageModel>;
+  messages: CoreMessage[];
+  maxTokens: number;
+  tools: ReturnType<typeof buildToolNameMap>['tools'] | undefined;
+  signal?: AbortSignal;
+  runControl?: RunExecutionControl;
+  onModelAttempt?: () => void;
+  partialEmitter: OutputEmitter;
+  emitter?: OutputEmitter;
+  toolDefinitions: ToolDefinition[];
+  toolNameMap: Map<string, string>;
+};
+
+/** Each retry enters the durable fence before starting its original SDK promise. */
+function invokeModelAttempt(input: ModelAttemptInput) {
+  return invokeRunAction(input.runControl, input.signal, 'model', () =>
+    withProviderAbortIdentity(input.signal, async () => {
+      let streamError: Error | null = null;
+      notifyObserver(() => input.onModelAttempt?.());
+      const res = streamText({
+        model: input.model,
+        messages: input.messages,
+        maxTokens: input.maxTokens,
+        tools: input.tools,
+        maxSteps: 1,
+        maxRetries: 0,
+        abortSignal: input.signal,
+        onError: ({ error }) => {
+          streamError = providerStreamError(error, input.signal);
+        },
+      });
+      const text = await streamAndAccumulate(res, input.partialEmitter, input.signal);
+      if (streamError) throw streamError;
+      const toolCalls = await res.toolCalls;
+      const usageInfo = await res.usage;
+      const finishReason = await res.finishReason;
+      if (finishReason !== 'length')
+        await emitToolCallPlaceholder(
+          text,
+          toolCalls,
+          input.toolDefinitions,
+          input.toolNameMap,
+          input.emitter,
+        );
+      return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo, finishReason };
+    }),
+  );
+}
+
 /**
  * Creates a graph node that invokes the LLM via the Vercel AI SDK using streamText.
  *
@@ -721,45 +771,19 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     try {
       completed = await withRetry(
         () =>
-          invokeRunAction(runControl, signal, 'model', () =>
-            withProviderAbortIdentity(signal, async () => {
-              let streamError: Error | null = null;
-              notifyObserver(() => onModelAttempt?.());
-              const res = streamText({
-                model,
-                messages: admission.messages,
-                maxTokens: admission.decision.outputCap,
-                tools,
-                maxSteps: 1,
-                maxRetries: 0,
-                abortSignal: signal,
-                onError: ({ error }) => {
-                  streamError = providerStreamError(error, signal);
-                },
-              });
-
-              const text = await streamAndAccumulate(res, partialEmitter, signal);
-
-              if (streamError) {
-                throw streamError;
-              }
-
-              const toolCalls = await res.toolCalls;
-              const usageInfo = await res.usage;
-
-              const finishReason = await res.finishReason;
-              if (finishReason !== 'length')
-                await emitToolCallPlaceholder(
-                  text,
-                  toolCalls,
-                  toolDefinitions,
-                  toolNameMap,
-                  emitter,
-                );
-
-              return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo, finishReason };
-            }),
-          ),
+          invokeModelAttempt({
+            model,
+            messages: admission.messages,
+            maxTokens: admission.decision.outputCap,
+            tools,
+            signal,
+            runControl,
+            onModelAttempt,
+            partialEmitter,
+            emitter,
+            toolDefinitions,
+            toolNameMap,
+          }),
         LLM_RETRY_CONFIG,
         buildRetryCallback(step, retryTraceEvents, retryCounter, dispatcher, state),
         { signal, runControl },

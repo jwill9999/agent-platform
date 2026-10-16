@@ -526,12 +526,11 @@ async function dispatchNativeTool(
       ok: false,
     };
   }
-  const options = nativeDispatchOptions(call, ctx, signal);
+  let options = nativeDispatchOptions(call, ctx, signal);
+  if (runControl) options = { ...options, runControl };
   const execute = ctx.nativeToolExecutor;
   const invocation = invokeRunAction(runControl, signal, 'tool', () =>
-    options
-      ? execute(call.name, call.args, { ...options, ...(runControl ? { runControl } : {}) })
-      : execute(call.name, call.args, runControl ? { runControl } : undefined),
+    execute(call.name, call.args, options),
   );
   try {
     const result = await invocation;

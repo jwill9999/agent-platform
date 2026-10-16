@@ -140,12 +140,46 @@ export function beginDiagnosticRun(sessionId: string, runId: string): () => void
 
 export function failDiagnosticRun(signal: AbortSignal, unknown = false): void {
   const terminal: Pick<DiagnosticEvent, 'outcome' | 'errorCode'> = {
-    outcome: unknown ? 'unknown' : signal.aborted ? 'cancelled' : 'failed',
+    outcome: runFailureOutcome(signal, unknown),
     errorCode: runFailureCode(signal),
   };
   const current = context.getStore();
   if (current) current.terminal = terminal;
   emit({ phase: 'request', ...terminal });
+}
+
+function runFailureOutcome(signal: AbortSignal, unknown: boolean): DiagnosticEvent['outcome'] {
+  if (unknown) return 'unknown';
+  return signal.aborted ? 'cancelled' : 'failed';
+}
+
+function terminalControlOutcome(
+  state: ControlObservation['record']['state'],
+): DiagnosticEvent['outcome'] | undefined {
+  if (state === 'outcome_unknown' || state === 'interrupted') return 'unknown';
+  if (state === 'failed') return 'failed';
+  if (state === 'cancelled') return 'cancelled';
+  return undefined;
+}
+
+function controlOutcome(
+  state: ControlObservation['record']['state'],
+  stage: ControlObservation['stage'],
+): DiagnosticEvent['outcome'] {
+  const terminal = terminalControlOutcome(state);
+  if (terminal) return terminal;
+  if (state === 'waiting_for_approval' || stage === 'requested') return 'waiting';
+  return stage === 'admitted' ? 'started' : 'succeeded';
+}
+
+function controlReasonError(
+  reason: unknown,
+  fallback: DiagnosticEvent['errorCode'],
+): DiagnosticEvent['errorCode'] {
+  if (reason === 'user_stop') return 'cancelled';
+  if (reason === 'timeout') return 'timeout';
+  if (reason === 'client_disconnect') return 'connection_lost';
+  return fallback;
 }
 
 /** A safe observation of mandatory authority, never the authority itself. */
@@ -160,38 +194,19 @@ export function observeDiagnosticRunControl({
   if (!current) return;
   current.sessionId = record.sessionId;
   if (executionId) current.runId = executionId;
-  if (['outcome_unknown', 'interrupted', 'failed', 'cancelled'].includes(record.state)) {
+  const terminal = terminalControlOutcome(record.state);
+  if (terminal) {
     current.terminal = {
-      outcome:
-        record.state === 'outcome_unknown' || record.state === 'interrupted'
-          ? 'unknown'
-          : record.state === 'failed'
-            ? 'failed'
-            : 'cancelled',
-      errorCode:
-        record.reason === 'user_stop'
-          ? 'cancelled'
-          : record.reason === 'timeout'
-            ? 'timeout'
-            : record.reason === 'client_disconnect'
-              ? 'connection_lost'
-              : (current.haltError ?? current.terminal?.errorCode ?? 'internal_error'),
+      outcome: terminal,
+      errorCode: controlReasonError(
+        record.reason,
+        current.haltError ?? current.terminal?.errorCode ?? 'internal_error',
+      ),
     };
   }
   emit({
     phase: 'control',
-    outcome:
-      record.state === 'outcome_unknown' || record.state === 'interrupted'
-        ? 'unknown'
-        : record.state === 'failed'
-          ? 'failed'
-          : record.state === 'cancelled'
-            ? 'cancelled'
-            : record.state === 'waiting_for_approval' || stage === 'requested'
-              ? 'waiting'
-              : stage === 'admitted'
-                ? 'started'
-                : 'succeeded',
+    outcome: controlOutcome(record.state, stage),
     durationMs,
     control: {
       logicalRunId: record.id,
@@ -353,11 +368,7 @@ function completionOutcome(waiting: boolean, failed: boolean): DiagnosticEvent['
 
 function runFailureCode(signal: AbortSignal): DiagnosticEvent['errorCode'] {
   if (!signal.aborted) return 'internal_error';
-  return signal.reason === 'timeout'
-    ? 'timeout'
-    : signal.reason === 'client_disconnect'
-      ? 'connection_lost'
-      : 'cancelled';
+  return controlReasonError(signal.reason, 'cancelled');
 }
 
 function interruptionFromError(
@@ -379,6 +390,24 @@ function nodeMetadata(phase: 'model' | 'tool', state: HarnessStateType): Partial
   return { provider: provider.success ? provider.data : 'other' };
 }
 
+function interruptedTrace(
+  traces: NonNullable<NodeResult['trace']>,
+): Pick<DiagnosticEvent, 'outcome' | 'errorCode'> | undefined {
+  const aborted = traces.find((event) => event.type === 'stream_aborted');
+  if (aborted?.type !== 'stream_aborted') return undefined;
+  return { outcome: 'cancelled', errorCode: controlReasonError(aborted.reason, 'cancelled') };
+}
+
+function nodeFailureMetadata(
+  failed: boolean,
+  haltError: DiagnosticEvent['errorCode'],
+  waiting: boolean,
+  phase: 'model' | 'tool',
+): Pick<DiagnosticEvent, 'errorCode'> {
+  if ((!failed && !haltError) || waiting) return {};
+  return { errorCode: haltError ?? (phase === 'model' ? 'provider_error' : 'tool_error') };
+}
+
 function observeNodeResult(
   parent: Context,
   phase: 'model' | 'tool',
@@ -387,19 +416,7 @@ function observeNodeResult(
   started: number,
 ): void {
   const traces = result.trace ?? [];
-  const aborted = traces.find((event) => event.type === 'stream_aborted');
-  const interrupted =
-    aborted?.type === 'stream_aborted'
-      ? {
-          outcome: 'cancelled' as const,
-          errorCode:
-            aborted.reason === 'timeout'
-              ? ('timeout' as const)
-              : aborted.reason === 'client_disconnect'
-                ? ('connection_lost' as const)
-                : ('cancelled' as const),
-        }
-      : undefined;
+  const interrupted = interruptedTrace(traces);
   if (interrupted) parent.terminal = interrupted;
   if (result.halted) parent.halted = true;
   const haltError = observedContextHalt(result) ?? observedMcpHalt(result);
@@ -421,13 +438,7 @@ function observeNodeResult(
     ...metadata,
     outcome: completionOutcome(waiting, failed || Boolean(haltError)),
     durationMs: performance.now() - started,
-    ...((failed || haltError) && !waiting
-      ? {
-          errorCode:
-            haltError ??
-            (phase === 'model' ? ('provider_error' as const) : ('tool_error' as const)),
-        }
-      : {}),
+    ...nodeFailureMetadata(failed, haltError, waiting, phase),
     ...interrupted,
     ...observedTokenUsage(traces),
   });

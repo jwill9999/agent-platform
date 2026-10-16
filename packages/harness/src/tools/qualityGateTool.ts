@@ -5,7 +5,7 @@ import {
   type RunExecutionControl,
 } from '../runControl.js';
 import { createHash } from 'node:crypto';
-import { execFile } from 'node:child_process';
+import { execFile, type ExecFileException } from 'node:child_process';
 import { constants, existsSync } from 'node:fs';
 import { access, readFile, realpath } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
@@ -258,6 +258,13 @@ function parseFailures(stdout: string, stderr: string): CodingQualityGateFailure
   return failures;
 }
 
+function commandExitCode(error: ExecFileException | null, timedOut: boolean): number | null {
+  if (error && typeof error.code === 'number') return error.code;
+  if (timedOut) return null;
+  if (error) return 1;
+  return 0;
+}
+
 function runCommand(
   spec: CommandSpec,
   cwd: string,
@@ -280,14 +287,7 @@ function runCommand(
           error instanceof Error &&
           'signal' in error &&
           (error as { signal?: unknown }).signal === 'SIGTERM';
-        const exitCode =
-          error && 'code' in error && typeof error.code === 'number'
-            ? error.code
-            : timedOut
-              ? null
-              : error
-                ? 1
-                : 0;
+        const exitCode = commandExitCode(error, timedOut);
         const uncertain =
           signal?.aborted || timedOut || (error && 'killed' in error && error.killed === true);
         resolveResult({

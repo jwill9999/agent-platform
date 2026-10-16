@@ -1796,7 +1796,7 @@ describe('POST /v1/chat (session-aware)', () => {
         .send({ sessionId, message: 'Continue without approving yet' })
         .expect(409);
       expect(conflict.body.error.code).toBe('RUN_CONFLICT');
-      expect(mockToolCalls.mock.calls.length).toBe(calls);
+      expect(mockToolCalls.mock.calls).toHaveLength(calls);
       const pending = await request(app)
         .get(`/v1/approval-requests/${approvalRequestId}`)
         .expect(200);

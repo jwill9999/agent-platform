@@ -172,6 +172,65 @@ describe('shared application-owned RunControlService', () => {
       expect.arrayContaining(['state', 'requested', 'acknowledged']),
     );
   });
+  it('invokes the admitted action synchronously before an observer can acknowledge Stop', async () => {
+    const order: string[] = [];
+    service = new RunControlService(context.db, (value) => {
+      observations.push(value);
+      if (value.stage === 'admitted') {
+        order.push('admitted-observer');
+        service.stop(value.record.sessionId, value.record.id);
+      }
+    });
+    const { selected, execution } = open();
+    const gate = deferred<string>();
+    const pending = execution.invoke('tool', () => {
+      expect(service.read(selected.id, execution.runId)?.inFlight).toBe(1);
+      order.push('actual-action');
+      return gate.promise;
+    });
+    expect(order).toEqual(['actual-action', 'admitted-observer']);
+    expect(service.read(selected.id, execution.runId)).toMatchObject({
+      state: 'stop_requested',
+      inFlight: 1,
+    });
+    gate.resolve('actual-late-result');
+    await expect(pending).resolves.toBe('actual-late-result');
+    expect(service.read(selected.id, execution.runId)).toMatchObject({
+      state: 'cancelled',
+      inFlight: 0,
+    });
+    expect(
+      context.sqlite
+        .prepare('select kind, outcome from run_attempts where run_id = ?')
+        .all(execution.runId),
+    ).toEqual([{ kind: 'tool', outcome: 'succeeded' }]);
+  });
+  it.each(['synchronous', 'asynchronous'] as const)(
+    'tracks one durable failed attempt for a genuine %s action rejection',
+    async (mode) => {
+      const { selected, execution } = open();
+      const failure = new Error('genuine-action-failure');
+      let calls = 0;
+      const pending = execution.invoke('model', () => {
+        calls++;
+        if (mode === 'synchronous') throw failure;
+        return Promise.reject(failure);
+      });
+      expect(calls).toBe(1);
+      await expect(pending).rejects.toBe(failure);
+      expect(service.read(selected.id, execution.runId)?.inFlight).toBe(0);
+      expect(
+        context.sqlite
+          .prepare('select kind, outcome from run_attempts where run_id = ?')
+          .all(execution.runId),
+      ).toEqual([{ kind: 'model', outcome: 'failed' }]);
+      expect(observations.filter((value) => value.stage === 'settled')).toHaveLength(1);
+      expect(execution.finish('failed', 'execution_failed')).toMatchObject({
+        state: 'failed',
+        reason: 'execution_failed',
+      });
+    },
+  );
   it('acknowledges while an admitted model is blocked, then tracks actual late settlement', async () => {
     const { selected, execution } = open();
     const gate = deferred<string>();

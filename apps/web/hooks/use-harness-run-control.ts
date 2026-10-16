@@ -27,8 +27,9 @@ class PassiveRateLimitError extends Error {
 
 function passiveRetryDelay(headers: Headers): number {
   const retryAfter = headers.get('retry-after')?.trim();
-  const seconds = retryAfter && /^\d+(?:\.\d+)?$/.test(retryAfter) ? Number(retryAfter) : NaN;
-  const date = retryAfter && !Number.isFinite(seconds) ? Date.parse(retryAfter) : NaN;
+  const seconds =
+    retryAfter && /^\d+(?:\.\d+)?$/.test(retryAfter) ? Number(retryAfter) : Number.NaN;
+  const date = retryAfter && !Number.isFinite(seconds) ? Date.parse(retryAfter) : Number.NaN;
   const reset = Number(
     headers.get('ratelimit')?.match(/(?:^|[,;]\s*)reset=(\d+(?:\.\d+)?)(?=$|[,;\s])/)?.[1],
   );
@@ -180,7 +181,7 @@ export function useHarnessRunControl(
       } catch (error) {
         if (disposed) return;
         accept(latest.current.record, CONTROL_ERROR);
-        active ||= Boolean(latest.current.record && ACTIVE.has(latest.current.record.state));
+        active ||= Boolean(latest.current.record?.state && ACTIVE.has(latest.current.record.state));
         if (error instanceof PassiveRateLimitError) {
           delayMs = error.retryDelayMs;
           active = true;

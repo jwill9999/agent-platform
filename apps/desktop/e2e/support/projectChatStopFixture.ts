@@ -38,7 +38,7 @@ export async function nativeStopJourney(info: TestInfo, scenario: StopScenario) 
   let page: Page | undefined;
   let ctx: StopJourneyContext | undefined;
   let traced = false;
-  const settle = async (action: () => Promise<unknown> | unknown) => {
+  const settle = async (action: () => unknown) => {
     try {
       await action();
     } catch (error) {
@@ -188,7 +188,7 @@ export async function nativeStopJourney(info: TestInfo, scenario: StopScenario) 
           .poll(() => ctx!.readSensorMarker().finished, { timeout: 5000 })
           .toBe(ctx.readSensorMarker().started);
     });
-    await settle(async () => app?.close());
+    await settle(() => app?.close());
     await settle(async () => provider.close());
     await settle(() => {
       if (!fixture) return;

@@ -1,6 +1,42 @@
 # Shared harness Stop implementation and qualification
 
 **Date:** 16 October 2026. **Beads:** `agent-platform-harness-r3.cancel`, IN_PROGRESS.
+
+## PR334 hosted quality repair — 16 October 2026, 04:27 UTC
+
+The subsequent task-to-feature [PR334](https://github.com/jwill9999/agent-platform/pull/334)
+opened at `cc9c4a204914e70f8af41716f88167f7a279e8d7`, tree
+`d4b4814919aecf290905562dc95944ce5f0f1faa`. Its seven complete branch-specific Notion
+mirrors passed all 27 body/metadata/destination readbacks, including the full session in twenty
+ordered parts (`publication-cc9c4a20.json`). That publication does not establish hosted qualification.
+
+Initial Sonar analysis reported 60 issues: 13 Critical, 30 Major and 17 Minor. Reliability rating C
+failed; security A, maintainability A, 1.2% duplication and reviewed hotspots passed. Scanner categories
+are not proof that an unhandled production failure occurred. The original issue/gate responses remain
+in `pr334-sonar-cc9c4a20-issues.json` and `pr334-sonar-cc9c4a20-gate.json`. No review threads were
+unresolved at opening; Sourcery skipped its review, so its check is not independent source approval.
+
+The bounded source repair extracts decision/projection helpers, preserves synchronous admission
+followed immediately by action invocation, retains serial abortable retries and exact approval/history/
+Git cleanup order, and fixes equivalent typing/style findings. Independent source review found no
+remaining semantic regression in the repaired set. Three real-SQLite finish-reason cases, three
+synchronous/async admission controls and four retry controls were added. Fixture runner/sensor and
+regex-replacement bytes are unchanged. Original-versus-repaired diagnostic modules produce identical
+schema-accepted projections in 960 control and 32 node comparisons under a mock collector/fixed clock;
+that comparison is not application E2E, authentication, persistence or performance qualification.
+
+The SQLite migration `0020_run_control.sql` remains byte-identical. Its `plsql:S1192` finding suggests
+an Oracle-style shared constant for four `running` literals in SQLite CHECK/default/partial-index
+DDL. The source-aware critic agrees that changing this migration to satisfy an incompatible dialect
+would be wrong. A narrow evidence-backed finding disposition is still pending; no rule, exclusion,
+policy, suppression or schema redesign has been applied.
+
+**Current boundary:** repaired application bytes need new meaningful tests, connected browser/Electron/
+signed-VM evidence, diagnostic review and actual current-head hosted analysis. All `9044859d` results
+below remain valid historical qualification of that application, not proof of these changed bytes.
+This repair is not merged/delivered, monitoring remains unstarted behind Stop, and owner stress testing
+is not ready. Paused orchestration stays separate.
+
 **Status:** Required local execution evidence recorded; delivery qualification remains in progress. Not merged, delivered or ready for owner stress testing.
 **Source:** `task/project-chat-stop` into `feature/project-chat-stop`. Early local test provenance
 was documentation ancestry `1b574dbc5fc9e0151d1ed8beac5a2ddc0f02c06e` with dirty implementation
