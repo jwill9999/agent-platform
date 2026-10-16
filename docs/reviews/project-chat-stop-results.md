@@ -2,6 +2,44 @@
 
 **Date:** 16 October 2026. **Beads:** `agent-platform-harness-r3.cancel`, IN_PROGRESS.
 
+## Current repair checkpoint — 16 October 2026, 04:43 UTC
+
+Application repair 9867a61b is independently reviewed but not yet pushed. The normal hook passed
+four package suites (desktop 187, web 417, DB 172 and harness 773) and failed API 527/528: locked-writer request p95 overhead 42.482 ms
+exceeded 20 ms. Healthy capture retained 1540 events with zero loss, and locked enqueue p95 was 0.035 ms.
+No cause is established. The original failed log is `pr334-normal-push-9867a61b.log`.
+
+The subsequent fresh-process unchanged benchmark completed 900 measurements/990 fixture calls.
+One instrumented full API run then passed 528/528 in 190.25 seconds. Raw per-request timings and
+passive VM/process/disk observations are retained in `pr334-performance-full9867-measurements.json`
+and `pr334-api-full9867-observation.json`. These results permit the reviewed one normal-push attempt;
+they do not replace it, erase the first failure or prove a CPU/disk/GC/Docker cause. Existing 20 ms/
+2 ms limits, healthy zero-loss assertion, workload and all deadlines remain unchanged.
+
+Initial hosted cc9c4a20 verify, Docker and browser E2E passed. Electron 66/67 failed both attempts at
+sensor entry. Digest-verified reports contain ready/durable/verified diagnostics with no losses;
+the tool returned `QUALITY_GATE_DENIED: No fixed pnpm binary found`, no sensor was admitted and
+no Stop operation began. The action installed pnpm 9.15.4 under `/home/runner/setup-pnpm`, outside
+all three accepted fixed command paths. This is a confirmed CI provisioning gap, not evidence of
+a slow connection or failed cancellation. `pr334-desktop-diagnosis.json` binds both actual receipts.
+
+The independently reviewed workflow-only repair resolves the pinned action's actual pnpm package,
+validates its version/location/executable, exposes its JS payload at `/usr/local/bin/pnpm` only if
+absent or already identical, and checks 9.15.4 with current Node/fresh HOME before Electron tests.
+Eleven synthetic controls pass, including relative-loader behavior and collision refusals. No
+product command policy, sensor assertions, time limits or tests were weakened. Actual new-head
+hosted desktop qualification remains required.
+
+The specific SQLite issue `AaFC7_WxAKgrwE5N3nAL` was independently approved and individually marked
+False Positive through the supported Sonar API. The exact source-backed comment and final status
+were read back; migration SHA256 8f593894 remains unchanged. Oracle PL/SQL constant guidance does
+not apply to SQLite CHECK/default/partial-index DDL. No rule/profile/exclusion or other issue was
+changed. The pending statement in the older 04:27 checkpoint below is historical.
+
+Fresh browser 16/Electron 67/actual-VM 1 qualification, normal push, current-head Sonar/security/reviews,
+changed full document mirrors and actual delivery remain outstanding. Existing 904 results below do
+not qualify repaired application bytes. Monitoring remains unstarted and owner stress is not ready.
+
 ## PR334 hosted quality repair — 16 October 2026, 04:27 UTC
 
 The subsequent task-to-feature [PR334](https://github.com/jwill9999/agent-platform/pull/334)
