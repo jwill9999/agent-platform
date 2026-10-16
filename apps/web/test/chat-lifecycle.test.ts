@@ -454,6 +454,133 @@ describe('mounted chat session lifecycle', () => {
     },
   );
 
+  it.each(['COMMAND_OUTCOME_UNKNOWN', 'HTTP_OUTCOME_UNKNOWN', 'DOWNLOAD_OUTCOME_UNKNOWN'])(
+    'retains %s action uncertainty for streamed and HTTP resume errors without replay',
+    async (code) => {
+      for (const route of ['stream', 'http'] as const) {
+        const start = calls.length;
+        const postStart = posts().length;
+        await select(`${code}-${route}`, true);
+        await restore(start, 'assistant', [approval()]);
+        let result!: ChatAdmission;
+        await act(async () => {
+          result = current.decideApproval('approval-1', 'approve');
+        });
+        const operation = accepted(result);
+        await respond(post(postStart), envelope({}));
+        await act(async () => {
+          post(postStart + 1).resolve(
+            route === 'http'
+              ? new Response(
+                  JSON.stringify({ error: { code, message: 'Private transport detail' } }),
+                  {
+                    status: 409,
+                  },
+                )
+              : stream({ type: 'error', code, message: 'Private transport detail' }),
+          );
+          await operation.completion;
+        });
+        const card = required(Object.values(current.approvalEventsByMessage).flat(), 0);
+        expect(card.status).toBe('not_completed');
+        expect(card.error).toContain('may have taken effect');
+        expect(card.error).toContain('Inspect its effects');
+        expect(card.error).toContain('cannot be retried');
+        expect(card.error).not.toContain('Private transport detail');
+        if (route === 'stream') {
+          expect(Object.values(current.toolEventsByMessage).flat()).toContainEqual({
+            type: 'error',
+            code,
+            message: 'Private transport detail',
+          });
+        }
+        expect(current.decideApproval('approval-1', 'approve')).toEqual({
+          accepted: false,
+          reason: 'invalid-approval',
+        });
+        expect(posts()).toHaveLength(postStart + 2);
+      }
+    },
+  );
+
+  it.each(['MODEL_FAILED', 'RUN_CANCELLED'])(
+    'retains a confirmed action when the following model reports %s',
+    async (code) => {
+      let saved: unknown = null;
+      controlFetch = async () => envelope(saved);
+      await select('confirmed', true);
+      await restore(0, 'assistant', [approval()]);
+      let result!: ChatAdmission;
+      await act(async () => {
+        result = current.decideApproval('approval-1', 'approve');
+      });
+      const operation = accepted(result);
+      await respond(post(0), envelope({}));
+      await act(async () => {
+        const runId = '81ce397c-a87d-4f20-9e21-9e6edfa92322';
+        saved = {
+          id: runId,
+          sessionId: 'confirmed',
+          processInstanceId: '99ce397c-a87d-4f20-9e21-9e6edfa92322',
+          state: 'outcome_unknown',
+          reason: 'user_stop',
+          version: 3,
+          createdAtMs: 1,
+          updatedAtMs: 2,
+          inFlight: 1,
+        };
+        const response = stream(
+          { type: 'tool_result', toolId: 'server:tool', data: { ok: true } },
+          { type: 'error', code, message: 'Following model did not complete' },
+        );
+        response.headers.set('x-harness-run-id', runId);
+        post(1).resolve(response);
+        await operation.completion;
+      });
+      expect(current.runControl?.state).toBe('outcome_unknown');
+      expect(required(Object.values(current.approvalEventsByMessage).flat(), 0).status).toBe(
+        'executed',
+      );
+      expect(Object.values(current.toolEventsByMessage).flat()).toContainEqual({
+        type: 'result',
+        toolId: 'server:tool',
+        data: { ok: true },
+        status: 'success',
+      });
+      expect(posts()).toHaveLength(2);
+    },
+  );
+
+  it('restores durable uncertainty without inventing a completed or replayable native approval', async () => {
+    controlFetch = async () =>
+      envelope({
+        id: '81ce397c-a87d-4f20-9e21-9e6edfa92322',
+        sessionId: 'uncertain-saved',
+        processInstanceId: '99ce397c-a87d-4f20-9e21-9e6edfa92322',
+        state: 'outcome_unknown',
+        reason: 'execution_failed',
+        version: 3,
+        createdAtMs: 1,
+        updatedAtMs: 2,
+        inFlight: 1,
+      });
+    await select('uncertain-saved', true);
+    // The backend pending-only approval query excludes the already-approved action.
+    // Its durable logical run still exposes uncertainty after a full reload.
+    await restore(0, 'saved-native-failure', []);
+    expect(call(1).url).toContain('status=pending');
+    expect(current.runControl?.state).toBe('outcome_unknown');
+    expect(current.runControlStatusText).toContain('Run outcome is unknown');
+    expect(current.runControlStatusText).toContain('inspect effects');
+    expect(current.approvalEventsByMessage).toEqual({});
+    expect(current.canDecideApproval).toBe(false);
+    expect(current.decideApproval('old-native-approval', 'approve')).toEqual({
+      accepted: false,
+      reason: 'invalid-approval',
+    });
+    expect(posts()).toHaveLength(0);
+  });
+
   it('preserves a controlled stream error and context-limit refusal without replay', async () => {
     await select('new');
     const operation = await send();

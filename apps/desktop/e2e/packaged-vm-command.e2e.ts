@@ -60,6 +60,8 @@ const STOP_GUEST_COMMAND = 'sh ./stop-guest.sh';
 const STOP_STARTED = 'stop-started.txt';
 const STOP_RELEASE = 'stop-release.txt';
 const STOP_LATE = 'stop-late.txt';
+const UNHEALTHY_EXEC_JOURNAL = '.unhealthy-helper-exec-requests.jsonl';
+const UNHEALTHY_EXEC_MARKER = 'unhealthy-helper-exec-request';
 const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 async function readCompleteDiagnosticReport(path: string) {
@@ -135,12 +137,30 @@ test.describe('packaged Electron macOS VM command runner', () => {
     }
   });
 
-  test('fails closed visibly when packaged VM runtime is unhealthy', async () => {
+  test('preserves an uncertain outcome when packaged VM runtime is unhealthy', async () => {
     const fixture = await createVmFixture({ health: 'failed' });
     let app: ElectronApplication | undefined;
+    let control: RunControlRecord | undefined;
+    let admission: VmAdmissionEvidence | undefined;
+    let approval: ApprovalEvidence | undefined;
+    let audit: AuditEvidence | undefined;
+    const readExecRequests = (): Array<{ operation: string; marker: string }> => {
+      const path = join(fixture.projectDir, UNHEALTHY_EXEC_JOURNAL);
+      return existsSync(path)
+        ? readFileSync(path, 'utf8')
+            .trim()
+            .split('\n')
+            .filter(Boolean)
+            .map((line) => JSON.parse(line) as { operation: string; marker: string })
+        : [];
+    };
+    let execRequests: ReturnType<typeof readExecRequests> = [];
 
     try {
-      app = await launchVmFixture(fixture, { finalText: 'VM command failed closed' });
+      app = await launchVmFixture(fixture, {
+        command: VM_E2E_MARKER_COMMAND,
+        finalText: 'VM command failed closed',
+      });
       const page = await app.firstWindow();
       await openProject(page);
 
@@ -148,18 +168,149 @@ test.describe('packaged Electron macOS VM command runner', () => {
         timeout: 15_000,
       });
       await sendChatMessage(page, 'Show the VM working directory');
-      await expect(page.getByTestId('approval-card')).toBeVisible({ timeout: 15_000 });
-      await page.getByRole('button', { name: 'Approve' }).click();
+      const card = page.getByTestId('approval-card').last();
+      await expect(card).toBeVisible({ timeout: 15_000 });
+      approval = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
+        (row) => row.toolName === 'sys_bash',
+      );
+      expect(approval?.status).toBe('pending');
+      expect(JSON.parse(approval!.argsJson ?? '{}')).toEqual({ command: VM_E2E_MARKER_COMMAND });
+      await card.getByRole('button', { name: 'Approve', exact: true }).click();
 
+      await expect(card).toContainText('Action needs attention', { timeout: 20_000 });
+      await expect(card).toContainText(
+        'This action may have taken effect, but its result was not confirmed. Inspect its effects before starting a new request. This approval cannot be retried.',
+      );
       const toolActivity = await openToolActivity(page);
-      await expect(toolActivity.getByText('Command runner unavailable').first()).toBeVisible({
-        timeout: 20_000,
+      await expect(toolActivity).toContainText('COMMAND_OUTCOME_UNKNOWN');
+      await expect(card.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+      await expect(page.getByText('Approved action completed', { exact: true })).toHaveCount(0);
+      await expect
+        .poll(
+          () =>
+            readBackendEvents(fixture).filter(
+              (row) => row.sessionId === approval!.sessionId && row.kind === 'task_end',
+            ).length,
+        )
+        .toBe(2);
+      control = await readVmRunControl(fixture, approval!.sessionId);
+      expect(control).toMatchObject({
+        sessionId: approval!.sessionId,
+        state: 'outcome_unknown',
+        reason: 'execution_failed',
+        inFlight: 2,
       });
-      await expect(toolActivity.getByText('Failed').first()).toBeVisible();
-      await expect(toolActivity.getByText('E2E VM unavailable').first()).toBeVisible();
+      approval = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
+        (row) => row.id === approval!.id,
+      );
+      expect(approval).toMatchObject({ status: 'approved', resumedAtMs: expect.any(Number) });
+      const audits = (await readEvidence<AuditEvidence>(fixture, 'tool-executions')).filter(
+        (row) => row.sessionId === control!.sessionId && row.toolName === 'sys_bash',
+      );
+      expect(audits.filter((row) => row.status === 'success')).toHaveLength(0);
+      const errors = audits.filter((row) => row.status === 'error');
+      expect(errors).toHaveLength(1);
+      audit = errors[0];
+      expect(JSON.parse(audit!.resultJson ?? '{}')).toMatchObject({
+        type: 'error',
+        code: 'COMMAND_OUTCOME_UNKNOWN',
+      });
+      expect(audit!.resultJson).not.toContain(`HOST_CWD:${fixture.projectDir}`);
+      expect(audit!.resultJson).not.toContain(HOST_ONLY_CANARY_VALUE);
+      admission = readVmAdmissionEvidence(fixture, control.sessionId);
+      expect(admission.records).toEqual([
+        expect.objectContaining({
+          id: control.id,
+          state: 'outcome_unknown',
+          reason: 'execution_failed',
+        }),
+      ]);
+      expect(admission.executions.map((row) => row.runId)).toEqual([control.id, control.id]);
+      expect(admission.executions[0]?.executionId).toBe(approval!.runId);
+      const toolAttempts = admission.attempts.filter((row) => row.kind === 'tool');
+      // Native dispatch and its command transport are separately admitted; both remain uncertain.
+      expect(toolAttempts).toEqual([
+        expect.objectContaining({
+          runId: control.id,
+          executionId: admission.executions[1]!.executionId,
+          kind: 'tool',
+          outcome: 'unknown',
+        }),
+        expect.objectContaining({
+          runId: control.id,
+          executionId: admission.executions[1]!.executionId,
+          kind: 'tool',
+          outcome: 'unknown',
+        }),
+      ]);
+      expect(new Set(toolAttempts.map((row) => row.id)).size).toBe(2);
+      expect(
+        admission.attempts
+          .filter((row) => ['running', 'unknown'].includes(row.outcome))
+          .map((row) => row.id),
+      ).toEqual(toolAttempts.map((row) => row.id));
+      // This proves one helper protocol request, not that pwd ran in a guest or host shell.
+      execRequests = readExecRequests();
+      expect(execRequests).toEqual([{ operation: 'exec', marker: UNHEALTHY_EXEC_MARKER }]);
       await expect(page.getByText(`HOST_CWD:${fixture.projectDir}`)).toHaveCount(0);
       await expect(page.getByText(HOST_ONLY_CANARY_VALUE)).toHaveCount(0);
+      await page.reload();
+      await expect(
+        page.getByText(
+          'Run outcome is unknown. Admitted work may still finish; inspect effects before a new request.',
+          { exact: true },
+        ),
+      ).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+      await expect(page.getByText('Approved action completed', { exact: true })).toHaveCount(0);
+      expect(await readVmRunControl(fixture, control.sessionId, control.id)).toEqual(control);
+      expect(readVmAdmissionEvidence(fixture, control.sessionId)).toEqual(admission);
+      expect(readExecRequests()).toEqual(execRequests);
+      expect(
+        (await readEvidence<AuditEvidence>(fixture, 'tool-executions')).filter(
+          (row) => row.sessionId === control!.sessionId && row.toolName === 'sys_bash',
+        ),
+      ).toEqual(audits);
     } finally {
+      await recordCleanupFailures(fixture, [
+        {
+          name: 'unhealthy-evaluation',
+          run: async () => {
+            if (approval) {
+              admission ??= readVmAdmissionEvidence(fixture, approval.sessionId);
+              control ??= await readVmRunControl(fixture, approval.sessionId);
+              audit ??= (await readEvidence<AuditEvidence>(fixture, 'tool-executions')).find(
+                (row) =>
+                  row.sessionId === approval!.sessionId &&
+                  row.toolName === 'sys_bash' &&
+                  row.status === 'error',
+              );
+            }
+            const evidencePath = test.info().outputPath('unhealthy-command-evaluation.json');
+            writeFileSync(
+              evidencePath,
+              JSON.stringify(
+                {
+                  mode: 'controlled-unhealthy-helper-fixture',
+                  control,
+                  admission,
+                  approval,
+                  helperExecRequests: readExecRequests(),
+                  audit: audit ? { id: audit.id, status: audit.status } : null,
+                  limitation:
+                    'Nested authority rows are distinct from the fixed-marker helper request journal. The unhealthy helper returns before executing pwd; no guest/shell execution, termination or actual VM is claimed.',
+                },
+                null,
+                2,
+              ),
+            );
+            await test.info().attach('unhealthy-command-evaluation', {
+              path: evidencePath,
+              contentType: 'application/json',
+            });
+          },
+        },
+      ]);
       await cleanupFixtureResources(fixture, app);
       if (!fixture.vmTeardownFailed) rmSync(fixture.tempRoot, { recursive: true, force: true });
     }
@@ -828,23 +979,93 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
                 event.phase === 'tool' && event.outcome === 'succeeded',
             ),
           ).toBe(true);
-        // The provider transcript proves SDK recovery after a real 503. SDK-internal
-        // attempts are opaque: the diagnostic contract truthfully reports the outer
-        // model operation rather than inventing a retry event for unseen attempts.
+        // SDK retry0 leaves the real503 recovery to the observed, fenced outer loop.
+        // Prove the failed attempt from durable authority and the provider ledger;
+        // V1 does not invent a separate failed event for a retried model invocation.
         if (failFirst) {
-          const modelEvents = diagnostic.events.filter(
-            ({ event }: { event: { phase: string } }) => event.phase === 'model',
+          const diagnosticPath = test.info().outputPath('retry-durable-diagnostics.json');
+          writeFileSync(diagnosticPath, diagnosticText, { mode: 0o600 });
+          await test.info().attach('retry-durable-diagnostic-report', {
+            path: diagnosticPath,
+            contentType: 'application/json',
+          });
+          const control = await readVmRunControl(fixture, approval!.sessionId);
+          const admission = readVmAdmissionEvidence(fixture, approval!.sessionId);
+          const modelEvents = diagnostic.events
+            .map(({ event }) => event)
+            .filter((event) => event.phase === 'model');
+          const retryEvidencePath = test.info().outputPath('retry-admission-evidence.json');
+          writeFileSync(
+            retryEvidencePath,
+            JSON.stringify(
+              {
+                control,
+                admission,
+                modelEvents,
+                diagnosticArtifact: {
+                  file: 'retry-durable-diagnostics.json',
+                  bytes: Buffer.byteLength(diagnosticText),
+                  sha256: sha256(diagnosticText),
+                },
+                providerStatuses: provider.attempts.map((attempt) => attempt.status),
+              },
+              null,
+              2,
+            ),
           );
+          await test.info().attach('retry-admission-evidence', {
+            path: retryEvidencePath,
+            contentType: 'application/json',
+          });
+          expect(control).toMatchObject({ state: 'completed', inFlight: 0, reason: 'none' });
+          expect(admission.records).toEqual([
+            expect.objectContaining({ id: control.id, state: 'completed' }),
+          ]);
+          expect(admission.executions.map((row) => row.executionId)).toEqual(
+            starts.map((row) => row.runId),
+          );
+          expect(admission.executions.map((row) => row.runId)).toEqual([control.id, control.id]);
+          const admittedModels = admission.attempts.filter((row) => row.kind === 'model');
+          expect(admittedModels.map((row) => [row.executionId, row.outcome])).toEqual([
+            [approval!.runId, 'failed'],
+            [approval!.runId, 'succeeded'],
+            [starts[1]!.runId, 'succeeded'],
+          ]);
+          const initialModels = modelEvents.filter((event) => event.runId === approval!.runId);
+          expect(initialModels.map((event) => [event.outcome, event.attempt])).toEqual([
+            ['started', 1],
+            ['retrying', 1],
+            ['started', 2],
+            ['succeeded', 2],
+          ]);
+          expect(new Set(initialModels.map((event) => event.operationId)).size).toBe(1);
+          expect(new Set(initialModels.map((event) => event.requestId)).size).toBe(1);
+          expect(initialModels[0]!.requestId).toBe(starts[0]!.correlationId);
+          expect(initialModels.every((event) => event.sessionId === approval!.sessionId)).toBe(
+            true,
+          );
+          const resumedModels = modelEvents.filter((event) => event.runId === starts[1]!.runId);
+          expect(resumedModels.map((event) => [event.outcome, event.attempt])).toEqual([
+            ['started', 1],
+            ['succeeded', 1],
+          ]);
+          expect(new Set(resumedModels.map((event) => event.operationId)).size).toBe(1);
+          expect(new Set(resumedModels.map((event) => event.requestId)).size).toBe(1);
+          expect(resumedModels[0]!.requestId).toBe(starts[1]!.correlationId);
+          expect(resumedModels[0]!.requestId).not.toBe(initialModels[0]!.requestId);
+          expect(modelEvents).toHaveLength(6);
           expect(
-            modelEvents.some(
-              ({ event }: { event: { outcome: string } }) => event.outcome === 'succeeded',
-            ),
-          ).toBe(true);
-          expect(
-            modelEvents.some(
-              ({ event }: { event: { outcome: string } }) => event.outcome === 'retrying',
-            ),
-          ).toBe(false);
+            diagnostic.events
+              .map(({ event }) => event)
+              .filter(
+                (event) =>
+                  event.phase === 'approval' &&
+                  event.outcome === 'started' &&
+                  event.approvalRequestId === approval!.id,
+              ),
+          ).toEqual([
+            expect.objectContaining({ runId: starts[1]!.runId, linkedRunId: approval!.runId }),
+          ]);
         }
         expect(diagnosticText).not.toContain(JOURNEY_COMMAND);
         expect(diagnosticText).not.toContain(HOST_ONLY_CANARY_VALUE);
@@ -1191,9 +1412,57 @@ type ApprovalEvidence = {
   runId: string;
   toolName: string;
   status: string;
+  argsJson?: string;
   resumedAtMs?: number | null;
 };
-type AuditEvidence = { id: string; sessionId: string; toolName: string; status: string };
+type AuditEvidence = {
+  id: string;
+  sessionId: string;
+  toolName: string;
+  status: string;
+  resultJson?: string;
+};
+
+type VmAdmissionEvidence = {
+  records: Array<{ id: string; state: string; reason: string; version: number }>;
+  executions: Array<{ executionId: string; runId: string }>;
+  attempts: Array<{
+    id: string;
+    runId: string;
+    executionId: string;
+    kind: string;
+    outcome: string;
+  }>;
+};
+
+/** Independently read only the owned application's actual durable admission rows. */
+function readVmAdmissionEvidence(fixture: VmFixture, sessionId: string): VmAdmissionEvidence {
+  const script = [
+    "import { createRequire } from 'node:module';",
+    "const require = createRequire(new URL('./packages/db/dist/index.js', import.meta.url));",
+    "const Database = require('better-sqlite3');",
+    'const db = new Database(process.argv[1], { readonly: true, fileMustExist: true, timeout: 250 });',
+    'try {',
+    "const records = db.prepare('SELECT id, state, reason, version FROM controlled_runs WHERE session_id = ? ORDER BY created_at_ms, rowid').all(process.argv[2]);",
+    "const executions = db.prepare('SELECT execution_id AS executionId, run_id AS runId FROM run_executions WHERE run_id IN (SELECT id FROM controlled_runs WHERE session_id = ?) ORDER BY rowid').all(process.argv[2]);",
+    "const attempts = db.prepare('SELECT id, run_id AS runId, execution_id AS executionId, kind, outcome FROM run_attempts WHERE run_id IN (SELECT id FROM controlled_runs WHERE session_id = ?) ORDER BY admitted_at_ms, rowid').all(process.argv[2]);",
+    'console.log(JSON.stringify({ records, executions, attempts }));',
+    '} finally { db.close(); }',
+  ].join('\n');
+  return JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        script,
+        join(fixture.runtimeDir, 'data', 'agent.sqlite'),
+        sessionId,
+      ],
+      { cwd: repoRoot, encoding: 'utf8', timeout: 5_000, maxBuffer: 512 * 1024 },
+    ),
+  ) as VmAdmissionEvidence;
+}
 
 async function recordCleanupFailures(
   fixture: VmFixture,
@@ -1515,6 +1784,12 @@ function writePackagedVmResources(resourcesDir: string, health: VmFixtureHealth)
       'const args = process.argv.slice(2);',
       "const option = (name) => args.includes(name) ? args[args.indexOf(name) + 1] : '';",
       "const command = args.slice(args.indexOf('--') + 1).join(' ');",
+      // Only the unhealthy test double journals its exec protocol request before its ambiguous reply.
+      ...(health === 'failed'
+        ? [
+            `if (args[0] === 'exec') require('node:fs').appendFileSync(require('node:path').join(option('--workspace'), ${JSON.stringify(UNHEALTHY_EXEC_JOURNAL)}), JSON.stringify({ operation: 'exec', marker: ${JSON.stringify(UNHEALTHY_EXEC_MARKER)} }) + '\\n');`,
+          ]
+        : []),
       health === 'failed' ? 'if (true) {' : 'if (false) {',
       "  console.log(JSON.stringify({ ok: false, mode: 'macos-vm', state: 'unavailable', message: 'E2E VM unavailable' }));",
       '  process.exit(0);',

@@ -147,9 +147,17 @@ export type ToolTraceEvent =
   | { type: 'result'; toolId: string; data: unknown; status: 'success' | 'error' | 'denied' }
   | { type: 'error'; code?: string; message: string; recovery?: CapabilityRecovery };
 
-/** Terminal MCP failures cannot be replayed through the same approval card. */
+const UNCERTAIN_ACTION_CODES = new Set([
+  'COMMAND_OUTCOME_UNKNOWN',
+  'HTTP_OUTCOME_UNKNOWN',
+  'DOWNLOAD_OUTCOME_UNKNOWN',
+]);
+
+/** Terminal action failures cannot be replayed through the same approval card. */
 export function mcpApprovalHaltMessage(event: ToolTraceEvent): string | null {
   if (event.type !== 'error') return null;
+  if (event.code && UNCERTAIN_ACTION_CODES.has(event.code))
+    return 'This action may have taken effect, but its result was not confirmed. Inspect its effects before starting a new request. This approval cannot be retried.';
   if (event.code === 'MCP_OUTCOME_UNKNOWN')
     return 'The MCP action may have taken effect, but its result was not confirmed. Inspect the server before starting a new request. This approval cannot be retried.';
   if (event.code === 'MCP_APPROVAL_STALE')
@@ -226,6 +234,7 @@ function isRecoverableToolErrorCode(code: unknown): code is string {
     return false;
   }
   return (
+    UNCERTAIN_ACTION_CODES.has(code) ||
     code === 'INVALID_ARGS' ||
     code === 'CONTENT_TOO_LARGE' ||
     code === 'PATH_ACCESS_DENIED' ||
