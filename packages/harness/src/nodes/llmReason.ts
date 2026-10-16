@@ -668,6 +668,63 @@ function invokeModelAttempt(input: ModelAttemptInput) {
   );
 }
 
+type CompletedModelOutputInput = {
+  state: HarnessStateType;
+  completed: Awaited<ReturnType<typeof invokeModelAttempt>>;
+  toolNameMap: Map<string, string>;
+  contextTrace: TraceEvent;
+  retryTraceEvents: TraceEvent[];
+  step: number;
+  retryCount: number;
+  emitter?: OutputEmitter;
+};
+
+/** Assemble completed output only after the tracked SDK attempt and final admission check. */
+async function completeModelOutput({
+  state,
+  completed,
+  toolNameMap,
+  contextTrace,
+  retryTraceEvents,
+  step,
+  retryCount,
+  emitter,
+}: CompletedModelOutputInput): Promise<Partial<HarnessStateType>> {
+  const { fullText, finalToolCalls, usage, finishReason } = completed;
+
+  const tokenUsage = normaliseTokenUsage(usage);
+  const { output, assistantMessage } = buildLlmOutput(
+    fullText,
+    finishReason === 'length' ? [] : finalToolCalls,
+    toolNameMap,
+  );
+
+  const tokenDelta = sumUsageTokens(usage);
+  const newTotalTokens = state.totalTokensUsed + tokenDelta;
+  const costDelta = tokenDelta / 1000;
+  const newTotalCost = (state.totalCostUnits ?? 0) + costDelta;
+  const traceEvents: TraceEvent[] = [
+    contextTrace,
+    ...retryTraceEvents,
+    { type: 'llm_call', step, tokenUsage },
+  ];
+
+  const halted = await checkBudgetLimits(state, newTotalTokens, newTotalCost, traceEvents, emitter);
+
+  const incomplete = finishReason === 'length';
+  if (incomplete) await emitContextHalt(emitter, 'MODEL_OUTPUT_INCOMPLETE');
+  return {
+    ...(incomplete ? { contextHalt: { code: 'MODEL_OUTPUT_INCOMPLETE' as const } } : {}),
+    llmOutput: incomplete ? null : output,
+    messages: [assistantMessage],
+    trace: traceEvents,
+    totalTokensUsed: newTotalTokens,
+    totalCostUnits: newTotalCost,
+    totalRetries: (state.totalRetries ?? 0) + retryCount,
+    ...(halted || incomplete ? { halted: true } : {}),
+  };
+}
+
 /**
  * Creates a graph node that invokes the LLM via the Vercel AI SDK using streamText.
  *
@@ -803,45 +860,16 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
         ],
       };
     }
-    const { fullText, finalToolCalls, usage, finishReason } = completed;
-
-    const tokenUsage = normaliseTokenUsage(usage);
-    const { output, assistantMessage } = buildLlmOutput(
-      fullText,
-      finishReason === 'length' ? [] : finalToolCalls,
-      toolNameMap,
-    );
-
-    const tokenDelta = sumUsageTokens(usage);
-    const newTotalTokens = state.totalTokensUsed + tokenDelta;
-    const costDelta = tokenDelta / 1000;
-    const newTotalCost = (state.totalCostUnits ?? 0) + costDelta;
-    const traceEvents: TraceEvent[] = [
-      contextTrace,
-      ...retryTraceEvents,
-      { type: 'llm_call', step, tokenUsage },
-    ];
-
-    const halted = await checkBudgetLimits(
+    return completeModelOutput({
       state,
-      newTotalTokens,
-      newTotalCost,
-      traceEvents,
+      completed,
+      toolNameMap,
+      contextTrace,
+      retryTraceEvents,
+      step,
+      retryCount: retryCounter.count,
       emitter,
-    );
-
-    const incomplete = finishReason === 'length';
-    if (incomplete) await emitContextHalt(emitter, 'MODEL_OUTPUT_INCOMPLETE');
-    return {
-      ...(incomplete ? { contextHalt: { code: 'MODEL_OUTPUT_INCOMPLETE' as const } } : {}),
-      llmOutput: incomplete ? null : output,
-      messages: [assistantMessage],
-      trace: traceEvents,
-      totalTokensUsed: newTotalTokens,
-      totalCostUnits: newTotalCost,
-      totalRetries: (state.totalRetries ?? 0) + retryCounter.count,
-      ...(halted || incomplete ? { halted: true } : {}),
-    };
+    });
   };
 }
 

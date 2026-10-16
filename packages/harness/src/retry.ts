@@ -46,24 +46,26 @@ export async function withRetry<T>(
   options?: { signal?: AbortSignal; runControl?: RunExecutionControl },
 ): Promise<T> {
   async function runAttempt(attempt: number, lastError?: unknown): Promise<T> {
-    if (!(attempt < config.maxAttempts)) throw lastError;
-    assertRunActive(options?.runControl, options?.signal);
-    try {
-      return await fn();
-    } catch (err) {
+    if (attempt < config.maxAttempts) {
       assertRunActive(options?.runControl, options?.signal);
-      if (!config.isRetryable(err)) {
-        throw err;
+      try {
+        return await fn();
+      } catch (err) {
+        assertRunActive(options?.runControl, options?.signal);
+        if (!config.isRetryable(err)) {
+          throw err;
+        }
+
+        const isLastAttempt = attempt >= config.maxAttempts - 1;
+        if (isLastAttempt) throw err;
+
+        const delayMs = computeDelay(attempt, config);
+        onRetry?.(attempt + 1, err, delayMs);
+        await sleep(delayMs, undefined, { signal: options?.signal });
+        return runAttempt(attempt + 1, err);
       }
-
-      const isLastAttempt = attempt >= config.maxAttempts - 1;
-      if (isLastAttempt) throw err;
-
-      const delayMs = computeDelay(attempt, config);
-      onRetry?.(attempt + 1, err, delayMs);
-      await sleep(delayMs, undefined, { signal: options?.signal });
-      return runAttempt(attempt + 1, err);
     }
+    throw lastError;
   }
   return runAttempt(0);
 }

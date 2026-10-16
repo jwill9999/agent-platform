@@ -201,7 +201,7 @@ export function useHarnessRunControl(
     if (!mounted.current || current.current !== owner || stopping.current === owner || !sessionId)
       return false;
     const target = latest.current.record;
-    if (!target || target.sessionId !== sessionId || !STOPPABLE.has(target.state)) return false;
+    if (target?.sessionId !== sessionId || !STOPPABLE.has(target.state)) return false;
     stopping.current = owner;
     stopFailure.current = null;
     accept(target);

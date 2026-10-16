@@ -85,6 +85,14 @@ function interrupted(error: unknown): boolean {
   );
 }
 
+function invokeAction<T>(action: () => Promise<T>): Promise<T> {
+  try {
+    return Promise.resolve(action());
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
 /** The original action promise remains tracked even when an HTTP/timeout wrapper stops waiting. */
 export class ControlledExecution implements RunExecutionControl {
   readonly controller = new AbortController();
@@ -119,9 +127,9 @@ export class ControlledExecution implements RunExecutionControl {
       nowMs: Date.now(),
     });
     // No await or diagnostic callback between the committed fence and the actual invocation.
-    // The executor calls the action synchronously, converts synchronous throws to
-    // rejections, and adopts the original promise through its actual settlement.
-    const result = new Promise<T>((resolve) => resolve(action()));
+    // The helper calls the action synchronously and converts only synchronous throws
+    // to rejections; the original promise remains tracked through actual settlement.
+    const result = invokeAction(action);
     this.owner.observeCurrent(this, 'admitted', kind);
     return Promise.resolve(result).then(
       (value) => {
