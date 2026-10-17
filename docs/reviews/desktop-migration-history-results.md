@@ -1,3 +1,33 @@
+# Staging review repair checkpoint — 17 October 2026
+
+PR345 at `7bc52436` was independently qualified: nine executed checks passed;70 Electron tests
+passed without retries, DB214 included25 new migration regressions, API547 included19 diagnostics
+controls, and the raw nine-vector benchmark passed unchanged limits. The owner subsequently
+authorized merge, completed at feature merge `d92efe38`, with tree `5c09da3a9ca16aaad8879173911d8935c19cc000`
+matching reviewed source and the actual staging rehearsal.
+
+Protected PR347 at that source completed two genuine full Promptfoo analyses with no reported
+findings; source/run/attempt-bound proof and SARIF digests were verified independently. The real
+macOS secure-storage round trip and20 packaged VM tests passed; signing, pinned assets and healthy/
+Stop-outcome-unknown receipts matched the source, with no host-path/secret exposure in those journeys.
+These passes do not qualify changed hook source or override review findings.
+
+Review thread `PRRT_kwDOSBqCws6teuMH` found package-name command injection through shell `eval`.
+Related discovery inserts a package path into JavaScript source. Both are in scope for the bounded
+active-hook repair: static Node JSON reads and argument arrays, NUL path discovery, safe validated
+package identities, unchanged test sequencing/failure propagation and malicious-name/path controls.
+Original-hook controls retain16 passes and22 failures before repair. The corrected source passes
+all38 hook controls, plus4 unchanged real-Git isolation cases, without skips. Independent reviewer
+verified all3 frozen source hashes and reran those controls: APPROVED, no actionable findings.
+Node/shell syntax, scoped ESLint, formatting and diff checks pass. Fresh exact-head hosted
+qualification remains pending; earlier-source passes are not inherited.
+
+Evidence root: `/Users/letuscode/.codex/migration-regression-20261017/`. Earlier original failures and
+results follow unchanged. The historical export503 cause is still unproven; clean subsequent runs
+do not establish its cause. Model compatibility and security package remediation remain separate.
+
+<!-- markdownlint-disable MD025 -->
+
 # Desktop migration-history regression verification
 
 Task: [agent-platform-desktop-migration-history](../tasks/agent-platform-desktop-migration-history.md).

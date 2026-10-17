@@ -1,3 +1,34 @@
+# Desktop migration — staging hook review repair
+
+Owner authorized PR345 and feature-to-staging delivery after current checks and comments clear.
+PR345 merged into `feature/desktop-secure-storage-startup` at `d92efe38`; its tree equals reviewed
+`7bc52436`. Protected PR347 is open against staging `d55f20ed`. Both genuine full security scans,
+CodeQL and Sonar passed; the real packaged macOS VM job passed20 tests. Those results qualify that
+source only. No protected merge or owner stress trial has occurred.
+
+GitHub Advanced Security review identified command injection through package names passed to
+`eval` in the push hook. Discovery also interpolates package paths into JavaScript source. This
+branch, `task/desktop-hook-review`, repairs only those active developer-hook boundaries and their
+regressions. Static JSON reads, NUL paths, validated package names and argument-array process calls
+replace command construction; existing test selection, Git-environment isolation, failure propagation
+and fresh benchmark limits remain mandatory. Independent source review is approved;38 hook
+controls and4 unchanged real-Git isolation tests pass without skips. New exact-head checks are
+required before the feature/staging merge. The actual source must contain the fix before resolving
+PR347's review thread.
+
+The owner app still uses the earlier checkout and is untouched. Its installed AI SDK4.3.19/OpenAI
+adapter1.3.24 emits `max_tokens` for the configured model; rebuilding unchanged source cannot fix
+that compatibility gap. An offline compiled connection-test fixture also incorrectly treats the
+HTTP400 rejection as success. Supported SDK correction and diagnostics tests remain separate from
+this migration/hook delivery and dependency-security draft; no additional paid request or key change.
+No main promotion, external publication, Docker gateway change or paused orchestration work.
+
+Canonical Beads: `agent-platform-desktop-migration-history` remains IN_PROGRESS. Earlier complete
+handoff bodies follow as historical snapshots; their pending authority/check states are superseded
+by this dated checkpoint and canonical Beads.
+
+<!-- markdownlint-disable MD025 -->
+
 # Migration CI — diagnostics export evidence follow-up
 
 Current hosted follow-up: Sonar's check on `14cbbe84` reports SUCCESS, but its findings API

@@ -1,17 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import process from 'node:process';
 
-const hook = fileURLToPath(new URL('../.husky/pre-push', import.meta.url));
+const hook =
+  process.env.PRE_PUSH_TEST_HOOK_PATH ??
+  fileURLToPath(new URL('../.husky/pre-push', import.meta.url));
 const benchmark = 'test/diagnostics.performance.test.ts';
 const vitestOptions = ['--maxWorkers=1', '--minWorkers=1', '--no-file-parallelism'];
 
-function runHook(packages, failure = '') {
+function runHook(packages, failure = '', options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'pre-push-measurement-'));
   const bin = join(root, 'bin');
   const calls = join(root, 'calls.jsonl');
@@ -19,27 +21,38 @@ function runHook(packages, failure = '') {
   try {
     for (const [path, name] of packages) {
       mkdirSync(join(root, path), { recursive: true });
-      writeFileSync(join(root, path, 'package.json'), JSON.stringify({ name }));
+      if (options.manifestDirectory) mkdirSync(join(root, path, 'package.json'));
+      else
+        writeFileSync(
+          join(root, path, 'package.json'),
+          options.manifest ?? JSON.stringify({ name }),
+        );
     }
     // Only discovery is stubbed; execute the real hook through /bin/sh and a recording pnpm.
     writeFileSync(
       join(bin, 'git'),
-      `#!/bin/sh
-case "$1 $2" in
-  'rev-parse --abbrev-ref') echo origin/fixture ;;
-  'rev-parse --local-env-vars') echo GIT_DIR ;;
-  'diff --name-only') printf '%s\\n' "$HOOK_CHANGED_PATHS" ;;
-  *) exit 91 ;;
-esac
+      `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args.slice(0,2).join(' ') === process.env.HOOK_GIT_FAILURE) process.exit(94);
+if (args[0] === 'rev-parse' && args[1] === '--abbrev-ref') console.log(process.env.HOOK_REMOTE || 'origin/fixture');
+else if (args[0] === 'rev-parse' && args[1] === '--local-env-vars') console.log('GIT_DIR\\nGIT_WORK_TREE\\nGIT_INDEX_FILE');
+else if (args[0] === 'diff' && args[1] === '--name-only') {
+ if (process.env.HOOK_EXPECT_DIFF && JSON.stringify(args) !== process.env.HOOK_EXPECT_DIFF) process.exit(95);
+ const paths = JSON.parse(process.env.HOOK_CHANGED_PATHS);
+ process.stdout.write(paths.join(args.includes('-z') ? '\\0' : '\\n') + (args.includes('-z') ? '\\0' : '\\n'));
+} else process.exit(91);
 `,
       { mode: 0o755 },
     );
     writeFileSync(
       join(bin, 'pnpm'),
-      `#!/usr/bin/env node
+      options.spawnError
+        ? '#!/does-not-exist\n'
+        : `#!/usr/bin/env node
 const { appendFileSync } = require('node:fs');
 const args = process.argv.slice(2);
-appendFileSync(process.env.HOOK_CALLS, JSON.stringify({args,gitDir:process.env.GIT_DIR ?? null})+'\\n');
+appendFileSync(process.env.HOOK_CALLS, JSON.stringify({args,gitDir:process.env.GIT_DIR ?? null,gitWorkTree:process.env.GIT_WORK_TREE ?? null,gitIndex:process.env.GIT_INDEX_FILE ?? null})+'\\n');
+if (process.env.HOOK_PNPM_SIGNAL) process.kill(process.pid, 'SIGTERM');
 const stage = args[0] === 'deps:check-cycles' ? 'cycles'
   : args.includes('exec') ? 'benchmark'
   : args.includes('typecheck') ? 'typecheck'
@@ -54,7 +67,15 @@ process.exit(stage === process.env.HOOK_FAILURE ? 23 : 0);
       env: {
         PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
         GIT_DIR: '/fixture/parent/git-dir',
-        HOOK_CHANGED_PATHS: packages.map(([path]) => `${path}/changed.ts`).join('\n'),
+        GIT_WORK_TREE: '/fixture/parent/tree',
+        GIT_INDEX_FILE: '/fixture/parent/index',
+        HOOK_GIT_FAILURE: options.gitFailure ?? '',
+        HOOK_REMOTE: options.remote ?? '',
+        HOOK_EXPECT_DIFF: options.expectedDiff ? JSON.stringify(options.expectedDiff) : '',
+        HOOK_PNPM_SIGNAL: options.signal ? 'yes' : '',
+        HOOK_CHANGED_PATHS: JSON.stringify(
+          options.paths ?? packages.map(([path]) => `${path}/changed.ts`),
+        ),
         HOOK_CALLS: calls,
         HOOK_FAILURE: failure,
       },
@@ -62,9 +83,20 @@ process.exit(stage === process.env.HOOK_FAILURE ? 23 : 0);
       timeout: 10_000,
     });
     assert.ifError(result.error);
-    const invocations = readFileSync(calls, 'utf8').trim().split('\n').map(JSON.parse);
-    assert.ok(invocations.every(({ gitDir }) => gitDir === null));
-    return { status: result.status, args: invocations.map(({ args }) => args) };
+    const invocations = existsSync(calls)
+      ? readFileSync(calls, 'utf8').trim().split('\n').map(JSON.parse)
+      : [];
+    assert.ok(
+      invocations.every(
+        ({ gitDir, gitWorkTree, gitIndex }) =>
+          gitDir === null && gitWorkTree === null && gitIndex === null,
+      ),
+    );
+    return {
+      status: result.status,
+      args: invocations.map(({ args }) => args),
+      marker: existsSync(join(root, 'injection-marker')),
+    };
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -142,4 +174,115 @@ test('benchmark failure cannot be masked by an earlier passing suite', () => {
   const result = runHook([api, desktop], 'benchmark');
   assert.equal(result.status, 23);
   assert.deepEqual(result.args.at(-1), expectedBenchmark);
+});
+
+for (const name of [
+  '@agent-platform/api$(touch injection-marker)',
+  '@agent-platform/api;touch injection-marker;#',
+  '--filter',
+  '@agent-platform/api...',
+  '...api',
+  '@agent-platform/api\n',
+  '@agent-platform/api\r',
+  '@agent-platform/*',
+  '@agent-platform/api\n@agent-platform/desktop',
+  '@agent-platform/api @agent-platform/desktop',
+  42,
+  null,
+  '',
+]) {
+  test(`invalid package name ${JSON.stringify(name)} fails closed without command execution`, () => {
+    const result = runHook([['apps/unsafe', name], api]);
+    assert.equal(result.marker, false);
+    assert.notEqual(result.status, 0);
+    assert.deepEqual(result.args, []);
+  });
+}
+
+for (const path of [
+  'apps/space directory',
+  'apps/new\nline',
+  "apps/x'+(require('fs').writeFileSync('injection-marker','yes'),'')+'",
+]) {
+  test(`changed path ${JSON.stringify(path)} stays data and retains required checks`, () => {
+    const result = runHook([[path, '@agent-platform/safe'], api]);
+    assert.equal(result.marker, false);
+    assert.equal(result.status, 0);
+    assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+    assert.ok(result.args[1].includes('@agent-platform/safe'));
+  });
+}
+
+test('malformed present JSON fails closed rather than silently skipping a required package', () => {
+  const result = runHook([api], '', { manifest: '{broken' });
+  assert.notEqual(result.status, 0);
+  assert.deepEqual(result.args, []);
+});
+
+test('duplicate changed paths and package identities produce only one argument per package', () => {
+  const result = runHook([api, ['packages/alias', api[1]]], '', {
+    paths: ['apps/api/one.ts', 'apps/api/two.ts', 'packages/alias/changed.ts'],
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args[1], ['--filter', api[1], 'run', 'build']);
+  assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+});
+
+test('deleted or non-package directories are skipped explicitly while remaining packages run', () => {
+  const result = runHook([api], '', { paths: ['apps/deleted/file.ts', 'apps/api/changed.ts'] });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+});
+
+for (const gitFailure of ['diff --name-only', 'rev-parse --local-env-vars']) {
+  test(`${gitFailure} discovery failure is never treated as no changes`, () => {
+    const result = runHook([api], '', { gitFailure });
+    assert.notEqual(result.status, 0);
+    assert.deepEqual(result.args, []);
+  });
+}
+
+test('upstream discovery failure preserves the origin/main fallback and required checks', () => {
+  const result = runHook([api], '', { gitFailure: 'rev-parse --abbrev-ref' });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+});
+
+test('present but unreadable-as-file manifest fails closed', () => {
+  const result = runHook([api], '', { manifestDirectory: true });
+  assert.notEqual(result.status, 0);
+  assert.deepEqual(result.args, []);
+});
+
+test('a newline inside an unrelated file cannot introduce a spurious package boundary', () => {
+  const result = runHook([api], '', { paths: ['notes/prefix\napps/api/file.ts'] });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args, []);
+});
+
+test('only deleted package manifests preserve the cycles check then skip package commands', () => {
+  const result = runHook([], '', { paths: ['packages/deleted/old.ts'] });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args, [['deps:check-cycles']]);
+});
+
+test('option-looking upstream stays behind the Git option boundary', () => {
+  const result = runHook([api], '', {
+    remote: '-R',
+    expectedDiff: ['diff', '--name-only', '-z', '--end-of-options', '-R...HEAD', '--'],
+  });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+});
+
+test('a required command spawn failure cannot qualify the hook', () => {
+  const result = runHook([api], '', { spawnError: true });
+  assert.equal(result.status, 1);
+  assert.deepEqual(result.args, []);
+});
+
+test('a signalled required command stops the hook', () => {
+  const result = runHook([api], '', { signal: true });
+  assert.equal(result.status, 1);
+  assert.deepEqual(result.args, [['deps:check-cycles']]);
 });
