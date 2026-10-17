@@ -1,5 +1,11 @@
 # Migration CI — diagnostics export evidence follow-up
 
+Current hosted follow-up: Sonar's check on `14cbbe84` reports SUCCESS, but its findings API
+contains one OPEN CRITICAL S3776 issue: report-handler cognitive complexity16 exceeds15.
+The bounded repair extracts the unchanged best-effort observation block into a helper. No status,
+privacy projection, deadline or export behavior changes. Independent source review is approved and all19 affected API tests pass in7.24seconds. Fresh
+hosted Sonar/CI qualification remains required; the green check did not dispose this finding.
+
 PR345 remains open into `feature/desktop-secure-storage-startup`; merge authority is separately
 reserved. All executed hosted jobs on `4124faab` passed, but independent artifact review found
 CI-E01: the Electron report contains69 expected passes and one retry. The failed browser export

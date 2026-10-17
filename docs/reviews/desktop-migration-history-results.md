@@ -3,6 +3,20 @@
 Task: [agent-platform-desktop-migration-history](../tasks/agent-platform-desktop-migration-history.md).
 Date: 17 October 2026. Status: hosted jobs passed at4124faab; CI-E01 artifact finding remains open.
 
+## Current Sonar finding on14cbbe84
+
+The fresh14cbbe84 hosted Sonar check reports SUCCESS and its quality gate isOK, but direct findings
+inspection identifies one OPEN CRITICAL `typescript:S3776` issue at the diagnostics report handler:
+cognitive complexity16 exceeds15. Source finding `AaFIE2XVL1E8iXqjuuDw` remains retained;
+a green check does not resolve it. The bounded correction extracts the best-effort observation
+block into `observeReadFailure`, preserving the same validated allowlist, >=500 condition, exception
+containment and original safe response. No deadline, retry, status or privacy contract changes.
+All19 affected API regressions pass in7.24seconds, with typecheck, scoped lint and formatting
+passing. Independent source-aware review approved the helper extraction. New current-head hosted
+qualification remains required.
+The earlier runtime/Electron source behavior and evidence remain applicable only to their declared
+revision; new CI still executes the complete regression matrix.
+
 ## CI-E01: failed export observation
 
 Actual CI38998546853 attempt1 is terminal SUCCESS on4124faab. All25 migration regressions

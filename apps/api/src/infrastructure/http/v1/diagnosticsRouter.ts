@@ -68,27 +68,7 @@ export function createDiagnosticsRouter(
         res.json(report);
       } catch (error) {
         const failure = diagnosticReadError(error);
-        if (failure.status >= 500) {
-          try {
-            const health = DiagnosticHealthSchema.safeParse(store.health());
-            // Fixed categories/counters only. Raw errors, scope, SQL and paths stay private.
-            log.warn('Diagnostic report read unavailable', {
-              phase,
-              elapsedMs: performance.now() - startedAt,
-              ...(health.success
-                ? {
-                    state: health.data.state,
-                    reason: health.data.reason,
-                    pending: health.data.pending,
-                    dropped: health.data.dropped,
-                    acknowledgedSequence: health.data.acknowledgedSequence,
-                  }
-                : { state: 'unknown' }),
-            });
-          } catch {
-            // Observing a failed read must never replace its original safe response.
-          }
-        }
+        observeReadFailure(store, phase, startedAt, failure.status);
         throw failure;
       }
     }),
@@ -112,6 +92,34 @@ export function createDiagnosticsRouter(
     }),
   );
   return router;
+}
+
+function observeReadFailure(
+  store: DiagnosticStore,
+  phase: 'flush' | 'query' | 'report',
+  startedAt: number,
+  status: number,
+): void {
+  if (status < 500) return;
+  try {
+    const health = DiagnosticHealthSchema.safeParse(store.health());
+    // Fixed categories/counters only. Raw errors, scope, SQL and paths stay private.
+    log.warn('Diagnostic report read unavailable', {
+      phase,
+      elapsedMs: performance.now() - startedAt,
+      ...(health.success
+        ? {
+            state: health.data.state,
+            reason: health.data.reason,
+            pending: health.data.pending,
+            dropped: health.data.dropped,
+            acknowledgedSequence: health.data.acknowledgedSequence,
+          }
+        : { state: 'unknown' }),
+    });
+  } catch {
+    // Observing a failed read must never replace its original safe response.
+  }
 }
 
 async function flushForRead(store: DiagnosticStore): Promise<void> {
