@@ -8,11 +8,11 @@ No global file is changed by this cleanup. These exact proposals await owner dis
    that rule is not a default prerequisite for unrelated developer tickets." Replace the MCP Boundary
    and Sync And Closeout broker paragraphs with the same scope; retain Beads as task authority,
    canonical root, descriptions/specs, dependency/order and safe sync guidance.
-2. `/Users/letuscode/.codex/skills/agent-platform-documentation/SKILL.md`: retain project-only scope,
-   full-content mirrors/identity/readback/notes preservation. Change its inherited workflow sentence
-   to "Follow the current repository native-development policy; exact-material managed approval and
-   broker routing apply only to an explicitly selected prototype run." Scope its broker-only
-   publication clause accordingly. No generic skill adoption can narrow later owner authorization.
+2. The original proposal to retain the home-installed `agent-platform-documentation` publisher is
+   superseded by the owner's 16 October removal and opt-in publication policy. The publisher is no
+   longer installed. Do not recreate it or treat the earlier mirror/readback proposal as permission
+   to publish. Any future external publication needs an explicit owner request covering its
+   destination and documents; existing external notes and pages remain preserved.
 3. Older project-review memory guidance, including `memories/skills/agent-platform-beads-review-gate/`
    and the September13 next-session-harness-review note: propose an owner-requested small additive
    correction note stating "9 October policy supersedes per-task allocation/renewed approvals;

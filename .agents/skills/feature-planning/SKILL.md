@@ -106,8 +106,9 @@ required coverage must be explicit and reviewed, never silently marked not appli
    [plan critique](../plan-critique/SKILL.md). The critic may use available native tools to inspect
    source. Record actionable findings and correction evidence; recheck affected semantics after fixes.
    No blanket no-tool procedure or managed launcher is required for normal review.
-3. Save/read back the plan/specs, real Beads links/dependencies and full Notion mirrors with reviewed
-   source provenance. Document publication alone grants no implementation authority.
+3. Save/read back the repository plan/specs and real Beads links/dependencies with reviewed source
+   provenance. External publication runs only when explicitly requested and grants no implementation
+   authority.
 4. Check actual owner authorization. If it already covers end-to-end delivery, continue directly into
    [implementation](../feature-implementation/SKILL.md) with the reviewed plan/test map; do not ask for
    another routine handoff grant. Otherwise present the concrete proposed scope for agreement.

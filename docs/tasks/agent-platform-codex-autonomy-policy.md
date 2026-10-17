@@ -26,7 +26,9 @@ and denied-effect coverage and inspect required CI. Actual outcomes remain in th
 ## Definition of done and sign-off
 
 Requirements in plan and Beads acceptance match; upstream closed; bounded changes independently
-reviewed, appropriate local gates and preservation checks pass, full changed-document mirrors read
-back, scoped branch pushed. Intermediate handoff is accepted locally; final hosted integration belongs to acceptance task.
+reviewed, appropriate local gates and preservation checks pass, repository documentation is
+validated, scoped branch pushed. External publication and readback are required only when the owner
+explicitly requests the destination and documents; prior Notion requirements are historical.
+Intermediate handoff is accepted locally; final hosted integration belongs to acceptance task.
 Record exact head, findings/dispositions, checks and gaps in [results](../reviews/codex-developer-autonomy.md).
 No pilot/paid gateway/automation/global edits. Completion is not claimed in advance.

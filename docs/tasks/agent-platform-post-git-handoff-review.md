@@ -1,3 +1,8 @@
+> Historical 15 October specification. Publication/readback requirements below describe that delivery
+> only. For new work, the [current external-publication policy](../README.md#external-publication)
+> requires an explicit owner request covering the destination and documents. This specification
+> supplies no standing publication authority.
+
 # Refresh post-Git handoff and recommend the next local MVP priority
 
 **Beads issue:** `agent-platform-post-git-handoff-review`

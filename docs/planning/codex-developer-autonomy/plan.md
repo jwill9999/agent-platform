@@ -3,6 +3,14 @@
 Status: detailed plan independently approved with zero remaining findings; implementation already authorized by owner on
 9 October 2026. Native Codex is the chosen route; this document does not create runtime approval.
 
+## Current publication policy
+
+The 9 October delivery's Notion requirements below are historical. For new work, follow the
+[opt-in publication policy](../../README.md#external-publication): external copies and their
+readbacks require an explicit owner request covering the destination and documents. Routine task
+approval or access to publication tools is insufficient. Retain existing historical copies and
+evidence; do not repeat their publication or reinstall the removed publisher.
+
 ## Objective and authority
 
 AUT-01–08 in [the canonical planning task](../../tasks/agent-platform-codex-autonomy-plan.md)
@@ -63,9 +71,11 @@ plan folder, linked task/testing/review evidence, `docs/development/codex-develo
    keep agents enabled/interrupt behavior and responsibility-oriented role prompts.
 2. Rewrite planning/implementation/critique skills for native authorized delivery and meaningful source
    review. Exact-material machine contracts/approvals apply only to the explicit prototype. Planning
-   by the coordinator can publish; distinct review remains independent. Remove mandatory no-tool review.
+   by the coordinator can save repository records; external publication requires the explicit
+   request described above. Distinct review remains independent. Remove mandatory no-tool review.
 3. Scope orchestration skill to paused explicit prototype only. Reconcile documentation/publishing/
-   Playwright skills and guides/tasks/template; keep connected product QA and full Notion readback.
+   Playwright skills and guides/tasks/template; keep connected product QA. For new work, external
+   publication and readback apply only when explicitly requested under the current policy.
 4. Supersede ADR0004's default policy via ADR0005; retain historical body. Add prototype-only banners
    to all `docs/workflow-control*.md`, retain enforcement/API documentation. Reconcile decisions,
    skill index, AGENTS entry point and session guidance. Historical tasks/reviews/plans keep bytes.
@@ -123,6 +133,7 @@ delete recovery evidence, restore global defaults or restart the pilot. No deplo
 - [Global proposals](global-follow-ups.md)
 - [Inventory](inventory.md) and supporting evidence manifest above
 
-Changed substantive documents/skills/session get full branch-specific Notion mirrors and readback.
-Supporting raw artifacts get immutable source links in the owning report. No native execution-contract
-schema or persisted workflow approval is required for this owner-authorized cleanup.
+Changed substantive documents/skills/session remain canonical in the repository. New external
+mirrors and readbacks require an explicit owner request; the earlier delivery's Notion copies are
+retained historical evidence, not a recurring instruction. Supporting raw artifacts get immutable
+source links in the owning report. No native execution-contract schema or persisted workflow approval is required for this owner-authorized cleanup.
