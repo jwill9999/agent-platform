@@ -31,9 +31,43 @@ requests/990 provider-fixture calls and all original assertions; numerical evide
 Thread termination after bounded store close and uncancelled session-lock timers are diagnostic
 leads, not established causes. No production lifecycle or lock changes are included in this repair.
 
-Fresh hosted qualification and actual-app preflight remain required; this checkpoint does not declare
-the app ready for owner stress testing. No live provider request, owner data change, merge or
-external publication occurred.
+The normal push hook then failed healthy2 overhead21.106ms while running the benchmark inside the
+reused API test fork. It now matches CI's existing separation: non-API package tests finish, the
+ordinary API suite runs with only this benchmark excluded, then the complete benchmark must pass in
+a new Vitest process. Build/typecheck/cycles remain required; either suite or benchmark failure stops
+the push. API selection uses exact package identity. Ten shell-boundary controls pass, including mixed
+selection, near-name rejection and failure propagation; they run in CI. The four existing real Git
+environment-isolation controls pass without changing paused prototype source. The first new control
+incorrectly expected cycle failures to retain exit23; it now expects the existing normalized exit1.
+
+## Updated actual-app preflight
+
+Using the updated runtime source from `99fb4aa0`, the real retained profile reached a window in2.419s
+and1.967s on clean relaunch with its original Make key. Native Save As exported a local report before
+and after restart. The original process reports `stop-confirmed` and its backend/renderer ports are
+released. All29 original application tables remain logically byte-equivalent at this checkpoint;
+all112 settled pre-restart monitoring samples and enabled seven-day preference survive. Later owner
+changes are not overwritten or treated as preservation failures.
+
+Report `~/Downloads/agent-platform-migration-preflight-20261017-after-restart.json` is8909bytes,
+SHA256 `d0552a6b7d9a9b035548b55c3d1348ed310a5b6feaeb2f46e2754a417983e7f4`, with5 samples across
+two process identities, zero resource gaps/loss/conflicts and no unclean previous shutdown. That
+export includes the restarted process's initial sample; independent read-only storage inspection
+also confirms subsequent periodic samples. Existing samples retain30-second cadence. The idle
+window has0 V1 events and an earlier window edge, so combined coverage correctly remains incomplete.
+Private backup and source/build bindings are retained outside the repository, not uploaded to CI.
+Free app-volume space exceeds20GiB. No provider call was initiated by this preflight.
+
+After the Codex restart, the app's backend and renderer still listen normally. Its Models screen
+shows a failed connection status; that live-provider readiness has not been established. Existing
+global Workspace Files also still shows an error, as recorded by the previous preflight. These
+limits must be disclosed before inviting model-driven stress testing; do not infer their causes
+or change the owner's model configuration. New provider interoperability work is a separate P1.
+
+Fresh hosted qualification and live-provider readiness remain required; this checkpoint does not
+declare the app ready for model-driven owner stress testing. The authorized preflight added monitoring
+samples while preserving existing application records. No provider request was initiated by this
+work, and no merge or external publication occurred.
 
 ## Why the issue escaped
 

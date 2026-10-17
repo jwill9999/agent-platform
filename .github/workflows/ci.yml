@@ -67,7 +67,7 @@ jobs:
         run: node --test e2e/support/project-chat-stop/*.test.mjs
 
       - name: Test local diagnostic command boundaries
-        run: node --test scripts/diagnostics.test.mjs scripts/monitoring.test.mjs
+        run: node --test scripts/diagnostics.test.mjs scripts/monitoring.test.mjs scripts/pre-push.test.mjs
 
       - name: Prepare private interpreter for pinned execution tests
         shell: bash

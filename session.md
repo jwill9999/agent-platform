@@ -5,8 +5,9 @@
 Owner authorized implementing the P1 migration regression matrix and repairing exposed issues, with
 Beads, independent critique and actual CI execution before closure. Work is on
 `task/desktop-migration-history`, chained from startup `aa5848cd`, targeting existing
-`feature/desktop-secure-storage-startup`. This worktree is separate from the running owner app.
-Merges remain separately authorized; no owner profile/build, gateway, global or paused work changed.
+`feature/desktop-secure-storage-startup`. The previous owner checkout is preserved; actual-app
+preflight now uses this updated build and the retained normal profile with its original Make key.
+Merges remain separately authorized; gateway, global and paused work remain unchanged.
 
 CI `38995982248` at `769a5517` exposed two failures: missing backend logs in the directly spawned
 Linux rejected-startup fixture and diagnostic benchmark overhead37.508ms above its20ms limit.
@@ -14,8 +15,18 @@ The fixture now matches Playwright's existing Linux launch policy and always ret
 both real migration Electron journeys pass locally again. The unchanged benchmark and its added
 timestamp/heap/ELU observations pass locally, all9vectors/900measured requests, with limits unchanged.
 Its hosted timing cause remains unproven. No production lifecycle changes or blind rerun are used.
-Fresh hosted checks and actual-app recording/export/restart preflight remain required before reporting
-stress-test readiness. See the current [CI repair checkpoint](docs/reviews/desktop-migration-history-results.md#current-ci-repair-checkpoint).
+Fresh hosted checks remain required before reporting stress-test readiness; actual-app preflight
+results follow below. See the current [CI repair checkpoint](docs/reviews/desktop-migration-history-results.md#current-ci-repair-checkpoint).
+
+The normal push hook also exposed a reused-fork benchmark failure. It is aligned with CI's mandatory
+ordinary-suite/fresh-benchmark separation, with unchanged workload and thresholds; ten boundary
+controls and four unchanged Git-isolation controls pass. Actual retained-app recording, native export
+and clean restart now pass on this production source: all29 original application tables and112 settled
+monitoring samples/preferences were preserved. Updated [preflight evidence](docs/reviews/desktop-migration-history-results.md#updated-actual-app-preflight)
+records the source/report bindings and idle coverage limits. The live Models screen shows a failed
+connection status, so model-driven stress readiness is not established. No model configuration change
+or paid call was made by this work. Fresh hosted qualification remains pending; the prior source's
+green jobs do not qualify the local correction.
 
 Known committed migration metadata now drives one immediate SQLite transaction encompassing history
 checks, pending SQL/journal writes, existing legacy repair and scoped schema verification. Missing
