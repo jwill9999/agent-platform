@@ -5,8 +5,9 @@
 **Source:** protected staging `d55f20ed034ec79ebe60af3a2f734699fe7ba264`.
 **Branches:** `feature/desktop-secure-storage-startup` →
 `task/desktop-secure-storage-startup-plan`; existing verified staging worktree reused.
-**Authority:** owner requested actual-app recording/export/restart preflight. This records a failed
-preflight and bounded repair proposal; no dependency/source repair or new merge grant is claimed.
+**Authority:** owner requested actual-app recording/export/restart preflight, then explicitly approved
+the bounded Electron42.4.1 patch and regression checks. Implementation is authorized; no new merge
+grant or credential replacement is implied. The original failed preflight remains recorded below.
 Repository files are canonical; no external publication is requested.
 
 ## Observed failure and source
@@ -28,8 +29,8 @@ returns the readiness flag synchronously before its callback initializes the enc
 
 The owner profile is the normal OS application-data profile, with16 Projects,51 sessions,
 478 messages,2 agents and1 model configuration before and after this failed launch. Existing
-protected master-key metadata is absent and one encrypted secret row exists: provenance/key
-compatibility remains unverified; do not generate replacement credentials or overwrite that row.
+protected master-key metadata was absent and one encrypted secret row existed at that failed-launch
+checkpoint: provenance/key compatibility was then unverified; do not generate replacement credentials or overwrite that row.
 No monitoring database exists yet. Host/app-volume free space is about61 GiB, above20 GiB.
 
 ## Bounded proposal and exclusions
@@ -37,7 +38,7 @@ No monitoring database exists yet. Host/app-volume free space is about61 GiB, ab
 Prefer the official same-major Electron42.4.1 patch containing51924, with only the desktop manifest
 and lockfile plus a targeted startup regression if necessary. Confirm exact patched binary and
 native-module ABI; retain secureStorage encryption, capability isolation and unchanged startup/
-shutdown budgets. No latest-major migration, synchronous fallback, plaintext environment key,
+shutdown budgets. No latest-major migration, synchronous fallback, fabricated fixture master key,
 arbitrary startup sleep, caller retry loop, credential reset, provider call or global change.
 
 The missing existing master-key metadata is a separate constraint: successful startup with a newly
@@ -45,19 +46,29 @@ created key would not prove existing secret compatibility. Establish the configu
 source without printing/copying secrets; if unavailable, stop and request that specific owner input.
 Do not mark the app ready from a test-only key or disposable profile.
 
+The owner identified the historical Make launcher. Its original key file at
+`/Users/letuscode/projects/agent-platform/.agent-platform/desktop-runtime/config/secrets-master-key.b64`
+exists and authenticated the sole existing encrypted credential using a read-only check; no key or
+plaintext value was printed or persisted. Reuse that exact original key via the existing supported
+environment setting for the owner journey. Assert the original file already exists and is nonempty;
+never run bare `make electron-local` from a new worktree, because its relative default creates a new
+key when absent. This is not an OS-protected key migration. Qualify the native API separately without
+an environment master-key override, using a 60-second diagnostic-only failure deadline, no retry
+or startup delay. Production startup budgets remain unchanged. Independent review required this launch boundary before relaunch.
+
 ## Requirements and verification map
 
-| ID  | Required outcome                          | Verification and retained evidence                                                                                                                                                                                                                                                                                                 |
-| --- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| S01 | Fail-closed OS-protected startup works    | Real Electron/native Keychain availability and non-sensitive roundtrip, no environment master-key override; existing unit cases for unavailable storage, persisted key and re-encryption remain passing.                                                                                                                           |
-| S02 | Existing owner data and secrets preserved | Read-only before/after row identity/count checks; verify existing credential compatibility without provider dispatch or exposing credentials. Missing historical key remains a blocker, never silently replaced.                                                                                                                   |
-| S03 | Actual recording/export/restart passes    | Use actual app controls to enable seven-day capture, observe at least two durable samples at the real30-second cadence, save the native report and verify coverage/health/privacy. Cleanly quit/relaunch the same profile and independently verify old samples/preference remain, process identity changes and new samples arrive. |
-| S04 | Qualified delivery remains bounded        | Review exact dependency/source diff; run relevant desktop unit/type/lint/native and actual UI checks, normal hooks and all declared exact-head feature/protected staging gates if delivering a repair. No bypass or claim that planned checks passed.                                                                              |
+| ID  | Required outcome                          | Verification and retained evidence                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S01 | Fail-closed OS-protected startup works    | Real Electron/native Keychain availability and non-sensitive roundtrip, no environment master-key override; existing unit cases for unavailable storage, persisted key and re-encryption remain passing.                                                                                                                                                                                               |
+| S02 | Existing owner data and secrets preserved | Read-only before/after row identity/count checks; verify existing credential compatibility without provider dispatch or exposing credentials. Missing historical key remains a blocker, never silently replaced.                                                                                                                                                                                       |
+| S03 | Actual recording/export/restart passes    | Reuse the authenticated original Make key and normal owner profile. Use actual app controls to enable seven-day capture, observe at least two durable samples at the real30-second cadence, save the native report and verify coverage/health/privacy. Cleanly quit/relaunch the same profile and independently verify old samples/preference remain, process identity changes and new samples arrive. |
+| S04 | Qualified delivery remains bounded        | Review exact dependency/source diff; run relevant desktop unit/type/lint/native and actual UI checks, normal hooks and all declared exact-head feature/protected staging gates if delivering a repair. No bypass or claim that planned checks passed.                                                                                                                                                  |
 
 ```gherkin
 Feature: Normal desktop preflight with protected local credentials
   Scenario: Record and export after clean startup and restart
-    Given the current app uses the owner's preserved normal profile and OS secure storage
+    Given the current app uses the owner's preserved normal profile and authenticated original key
     When the app starts and resource recording is enabled
     Then real periodic samples and capture health are visible and durable
     When a safe report is saved and the app is cleanly restarted
@@ -84,16 +95,18 @@ not a hard reverse dependency. Stop/monitoring delivery stays closed and paused 
 separate. Estimate one bounded patch/regression pass, then re-evaluate if the historical key is
 unavailable or dependency behavior differs; do not turn preflight into a storage redesign.
 
-Implementation and merge authority must be resolved from the owner's current instructions before
-changing dependencies or promoting a repair. Plan and source-aware independent critique precede
-that decision. Completion requires S01–S04 and actual required delivery evidence, then Beads
+The owner explicitly authorized the bounded patch/regressions after independent plan review.
+Merge authority remains separate; do not promote this repair on tests alone. Completion requires S01–S04 and actual required delivery evidence, then Beads
 readback/Dolt sync. Owner hands-on stress testing remains a distinct open task.
 
 ## Actual results and handoff
 
 - PASS: supported backend/renderer/desktop builds; about61 GiB free; existing record counts unchanged.
 - FAIL: normal app startup; exact native availability mismatch and delayed initialization reproduced.
-- BLOCKED/NOT RUN: actual recording, native export, same-profile restart and stress readiness.
-- NOT APPLIED: dependency update, production-code changes, timing/security workarounds or credential replacement.
+- BLOCKED/NOT RUN: actual recording, native export, same-profile restart and stress readiness;
+  original-key relaunch now reaches backend, but missing Git/Stop tables prevent readiness.
+- IN PROGRESS: exact42.4.1 dependency pin and native startup regression; no production-code timing/security workaround or credential replacement.
+- PASS: read-only original Make-key authentication against the existing encrypted credential; actual owner relaunch reached backend startup, then failed with missing `git_delivery_operations`;
+  [separate P1 schema recovery](agent-platform-owner-profile-schema-preflight.md) blocks recording.
 
 Independent critique and later exact source/revision results belong in canonical Beads before sign-off.

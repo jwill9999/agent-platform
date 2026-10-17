@@ -1,22 +1,26 @@
-# Actual-app preflight blocked — secure-storage startup
+# Actual-app preflight — Electron patch verified, database recovery blocked
 
-The owner merged PR343 into staging at `d55f20ed034ec79ebe60af3a2f734699fe7ba264`; its tree exactly
-matches reviewed source, all14 executed checks passed and delivered branches were recovery-protected
-and cleaned. Stop and monitoring are CLOSED/synced. The owner trial remains OPEN.
+Owner-authorized preflight on staged `d55f20ed` found two startup blockers before recording.
+The owner approved the official Electron42.4.1 patch and identified the original Make launcher key.
+Exact42.4.1 package/lock pin and native secure-storage regression are implemented locally; native
+post-ready Promise/availability/roundtrip, desktop229unit tests, build/typecheck/lint pass. Initial
+native-script lint failures were repaired without changing runtime behavior. Source review approved
+the patch; original failed42.0.1 evidence is retained. No new feature/staging merge is authorized yet.
 
-Requested actual-app recording/export/restart preflight found a normal startup failure before a
-window/backend opens. Installed Electron42.0.1 async secure storage is initially unavailable while
-sync Keychain is available; a bounded native probe sees async availability true111 ms later. The
-official42.4.1 patch fixes this upstream initialization bug. See
-[bounded blocker/repair proposal](docs/tasks/agent-platform-desktop-secure-storage-startup.md).
-No repair dependency or production-code change has been applied. The normal profile's original
-16 Projects/51 sessions/478 messages remain intact; its missing persisted master-key metadata and
-existing encrypted-secret compatibility require attention before any new key is created. About61 GiB
-is free. Recording/export/restart remain blocked; do not invite the owner to stress test yet.
+The absolute original primary Make key authenticated the normal profile's existing encrypted secret
+without exposing or replacing values. Owner relaunch reached backend, then failed after15.234s:
+`git_delivery_operations` is missing. A later unrecognized migration journal timestamp causes
+Drizzle to skip current0019/0020. Four Git/Stop tables are absent. Original profile integrity/FK
+checks pass and Projects16/sessions51/messages478 remain; about61GiB free exceeds20GiB.
+Only a private backup was rehearsed: exact additive SQL succeeds with unchanged original counts.
 
-Docker gateway stays disabled. Main and paused PR283/orchestration remain separate. No new external
-publication, paid calls or credential reset is authorized by this preflight. Earlier source handoff
-follows unchanged; canonical Beads carries current status and independent review.
+See [Electron repair](docs/tasks/agent-platform-desktop-secure-storage-startup.md) and
+[specific proposed database recovery](docs/tasks/agent-platform-owner-profile-schema-preflight.md).
+Do not alter original schema/history or create a replacement key/profile without the specific recovery
+decision. Recording, native export and same-profile restart are still BLOCKED/NOT RUN; owner stress
+review stays OPEN. Canonical Beads carries actual review/push/check state. Stop/monitoring remain
+CLOSED and delivered. Docker gateway stays disabled; main/paused PR283 work remains separate.
+Repository documentation is canonical; no external publication requested. Previous handoff follows.
 
 <!-- markdownlint-disable MD025 -->
 
