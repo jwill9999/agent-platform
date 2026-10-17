@@ -14,7 +14,11 @@ import {
   updateSettings,
 } from '@agent-platform/db';
 import { createRequire } from 'node:module';
-import { monitorEventLoopDelay, PerformanceObserver } from 'node:perf_hooks';
+import {
+  monitorEventLoopDelay,
+  performance as nodePerformance,
+  PerformanceObserver,
+} from 'node:perf_hooks';
 const Database = createRequire(new URL('../../../packages/db/package.json', import.meta.url))(
   'better-sqlite3',
 ) as new (path: string) => ReturnType<typeof openDatabase>['sqlite'];
@@ -66,6 +70,13 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
       residentBytesBefore: number;
       residentBytesAfter: number;
       observedGcDurationsMs: number[];
+      observedGcEvents: Array<{ startTimeMs: number; durationMs: number }>;
+      requestWindows: Array<{ startTimeMs: number; durationMs: number; warmup: boolean }>;
+      heapUsedBytesBefore: number;
+      heapUsedBytesAfter: number;
+      eventLoopUtilization: number;
+      resourcesBefore: string[];
+      resourcesAfterCleanup: string[];
       resourceMonitoring: {
         enabledAtMs: number | null;
         measurementStartedAtMs: number;
@@ -142,6 +153,13 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
           residentBytesBefore: 0,
           residentBytesAfter: 0,
           observedGcDurationsMs: [] as number[],
+          observedGcEvents: [] as Array<{ startTimeMs: number; durationMs: number }>,
+          requestWindows: [] as Array<{ startTimeMs: number; durationMs: number; warmup: boolean }>,
+          heapUsedBytesBefore: 0,
+          heapUsedBytesAfter: 0,
+          eventLoopUtilization: 0,
+          resourcesBefore: [] as string[],
+          resourcesAfterCleanup: [] as string[],
           resourceMonitoring: {
             enabledAtMs: null as number | null,
             measurementStartedAtMs: 0,
@@ -255,21 +273,39 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
         const eventLoop = monitorEventLoopDelay({ resolution: 10 });
         eventLoop.enable();
         const gc = new PerformanceObserver((list) => {
-          sample.observedGcDurationsMs.push(...list.getEntries().map((entry) => entry.duration));
+          for (const entry of list.getEntries()) {
+            sample.observedGcDurationsMs.push(entry.duration);
+            sample.observedGcEvents.push({
+              startTimeMs: entry.startTime,
+              durationMs: entry.duration,
+            });
+          }
         });
         gc.observe({ entryTypes: ['gc'] });
         cleanups.push(async () => gc.disconnect());
         const initialCpu = process.cpuUsage();
+        const initialEventLoop = nodePerformance.eventLoopUtilization();
         const windowStarted = performance.now();
         sample.resourceMonitoring.measurementStartedAtMs = Date.now();
         sample.residentBytesBefore = process.memoryUsage().rss;
+        sample.heapUsedBytesBefore = process.memoryUsage().heapUsed;
+        sample.resourcesBefore = process.getActiveResourcesInfo();
         captureActiveSample = () => {
-          sample.observedGcDurationsMs.push(...gc.takeRecords().map((entry) => entry.duration));
+          for (const entry of gc.takeRecords()) {
+            sample.observedGcDurationsMs.push(entry.duration);
+            sample.observedGcEvents.push({
+              startTimeMs: entry.startTime,
+              durationMs: entry.duration,
+            });
+          }
           const cpu = process.cpuUsage(initialCpu);
           sample.cpuUserMs = cpu.user / 1000;
           sample.cpuSystemMs = cpu.system / 1000;
           sample.wallDurationMs = performance.now() - windowStarted;
           sample.residentBytesAfter = process.memoryUsage().rss;
+          sample.heapUsedBytesAfter = process.memoryUsage().heapUsed;
+          sample.eventLoopUtilization =
+            nodePerformance.eventLoopUtilization(initialEventLoop).utilization;
           sample.requestP95Ms = percentile95(durations);
           sample.enqueueP95Ms = percentile95(enqueue);
           sample.enqueueSamples = enqueue.length;
@@ -298,6 +334,11 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
             .timeout({ response: 5000, deadline: 10000 })
             .expect(200);
           const elapsed = performance.now() - started;
+          sample.requestWindows.push({
+            startTimeMs: started,
+            durationMs: elapsed,
+            warmup: index < 10,
+          });
           expect(result.text).toContain('benchmark result');
           if (index >= 10) durations.push(elapsed);
         }
@@ -363,8 +404,10 @@ it('measures 100 real requests per mode and preserves outcomes while the diagnos
         sample.status = 'passed';
         publishMeasurements();
         captureActiveSample = undefined;
-        // Release each mode's actual DB/worker before the next measurement.
+        // Request each mode's bounded store shutdown before the next measurement. Store close()
+        // does not await native worker termination; resource types are observations, not exit proof.
         for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+        sample.resourcesAfterCleanup = process.getActiveResourcesInfo();
       }
       const baseline = samples[`${repetition}-disabled`]!.requestP95Ms;
       for (const mode of ['healthy', 'locked']) {

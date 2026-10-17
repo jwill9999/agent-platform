@@ -155,6 +155,8 @@ describe('local diagnostic API with real SQLite', () => {
   it('denies missing capability and foreign host before accessing the store', async () => {
     const f = await fixture();
     const query = vi.spyOn(f.store, 'query');
+    const flush = vi.spyOn(f.store, 'flush');
+    const output = vi.spyOn(console, 'log').mockImplementation(() => {});
     const body = { scope: { requestId: randomUUID() } };
     await request(f.app).post('/v1/diagnostics/report').set('Host', host).send(body).expect(403);
     await request(f.app)
@@ -165,6 +167,10 @@ describe('local diagnostic API with real SQLite', () => {
       .send(body)
       .expect(403);
     expect(query).not.toHaveBeenCalled();
+    expect(flush).not.toHaveBeenCalled();
+    expect(output.mock.calls.some(([line]) => String(line).includes('diagnostics-read'))).toBe(
+      false,
+    );
   });
 
   it('rejects invalid report/list inputs without reflecting secret keys or payloads', async () => {
@@ -180,6 +186,73 @@ describe('local diagnostic API with real SQLite', () => {
       expect(JSON.stringify(response.body)).not.toContain(canary);
     }
   });
+
+  it('retains safe flush-timeout evidence without querying or changing the read deadline', async () => {
+    const f = await fixture();
+    const output = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const query = vi.spyOn(f.store, 'query');
+    vi.spyOn(f.store, 'flush').mockImplementation(() => new Promise(() => {}));
+    const res = await f.report({ sessionId: f.sessionId }).expect(503);
+    expect(res.body.error.code).toBe('DIAGNOSTICS_UNAVAILABLE');
+    expect(query).not.toHaveBeenCalled();
+    const records = output.mock.calls.map(([line]) => JSON.parse(String(line)));
+    expect(records).toContainEqual(
+      expect.objectContaining({ service: 'diagnostics-read', phase: 'flush', level: 'warn' }),
+    );
+    expect(
+      records.find((record) => record.service === 'diagnostics-read').elapsedMs,
+    ).toBeGreaterThanOrEqual(190);
+    expect(JSON.stringify(records)).not.toContain(f.sessionId);
+    expect(JSON.stringify(records)).not.toContain(f.dir);
+  });
+
+  it('distinguishes a query failure from a flush timeout without logging raw storage errors', async () => {
+    const f = await fixture();
+    const output = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(f.store, 'query').mockRejectedValue(new Error(canary));
+    await f.report({ sessionId: f.sessionId }).expect(503);
+    const records = output.mock.calls.map(([line]) => JSON.parse(String(line)));
+    expect(records).toContainEqual(
+      expect.objectContaining({ service: 'diagnostics-read', phase: 'query', level: 'warn' }),
+    );
+    expect(JSON.stringify(records)).not.toContain(canary);
+    expect(JSON.stringify(records)).not.toContain(f.sessionId);
+  });
+
+  it('projects invalid health metadata to unknown instead of logging arbitrary strings', async () => {
+    const f = await fixture();
+    const output = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(f.store, 'query').mockRejectedValue(new Error(canary));
+    vi.spyOn(f.store, 'health').mockReturnValue({
+      ...f.store.health(),
+      state: canary,
+    } as unknown as ReturnType<DiagnosticStore['health']>);
+    await f.report({ sessionId: f.sessionId }).expect(503);
+    const records = output.mock.calls.map(([line]) => JSON.parse(String(line)));
+    expect(records).toContainEqual(
+      expect.objectContaining({ service: 'diagnostics-read', state: 'unknown' }),
+    );
+    expect(JSON.stringify(records)).not.toContain(canary);
+  });
+
+  it.each(['health', 'logger'] as const)(
+    'preserves the safe failure when %s observation fails',
+    async (source) => {
+      const f = await fixture();
+      vi.spyOn(f.store, 'query').mockRejectedValue(new Error(canary));
+      if (source === 'health')
+        vi.spyOn(f.store, 'health').mockImplementation(() => {
+          throw new Error(canary);
+        });
+      else
+        vi.spyOn(console, 'log').mockImplementation(() => {
+          throw new Error(canary);
+        });
+      const res = await f.report({ sessionId: f.sessionId }).expect(503);
+      expect(res.body.error.code).toBe('DIAGNOSTICS_UNAVAILABLE');
+      expect(JSON.stringify(res.body)).not.toContain(canary);
+    },
+  );
 
   it('paginates a stable protected snapshot and rejects cross-scope cursors', async () => {
     const f = await fixture();

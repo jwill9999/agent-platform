@@ -26,11 +26,12 @@
     "start:renderer": "pnpm run build:backend && pnpm run build:renderer && pnpm run build && AGENT_PLATFORM_DESKTOP_BACKEND=managed AGENT_PLATFORM_DESKTOP_RENDERER=standalone electron .",
     "test": "vitest run",
     "test:e2e": "pnpm run build:backend && pnpm run build:renderer && pnpm run build && playwright test -c e2e/playwright.electron.config.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:native:secret-storage": "electron scripts/check-macos-secure-storage.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.19.25",
-    "electron": "^42.0.1",
+    "electron": "42.4.1",
     "typescript": "^5.9.3",
     "vitest": "^2.1.8"
   },

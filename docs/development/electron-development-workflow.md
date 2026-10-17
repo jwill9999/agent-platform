@@ -181,6 +181,38 @@ pnpm --filter @agent-platform/desktop run test:e2e
 This command builds the backend, renderer, and Electron main/preload code before running the desktop
 Playwright suite.
 
+## Native startup and retained-profile regression coverage
+
+Keep fixture-driven journeys, native OS checks and upgrade checks distinct. A test master key
+intentionally bypasses OS secure-storage initialization; a freshly seeded database does not prove
+that an older profile with inconsistent migration history can start. A passing process exit alone
+also does not establish window/backend readiness.
+
+For macOS Electron or secure-storage changes, run the native check without a master-key override:
+
+```bash
+env -u SECRETS_MASTER_KEY pnpm --filter @agent-platform/desktop test:native:secret-storage
+```
+
+It asserts immediate post-ready Promise behavior, awaited availability and a non-sensitive native
+encryption roundtrip. It uses a60-second diagnostic failure deadline, without startup sleeps,
+retries or application credentials. The existing macOS staging workflow runs the same command after
+Electron installation, with a two-minute step limit and normal failure propagation. This happens
+on each pull request targeting staging, not on feature-targeted Linux-only qualification. Until
+that workflow change is merged, this is PR source rather than an active staging safeguard.
+
+Retain ordinary previous-schema upgrade and rollback tests. Add synthetic inconsistent-journal
+cases through [the open migration-history task](../tasks/agent-platform-desktop-migration-history.md):
+later journal entry plus missing earlier tables, complete-schema control, preserved existing rows,
+reopen/idempotence and actionable actual desktop startup failure. These additional cases remain
+planned; existing fresh-database/ordinary-upgrade passes do not qualify them. Never run destructive
+upgrade fixtures against an owner's real profile or use a reset to make a regression pass.
+
+Before each bounded owner stress-test session, verify recording/export/clean restart and disk
+preflight in the actual app. This is a separate human preflight, not an automatically scheduled
+test of the user's profile. Use the scoped [owner-trial record](../tasks/agent-platform-local-mvp-stress-review.md)
+and retain unknowns, failure evidence and backlog dispositions.
+
 ## Closeout Rules For Electron Work
 
 An Electron task is not done until the verification level matches the behavior changed.
