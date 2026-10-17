@@ -1,6 +1,6 @@
 # Detect desktop migration history and schema divergence
 
-**Beads:** `agent-platform-desktop-migration-history`, P1 OPEN.
+**Beads:** `agent-platform-desktop-migration-history`, P1 IN_PROGRESS.
 **Discovered by:** [owner-profile recovery](agent-platform-owner-profile-schema-preflight.md).
 
 The retained owner profile had an unknown later migration timestamp. Drizzle0.38.4 uses the latest
@@ -8,16 +8,16 @@ timestamp as a high-water mark and skipped earlier committed0019/0020, leaving f
 absent. The separately authorized one-time recovery preserves that later entry and all original data;
 it does not fix future timestamp ordering. The later entry's origin remains unknown.
 
-Before implementation, prepare a bounded source-backed plan and independent critique. Reproduce
+The bounded source-backed implementation plan passed independent critique. Reproduce
 the mismatch on a disposable database, compare journal identity with physical schema, and define
 supported safe recovery or a clear fail-closed diagnosis. Do not blindly replay unknown SQL,
 erase history, reset credentials or alter unrelated user records.
 
 Acceptance must cover repeated database opens, future migrations, copy-based preservation,
 transaction rollback and actionable startup errors. Tests must verify real database state, not just
-successful process exit. No generic repair has been implemented or qualified by the one-time case.
+successful process exit. The one-time owner recovery did not qualify generic migration handling.
 
-This follow-up is OPEN for backlog review. The recovered profile can undertake its bounded local
+This follow-up is in implementation under the owner's authorization. The recovered profile can undertake its bounded local
 monitoring trial; this is not production/distribution upgrade qualification. Docker gateway and
 paused orchestration remain separate.
 
@@ -32,7 +32,7 @@ Generate all records and migration journals from synthetic fixtures. Do not copy
 or credentials into CI. Start from the committed pre0019 schema and preserve identifiable synthetic
 sessions, approvals, messages and encrypted test-secret rows. Insert a synthetic later unknown
 journal entry to reproduce the high-water skip. The chosen safe reconciliation/diagnosis behavior
-still needs the bounded source-backed implementation plan; the following tests define its outcomes.
+follows the independently reviewed fail-closed contract below; the following tests define its outcomes.
 
 | ID      | Scenario                                                          | Required outcome                                                                                                                                                                                                                                                                 |
 | ------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -49,6 +49,51 @@ normal Electron suite on those PRs. Keep the recurring CI inclusion as a DoD req
 manual success or the one-time owner repair does not satisfy it. No nightly job or paid provider
 is needed; use deterministic external boundaries and real application/database behavior.
 
-**Current status:** matrix specified and linked in Beads; new regression cases and generic handling
-remain unimplemented. Do not close this P1 or claim future upgrade safety until those cases and
-current-head delivery gates actually pass. The restored owner's bounded trial is a separate activity.
+**Current status:** fail-closed handling and the new default-suite regressions are implemented;
+local database and connected Electron cases pass. See the [verification record](../reviews/desktop-migration-history-results.md).
+Hosted current-head qualification remains pending. Do not close this P1 or claim future upgrade safety
+until those cases and delivery gates actually pass. The restored owner's bounded trial is separate.
+
+## Authorized bounded implementation contract
+
+The owner approved implementation and exposed-issue repair with critic review on17 October.
+Implementation is on `task/desktop-migration-history`, chained from startup head `aa5848cd`, in a
+separate reused worktree; the running owner app's checkout, builds and data remain unchanged.
+The final task-tip PR targets existing `feature/desktop-secure-storage-startup`. Actual merges
+still require their applicable authority. Do not close P1 before new default-suite CI evidence.
+
+Choose fail-closed diagnosis for inconsistent history, not automatic replay or reset. Load trusted
+committed SQL/hash/timestamp metadata using public Drizzle `readMigrationFiles`. A small SQLite
+transaction owner must encompass journal preflight, known pending SQL and journal inserts, existing
+legacy-slug repair and final schema validation. Do not nest Drizzle's literal BEGIN/COMMIT. Any
+failure rolls the entire open-time operation back and closes the failed connection.
+
+Reject unrecorded known migrations whose timestamp would be skipped by the existing high-water
+mark, or recorded known hashes with conflicting timestamps. Preserve unknown journal rows.
+An unknown later row is compatible only when every known migration is recorded and the scoped
+current schema matches the trusted canonical shape. The already repaired owner profile has those
+truthful known entries; this implementation does not inspect or mutate it.
+
+Construct the expected Git/Stop schema in an ephemeral empty database from trusted migration SQL.
+Compare the four tables and their complete table/index definitions, including column types,
+foreign keys, CHECK constraints and partial uniqueness, plus required approval-binding columns/index.
+Reject unexpected triggers attached to those four tables or `approval_requests`; otherwise a matching
+table/index shape could still run unreviewed side effects. Type/FK/CHECK tamper fixtures restore all
+original indexes so rejection proves the changed constraint, rather than a missing-index shortcut.
+A fully recorded ledger with tampered physical schema must also fail. This is scoped contract
+validation, not a claim to validate every unrelated table or authorize arbitrary schema repair.
+Keep error code/message fixed, safe and actionable; omit paths, hashes, SQL and credentials.
+
+MIG-R01–05 use independently generated synthetic retained fixtures through the unchanged upstream
+migrator, not the new `openDatabase` path. Add the future-known-migration-below-unknown-high-water
+case and complete-ledger/tampered-schema controls. MIG-R06 uses real managed Electron/backend:
+supported profile must show a window and readiness with sentinel rows preserved; rejected profile
+must retain a safe failure marker, never become ready/window-ready, preserve its database and clean
+up owned children. Electron wrapper exit0 alone is not success or failure evidence. Fixture key and
+ports/profile isolation are explicit; native OS storage remains the separate macOS gate.
+
+Verification: preserve red tests before production changes, focused then full database suite,
+desktop/type/lint/build, connected Electron success and failure, source-aware independent review,
+normal hooks and hosted default database/Electron CI on the final head. Startup failure precedes
+V1 store creation, so its safe backend log/process evidence is required; no agent/provider requests
+are needed and agent-execution report review is not applicable to this startup-only slice.

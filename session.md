@@ -1,14 +1,35 @@
-# Actual-app recording, export and restart preflight passed
+# Migration-history regression repair — implementation checkpoint
 
-## Startup regression escape analysis follow-up
+## Current authorized migration follow-up
 
-Owner asked why startup blockers escaped. Source review confirms fixture master keys bypassed native
-Keychain initialization; ordinary retained-schema upgrades were covered, but anomalous future journal
-history with missing earlier tables was not. PR344 adds the existing native check to the macOS staging
-workflow; it is not yet merged/hosted-qualified. P1 migration-history now requires six synthetic upgrade/
-readiness/rollback regressions in default database/Electron CI; these remain planned, not implemented.
-See the linked startup and migration task specs below. No owner-app restart, profile mutation, new
-provider call, protection-setting change or scheduled automation is part of this follow-up.
+Owner authorized implementing the P1 migration regression matrix and repairing exposed issues, with
+Beads, independent critique and actual CI execution before closure. Work is on
+`task/desktop-migration-history`, chained from startup `aa5848cd`, targeting existing
+`feature/desktop-secure-storage-startup`. This worktree is separate from the running owner app.
+Merges remain separately authorized; no owner profile/build, gateway, global or paused work changed.
+
+Known committed migration metadata now drives one immediate SQLite transaction encompassing history
+checks, pending SQL/journal writes, existing legacy repair and scoped schema verification. Missing
+past migrations, conflicting history or changed Git/Stop contracts fail closed with a fixed safe
+recovery error; unknown rows are preserved and never replayed. Every failed open rolls back and closes.
+Ordinary upgrades and complete known schemas with a later unknown journal entry remain supported.
+
+Local verification: 214 database tests and 229 desktop unit tests passed; both real managed Electron
+retained-upgrade and rejected-history journeys passed without retries. The critic's atomicity,
+trigger, isolated constraint, safe-error and cleanup findings are addressed; independent final source
+and evidence review approved with no remaining findings. Hosted current-head gates remain pending.
+New cases are discovered by normal DB/Electron CI, with explicit
+workflow comments. P1 stays IN_PROGRESS until actual CI qualification. See the
+[task](docs/tasks/agent-platform-desktop-migration-history.md) and
+[results](docs/reviews/desktop-migration-history-results.md).
+
+The escape analysis found that fixture master keys bypassed native Keychain initialization, while
+fresh seeded Electron profiles missed anomalous future history with absent earlier tables. PR344
+contains the earlier Electron42.4.1/native macOS check; this cumulative task-tip carries those changes
+forward. Feature CI skips the macOS staging-only job, so actual native hosted qualification still
+requires the later protected staging PR. The owner trial has not run; previous preflight follows.
+
+## Actual-app recording, export and restart preflight passed
 
 Stop/monitoring remain delivered in staging `d55f20ed`. The owner authorized actual-app preflight,
 then the bounded Electron42.4.1 patch and a separate reviewed one-time database recovery. Exact
