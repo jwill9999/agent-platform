@@ -41,5 +41,5 @@ async function verifyNativeStorage() {
 }
 
 // Electron waits for main-module evaluation before ready; do not await ready at module scope.
-if (app.isReady()) void verifyNativeStorage();
+if (app.isReady()) await verifyNativeStorage();
 else app.once('ready', verifyNativeStorage);

@@ -29,6 +29,9 @@ remove the unused fixture CLI, use Set membership and replace native Promise-cha
 event-driven check. A never-pushed top-level readiness-await draft hit its unchanged watchdog and
 was corrected; the real native macOS check, all25 migration cases and both Electron journeys pass
 again. Fresh exact-head hosted checks remain pending; no suppression, bypass or task closure.
+The `77a4cca3` Sonar gate passed but still listed one style finding. The already-ready branch now
+awaits its native verification only after readiness is confirmed; the not-ready branch remains
+event-driven. The native macOS rerun passes, and final-head hosted qualification remains required.
 
 The escape analysis found that fixture master keys bypassed native Keychain initialization, while
 fresh seeded Electron profiles missed anomalous future history with absent earlier tables. PR344

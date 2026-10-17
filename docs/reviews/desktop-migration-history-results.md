@@ -76,6 +76,12 @@ again without retries (`/tmp/migration-sonar-regressions-20261017.log`,
 `/tmp/migration-sonar-electron-20261017.log`). Fresh current-head hosted qualification remains required;
 the first head's passing jobs cannot qualify changed source. No owner app/profile operation occurred.
 
+The corrected `77a4cca3` Sonar gate passed, but direct issue inspection found one remaining style
+finding on the already-ready async call. That branch now awaits verification only after `app.isReady()`
+is true; the not-ready branch still registers its event and finishes module loading immediately.
+The exact native macOS command passed again (`/tmp/migration-native-storage-guarded-await-20261017.log`).
+Gate success alone is not treated as absence of actionable findings; fresh final-head checks are required.
+
 ## Recurring CI and review gate
 
 `packages/db/test/migrationHistory.test.ts` is part of the default database suite in CI `verify`.
