@@ -12,7 +12,6 @@ import {
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
-import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -111,8 +110,4 @@ export function inspectMigrationProfile(sqlitePath) {
   } finally {
     sqlite.close();
   }
-}
-
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  createMigrationProfile(process.argv[2], process.argv[3]);
 }

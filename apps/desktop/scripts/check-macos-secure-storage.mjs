@@ -10,7 +10,7 @@ const deadline = setTimeout(() => {
 }, 60_000);
 
 // Exercise native initialization directly, without an environment key, fixture protector or delay.
-app.whenReady().then(async () => {
+async function verifyNativeStorage() {
   try {
     assert.equal(process.platform, 'darwin', 'This check requires macOS secure storage');
     assert.equal(process.env.SECRETS_MASTER_KEY, undefined, 'Run without a master-key override');
@@ -38,4 +38,8 @@ app.whenReady().then(async () => {
     );
     app.exit(1);
   }
-});
+}
+
+// Electron waits for main-module evaluation before ready; do not await ready at module scope.
+if (app.isReady()) void verifyNativeStorage();
+else app.once('ready', verifyNativeStorage);

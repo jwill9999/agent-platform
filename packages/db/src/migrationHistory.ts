@@ -3,12 +3,12 @@ import type { MigrationMeta } from 'drizzle-orm/migrator';
 import { MigrationHistoryError } from './errors.js';
 import { repairLegacySlugMigrationIfNeeded } from './legacyRepair.js';
 
-const scopedTables = [
+const scopedTables = new Set([
   'git_delivery_operations',
   'controlled_runs',
   'run_executions',
   'run_attempts',
-];
+]);
 const approvalColumns = new Set(['run_id', 'execution_payload_json', 'resumed_at_ms']);
 
 interface JournalRow {
@@ -31,7 +31,7 @@ function scopedSchema(sqlite: Database.Database) {
     rows.some(
       (row) =>
         row.type === 'trigger' &&
-        (scopedTables.includes(row.tbl_name) || row.tbl_name === 'approval_requests'),
+        (scopedTables.has(row.tbl_name) || row.tbl_name === 'approval_requests'),
     )
   ) {
     throw new MigrationHistoryError();
@@ -39,7 +39,7 @@ function scopedSchema(sqlite: Database.Database) {
   const definitions = rows
     .filter(
       (row) =>
-        scopedTables.includes(row.tbl_name) ||
+        scopedTables.has(row.tbl_name) ||
         (row.type === 'index' && row.name === 'approval_requests_run_idx'),
     )
     .map((row) => ({ ...row, sql: row.sql?.trim() ?? null }));

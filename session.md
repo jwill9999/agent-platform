@@ -23,6 +23,13 @@ workflow comments. P1 stays IN_PROGRESS until actual CI qualification. See the
 [task](docs/tasks/agent-platform-desktop-migration-history.md) and
 [results](docs/reviews/desktop-migration-history-results.md).
 
+Cumulative [PR345](https://github.com/jwill9999/agent-platform/pull/345) supersedes closed PR344 while
+retaining its ancestry/source. First head `92d249b7` received five Sonar findings; bounded repairs
+remove the unused fixture CLI, use Set membership and replace native Promise-chain style with an
+event-driven check. A never-pushed top-level readiness-await draft hit its unchanged watchdog and
+was corrected; the real native macOS check, all25 migration cases and both Electron journeys pass
+again. Fresh exact-head hosted checks remain pending; no suppression, bypass or task closure.
+
 The escape analysis found that fixture master keys bypassed native Keychain initialization, while
 fresh seeded Electron profiles missed anomalous future history with absent earlier tables. PR344
 contains the earlier Electron42.4.1/native macOS check; this cumulative task-tip carries those changes

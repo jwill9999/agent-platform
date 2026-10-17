@@ -54,6 +54,28 @@ destructuring. A metadata-error control initially hit an immutable ESM spy expor
 mocks only the one loader failure, while normal SQL and fixture creation remain real. Original logs
 are retained; these are not passing acceptance evidence.
 
+## Initial hosted findings and source repair
+
+PR345 at `92d249b7` reported five Sonar findings: prefer Set membership, three fixture path-traversal
+flows from an unused CLI entry point, and Promise-chain style in the inherited native startup check.
+The fixture CLI is removed entirely; its only required consumers import the synthetic helper.
+Scoped membership now uses `Set.has`, with unchanged migration/schema behavior. No scanner exclusion,
+suppression, credential reset or file-content omission was introduced.
+
+A draft top-level readiness await in the native check failed its unchanged 60-second watchdog:
+Electron waits for main-module evaluation before readiness. That draft was never pushed. The corrected
+event-driven async check handles both already-ready and future-ready cases, keeping the immediate
+availability assertion and native encryption roundtrip. Actual macOS rerun passed on Electron42.4.1
+without an environment master-key override. See `/tmp/migration-native-storage-event-driven-20261017.log`;
+the failed attempt remains `/tmp/migration-native-storage-top-await-20261017.log`. Pinned loader evidence:
+[Electron42.4.1 initialization](https://github.com/electron/electron/blob/v42.4.1/lib/browser/init.ts)
+and [CLI module loading](https://github.com/electron/electron/blob/v42.4.1/default_app/main.ts).
+
+After these bounded corrections, all25 migration cases and both real Electron startup journeys passed
+again without retries (`/tmp/migration-sonar-regressions-20261017.log`,
+`/tmp/migration-sonar-electron-20261017.log`). Fresh current-head hosted qualification remains required;
+the first head's passing jobs cannot qualify changed source. No owner app/profile operation occurred.
+
 ## Recurring CI and review gate
 
 `packages/db/test/migrationHistory.test.ts` is part of the default database suite in CI `verify`.
