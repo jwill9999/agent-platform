@@ -1,10 +1,10 @@
 # Reconcile the retained owner's missing Git and Stop schema
 
-**Beads:** `agent-platform-owner-profile-schema-preflight`, P1 OPEN.
+**Beads:** `agent-platform-owner-profile-schema-preflight`, P1 recovery applied; canonical Beads carries closeout status.
 **Blocks:** `agent-platform-local-mvp-stress-review`.
 **Related:** [secure-storage startup repair](agent-platform-desktop-secure-storage-startup.md).
-**Authority:** actual-app preflight and Electron patch are authorized. Original-database repair
-requires a specific owner decision on this bounded proposal; it has not been applied.
+**Authority:** actual-app preflight and Electron patch are authorized. The owner separately approved this exact bounded recovery. It was applied after independent
+executor review; the original proposal and failed preflight remain retained below.
 
 ## Actual failure and evidence
 
@@ -59,5 +59,28 @@ risk in Beads; do not redesign the migrator during this recovery. If schema/hist
 fails or another missing schema appears, stop with the exact finding and preserve the backup.
 
 Acceptance requires actual authorized recovery, unchanged original data, verified ledger/schema,
-integrity and foreign keys, followed by successful actual-app preflight. Current state is OPEN and
-BLOCKED awaiting the specific recovery decision. Paused orchestration and Docker gateway are untouched.
+integrity and foreign keys, followed by successful actual-app preflight. The actual recovery/preflight results are recorded below; no generic migration fix is claimed. Paused orchestration and Docker gateway are untouched.
+
+## Actual authorized result
+
+The owner explicitly approved the two additive migrations. The app/backend was quiescent and its
+ports/database had no open listener/handle. Reviewed executor SHA256
+`38309d0e411b45c391fce273205ba211c1bf1834b00873cac49f6e10a8a3dc34`
+then applied the exact pinned SQL transactionally after fresh private backup and guarded rehearsal.
+Independent review corrected optimized-Python guard removal, no-create database opening and an
+unneeded new verification-JSON write before execution. Original database mutation occurred only
+on the specifically authorized apply. No plaintext key or credential appears in source/output.
+
+Backup retained privately at
+`/Users/letuscode/.codex/owner-app-preflight-20261017/original-l_azzvag.sqlite`.
+All original rows/journal entries were preserved; only the two truthful migration entries were added.
+Integrity is OK, foreign-key violations zero and new table/index definitions match the rehearsal.
+After actual app launches, all24 original non-ledger table rows remain byte-equivalent by read-only
+comparison; Projects16/sessions51/messages478/agents2/models1/encrypted secrets1 remain unchanged.
+
+The real app subsequently starts, records and exports, cleanly quits and restarts with preference and
+old samples retained and new-process periodic samples arriving. See the linked startup/preflight
+record for exact export identity and limits. No hands-on owner trial has occurred.
+
+[Migration history follow-up](agent-platform-desktop-migration-history.md) remains P1 OPEN for the
+unfixed general high-water behavior. This one-time recovery does not establish distribution readiness.

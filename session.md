@@ -1,26 +1,37 @@
-# Actual-app preflight — Electron patch verified, database recovery blocked
+# Actual-app recording, export and restart preflight passed
 
-Owner-authorized preflight on staged `d55f20ed` found two startup blockers before recording.
-The owner approved the official Electron42.4.1 patch and identified the original Make launcher key.
-Exact42.4.1 package/lock pin and native secure-storage regression are implemented locally; native
-post-ready Promise/availability/roundtrip, desktop229unit tests, build/typecheck/lint pass. Initial
-native-script lint failures were repaired without changing runtime behavior. Source review approved
-the patch; original failed42.0.1 evidence is retained. No new feature/staging merge is authorized yet.
+Stop/monitoring remain delivered in staging `d55f20ed`. The owner authorized actual-app preflight,
+then the bounded Electron42.4.1 patch and a separate reviewed one-time database recovery. Exact
+patch/regression source is committed/pushed at `f194f571`; final documentation/PR/check state is in
+canonical Beads. No new merge authority is inferred and the patch is not yet delivered to staging.
 
-The absolute original primary Make key authenticated the normal profile's existing encrypted secret
-without exposing or replacing values. Owner relaunch reached backend, then failed after15.234s:
-`git_delivery_operations` is missing. A later unrecognized migration journal timestamp causes
-Drizzle to skip current0019/0020. Four Git/Stop tables are absent. Original profile integrity/FK
-checks pass and Projects16/sessions51/messages478 remain; about61GiB free exceeds20GiB.
-Only a private backup was rehearsed: exact additive SQL succeeds with unchanged original counts.
+The normal retained profile now opens with its authenticated original Make key. Two startup failures
+were diagnosed before repair: Electron42.0.1 async availability race, then missing Git/Stop tables
+because a later unknown migration journal entry skipped current0019/0020. The reviewed recovery
+retains a private backup and preserves all original rows/history. Source and native checks pass;
+desktop229unit tests/build/typecheck/lint/normalhooks pass. Original failures remain retained.
 
-See [Electron repair](docs/tasks/agent-platform-desktop-secure-storage-startup.md) and
-[specific proposed database recovery](docs/tasks/agent-platform-owner-profile-schema-preflight.md).
-Do not alter original schema/history or create a replacement key/profile without the specific recovery
-decision. Recording, native export and same-profile restart are still BLOCKED/NOT RUN; owner stress
-review stays OPEN. Canonical Beads carries actual review/push/check state. Stop/monitoring remain
-CLOSED and delivered. Docker gateway stays disabled; main/paused PR283 work remains separate.
-Repository documentation is canonical; no external publication requested. Previous handoff follows.
+Actual app controls enabled seven-day recording. Native Save As produced a safe report containing
+five samples across two process identities with30.001-second intervals, zero loss/conflicts and
+resource gaps0. Clean quit/relaunch retained all original three sample IDs and the preference; fresh
+periodic samples arrived after restart. Minimum app-volume free space60.50GiB exceeds20GiB.
+Final Downloads report `agent-platform-monitoring-after-restart-20261017T0157Z.json` is8857bytes,
+SHA256 `2f02b1719f78a7e38eb8c4bd51f8dfb4078772d7f0e6ffdf66deabc3dc8118ee`.
+Independent critique verified its metadata, cadence, process groups and health/coverage limits.
+
+This was idle preflight: no model/provider request or owner stress workload. Zero V1 events correctly
+leave combined coverage incomplete; first-process CPU/event-loop baselines are explicitly unknown.
+The actual app is left open with recording enabled for the bounded local owner trial: disposable
+Project, at most2sessions/20requests/30minutes, one active run per session and no implicit paid spend.
+The owner-trial task stays OPEN; patch PR/hosted delivery is separate from local preflight readiness.
+
+See [startup results](docs/tasks/agent-platform-desktop-secure-storage-startup.md),
+[authorized schema recovery](docs/tasks/agent-platform-owner-profile-schema-preflight.md) and
+[P1 general migration follow-up](docs/tasks/agent-platform-desktop-migration-history.md).
+Global Workspace Files still shows an unexpected error; monitoring works, and the observation is
+retained for trial triage without a speculative cause or repair claim. All24 original user-table rows
+remain identical. Main/paused PR283 work and disabled Docker gateway remain untouched. No new
+external publication. Earlier staged handoff follows unchanged.
 
 <!-- markdownlint-disable MD025 -->
 

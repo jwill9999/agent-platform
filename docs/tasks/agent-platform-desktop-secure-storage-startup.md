@@ -90,7 +90,9 @@ credential coverage. Broad renderer/Docker/disk-I/O monitoring is outside this r
 
 ## Dependencies, delivery and stopping point
 
-Beads owner-trial task hard-depends on this actual startup blocker; discovered-from is informational,
+The owner-trial hard dependency applied while actual startup/preflight was blocked. With that
+preflight now passed, retain a related delivery link rather than a runtime blocker; hosted patch
+qualification and merge remain required for patch delivery. Discovered-from is informational,
 not a hard reverse dependency. Stop/monitoring delivery stays closed and paused orchestration stays
 separate. Estimate one bounded patch/regression pass, then re-evaluate if the historical key is
 unavailable or dependency behavior differs; do not turn preflight into a storage redesign.
@@ -101,12 +103,30 @@ readback/Dolt sync. Owner hands-on stress testing remains a distinct open task.
 
 ## Actual results and handoff
 
-- PASS: supported backend/renderer/desktop builds; about61 GiB free; existing record counts unchanged.
-- FAIL: normal app startup; exact native availability mismatch and delayed initialization reproduced.
-- BLOCKED/NOT RUN: actual recording, native export, same-profile restart and stress readiness;
-  original-key relaunch now reaches backend, but missing Git/Stop tables prevent readiness.
-- IN PROGRESS: exact42.4.1 dependency pin and native startup regression; no production-code timing/security workaround or credential replacement.
-- PASS: read-only original Make-key authentication against the existing encrypted credential; actual owner relaunch reached backend startup, then failed with missing `git_delivery_operations`;
-  [separate P1 schema recovery](agent-platform-owner-profile-schema-preflight.md) blocks recording.
+- PASS: exact Electron42.4.1 pin/lock and native startup regression; immediate Promise and real
+  non-sensitive OS secure-storage roundtrip without a master-key override. Independent source review
+  approved after diagnostic-watchdog and native/owner-key wording corrections.
+- PASS: desktop229unit tests, build/typecheck/lint, explicit formatting/Markdown and normal hooks;
+  push at `f194f571`. Original script lint failures remain retained; no suppressed checks.
+- PASS: read-only original Make-key authentication against the existing encrypted credential.
+- PASS: separately authorized and reviewed owner-profile schema recovery; see linked recovery record.
+- PASS: actual UI seven-day recording, native Save As export, clean quit/relaunch and retained history.
+  Export contains five samples across two process identities, actual30.001-second intervals and
+  zero pending/dropped/conflicting samples. App-volume minimum60.50GiB exceeds20GiB.
+- PASS: original three sample IDs and seven-day preference survive restart; fresh second-process
+  periodic observation arrives. All24 original non-ledger table rows remain identical; six original
+  counts are16/51/478/2/1/1. No credential replacement or provider request occurred.
+- LIMIT: the idle preflight has zero V1 diagnostic events, so combined export coverage is honestly
+  incomplete; resource history has zero gaps/no missing-history flag. Initial per-process CPU/event-loop
+  baselines are explicitly unavailable. This is not an agent/provider workload or capacity result.
+- FOLLOW-UP: global Workspace Files listing shows an unexpected error while monitoring controls
+  work. Retain this observation for owner-trial triage; no cause or repair is claimed.
+- DELIVERY: local preflight supports the bounded owner trial; patch PR/hosted qualification and any
+  merge remain separate. The user trial has not happened and no production readiness is claimed.
 
-Independent critique and later exact source/revision results belong in canonical Beads before sign-off.
+The actual native-saved reports are in Downloads. Final report
+`agent-platform-monitoring-after-restart-20261017T0157Z.json` is8857bytes,
+SHA256 `2f02b1719f78a7e38eb8c4bd51f8dfb4078772d7f0e6ffdf66deabc3dc8118ee`.
+Independent terminal critique verified the exported allowlisted metadata, two process histories,
+actual intervals, health and coverage limits without inspecting user credentials or databases.
+Canonical Beads records later revision/check/PR identities; original failures remain historical evidence.
