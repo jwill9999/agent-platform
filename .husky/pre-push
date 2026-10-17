@@ -1,4 +1,27 @@
 #!/bin/sh
 
-# Keep repository paths and package metadata out of executable shell text.
-exec node "$(dirname "$0")/../scripts/pre-push.mjs"
+# Filter PATH before launching Node or any other executable. Parameter expansion preserves
+# spaces, newlines and metacharacters literally, without globbing or evaluating directory text.
+HOOK_PATH_REST=${PATH-}
+HOOK_PATH=
+while :; do
+  case "$HOOK_PATH_REST" in
+    *:*) HOOK_PATH_ENTRY=${HOOK_PATH_REST%%:*}; HOOK_PATH_REST=${HOOK_PATH_REST#*:}; HOOK_PATH_MORE=1 ;;
+    *) HOOK_PATH_ENTRY=$HOOK_PATH_REST; HOOK_PATH_MORE=0 ;;
+  esac
+  case "$HOOK_PATH_ENTRY" in
+    /*) HOOK_PATH=${HOOK_PATH:+$HOOK_PATH:}$HOOK_PATH_ENTRY ;;
+  esac
+  [ "$HOOK_PATH_MORE" = 1 ] || break
+done
+if [ -z "$HOOK_PATH" ]; then
+  printf '%s\n' '[pre-push] No absolute executable PATH entries; required checks did not complete.' >&2
+  exit 1
+fi
+PATH=$HOOK_PATH
+export PATH
+case "$0" in
+  */*) HOOK_DIRECTORY=${0%/*} ;;
+  *) HOOK_DIRECTORY=. ;;
+esac
+exec node "$HOOK_DIRECTORY/../scripts/pre-push.mjs"

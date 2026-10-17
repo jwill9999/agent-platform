@@ -22,6 +22,23 @@ verified all3 frozen source hashes and reran those controls: APPROVED, no action
 Node/shell syntax, scoped ESLint, formatting and diff checks pass. Fresh exact-head hosted
 qualification remains pending; earlier-source passes are not inherited.
 
+The first hosted repair `06f9c79` failed Sonar: explicit sorting and lower orchestration complexity
+were required, plus fixed executable resolution and a concise environment-name regex. The follow-up
+uses literal fixed command names resolved to absolute executable regular files, skips empty/relative
+PATH entries, preserves Corepack symlink dispatch and fails closed when no candidate qualifies.
+Absolute PATH entries remain developer-trusted configuration; installation immutability is not
+claimed. New controls demonstrate marker execution through empty/relative PATH entries on the prior
+helper (45 passes/2 failures); corrected-source47 controls pass without failures/skips. Existing
+benchmark workload/options/deadlines and Git isolation remain unchanged. That47-control draft was
+rejected by independent review: HOOK-R01 demonstrated current-directory Node execution in the
+wrapper before filtering and through inherited Corepack child PATH. The final wrapper filters PATH
+with shell builtins before any external launch, derives its directory without external dirname,
+and the helper sanitizes every child environment independently. Final54 controls retain49 passes/
+5 failures on the prior source and54 passes/0 failures/cancellations/skips on the correction
+(14.148seconds); all4 unchanged real-Git isolation controls pass in2.20seconds. Frozen source and
+log hashes are in `hook-review/hook-r01-worker-evidence.json`. Final independent source review is
+approved; fresh hosted Sonar/CI remain required, with no suppression or green-check waiver.
+
 Evidence root: `/Users/letuscode/.codex/migration-regression-20261017/`. Earlier original failures and
 results follow unchanged. The historical export503 cause is still unproven; clean subsequent runs
 do not establish its cause. Model compatibility and security package remediation remain separate.

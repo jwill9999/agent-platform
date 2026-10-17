@@ -11,10 +11,21 @@ GitHub Advanced Security review identified command injection through package nam
 branch, `task/desktop-hook-review`, repairs only those active developer-hook boundaries and their
 regressions. Static JSON reads, NUL paths, validated package names and argument-array process calls
 replace command construction; existing test selection, Git-environment isolation, failure propagation
-and fresh benchmark limits remain mandatory. Independent source review is approved;38 hook
-controls and4 unchanged real-Git isolation tests pass without skips. New exact-head checks are
+and fresh benchmark limits remain mandatory. The final54 hook controls and4 unchanged real-Git
+isolation tests pass without skips; final independent source review is approved. New exact-head checks are
 required before the feature/staging merge. The actual source must contain the fix before resolving
 PR347's review thread.
+
+The first repair head `06f9c79` failed Sonar on sort/complexity and executable-resolution findings.
+The follow-up uses explicit lexical sorting, focused orchestration helpers and absolute executable
+resolution. Independent review then found HOOK-R01: the wrapper could launch a current-directory
+Node before filtering PATH, and Corepack children inherited that unsafe PATH. The wrapper now
+filters PATH using shell builtins before launching any executable; the helper independently filters
+PATH for direct invocation and every child. Five new marker controls fail on the prior source
+(49 passes/5 failures), then all54 pass on the correction. Fixed Git/pnpm names preserve normal
+installation/Corepack dispatch. Developer-selected absolute PATH
+entries and their mutable installation files remain trusted; this is not a sandbox or an immutable
+toolchain guarantee. Fresh Sonar and hosted checks are required for the corrected source.
 
 The owner app still uses the earlier checkout and is untouched. Its installed AI SDK4.3.19/OpenAI
 adapter1.3.24 emits `max_tokens` for the configured model; rebuilding unchanged source cannot fix

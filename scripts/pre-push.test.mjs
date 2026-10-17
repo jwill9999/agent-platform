@@ -1,7 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+  chmodSync,
+  symlinkSync,
+  renameSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
@@ -15,9 +25,11 @@ const vitestOptions = ['--maxWorkers=1', '--minWorkers=1', '--no-file-parallelis
 
 function runHook(packages, failure = '', options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'pre-push-measurement-'));
-  const bin = join(root, 'bin');
+  const bin = join(root, options.binName ?? 'bin');
   const calls = join(root, 'calls.jsonl');
   mkdirSync(bin);
+  symlinkSync(process.execPath, join(bin, 'node'));
+  symlinkSync('/usr/bin/dirname', join(bin, 'dirname'));
   try {
     for (const [path, name] of packages) {
       mkdirSync(join(root, path), { recursive: true });
@@ -31,8 +43,9 @@ function runHook(packages, failure = '', options = {}) {
     // Only discovery is stubbed; execute the real hook through /bin/sh and a recording pnpm.
     writeFileSync(
       join(bin, 'git'),
-      `#!/usr/bin/env node
+      `#!${options.gitAbsoluteInterpreter ? process.execPath : '/usr/bin/env node'}
 const args = process.argv.slice(2);
+if (process.env.GIT_DIR !== '/fixture/parent/git-dir' || process.env.GIT_WORK_TREE !== '/fixture/parent/tree' || process.env.GIT_INDEX_FILE !== '/fixture/parent/index') process.exit(96);
 if (args.slice(0,2).join(' ') === process.env.HOOK_GIT_FAILURE) process.exit(94);
 if (args[0] === 'rev-parse' && args[1] === '--abbrev-ref') console.log(process.env.HOOK_REMOTE || 'origin/fixture');
 else if (args[0] === 'rev-parse' && args[1] === '--local-env-vars') console.log('GIT_DIR\\nGIT_WORK_TREE\\nGIT_INDEX_FILE');
@@ -51,7 +64,7 @@ else if (args[0] === 'diff' && args[1] === '--name-only') {
         : `#!/usr/bin/env node
 const { appendFileSync } = require('node:fs');
 const args = process.argv.slice(2);
-appendFileSync(process.env.HOOK_CALLS, JSON.stringify({args,gitDir:process.env.GIT_DIR ?? null,gitWorkTree:process.env.GIT_WORK_TREE ?? null,gitIndex:process.env.GIT_INDEX_FILE ?? null})+'\\n');
+appendFileSync(process.env.HOOK_CALLS, JSON.stringify({args,path:process.env.PATH,launchedAs:process.argv[1],gitDir:process.env.GIT_DIR ?? null,gitWorkTree:process.env.GIT_WORK_TREE ?? null,gitIndex:process.env.GIT_INDEX_FILE ?? null})+'\\n');
 if (process.env.HOOK_PNPM_SIGNAL) process.kill(process.pid, 'SIGTERM');
 const stage = args[0] === 'deps:check-cycles' ? 'cycles'
   : args.includes('exec') ? 'benchmark'
@@ -62,10 +75,42 @@ process.exit(stage === process.env.HOOK_FAILURE ? 23 : 0);
 `,
       { mode: 0o755 },
     );
-    const result = spawnSync('/bin/sh', [hook], {
+    const malicious = `#!${process.execPath}
+require('node:fs').writeFileSync('injection-marker','yes');
+`;
+    const shadow = join(root, 'shadow');
+    mkdirSync(shadow);
+    for (const name of ['git', 'pnpm']) {
+      writeFileSync(join(shadow, name), malicious, { mode: 0o755 });
+      if (options.pathPrefix === 'empty')
+        writeFileSync(join(root, name), malicious, { mode: 0o755 });
+    }
+    if (options.pnpmEntry === 'missing') rmSync(join(bin, 'pnpm'));
+    if (options.pnpmEntry === 'non-executable') chmodSync(join(bin, 'pnpm'), 0o644);
+    if (options.pnpmEntry === 'directory') {
+      rmSync(join(bin, 'pnpm'));
+      mkdirSync(join(bin, 'pnpm'));
+    }
+    if (options.pnpmSymlink) {
+      renameSync(join(bin, 'pnpm'), join(bin, 'manager-shim'));
+      symlinkSync('manager-shim', join(bin, 'pnpm'));
+    }
+    if (options.cwdCommand) {
+      const output =
+        options.cwdCommand === 'dirname' ? `console.log(${JSON.stringify(dirname(hook))});` : '';
+      writeFileSync(join(root, options.cwdCommand), `${malicious}${output}\n`, { mode: 0o755 });
+    }
+    const prefix =
+      options.pathPrefix === 'relative' ? 'shadow:.:' : options.pathPrefix === 'empty' ? ':' : '';
+    const path = options.strictPath ? bin : `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`;
+    const entry = options.direct ? process.execPath : '/bin/sh';
+    const entryArgs = options.direct ? [join(dirname(hook), '../scripts/pre-push.mjs')] : [hook];
+    const result = spawnSync(entry, entryArgs, {
       cwd: root,
       env: {
-        PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
+        PATH: options.noAbsolutePath
+          ? '.'
+          : `${options.cwdCommand ? '.:' : ''}${prefix}${path}${options.shadowSuffix ? `:${shadow}` : ''}`,
         GIT_DIR: '/fixture/parent/git-dir',
         GIT_WORK_TREE: '/fixture/parent/tree',
         GIT_INDEX_FILE: '/fixture/parent/index',
@@ -96,6 +141,8 @@ process.exit(stage === process.env.HOOK_FAILURE ? 23 : 0);
       status: result.status,
       args: invocations.map(({ args }) => args),
       marker: existsSync(join(root, 'injection-marker')),
+      launchedAs: invocations.map(({ launchedAs }) => launchedAs),
+      childPaths: invocations.map(({ path }) => path),
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -285,4 +332,110 @@ test('a signalled required command stops the hook', () => {
   const result = runHook([api], '', { signal: true });
   assert.equal(result.status, 1);
   assert.deepEqual(result.args, [['deps:check-cycles']]);
+});
+
+for (const pathPrefix of ['relative', 'empty']) {
+  test(`${pathPrefix} PATH entries cannot launch working-directory commands`, () => {
+    const result = runHook([api], '', { pathPrefix, strictPath: true });
+    assert.equal(result.marker, false);
+    assert.equal(result.status, 0);
+    assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+  });
+}
+
+test('absolute executable directories with spaces preserve every required argument', () => {
+  const result = runHook([api], '', { binName: 'tools with spaces', strictPath: true });
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+});
+
+for (const pnpmEntry of ['missing', 'non-executable', 'directory']) {
+  test(`${pnpmEntry} pnpm cannot silently qualify an affected package`, () => {
+    const result = runHook([api], '', { pnpmEntry, strictPath: true });
+    assert.notEqual(result.status, 0);
+    assert.deepEqual(result.args, []);
+  });
+}
+
+test('absolute symlink executable keeps the pnpm dispatch basename', () => {
+  const result = runHook([api], '', { pnpmSymlink: true, strictPath: true });
+  assert.equal(result.status, 0);
+  assert.ok(result.launchedAs.every((path) => path.endsWith('/pnpm')));
+  assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+});
+
+test('resolver preserves the first absolute executable match', () => {
+  const result = runHook([api], '', { shadowSuffix: true, strictPath: true });
+  assert.equal(result.marker, false);
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+});
+
+test('package-directory comparison preserves default UTF-16 lexical ordering', () => {
+  const result = runHook([
+    ['packages/ä', 'unicode'],
+    ['packages/z', 'zed'],
+    ['packages/A', 'upper'],
+  ]);
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args[1], [
+    '--filter',
+    'upper',
+    '--filter',
+    'zed',
+    '--filter',
+    'unicode',
+    'run',
+    'build',
+  ]);
+});
+
+for (const cwdCommand of ['node', 'dirname']) {
+  test(`wrapper never launches cwd ${cwdCommand} before sanitizing PATH`, () => {
+    const result = runHook([api], '', { cwdCommand, strictPath: true });
+    assert.equal(result.marker, false);
+    assert.equal(result.status, 0);
+    assert.ok(
+      result.childPaths.every((path) => path.split(':').every((entry) => entry.startsWith('/'))),
+    );
+    assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+  });
+}
+
+test('direct helper sanitizes Git shebang interpreter lookup', () => {
+  const result = runHook([api], '', { cwdCommand: 'node', strictPath: true, direct: true });
+  assert.equal(result.marker, false);
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+});
+
+test('direct helper sanitizes Corepack-style pnpm env-node interpreter lookup', () => {
+  const result = runHook([api], '', {
+    cwdCommand: 'node',
+    strictPath: true,
+    direct: true,
+    gitAbsoluteInterpreter: true,
+  });
+  assert.equal(result.marker, false);
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
+});
+
+for (const direct of [false, true]) {
+  test(`${direct ? 'direct helper' : 'wrapper'} rejects PATH without any absolute entry`, () => {
+    const result = runHook([api], '', { cwdCommand: 'node', noAbsolutePath: true, direct });
+    assert.equal(result.marker, false);
+    assert.notEqual(result.status, 0);
+    assert.deepEqual(result.args, []);
+  });
+}
+
+test('absolute PATH metacharacters and newlines remain literal directory bytes', () => {
+  const result = runHook([api], '', {
+    binName: 'tools ;$(touch injection-marker)\n*',
+    strictPath: true,
+  });
+  assert.equal(result.marker, false);
+  assert.equal(result.status, 0);
+  assert.deepEqual(result.args.slice(-2), [expectedApiSuite, expectedBenchmark]);
 });
