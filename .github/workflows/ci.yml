@@ -444,6 +444,12 @@ jobs:
       - name: Install Electron binary
         run: node scripts/install-electron-binary.mjs
 
+      - name: Verify native macOS secure-storage startup
+        timeout-minutes: 2
+        # Fixture keys bypass Keychain initialization in the main Electron journeys.
+        # This independent native check must exercise the OS API without that override.
+        run: env -u SECRETS_MASTER_KEY pnpm --filter @agent-platform/desktop test:native:secret-storage
+
       - name: Run macOS VM host preflight
         run: pnpm --filter @agent-platform/desktop native:vm:host-check -- --json
 

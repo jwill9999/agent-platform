@@ -1,10 +1,11 @@
 # Repair secure-storage startup before the owner trial
 
-**Beads:** `agent-platform-desktop-secure-storage-startup`, P1 OPEN.
+**Beads:** `agent-platform-desktop-secure-storage-startup`, P1 IN_PROGRESS.
 **Discovered during:** [owner preflight](agent-platform-local-mvp-stress-review.md).
 **Source:** protected staging `d55f20ed034ec79ebe60af3a2f734699fe7ba264`.
 **Branches:** `feature/desktop-secure-storage-startup` →
-`task/desktop-secure-storage-startup-plan`; existing verified staging worktree reused.
+`task/desktop-secure-storage-startup-plan` → `task/desktop-secure-storage-startup`;
+existing verified staging worktree reused, delivery PR344 targets the feature.
 **Authority:** owner requested actual-app recording/export/restart preflight, then explicitly approved
 the bounded Electron42.4.1 patch and regression checks. Implementation is authorized; no new merge
 grant or credential replacement is implied. The original failed preflight remains recorded below.
@@ -130,3 +131,27 @@ SHA256 `2f02b1719f78a7e38eb8c4bd51f8dfb4078772d7f0e6ffdf66deabc3dc8118ee`.
 Independent terminal critique verified the exported allowlisted metadata, two process histories,
 actual intervals, health and coverage limits without inspecting user credentials or databases.
 Canonical Beads records later revision/check/PR identities; original failures remain historical evidence.
+
+## Why these blockers escaped and the recurring controls
+
+The owner requested an evidence-backed escape analysis after the actual-app preflight.
+
+| Gap                                   | Existing coverage and why it missed this case                                                                                                                                                                                                                                                                                                                                                                   | Recurring control and current state                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native Keychain initialization        | `test/secretStorage.test.ts` uses a mock protector. `e2e/support/contextTokenFixture.ts` seeds a fresh database and supplies a fixture master key; monitoring reuses that fixture. Packaged VM journeys also supply a fixture key. `ensureDesktopSecretsMasterKey` returns the environment key before consulting native availability. Real VM execution therefore did not exercise the missing OS API boundary. | The real native regression has passed locally. PR344 now wires it after Electron installation in the existing macOS staging job, with the environment override removed, no retries/fallback and normal failure propagation. It runs for each staging-targeted PR; feature-targeted qualification skips that job. The new hosted step has not yet qualified and is not yet active in staging. |
+| Inconsistent retained-profile history | Main Electron journeys seed current schemas. Existing Git delivery coverage does upgrade a retained v18 schema, preserve records and repeat recovery; Stop tests cover ordinary legacy approvals and additive rollback. None of those cases inserts a later unrecognized migration entry while required earlier tables are absent. Drizzle's timestamp high-water behavior skipped those tables.                | Explicit synthetic inconsistent-history, complete-schema, preservation, reopen, rollback and actual desktop readiness cases are now required by P1 `agent-platform-desktop-migration-history`. They are planned, not implemented or passing. Run them through the default database and Electron CI suites before that task closes.                                                           |
+
+The upstream native bug and missing database tables were runtime causes. The test escape was a
+coverage-boundary gap: fixture success was interpreted more broadly than the boundary exercised.
+It was not caused by fewer test counts or proven connection slowness. The earlier later-journal
+entry's origin remains unknown. Keep this factual distinction; do not invent who introduced it.
+
+The owner-profile preflight occurred only after integration, which left native initialization and
+that retained-profile shape unverified until the owner was about to test. For future desktop/runtime
+changes, run native OS and synthetic retained-profile checks before staging promotion, then the
+actual-app recording/export/restart preflight before each owner test session. Do not run recurring
+CI tests against the owner's real profile, credentials or database.
+
+This adds a workflow check and tracking/verification requirements, not a branch-protection change,
+new scheduled automation, generic migration repair or renewed merge authority. Independent critique
+must review the new workflow and this analysis; hosted execution remains separate evidence.

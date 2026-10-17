@@ -1,5 +1,15 @@
 # Actual-app recording, export and restart preflight passed
 
+## Startup regression escape analysis follow-up
+
+Owner asked why startup blockers escaped. Source review confirms fixture master keys bypassed native
+Keychain initialization; ordinary retained-schema upgrades were covered, but anomalous future journal
+history with missing earlier tables was not. PR344 adds the existing native check to the macOS staging
+workflow; it is not yet merged/hosted-qualified. P1 migration-history now requires six synthetic upgrade/
+readiness/rollback regressions in default database/Electron CI; these remain planned, not implemented.
+See the linked startup and migration task specs below. No owner-app restart, profile mutation, new
+provider call, protection-setting change or scheduled automation is part of this follow-up.
+
 Stop/monitoring remain delivered in staging `d55f20ed`. The owner authorized actual-app preflight,
 then the bounded Electron42.4.1 patch and a separate reviewed one-time database recovery. Exact
 patch/regression source is committed/pushed at `f194f571`; final documentation/PR/check state is in
