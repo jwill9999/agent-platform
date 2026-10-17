@@ -1,3 +1,25 @@
+# Actual-app preflight blocked — secure-storage startup
+
+The owner merged PR343 into staging at `d55f20ed034ec79ebe60af3a2f734699fe7ba264`; its tree exactly
+matches reviewed source, all14 executed checks passed and delivered branches were recovery-protected
+and cleaned. Stop and monitoring are CLOSED/synced. The owner trial remains OPEN.
+
+Requested actual-app recording/export/restart preflight found a normal startup failure before a
+window/backend opens. Installed Electron42.0.1 async secure storage is initially unavailable while
+sync Keychain is available; a bounded native probe sees async availability true111 ms later. The
+official42.4.1 patch fixes this upstream initialization bug. See
+[bounded blocker/repair proposal](docs/tasks/agent-platform-desktop-secure-storage-startup.md).
+No repair dependency or production-code change has been applied. The normal profile's original
+16 Projects/51 sessions/478 messages remain intact; its missing persisted master-key metadata and
+existing encrypted-secret compatibility require attention before any new key is created. About61 GiB
+is free. Recording/export/restart remain blocked; do not invite the owner to stress test yet.
+
+Docker gateway stays disabled. Main and paused PR283/orchestration remain separate. No new external
+publication, paid calls or credential reset is authorized by this preflight. Earlier source handoff
+follows unchanged; canonical Beads carries current status and independent review.
+
+<!-- markdownlint-disable MD025 -->
+
 # Stop and durable monitoring — protected integration checkpoint
 
 Protected [PR336](https://github.com/jwill9999/agent-platform/pull/336) delivered the opt-in
