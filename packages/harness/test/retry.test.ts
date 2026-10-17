@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { RunExecutionControl } from '../src/runControl.js';
 import {
   withRetry,
   isRetryableLlmError,
@@ -42,6 +43,65 @@ function nodeError(code: string): Error {
 // ---------------------------------------------------------------------------
 
 describe('withRetry', () => {
+  it.each([0, -1, Number.NaN])(
+    'preserves no-attempt rejection for maxAttempts=%s',
+    async (maxAttempts) => {
+      const fn = vi.fn();
+      const onRetry = vi.fn();
+      await expect(withRetry(fn, { ...alwaysRetry, maxAttempts }, onRetry)).rejects.toBeUndefined();
+      expect(fn).not.toHaveBeenCalled();
+      expect(onRetry).not.toHaveBeenCalled();
+    },
+  );
+
+  it('settles each original attempt before retry notification and the next admission', async () => {
+    const ledger: string[] = [];
+    let rejectFirst!: (error: Error) => void;
+    const first = new Promise<string>((_resolve, reject) => {
+      rejectFirst = reject;
+    });
+    let attempts = 0;
+    let active = 0;
+    let maximumActive = 0;
+    const runControl: RunExecutionControl = {
+      assertActive() {
+        ledger.push('admission');
+      },
+      invoke: async (_kind, action) => action(),
+    };
+    const result = withRetry(
+      () => {
+        const attempt = ++attempts;
+        ledger.push(`attempt:${attempt}`);
+        maximumActive = Math.max(maximumActive, ++active);
+        return (attempt === 1 ? first : Promise.resolve('done')).finally(() => {
+          active--;
+          ledger.push(`settled:${attempt}`);
+        });
+      },
+      alwaysRetry,
+      (attempt) => {
+        ledger.push(`retry:${attempt}`);
+      },
+      { runControl },
+    );
+    await Promise.resolve();
+    expect(attempts).toBe(1);
+    rejectFirst(new Error('retryable'));
+    expect(await result).toBe('done');
+    expect(maximumActive).toBe(1);
+    expect(ledger).toEqual([
+      'admission',
+      'attempt:1',
+      'settled:1',
+      'admission',
+      'retry:1',
+      'admission',
+      'attempt:2',
+      'settled:2',
+    ]);
+  });
+
   it('returns result on first attempt when fn succeeds', async () => {
     const result = await withRetry(() => Promise.resolve(42), alwaysRetry);
     expect(result).toBe(42);

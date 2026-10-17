@@ -11,6 +11,7 @@ import {
 } from 'react';
 import {
   Send,
+  Square,
   Loader2,
   Paperclip,
   X,
@@ -30,6 +31,9 @@ import { ChatModelSelector } from './chat-model-selector';
 interface ChatInputProps {
   onSend: (text: string) => boolean;
   isLoading: boolean;
+  onStop?: () => void;
+  stopPending?: boolean;
+  onRetryRunControl?: () => void;
   placeholder?: string;
   /** When false, sending is blocked (e.g. session not ready yet). */
   canSend?: boolean;
@@ -53,6 +57,9 @@ interface ChatInputProps {
 
 export function ChatInput({
   onSend,
+  onStop,
+  stopPending = false,
+  onRetryRunControl,
   isLoading,
   placeholder,
   canSend = true,
@@ -263,6 +270,18 @@ export function ChatInput({
               rows={1}
               disabled={isLoading}
             />
+            {onStop && (
+              <button
+                type="button"
+                aria-label="Stop run"
+                onClick={onStop}
+                disabled={stopPending}
+                className="flex-shrink-0 h-9 px-3 rounded-xl border border-border flex items-center gap-2 hover:bg-secondary disabled:opacity-50"
+              >
+                <Square className="h-4 w-4" aria-hidden />
+                {stopPending ? 'Requesting Stop…' : 'Stop'}
+              </button>
+            )}
             <button
               type="submit"
               aria-label="Send message"
@@ -316,6 +335,13 @@ export function ChatInput({
               ? 'Press Enter to send, Shift+Enter for new line'
               : 'Waiting for chat session…')}
         </output>
+        {onRetryRunControl && (
+          <div className="text-center mt-2">
+            <button type="button" onClick={onRetryRunControl} className="text-sm underline">
+              Retry run status
+            </button>
+          </div>
+        )}
         {onRetryHistory && (
           <div className="text-center mt-2">
             <button type="button" onClick={onRetryHistory} className="text-sm underline">

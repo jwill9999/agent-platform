@@ -368,22 +368,26 @@ export const toolExecutions = sqliteTable('tool_executions', {
 });
 
 /** Durable human approval requests for tool execution. */
-export const approvalRequests = sqliteTable('approval_requests', {
-  id: text('id').primaryKey(),
-  sessionId: text('session_id').notNull(),
-  runId: text('run_id').notNull(),
-  agentId: text('agent_id').notNull(),
-  toolName: text('tool_name').notNull(),
-  argsJson: text('args_json').notNull(),
-  executionPayloadJson: text('execution_payload_json'),
-  riskTier: text('risk_tier').notNull(),
-  status: text('status').notNull().default('pending'),
-  createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
-  decidedAtMs: integer('decided_at_ms', { mode: 'number' }),
-  resumedAtMs: integer('resumed_at_ms', { mode: 'number' }),
-  expiresAtMs: integer('expires_at_ms', { mode: 'number' }),
-  decisionReason: text('decision_reason'),
-});
+export const approvalRequests = sqliteTable(
+  'approval_requests',
+  {
+    id: text('id').primaryKey(),
+    sessionId: text('session_id').notNull(),
+    runId: text('run_id').notNull(),
+    agentId: text('agent_id').notNull(),
+    toolName: text('tool_name').notNull(),
+    argsJson: text('args_json').notNull(),
+    executionPayloadJson: text('execution_payload_json'),
+    riskTier: text('risk_tier').notNull(),
+    status: text('status').notNull().default('pending'),
+    createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+    decidedAtMs: integer('decided_at_ms', { mode: 'number' }),
+    resumedAtMs: integer('resumed_at_ms', { mode: 'number' }),
+    expiresAtMs: integer('expires_at_ms', { mode: 'number' }),
+    decisionReason: text('decision_reason'),
+  },
+  (t) => ({ runIdx: index('approval_requests_run_idx').on(t.runId) }),
+);
 
 /** Scoped long-term memory records. Prompt retrieval is intentionally added in later tasks. */
 export const memories = sqliteTable(
@@ -493,4 +497,56 @@ export const gitDeliveryOperations = sqliteTable(
       .on(table.repositoryRoot)
       .where(sql`${table.state} = 'executing'`),
   }),
+);
+
+/** Mandatory shared harness authority, independent of best-effort diagnostics. */
+export const controlledRuns = sqliteTable(
+  'controlled_runs',
+  {
+    id: text('id').primaryKey(),
+    sessionId: text('session_id').notNull(),
+    projectId: text('project_id'),
+    processInstanceId: text('process_instance_id').notNull(),
+    state: text('state').notNull(),
+    version: integer('version').notNull().default(1),
+    createdAtMs: integer('created_at_ms').notNull(),
+    updatedAtMs: integer('updated_at_ms').notNull(),
+    stopRequestedAtMs: integer('stop_requested_at_ms'),
+    stopAcknowledgedAtMs: integer('stop_acknowledged_at_ms'),
+    settledAtMs: integer('settled_at_ms'),
+    reason: text('reason').notNull().default('none'),
+  },
+  (t) => ({
+    activeSessionIdx: uniqueIndex('controlled_runs_active_session_idx')
+      .on(t.sessionId)
+      .where(sql`${t.state} IN ('running', 'waiting_for_approval', 'stop_requested')`),
+    sessionIdx: index('controlled_runs_session_idx').on(t.sessionId, t.createdAtMs),
+  }),
+);
+export const runExecutions = sqliteTable(
+  'run_executions',
+  {
+    executionId: text('execution_id').primaryKey(),
+    runId: text('run_id')
+      .notNull()
+      .references(() => controlledRuns.id, { onDelete: 'cascade' }),
+  },
+  (t) => ({ runIdx: index('run_executions_run_idx').on(t.runId) }),
+);
+export const runAttempts = sqliteTable(
+  'run_attempts',
+  {
+    id: text('id').primaryKey(),
+    runId: text('run_id')
+      .notNull()
+      .references(() => controlledRuns.id, { onDelete: 'cascade' }),
+    executionId: text('execution_id')
+      .notNull()
+      .references(() => runExecutions.executionId),
+    kind: text('kind').notNull(),
+    outcome: text('outcome').notNull().default('running'),
+    admittedAtMs: integer('admitted_at_ms').notNull(),
+    settledAtMs: integer('settled_at_ms'),
+  },
+  (t) => ({ runIdx: index('run_attempts_run_idx').on(t.runId) }),
 );

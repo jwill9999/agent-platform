@@ -3,6 +3,22 @@ import { describe, expect, it } from 'vitest';
 import { createInProcessSessionLock } from '../src/infrastructure/http/sessionLock.js';
 
 describe('createInProcessSessionLock', () => {
+  it('reports waiting callers separately from session keys and clears timeout/settlement observations', async () => {
+    const lock = createInProcessSessionLock();
+    const release = await lock.acquire('busy');
+    const releaseOther = await lock.acquire('other');
+    const queued = lock.acquire('busy');
+    const expired = lock.acquire('busy', 10).catch(() => undefined);
+    expect(lock.activeCount).toBe(2);
+    expect(lock.waitingCount).toBe(2);
+    await expired;
+    expect(lock.waitingCount).toBe(1);
+    release();
+    const releaseQueued = await queued;
+    expect(lock.waitingCount).toBe(0);
+    releaseQueued();
+    releaseOther();
+  });
   it('acquire resolves immediately when session is idle', async () => {
     const lock = createInProcessSessionLock();
     const release = await lock.acquire('s1');

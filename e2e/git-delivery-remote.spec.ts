@@ -14,7 +14,13 @@ test('Docker Project reviews publishing and recovers a lost PR response without 
   // At most two real one-minute rate-limit windows, plus bounded fixture/journey work.
   test.setTimeout(180_000);
   const pace = async (minimum: number) => {
-    const response = await request.get(`${apiURL}/v1/settings`);
+    const rendererOrigin = page.url().startsWith('http')
+      ? new URL(page.url()).origin
+      : new URL(testInfo.project.use.baseURL ?? 'http://127.0.0.1:3001').origin;
+    // Probe the actual renderer/BFF path, not the direct fixture setup bucket.
+    const budgetUrl = `${rendererOrigin}/api/v1/settings`;
+    const response = await page.request.get(budgetUrl);
+    expect([200, 429]).toContain(response.status());
     const header = response.headers()['ratelimit'];
     const remaining = Number(header?.match(/remaining=(\d+)/)?.[1]);
     const reset = Number(header?.match(/reset=(\d+)/)?.[1]);
@@ -23,10 +29,31 @@ test('Docker Project reviews publishing and recovers a lost PR response without 
       const waitMs = reset * 1000 + 100;
       expect(waitMs).toBeLessThanOrEqual(61_000);
       await testInfo.attach('request-budget-pacing', {
-        body: JSON.stringify({ remaining, waitMs }),
+        body: JSON.stringify({
+          url: response.url(),
+          rendererOrigin,
+          transport: 'browser-context request through renderer BFF',
+          status: response.status(),
+          rateHeader: header,
+          remaining,
+          waitMs,
+        }),
         contentType: 'application/json',
       });
       await delay(waitMs);
+      const recovered = await page.request.get(budgetUrl);
+      expect(recovered.ok()).toBe(true);
+      await testInfo.attach('request-budget-recovered', {
+        body: JSON.stringify({
+          url: recovered.url(),
+          status: recovered.status(),
+          rateHeader: recovered.headers()['ratelimit'],
+        }),
+        contentType: 'application/json',
+      });
+      expect(
+        Number(recovered.headers()['ratelimit']?.match(/remaining=(\d+)/)?.[1]),
+      ).toBeGreaterThanOrEqual(minimum);
     }
   };
   await pace(85);

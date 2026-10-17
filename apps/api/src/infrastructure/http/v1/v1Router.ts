@@ -1,4 +1,4 @@
-import { diagnosticRetry } from '../../diagnostics/observations.js';
+import { diagnosticRetry, observeDiagnosticRunControl } from '../../diagnostics/observations.js';
 import type { DrizzleDb } from '@agent-platform/db';
 import { loadSettings } from '@agent-platform/db';
 import {
@@ -26,6 +26,8 @@ import { createToolExecutionsRouter } from './toolExecutionsRouter.js';
 import { createWorkspaceRouter } from './workspaceRouter.js';
 import { createDynamicRateLimiter } from '../dynamicRateLimiter.js';
 import { createInProcessSessionLock } from '../sessionLock.js';
+import { getRunControlService } from '../../../application/runControl/service.js';
+import { createRunControlRouter } from './runControlRouter.js';
 
 export type V1RouterOptions = {
   chat?: Pick<
@@ -78,6 +80,10 @@ export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Ro
   router.use('/tools', createToolsRouter(db));
   router.use('/mcp-servers', createMcpServersRouter(db));
   router.use('/agents', createAgentsRouter(db));
+  router.use(
+    '/sessions',
+    createRunControlRouter(db, getRunControlService(db, observeDiagnosticRunControl)),
+  );
   router.use(
     '/sessions',
     createSessionsRouter(db, {

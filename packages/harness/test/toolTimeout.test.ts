@@ -72,22 +72,22 @@ describe('withToolTimeout', () => {
 
   it('throws immediately when parentSignal is already aborted', async () => {
     const controller = new AbortController();
-    controller.abort('pre-aborted');
+    const reason = new DOMException('Disconnected', 'AbortError');
+    controller.abort(reason);
 
     await expect(
       withToolTimeout(() => Promise.resolve('ok'), 5_000, 'tool', controller.signal),
-    ).rejects.toThrow(ToolTimeoutError);
+    ).rejects.toBe(reason);
   });
 
   it('aborts when parent signal fires mid-execution', async () => {
     const controller = new AbortController();
     const slow = () => new Promise<string>((resolve) => setTimeout(() => resolve('late'), 5_000));
 
-    setTimeout(() => controller.abort('parent-abort'), 20);
+    const reason = new DOMException('Disconnected', 'AbortError');
+    setTimeout(() => controller.abort(reason), 20);
 
-    await expect(withToolTimeout(slow, 10_000, 'tool', controller.signal)).rejects.toThrow(
-      ToolTimeoutError,
-    );
+    await expect(withToolTimeout(slow, 10_000, 'tool', controller.signal)).rejects.toBe(reason);
   });
 
   it('propagates non-timeout errors as-is', async () => {

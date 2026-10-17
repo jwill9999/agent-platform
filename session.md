@@ -1,3 +1,387 @@
+# Stop and durable monitoring — protected integration checkpoint
+
+Protected [PR336](https://github.com/jwill9999/agent-platform/pull/336) delivered the opt-in
+publication policy to staging at `a46407b5dab44fed4894268a401179d83275238d`. Its tree
+`5a6f115e59e092f92b9ad7f5783b543a547631bb` equals the reviewed source. All 15 executed checks
+passed, including two completed full security scans, fresh CodeQL/Sonar and 19 actual packaged VM
+tests; all four original review threads are resolved. No bypass or main promotion occurred.
+
+Stop PR334 and monitoring PR339/PR340 are feature-delivered. PR340 merged at
+`8836b3acbb05c3611693da6c63bec7afe80af917`, with its tree equal to reviewed `4d0d33d4` and all nine
+executed feature checks successful. The owner authorized this monitoring feature's protected staging
+integration once every current-head check and review finding clears, followed by cleanup of delivered
+branches with recovery protection. The reconciliation adopts qualified staging and preserves the reviewed monitoring runtime.
+Its bounded test-only correction checks the persistent Project header after conversation restoration,
+rather than an empty-state heading removed by successful restoration; workflow and product behavior
+remain unchanged.
+
+This handoff reconciles actual staging `a46407b5` with monitoring `f13fc391`. Actual later
+source/PR/run/merge identities and delivery state are recorded in canonical Beads
+`agent-platform-local-diagnostics-monitoring` and PR metadata. This source checkpoint does not claim
+that the new integration's checks, staging delivery or owner trial have already completed. It must
+pass its own full security/CodeQL/quality, browser/Electron, actual packaged VM and review gates.
+
+PR342 qualification exposed one Electron first-attempt failure despite a successful retry. The
+retained screenshot shows the correct Project and restored history; source inspection confirms the
+old heading exists only while messages are empty. A controlled real Electron probe reproduces the
+old assertion failure after history restoration. The corrected scenario keeps the existing history
+and header deadlines and all backend/file-effect checks. Actual corrected test results, source review
+and fresh hosted qualification are recorded in Beads and the results record; the earlier retry does
+not establish a clean original pass. No application or monitoring runtime repair is claimed.
+
+Repository documentation is canonical. External publication, mirrors and readbacks require an
+explicit owner request covering the destination and documents. Historical requirements provide no
+standing permission; existing pages and evidence remain retained without new publication artifacts.
+Docker gateway remains disabled. Main, PR283/paused orchestration and dirty or unrelated work stay
+separate. Owner stress testing retains its own actual app/recording/export/restart/disk preflight,
+bounded workload and later stored-evidence review; staging delivery alone does not close that task.
+
+## Preserved source histories
+
+The complete earlier sources reconstruct from their exact unique prefixes plus the shared historical
+body stored once. Their old pending states and publication requirements are historical. Formatting
+preservation directives below do not exclude any file or content from security analysis.
+
+- Monitoring `f13fc39162e2e4f0db35c5aa1d75d787cc6fdfed`: 24055 prefix bytes/SHA256 `297e31de9a764046a29b8432721f3227c1777d78918db473f1004799935bb920`;
+  complete source 446822 bytes/SHA256 `e0328b8c7e971021766557ad26b73dd38d775d7c35992c596c0f1e3a52d1c453`.
+- Staging `a46407b5dab44fed4894268a401179d83275238d`: 14592 prefix bytes/SHA256 `e3fc25dd6b5c7d34d00d30290629a563660372a17a96aa0c6a9bf92ad79864bc`;
+  complete source 437359 bytes/SHA256 `acc6d3870652a91139abd2fb15bfb4c261d2be47dffc10a3b8bf3e4f67cfd123`.
+- Common `cf5f04524c25c29635b0d84bda4e76282f28ddcb` body: 422767 bytes/SHA256 `7d49c0a28f75fbd2ebfefc5e6665290fca4524010133164463e392ef2df60f84`.
+
+<!-- markdownlint-disable MD024 MD025 -->
+
+<!-- prettier-ignore-start -->
+
+## Archived monitoring prefix at f13fc391
+
+# Current handoff — Stop and monitoring staging integration
+
+PR340 merged into `feature/local-diagnostics-monitoring` at
+`8836b3acbb05c3611693da6c63bec7afe80af917`, tree `0e8676755f3973c0cb26e735fcccb37a338366de`,
+exactly matching reviewed `4d0d33d4`. All nine executed checks passed, including 68 Electron tests;
+Sonar is OK with zero open issues and there are no unresolved review threads or blocking reviews.
+The owner authorized protected staging delivery after all current-head checks and findings clear.
+
+The current task is reconciling the qualified staging handoff and publication policy before that
+promotion. Actual later source, PR/run identities, gates and merge state belong in canonical Beads
+`agent-platform-local-diagnostics-monitoring` and PR metadata. This checkpoint does not claim future
+protected qualification, staging delivery, monitoring closure or owner stress-test readiness.
+
+Repository documentation is canonical. External publication, mirrors and readbacks require an
+explicit owner request covering the destination and documents; old requirements are historical.
+Existing pages and evidence remain retained; no new external publication or generated publication
+artifacts are requested. Docker gateway remains disabled. Main, paused PR283/orchestration and dirty
+or unrelated work stay separate. The owner trial remains bounded by its own recording/app/disk
+preflight and stored-evidence review.
+
+## Preserved historical monitoring checkpoint
+
+The complete previous source follows unchanged. Its old pending states, staging refs and publication
+requirements are historical and do not override the current handoff or owner authority.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current session — monitoring fixture qualification
+
+Stop [PR334](https://github.com/jwill9999/agent-platform/pull/334) merged under the owner's explicit
+conditional grant into `feature/project-chat-stop` at `a5d17683961236f9cf089030be51b813845d85da`.
+Its tree matches reviewed `e1713628`; all nine executed checks passed with no unresolved findings.
+Stop is CLOSED/read back/synced. This is feature delivery, not staging promotion.
+
+[Monitoring](docs/tasks/agent-platform-local-diagnostics-monitoring.md) remains IN_PROGRESS pending
+final documentation delivery and publication. [PR339](https://github.com/jwill9999/agent-platform/pull/339)
+merged into `feature/local-diagnostics-monitoring` at
+`ce3624dfac8c364ac447e75f9a740eaf31a5771b`; its tree exactly matches reviewed/tested7a7 below.
+This merge was observed after the independent terminal review; it was not performed by this
+follow-up. The documentation push after that merge recreated `task/local-diagnostics-monitoring`.
+Retain its ancestry and deliver this two-document correction through a separate PR into the same
+feature. Do not treat it as already included in PR339 or qualified by old checks.
+The feature contains staging `cf5f0452` plus Stop. Actual staging remains `cf5f0452`, without these
+Stop/monitoring changes. Current pushed revision, follow-up PR, terminal gates and publication
+receipts are recorded in canonical Beads/PR metadata. Main and paused PR283/orchestration stay separate.
+
+## Hosted result and bounded fixture repair
+
+Actual source `a2b867dfbc6aef38b2f16e6aede51e078413f24d`, tree
+`3bb0592a6fd411bd769e2aa4e2629c902e620f45`, passed all nine executed hosted feature checks in
+CI `38936644754` attempt1. Sonar is OK with zero open issues, duplication1.0%, all ratings1 and
+hotspots100%. No unresolved threads or blocking reviews. Sourcery's 150,000-diff-character size-limit skip and the
+feature-target VM skip are limitations, not code review or staging qualification.
+
+Clean readiness was withheld despite CI success: Electron reported67 passed plus one flaky
+network-block permission-policy case. Its first attempt expected Open folder within five seconds,
+but the actual renderer URL served Chromium's DevTools discovery page. API health and startup
+renderer/window phases were already ready. No policy mutation, model call, approval, audit or file
+effect occurred. The retry passed; the first failure stays retained. Browser passed31 general cases
+plus one existing isolated-context prerequisite skip, Git5 and Stop5.
+
+Source tracing found that the fixture released its backend/renderer ports before Playwright opened
+OS-selected Node inspector and Chromium debug listeners. Those listeners can choose the released
+renderer port. The reviewed fixture-only repair jointly allocates four distinct held ports and
+passes explicit debugger flags; the existing two-port API remains unchanged. An actual disposable
+Electron42.0.1/Playwright1.59.1 probe verified the flag override, loopback listeners, expected app
+content and owned cleanup. Two probe-collection errors are retained separately. Nine allocator
+controls, types, lint and formatting pass; exact source review approved all three test/helper files.
+Original permission/effect assertions, deadlines and retry settings remain intact. The original
+network-block journey now passed on its first actual application attempt: one case,5.399 seconds,
+retries0/skips0. Persisted network:block, zero approvals, one denied sys_bash audit, unchanged file,
+two controlled model requests and28 safe backend events were verified, with clean exit/owned-group
+cleanup and unchanged runtime bytes. Preflight/discovery stops launched no application and remain
+retained separately. Fresh current-head hosted coverage remains required; latest actual results are
+in Beads and the [results record](docs/reviews/local-diagnostics-monitoring-results.md).
+No application runtime, permission, sampler, storage or security-policy code changes in this repair.
+
+This prevents the fixture's own debugger collision opportunity; released ports can still be taken
+by another process. Production HTTP readiness accepts a response without authenticating server
+identity. Separate P2 [renderer identity](docs/tasks/agent-platform-renderer-readiness-identity.md)
+remains OPEN, discovered from monitoring, with no implementation authority or demonstrated capability
+breach. The owner-trial preflight now requires visibly identifying the actual application and
+working recording/export, not merely HTTP success. A load wait alone is not this repair.
+
+## Qualified implementation evidence
+
+First119 source normal hooks passed1,526 tests before hosted Sonar rejected18 findings/6.8%
+duplication. Independently reviewed source repairs and two internal SQLite helpers preserved strict
+schemas, bounded queues/reads/cleanup, independent snapshots and private access. No issue dismissal,
+rule/profile/exclusion or threshold change. Normal1c2 push passed five affected builds/types/cycles
+and1,532 tests (contracts146/desktop223/web431/DB189/API543). Final observer-only a2b follow-up passed
+normal API build/types/cycles and543 tests, including actual periodic sampling/SIGKILL restart and
+bounded worker close while HTTP drain is held. Existing earlier failures remain retained.
+
+Current a2b hosted benchmark artifact12062956123 was independently verified against its API digest,
+full small ZIP hash, CRC and all nine raw vectors:900 measured/990 total requests; maximum relative
+p95 overhead5.211 ms against20 ms and enqueue p95 0.052888 ms against2 ms, zero healthy capture loss.
+The local required-hook benchmark also passed. Enabled phases capture initial probes, not periodic
+load capacity. No unchanged manual benchmark repeat is needed for this fixture-only repair.
+
+Fresh1c2 managed Electron plus separate Chromium passed41.107 seconds without retry/skip/failure,
+proving actual30-second sampling, native SaveAs/cancel, private browser403, exact history after
+restart and resource OFF while V1 continues. Signed real-VM Stop passed44.816 seconds, ack6.538 ms,
+truthful outcome_unknown/two in-flight attempts, genuine started/late effects, zero post-ack
+admissions and no replay. Source/effects/ZIP/cleanup review approved the actual evidence. These are
+applicable regression proofs with the explicit observer/test-launcher deltas, not relabeled as
+exact-byte tests of later source. Actual current-head protected staging VM remains a separate gate.
+
+A fresh report-only reviewer located the deliberately held31.060-second model interval and later
+process boundary using only stored metadata, without source, live observation or fixture ground
+truth. The separate post-assessment comparison confirms the controlled seed was found, with
+incomplete coverage/independent snapshots and causal uncertainty preserved. This is not a new
+performance bug or proof of a provider/resource cause. Original insufficient idle report retained.
+
+## Subsequent hosted fixture checkpoint
+
+Exact `7a7831fa55287a64b40582215fb199e737ca9a84` completed all nine executed checks in
+CI38942508081 attempt1. Electron68 passed with no retries/flaky cases; browser31 general plus one
+existing isolated-context prerequisite skip, Git5 and Stop5. Live Sonar is OK/zero open issues,
+duplication0.9%, all ratings1/hotspots100%. No unresolved review threads or blocking reviews.
+Actual Sourcery outputs for both a2b and7a7 say the diff exceeds150,000 characters; the earlier
+budget attribution was incorrect. Independent source/evidence review establishes the skipped
+hosted review's limitation. Feature VM skip does not qualify staging.
+
+The new hosted benchmark artifact12064322746 was fully downloaded, hashed against its API digest,
+CRC checked and independently recomputed:900 measured/990 requests, worst relative p95 overhead
+2.874497 ms against20 ms and enqueue0.021693 ms against2 ms; healthy captures zero loss.
+Enabled stores retain their initial probes, not periodic-load capacity. No fresh CodeQL analysis
+ran on this feature event; a zero-open-alert PR-ref query is only scoped alert evidence, not a
+new analysis or broad security qualification. These are source-bound7a7 results; this factual
+documentation correction requires fresh pushed-head hosted gates and full mirror/readbacks.
+No unchanged local runtime tests or benchmark are repeated for this documentation-only delta.
+
+## Contract, publication and remaining delivery
+
+Resource recording defaults OFF; enabling once persists across restart and samples API-process
+CPU/RSS/event-loop, distinct active/unresolved/lock counts and app-volume free space every30 seconds.
+V1 request/model/tool/Stop capture continues independently. Seven-day retention is configurable1–90,
+but25,000 samples cover only about8.68 continuous days;32 MiB pages/34 MiB journal,5 MiB output,
+200 ms window reads and2s monitoring close remain fixed. No host/provider/container totals, prompt,
+secret or path upload, dashboard, paid provider call or recurring agent is added.
+
+The existing P2 [session-lock timeout](docs/tasks/agent-platform-session-lock-timeout-ownership.md)
+is OPEN, with real API exposure unverified and no unapproved mutex repair. Owner trial remains one
+active request per session. Monitoring/stress tasks do not close from a green retry or local pass.
+
+All nine substantive a2b mirrors plus twenty ordered session parts were fully read back:29 pages,
+620,566 canonical source bytes, existing identities/notes preserved. Receipts are under
+`publication-update-a2b867df`; the earlier119 partial publication remains historical. The new fixture
+repair, updated results/handoff, renderer-identity spec and stress preflight require current source-
+bound full mirror/readbacks before acceptance. Preserve/reuse existing page and part identities.
+
+Normal documentation hooks, fresh hosted checks and findings review, complete publication and
+actual owner-authorized follow-up/staging integration remain required. PR339 feature delivery is
+verified; further merges retain reserved authority. Staging also needs actual full security analysis,
+packaged VM and protections.
+Owner stress testing is NOT ready before actual delivery and preflight. No trial has started.
+Evidence: `/Users/letuscode/.codex/local-diagnostics-monitoring-20261016`; original Stop/API receipts
+remain under `/Users/letuscode/.codex/project-chat-stop-implementation-20261016`.
+
+Docker gateway is disabled; config SHA256
+`5bf96ed01d13eca69e7f3009c4521323e1027b3802bb007350127d54aee1696f` is unchanged. Readbacks found
+Docker29.8.2 responsive, the dev VM runner online/idle and host reserve above20 GiB. Recheck before
+trial. No restart/prune, globals change, retained-work deletion, paused orchestration or pilot.
+The full original history below remains434140 bytes/SHA256
+`2cd9dd3144d9585ae20a50150cf1ed9a06588f04bcd8c368ade566405da35f8c`; prior prefixes remain in Git
+and retained evidence. Beads is authoritative for current task status and completed synchronization.
+
+<!-- markdownlint-disable MD025 -->
+
+# Stop planning and durable monitoring handoff — 16 October 2026
+
+Current owner request is planning-only: review existing acknowledged Stop, obtain independent
+critique, then present a bounded plan before implementation. Subsequent owner refinements require
+shared harness capabilities for future voice/CLI clients, a focused audit of existing APIs, and
+persistent local evidence from ordinary use for later agent/owner reviews and Beads triage.
+
+Canonical plan: [shared Stop MVP](docs/planning/project-chat-stop-mvp.md). Verification:
+[S01–S14/M01–M06/Q01](docs/testing/project-chat-stop-mvp.md). Existing Stop task is
+`agent-platform-harness-r3.cancel`; planning task `agent-platform-project-chat-stop-plan`;
+source audit `agent-platform-harness-interface-audit`; queued durable capture
+`agent-platform-local-diagnostics-monitoring`; blocked owner trial `agent-platform-local-mvp-stress-review`.
+The audit/review/specs and actual planning checks are linked by the plan manifest.
+
+Staging remains cf5f04524c25c29635b0d84bda4e76282f28ddcb. Current documentation task
+`task/project-chat-stop-plan` chains from pushed 369ae334 on `task/post-git-handoff-review`,
+inside `feature/local-mvp-handoff-review`. PR332 is the earlier docs segment, not a Stop implementation.
+Future code feature/task branches are proposed only, to start from actual qualified staging after
+owner approval; no new product code, client, paid call, merge or production claim follows now.
+
+Source review confirms existing backend chat/approval/Git/MCP/context/diagnostic APIs are substantially
+shared; missing active logical-run discovery and durable Stop must be application-owned. Stop must
+bypass the execution mutex, fence every provider/tool/retry/resumed approval admission, preserve
+already-admitted effects and distinguish acknowledgement from confirmed termination. Diagnostics
+are observational, never authority. Current V1 already persists safe history; the separate monitoring
+task adds ordinary-use resource/queue capture, restart-safe review windows and visible coverage gaps.
+No external dashboard, broad tracing, SDK upgrade or scheduled daily agent has been activated.
+
+The owner trial is proposed after both Stop and durable monitoring are actually qualified: thirty
+minutes, disposable projects, at most two sessions/twenty requests, default zero paid spend. An
+agent must demonstrate review of a seeded issue from saved data without live observation first.
+Docker29.8.0 was reachable; host free space about13GiB is below proposed20GiB test reserve, so resource
+preflight remains a later execution requirement. No Stop or monitoring product tests have run.
+
+Distinct source-aware critic approved the corrected eight substantive files with zero actionable
+findings; STOP-C1–C10 dispositions belong to the linked review report. This is planning approval,
+not implementation authority or a runtime test result. All substantive
+planning documents require complete source-bound Notion publication/readback before handoff is done.
+Implementation and scoped Stop review-gate reconciliation await owner acceptance. Global review-gate,
+R3/recovery/dashboard scope, main, PR283/four paused refs and dirty unrelated work stay separate.
+
+The complete previous session body below is retained byte-for-byte; its dated permissions/states
+are historical. Live canonical Beads records supersede stale backlog statuses in those older notes.
+
+<!-- markdownlint-disable MD025 -->
+
+# Current handoff — Git delivery complete, next local MVP priority under review
+
+Reviewed on 15 October 2026. Beads remains authoritative for task status and dependencies.
+This handoff supersedes the pending-delivery wording in every historical checkpoint below.
+
+## Delivered development baseline
+
+Protected [PR330](https://github.com/jwill9999/agent-platform/pull/330) is merged into staging at
+`cf5f04524c25c29635b0d84bda4e76282f28ddcb`. Its tree
+`e4212ec7b8362cbd7fc25120d6dd856df8ad9691` exactly matches reviewed source `ce959c78`
+and the tested integration `e40c27ed`. PR329 and repair PR331 were delivered to the feature
+before the guarded staging squash. No admin bypass or main promotion occurred.
+
+All fourteen executed current-head checks and five expected workflows succeeded, with no
+unresolved review threads or blocking reviews. Independent reviews qualified the actual
+full Promptfoo analysis (eight batches), 61 first-attempt Electron tests, five first-attempt Git
+browser journeys, and nineteen first-attempt packaged macOS VM tests. Ordinary browser coverage
+passed 31 cases with one existing optional context prerequisite skip. Seven Git diagnostic exports
+and ten packaged-VM diagnostic bodies were reviewed for correlation, durability, loss and privacy.
+The Git unknown-outcome restart report honestly retains `unfinishedPriorProcess=true`; exactly one
+PR-create effect and no replay were verified. Deterministic external provider/GitHub/SSH boundaries
+remain disclosed; Git, SQLite, approvals, application and renderer are real.
+
+All 900 benchmark timings were independently checked against unchanged bounds: maximum relative
+p95 overhead 3.504090 ms versus 20 ms, enqueue p95 0.014071 ms versus 2 ms. Sonar is OK with 31
+existing minor code smells, no major/critical findings, bugs or vulnerabilities; scoped CodeQL has
+zero open alerts. Sourcery skipped PR330 because its diff exceeded 150,000 characters; independent
+source reviews supply the recorded review evidence. Large browser/Electron artifacts were qualified
+by downloaded-member CRC/SHA and API/run identity, without claiming whole outer-ZIP verification.
+Earlier failures, their diagnostic limits and unproven historical causes remain retained.
+
+`agent-platform-git-delivery-verification` is closed and Dolt-synced. The four complete changed
+document mirrors were read back at `ce959c78` across 24 pages; their source bytes are identical in
+staging. Evidence: `/Users/letuscode/.codex/git-delivery-implementation-20261014`, particularly
+`git-delivery-completion.json`, `pr330-staging-tree-qualification.json`,
+`pr330-81-combined-independent-qualification.json`, `git-delivery-cleanup-execution.json`,
+`git-delivery-final-independent-delivery-audit.json` and `pr331-publication-ce959c78.json`.
+
+## Branches and retained work
+
+Seven delivered local and remote Git-delivery branches were removed using exact guards after
+verification; eight local/remote recovery tags retain their commits. At the reviewed remote snapshot,
+six branches remain: main, staging and the four paused orchestration branches below. This handoff
+update uses separate temporary documentation branches; those are not new product implementation.
+
+- `feature/harness-backlog-review` at `583da680`.
+- `task/harness-readiness-reconciliation` at `5b796b74`.
+- `task/pilot-active-budget` at `ee3a160f`.
+- `task/test-runner-offline-adapter` at `e1222b19`.
+
+PR283 remains open, draft, labeled paused orchestration and unmerged. Preserve its branch links,
+all unique/dirty unrelated worktrees and the main tip. The prior preservation audit checked twelve
+worktrees, with only four authorized primary Beads status-journal appends; the original dirty diff
+was reconstructed and the real primary index remained unchanged. This documentation task may append
+its own recorded status change; do not claim the whole current primary diff hash is unchanged.
+No prototype resumption, pilot, release/distribution work or paid model call is authorized here.
+
+## Current work and next-priority recommendation
+
+Current housekeeping: `agent-platform-post-git-handoff-review`,
+[specification](docs/tasks/agent-platform-post-git-handoff-review.md). It updates this handoff,
+reviews the live backlog and publishes source-bound mirrors. Its task and feature branches are
+`task/post-git-handoff-review` and `feature/local-mvp-handoff-review`. Documentation validation,
+push, full mirror readbacks and the documentation PR are recorded in that task; this snapshot does
+not claim these new documentation changes are already in staging. All previous history follows
+unchanged. This task does not implement a new product feature or grant a new protected merge.
+
+The owner's immediate goal remains a working single-user local MVP. Distribution and its
+architecture/account model belong to phase two. The live review found sixty open, eight in-progress
+and twenty-four deferred records before creating this housekeeping task; counts alone are not a
+reliable implementation queue. Some records are stale or intentionally broad: the direct-file policy
+repair has merged PR271/source evidence despite its in-progress status; the open merge-resolver
+record overlaps delivered Git journeys; diagnostics V1 is complete while the broader export/dashboard
+record stays open. Do not auto-close those records or revive their old scopes from this review.
+
+Recommended discussion order, not an approved implementation schedule:
+
+1. **Acknowledged Stop for connected Project Chat** — `agent-platform-harness-r3.cancel`.
+   Add a run/session-scoped user stop action, backend acknowledgement, prevention of subsequent
+   dispatch, and an honest stopping/stopped/completed/unknown result. Preserve already-completed
+   effects and approval boundaries. Current chat code drains obsolete streams deliberately; losing
+   display ownership is not server cancellation. The API already forwards disconnect/timeout abort
+   signals, but the composer exposes no explicit run-scoped Stop action. This gives direct control
+   over the model/tool/Git work now available in the MVP. Start with this one bounded task; do not
+   absorb the broader recovery, dashboard, framework migration or orchestration backlog.
+2. **Keyless Ollama selection** — `agent-platform-est0`. The web considers a keyless Ollama config
+   usable, while an explicit chat model override is rejected by the API's stored-key check. This is
+   still visible in current source and is a small, concrete local-model usability fix. Do not add a
+   new provider, model download manager or credential bypass for providers that require keys.
+3. **Focused read-only PR review** — `agent-platform-5zg`. Build on the delivered commit/push/PR
+   flow with summary, changed files, checks and comments plus GitHub fallback. Keep merge/comment
+   mutation actions and a general embedded browser out of the first slice.
+
+Evidence paths checked at staging `cf5f0452`: `apps/web/hooks/use-harness-chat.ts`,
+`apps/web/components/chat/chat-input.tsx`,
+`apps/api/src/infrastructure/http/v1/chatRouter.ts`, `apps/web/lib/modelSelection.ts`,
+`apps/web/components/project/project-git-github-panel.tsx`, and their linked Beads specifications.
+This was a source/backlog review, not a new reproduction or acceptance run.
+
+The Stop proposal still has an open historical review-gate dependency and an existing planning-only
+specification. Rebase its plan and dependency disposition onto today's code with the planning skill
+and independent critique before owner implementation approval. Keep existing edges until explicitly
+reviewed; a recommendation is not readiness or permission to implement. No new-feature work starts
+from this handoff request alone. Broader Git epic `agent-platform-ii1` and journey remainder
+`agent-platform-7vf` remain open; the delivered bounded MVP does not close them.
+
+<!-- markdownlint-disable MD025 -->
+
+<!-- monitoring-prefix-end -->
+
+## Archived staging prefix at a46407b5
+
 # PR336 opt-in publication — staging qualification checkpoint
 
 Owner authorized PR337 feature integration and PR336 requalification, then approved protected
@@ -200,6 +584,10 @@ from this handoff request alone. Broader Git epic `agent-platform-ii1` and journ
 <!-- markdownlint-disable MD025 -->
 
 ## Shared historical session body at cf5f0452
+
+<!-- staging-prefix-end -->
+
+## Shared historical body at cf5f0452
 
 # Git delivery qualification handoff — 15 October 2026
 
@@ -5717,3 +6105,7 @@ and installed-version checks for Claude Code, Copilot and other agents without t
 
 ````````
 `````````
+
+<!-- prettier-ignore-end -->
+
+<!-- markdownlint-enable MD024 MD025 -->

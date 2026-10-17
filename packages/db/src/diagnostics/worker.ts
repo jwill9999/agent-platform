@@ -1,11 +1,14 @@
+import { captureMetadata, windowCursorCodec, attachCaptureWorker } from './captureWorker.js';
 import { parentPort, workerData } from 'node:worker_threads';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import Database from 'better-sqlite3';
 import {
   DiagnosticEventSchema,
   DiagnosticScopeSchema,
+  DiagnosticWindowSchema,
+  type DiagnosticWindow,
   type DiagnosticEvent,
   type DiagnosticScope,
 } from '@agent-platform/contracts';
@@ -14,38 +17,15 @@ const options = workerData as { path: string; retentionDays: number; maxEvents: 
 const port = parentPort!;
 let db: Database.Database;
 let previousShutdownUnclean = false;
-function meta(key: string): number {
-  return Number(
-    (
-      db.prepare('SELECT value FROM diagnostic_meta WHERE key = ?').get(key) as
-        | { value: string }
-        | undefined
-    )?.value ?? 0,
-  );
-}
-function setMeta(key: string, value: number | string): void {
-  db.prepare(
-    'INSERT INTO diagnostic_meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
-  ).run(key, String(value));
-}
-function maximum(): number {
-  return Number(
-    (
-      db.prepare("SELECT seq FROM sqlite_sequence WHERE name='diagnostic_events'").get() as
-        | { seq: number }
-        | undefined
-    )?.seq ?? 0,
-  );
-}
-function earliest(): number {
-  return Number(
-    (
-      db.prepare('SELECT min(sequence) AS value FROM diagnostic_events').get() as {
-        value: number | null;
-      }
-    ).value ?? 0,
-  );
-}
+const windowEpoch = randomUUID();
+const { meta, setMeta, maximum, earliest, sign } = captureMetadata(() => db, 'diagnostics');
+const windowCursors = windowCursorCodec({
+  epoch: windowEpoch,
+  sign,
+  maximum,
+  earliest,
+  prunedThrough: () => meta('pruned_through'),
+});
 function stats() {
   return {
     pruned: meta('pruned'),
@@ -86,14 +66,6 @@ function where(scope: DiagnosticScope): { sql: string; values: string[] } {
   return scope.runId
     ? { sql: 'session_id = ? AND run_id = ?', values: [scope.sessionId, scope.runId] }
     : { sql: 'session_id = ?', values: [scope.sessionId] };
-}
-function sign(payload: string): string {
-  const secret = (
-    db.prepare("SELECT value FROM diagnostic_meta WHERE key='cursor_secret'").get() as {
-      value: string;
-    }
-  ).value;
-  return createHmac('sha256', secret).update(payload).digest('base64url');
 }
 function cursor(scope: DiagnosticScope, after: number, snapshot: number): string {
   const payload = Buffer.from(
@@ -163,6 +135,67 @@ function query(input: { scope: DiagnosticScope; cursor?: string; limit?: number 
     stats: stats(),
   };
 }
+function windowCursor(
+  window: DiagnosticWindow,
+  after: number,
+  snapshot: number,
+  done: boolean,
+): string {
+  return windowCursors.encode(JSON.stringify(window), after, snapshot, done);
+}
+function decodeWindow(value: string, window: DiagnosticWindow) {
+  return windowCursors.decode(value, JSON.stringify(window));
+}
+function queryWindow(input: { window: DiagnosticWindow; cursor?: string; limit?: number }) {
+  db.transaction(prune)();
+  const window = DiagnosticWindowSchema.parse(input.window);
+  const limit = Math.max(1, Math.min(1000, Math.floor(input.limit ?? 1000)));
+  const bound = input.cursor
+    ? decodeWindow(input.cursor, window)
+    : { after: 0, snapshot: maximum(), done: false };
+  const filter = window.sessionId ? ' AND session_id = ?' : '';
+  const args: (string | number)[] = [
+    window.fromMs,
+    window.toMs,
+    bound.snapshot,
+    ...(window.sessionId ? [window.sessionId] : []),
+  ];
+  const observed = db
+    .prepare(
+      `SELECT min(observed_at) AS oldest,max(observed_at) AS newest FROM diagnostic_events WHERE observed_at >= ? AND observed_at < ? AND sequence <= ?${filter}`,
+    )
+    .get(...args) as { oldest: number | null; newest: number | null };
+  const records = bound.done
+    ? []
+    : rows(
+        `SELECT sequence,content FROM diagnostic_events WHERE observed_at >= ? AND observed_at < ? AND sequence <= ?${filter} AND sequence > ? ORDER BY sequence LIMIT ?`,
+        [...args, bound.after, limit + 1],
+      );
+  const truncated = records.length > limit;
+  const events = records.slice(0, limit),
+    after = events.at(-1)?.sequence ?? bound.after;
+  return {
+    window,
+    events,
+    snapshotSequence: bound.snapshot,
+    earliestSequence: earliest(),
+    truncated,
+    ...(truncated
+      ? { nextCursor: windowCursor(window, after, bound.snapshot, false) }
+      : { completedCursor: windowCursor(window, after, bound.snapshot, true) }),
+    coverage: {
+      oldestObservedAtMs: observed.oldest,
+      newestObservedAtMs: observed.newest,
+      gaps: 0,
+      historyMayBeMissing:
+        meta('pruned') > 0 ||
+        meta('dropped') > 0 ||
+        previousShutdownUnclean ||
+        observed.oldest === null,
+    },
+    stats: stats(),
+  };
+}
 function append(input: { events: DiagnosticEvent[]; dropped: number }) {
   if (!Array.isArray(input.events) || input.events.length > 32) throw new Error('invalid_batch');
   const insert = db.prepare(
@@ -210,6 +243,7 @@ try {
     throw new Error('storage_limited');
   db.pragma('synchronous = FULL');
   db.exec(`CREATE TABLE IF NOT EXISTS diagnostic_events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,event_id TEXT NOT NULL UNIQUE,request_id TEXT NOT NULL,session_id TEXT,run_id TEXT,observed_at INTEGER NOT NULL,content TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS diagnostic_time ON diagnostic_events(observed_at,sequence);
     CREATE INDEX IF NOT EXISTS diagnostic_request ON diagnostic_events(request_id,sequence);
     CREATE INDEX IF NOT EXISTS diagnostic_session ON diagnostic_events(session_id,run_id,sequence);
     CREATE TABLE IF NOT EXISTS diagnostic_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
@@ -262,6 +296,8 @@ function executeCommand(message: WorkerMessage): unknown {
   switch (message.type) {
     case 'append':
       return append(message.input as Parameters<typeof append>[0]);
+    case 'queryWindow':
+      return queryWindow(message.input as Parameters<typeof queryWindow>[0]);
     case 'query':
       return query(message.input as Parameters<typeof query>[0]);
     case 'list':
@@ -276,22 +312,4 @@ function executeCommand(message: WorkerMessage): unknown {
   }
 }
 
-function failureReason(error: unknown): string {
-  const messageText = error instanceof Error ? error.message : '';
-  if (messageText.startsWith('expired_history:')) return messageText;
-  if (messageText === 'invalid_cursor') return 'invalid_cursor';
-  const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : '';
-  if (code === 'SQLITE_BUSY') return 'busy';
-  if (code === 'SQLITE_FULL') return 'storage_limited';
-  return 'storage_unavailable';
-}
-
-port.on('message', (message: WorkerMessage) => {
-  try {
-    const result = executeCommand(message);
-    port.postMessage({ id: message.id, result });
-    if (message.type === 'close') port.close();
-  } catch (error) {
-    port.postMessage({ id: message.id, error: failureReason(error) });
-  }
-});
+attachCaptureWorker(port, executeCommand);

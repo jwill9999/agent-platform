@@ -1,3 +1,9 @@
+import {
+  readMonitoringStatus,
+  updateMonitoringPreference,
+  saveMonitoringReport,
+} from './monitoringExport.js';
+import { assertMonitoringSender } from './monitoringIpc.js';
 import { DesktopLifecycle } from './desktopLifecycle.js';
 import { diagnosticChildEnvironment, takeDiagnosticCapability } from './diagnosticEnvironment.js';
 import { randomBytes } from 'node:crypto';
@@ -50,6 +56,9 @@ import {
   resolveDesktopRuntimePathsFromApp,
 } from './runtimePaths.js';
 import {
+  getMonitoringStatusIpcChannel,
+  setMonitoringPreferenceIpcChannel,
+  saveMonitoringReportIpcChannel,
   saveDiagnosticReportIpcChannel,
   savePartialDiagnosticReportIpcChannel,
   resetLocalDataConfirmationIpcChannel,
@@ -400,6 +409,30 @@ function registerDesktopWorkspaceIpc(window: BrowserWindow): void {
   window.once('closed', () => {
     desktopWebViewService?.disposeAll();
     desktopWebViewService = undefined;
+  });
+
+  const monitoringRendererUrl = window.webContents.getURL();
+  const monitoringDependencies = () => ({
+    apiBaseUrl: resolveDesktopTerminalApiBaseUrl(),
+    capability: diagnosticCapability,
+    showSaveDialog: (options: { defaultPath: string; title: string }) =>
+      dialog.showSaveDialog(window, options),
+  });
+  ipcMain.removeHandler(getMonitoringStatusIpcChannel);
+  ipcMain.handle(getMonitoringStatusIpcChannel, (event, payload) => {
+    assertMonitoringSender(event, window.webContents, monitoringRendererUrl);
+    validateIpcPayload(payload, validateNoPayload);
+    return readMonitoringStatus(monitoringDependencies());
+  });
+  ipcMain.removeHandler(setMonitoringPreferenceIpcChannel);
+  ipcMain.handle(setMonitoringPreferenceIpcChannel, (event, payload) => {
+    assertMonitoringSender(event, window.webContents, monitoringRendererUrl);
+    return updateMonitoringPreference(payload, monitoringDependencies());
+  });
+  ipcMain.removeHandler(saveMonitoringReportIpcChannel);
+  ipcMain.handle(saveMonitoringReportIpcChannel, (event, payload) => {
+    assertMonitoringSender(event, window.webContents, monitoringRendererUrl);
+    return saveMonitoringReport(payload, monitoringDependencies());
   });
 
   ipcMain.removeHandler(saveDiagnosticReportIpcChannel);

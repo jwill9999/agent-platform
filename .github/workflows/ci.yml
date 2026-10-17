@@ -63,8 +63,11 @@ jobs:
         # Node fixture controls require built SDK packages and are separate from browser journeys.
         run: node --test e2e/support/git-delivery/*.test.mjs
 
+      - name: Shared Stop provider fixture controls
+        run: node --test e2e/support/project-chat-stop/*.test.mjs
+
       - name: Test local diagnostic command boundaries
-        run: node --test scripts/diagnostics.test.mjs
+        run: node --test scripts/diagnostics.test.mjs scripts/monitoring.test.mjs
 
       - name: Prepare private interpreter for pinned execution tests
         shell: bash
@@ -261,6 +264,31 @@ jobs:
             playwright-report-git-delivery/
             test-results-git-delivery/
 
+      - name: Prepare pinned Stop sensor fixture command
+        # The command remains the production fixed pnpm binary. Resolve its image-pinned
+        # Corepack payload as the runtime user before measuring controlled command entry.
+        run: |
+          sensor_setup_started=$SECONDS
+          sensor_pnpm_version=$(timeout 60s docker compose exec -T --user appuser api /usr/local/bin/pnpm --version)
+          test "$sensor_pnpm_version" = "9.15.4"
+          echo "Stop sensor pnpm $sensor_pnpm_version ready after $((SECONDS - sensor_setup_started)) seconds"
+
+      - name: Shared Stop browser tests
+        env:
+          BASE_URL: http://127.0.0.1:3001
+          API_URL: http://127.0.0.1:3000
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-project-chat-stop
+        run: pnpm run test:e2e --project=project-chat-stop --no-deps --output=test-results-project-chat-stop
+
+      - name: Upload shared Stop browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: project-chat-stop-browser-report
+          path: |
+            playwright-report-project-chat-stop/
+            test-results-project-chat-stop/
+
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -297,6 +325,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup pnpm
+        id: desktop-pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
 
       - name: Setup Node
@@ -322,6 +351,45 @@ jobs:
       - name: Install browser for connected diagnostics export
         # Invoke the already lockfile-installed browser CLI; this is not a package install.
         run: node node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Prepare fixed desktop sensor command
+        # The pinned action installs outside the product's fixed pnpm locations.
+        # Link its actual JS payload, not the .bin shell shim with relative paths.
+        env:
+          PNPM_ACTION_DEST: ${{ steps.desktop-pnpm.outputs.dest }}
+        run: |
+          sensor_pnpm_payload=$(node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const actionRoot = fs.realpathSync(process.env.PNPM_ACTION_DEST);
+          const packageRoot = fs.realpathSync(path.join(actionRoot, 'node_modules', 'pnpm'));
+          if (!packageRoot.startsWith(actionRoot + path.sep)) throw new Error('Unexpected pnpm package location');
+          const metadata = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
+          if (metadata.name !== 'pnpm' || metadata.version !== '9.15.4' || metadata.bin.pnpm !== 'bin/pnpm.cjs') {
+            throw new Error('Unexpected action-installed pnpm payload');
+          }
+          const payload = fs.realpathSync(path.join(packageRoot, 'bin', 'pnpm.cjs'));
+          if (payload !== path.join(packageRoot, 'bin', 'pnpm.cjs') || !fs.statSync(payload).isFile()) {
+            throw new Error('Unexpected pnpm executable location');
+          }
+          fs.accessSync(payload, fs.constants.X_OK);
+          process.stdout.write(payload);
+          NODE
+          )
+          if [ -e /usr/local/bin/pnpm ] || [ -L /usr/local/bin/pnpm ]; then
+            test -L /usr/local/bin/pnpm
+            test "$(readlink -f /usr/local/bin/pnpm)" = "$sensor_pnpm_payload"
+          else
+            sudo ln -s -- "$sensor_pnpm_payload" /usr/local/bin/pnpm
+          fi
+          sensor_node=$(node -p 'process.execPath')
+          sensor_home=$(mktemp -d "$RUNNER_TEMP/desktop-sensor-home.XXXXXX")
+          trap 'rm -rf -- "$sensor_home"' EXIT
+          sensor_version=$(timeout 30s env -i HOME="$sensor_home" \
+            PATH="$(dirname "$sensor_node"):/usr/bin:/bin:/usr/sbin:/sbin" \
+            /usr/local/bin/pnpm --version)
+          test "$sensor_version" = '9.15.4'
+          echo "Fixed desktop sensor pnpm $sensor_version verified with current Node"
 
       - name: Electron E2E tests
         run: xvfb-run -a pnpm --filter @agent-platform/desktop test:e2e

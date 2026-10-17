@@ -1,5 +1,5 @@
 import express, { type Application } from 'express';
-import type { DiagnosticStore } from '@agent-platform/contracts';
+import type { DiagnosticStore, MonitoringStore } from '@agent-platform/contracts';
 import { diagnosticIngress } from '../diagnostics/observations.js';
 import type { DiagnosticAccess } from '../diagnostics/localAccess.js';
 import { createDiagnosticsRouter } from './v1/diagnosticsRouter.js';
@@ -11,11 +11,19 @@ import { createHealthRouter } from './healthRouter.js';
 import { mountOpenApiValidation, openApiValidationErrorHandler } from './openApiValidation.js';
 import { mountSwaggerUI } from './swagger.js';
 import { createV1Router, type V1RouterOptions } from './v1/v1Router.js';
+import type { MonitoringRuntime } from '../diagnostics/monitoringRuntime.js';
+import { createInProcessSessionLock } from './sessionLock.js';
+import { getRunControlService } from '../../application/runControl/service.js';
 
 export function createApp(options: {
   db: DrizzleDb | null;
   v1?: V1RouterOptions;
-  diagnostics?: { store: DiagnosticStore; access: DiagnosticAccess; appVersion?: string };
+  diagnostics?: {
+    store: DiagnosticStore;
+    access: DiagnosticAccess;
+    appVersion?: string;
+    monitoring?: { store: MonitoringStore; runtime: MonitoringRuntime };
+  };
 }): Application {
   const app = express();
 
@@ -38,6 +46,7 @@ export function createApp(options: {
         options.diagnostics.store,
         options.diagnostics.access,
         options.diagnostics.appVersion,
+        options.diagnostics.monitoring,
       ),
     );
   }
@@ -46,7 +55,20 @@ export function createApp(options: {
   mountOpenApiValidation(app);
 
   if (options.db) {
-    app.use('/v1', createV1Router(options.db, options.v1));
+    const sessionLock = options.v1?.chat?.sessionLock ?? createInProcessSessionLock();
+    app.use(
+      '/v1',
+      createV1Router(options.db, {
+        ...options.v1,
+        chat: { ...options.v1?.chat, sessionLock },
+      }),
+    );
+    const control = getRunControlService(options.db);
+    options.diagnostics?.monitoring?.runtime.setMetrics(() => ({
+      ...control.monitoringMetrics(),
+      sessionLockKeys: sessionLock.activeCount,
+      sessionLockWaiters: sessionLock.waitingCount ?? null,
+    }));
   }
 
   app.use(openApiValidationErrorHandler);

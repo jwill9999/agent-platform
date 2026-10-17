@@ -61,3 +61,31 @@ describe('GitHub read proxy cancellation', () => {
     expect(await response.json()).toEqual({ data: { available: true } });
   });
 });
+
+it('forwards shared Stop exactly without leaking a local diagnostic capability or treating browser abort as cancellation', async () => {
+  const id = '81ce397c-a87d-4f20-9e21-9e6edfa92322';
+  const path = ['sessions', 'A', 'runs', id, 'stop'];
+  const fetcher = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () =>
+    Response.json(
+      { data: { id, state: 'stop_requested' } },
+      {
+        headers: { 'x-harness-run-id': id, 'x-diagnostics-capability': 'must-remain-server-side' },
+      },
+    ),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  const result = await POST(
+    new NextRequest(`http://localhost/api/v1/${path.join('/')}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    }),
+    { params: Promise.resolve({ path }) },
+  );
+  expect(fetcher.mock.calls[0]![0]).toContain(`/v1/sessions/A/runs/${id}/stop`);
+  expect(fetcher.mock.calls[0]![1].signal).toBeUndefined();
+  expect(Buffer.from(fetcher.mock.calls[0]![1].body as ArrayBuffer).toString()).toBe('{}');
+  expect(result.headers.get('x-harness-run-id')).toBe(id);
+  expect(result.headers.has('x-diagnostics-capability')).toBe(false);
+  expect(await result.json()).toEqual({ data: { id, state: 'stop_requested' } });
+});

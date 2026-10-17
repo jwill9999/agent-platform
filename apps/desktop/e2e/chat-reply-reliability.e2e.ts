@@ -228,19 +228,87 @@ for (const mode of ['chromium', 'electron'] as const) {
         await submitReply(ctx, 'B_CURRENT_PRIVATE_PROMPT');
         await expect.poll(() => fixture.provider.requests.length).toBe(2);
         aDone.release();
+        const completionProbes: {
+          count: number;
+          attempts: Array<{ status: number; elapsedMs: number; errorCode?: string }>;
+          truncated: boolean;
+        } = { count: 0, attempts: [], truncated: false };
+        ctx.evidence.diagnosticCompletionProbes = completionProbes;
         await expect
           .poll(async () => {
-            const report = DiagnosticReportSchema.parse(
-              await page.evaluate(async (sessionId) => {
-                const response = await fetch('/api/diagnostics/report', {
-                  method: 'POST',
-                  headers: { 'content-type': 'application/json' },
-                  body: JSON.stringify({ scope: { sessionId } }),
-                });
-                if (!response.ok) throw new Error(`Diagnostic completion probe ${response.status}`);
-                return response.json();
-              }, session.id),
-            );
+            completionProbes.count++;
+            const probe = await page.evaluate(async (sessionId) => {
+              const started = performance.now();
+              const response = await fetch('/api/diagnostics/report', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ scope: { sessionId } }),
+              });
+              if (!response.ok) {
+                let errorCode = 'unrecognized';
+                const reader = response.body?.getReader();
+                let timer: ReturnType<typeof setTimeout> | undefined;
+                try {
+                  if (!reader) throw new Error('unreadable');
+                  const body = await Promise.race([
+                    (async () => {
+                      const decoder = new TextDecoder();
+                      let text = '';
+                      let bytes = 0;
+                      while (true) {
+                        const chunk = await reader.read();
+                        if (chunk.done) break;
+                        bytes += chunk.value.byteLength;
+                        if (bytes > 1024) throw new Error('unreadable');
+                        text += decoder.decode(chunk.value, { stream: true });
+                      }
+                      return JSON.parse(text + decoder.decode());
+                    })(),
+                    new Promise<never>((_resolve, reject) => {
+                      timer = setTimeout(() => reject(new Error('unreadable')), 100);
+                    }),
+                  ]);
+                  const code: unknown = body?.error?.code;
+                  if (
+                    typeof code === 'string' &&
+                    [
+                      'DIAGNOSTICS_UNAVAILABLE',
+                      'REPORT_TOO_LARGE',
+                      'SCOPE_MISMATCH',
+                      'DIAGNOSTICS_DENIED',
+                      'INVALID_SCOPE',
+                    ].includes(code)
+                  )
+                    errorCode = code;
+                } catch {
+                  errorCode = 'unreadable';
+                } finally {
+                  clearTimeout(timer);
+                  void reader?.cancel().catch(() => undefined);
+                  reader?.releaseLock();
+                }
+                return {
+                  status: response.status,
+                  elapsedMs: performance.now() - started,
+                  errorCode,
+                  report: null,
+                };
+              }
+              const report: unknown = await response.json();
+              return { status: response.status, elapsedMs: performance.now() - started, report };
+            }, session.id);
+            if (completionProbes.attempts.length < 20) {
+              completionProbes.attempts.push({
+                status: probe.status,
+                elapsedMs: probe.elapsedMs,
+                ...(probe.errorCode ? { errorCode: probe.errorCode } : {}),
+              });
+            } else completionProbes.truncated = true;
+            // Keep the original one-request-per-poll behavior: an unavailable read
+            // still throws immediately, rather than becoming a retry-until-green.
+            if (probe.status < 200 || probe.status >= 300)
+              throw new Error(`Diagnostic completion probe ${probe.status}`);
+            const report = DiagnosticReportSchema.parse(probe.report);
             return report.events.some(
               (row) =>
                 row.event.phase === 'request' &&

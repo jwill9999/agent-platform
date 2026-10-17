@@ -122,6 +122,10 @@ export async function POST(req: Request) {
   outHeaders.set('x-request-id', apiRequestId.success ? apiRequestId.data : requestId);
   outHeaders.set('x-bff-request-id', requestId);
   if (apiRequestId.success) outHeaders.set('x-diagnostics-api-observed', '1');
+  for (const name of ['x-harness-run-id', 'x-harness-execution-id']) {
+    const value = z.string().uuid().safeParse(res.headers.get(name));
+    if (value.success) outHeaders.set(name, value.data);
+  }
   outHeaders.set('Cache-Control', 'no-store');
   outHeaders.set('Connection', 'keep-alive');
 

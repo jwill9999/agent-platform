@@ -36,3 +36,10 @@ export {
   McpConfigurationError,
 } from './repositories/mcpConnections.js';
 export * from './repositories/gitDelivery.js';
+export * from './repositories/runControl.js';
+
+export {
+  createMonitoringStore,
+  MonitoringStoreError,
+  type MonitoringStoreOptions,
+} from './monitoring/store.js';

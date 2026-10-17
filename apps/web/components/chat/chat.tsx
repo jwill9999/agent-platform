@@ -31,6 +31,9 @@ export interface ChatProps {
   messages: UIMessage[];
   onSend: (text: string) => boolean;
   isLoading: boolean;
+  onStop?: () => void;
+  stopPending?: boolean;
+  onRetryRunControl?: () => void;
   inputPlaceholder?: string;
   emptyStateTitle?: string;
   emptyStateDescription?: string;
@@ -90,6 +93,9 @@ export function Chat({
   diagnosticFailure,
   messages,
   onSend,
+  onStop,
+  stopPending,
+  onRetryRunControl,
   isLoading,
   inputPlaceholder,
   emptyStateTitle,
@@ -238,6 +244,9 @@ export function Chat({
           {/* Input */}
           <ChatInput
             onSend={onSend}
+            onStop={onStop}
+            stopPending={stopPending}
+            onRetryRunControl={onRetryRunControl}
             isLoading={isLoading}
             placeholder={inputPlaceholder}
             canSend={canSend}

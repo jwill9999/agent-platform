@@ -1341,7 +1341,7 @@ function ChatPanel({
   toolEventsByMessage: Record<string, ToolTraceEvent[]>;
   workspaceEventsByMessage: Record<string, WorkspaceEvent[]>;
   approvalEventsByMessage: Record<string, ApprovalCardState[]>;
-  onApprovalDecision: (approvalRequestId: string, decision: ApprovalDecision) => void;
+  onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -1862,6 +1862,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     workspaceEventsByMessage,
     approvalEventsByMessage,
     decideApproval,
+    canDecideApproval,
     canSend: chatCanSend,
   } = useHarnessChat(sessionId);
 
@@ -3049,7 +3050,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   toolEventsByMessage={toolEventsByMessage}
                   workspaceEventsByMessage={workspaceEventsByMessage}
                   approvalEventsByMessage={approvalEventsByMessage}
-                  onApprovalDecision={decideApproval}
+                  onApprovalDecision={canDecideApproval ? decideApproval : undefined}
                 />
               </WorkspaceResourcePreviewProvider>
             </ResizablePanel>

@@ -10,6 +10,8 @@ import { appendFile, copyFile, mkdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
+import { Readable } from 'node:stream';
+import { assertRunActive, invokeRunAction, type RunExecutionControl } from '../runControl.js';
 
 import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
 import { validateUrl } from '../security/urlGuard.js';
@@ -24,6 +26,8 @@ import {
   toolError,
   buildRiskMap,
 } from './toolHelpers.js';
+
+type MediumRiskExecutionOptions = { signal?: AbortSignal; runControl?: RunExecutionControl };
 
 const HTTP_TIMEOUT_MS = 30_000;
 const MAX_DOWNLOAD_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -235,18 +239,7 @@ async function handleCreateDirectory(
   }
 }
 
-async function handleHttpRequest(toolId: string, args: Record<string, unknown>): Promise<Output> {
-  const url = stringArg(args, 'url');
-  if (!url.trim()) {
-    return toolError('INVALID_ARGS', 'url is required');
-  }
-
-  const urlCheck = validateUrl(url);
-  if (!urlCheck.allowed) {
-    return toolError('URL_BLOCKED', urlCheck.reason ?? 'URL is blocked');
-  }
-
-  const method = stringArg(args, 'method', 'GET').toUpperCase();
+function requestHeaders(args: Record<string, unknown>): Record<string, string> {
   let headers: Record<string, string> = {};
   if (typeof args.headers === 'string' && args.headers.trim()) {
     try {
@@ -260,6 +253,26 @@ async function handleHttpRequest(toolId: string, args: Record<string, unknown>):
   } else if (typeof args.headers === 'object' && args.headers !== null) {
     headers = args.headers as Record<string, string>;
   }
+  return headers;
+}
+
+async function handleHttpRequest(
+  toolId: string,
+  args: Record<string, unknown>,
+  options?: MediumRiskExecutionOptions,
+): Promise<Output> {
+  const url = stringArg(args, 'url');
+  if (!url.trim()) {
+    return toolError('INVALID_ARGS', 'url is required');
+  }
+
+  const urlCheck = validateUrl(url);
+  if (!urlCheck.allowed) {
+    return toolError('URL_BLOCKED', urlCheck.reason ?? 'URL is blocked');
+  }
+
+  const method = stringArg(args, 'method', 'GET').toUpperCase();
+  const headers = requestHeaders(args);
   const body = typeof args.body === 'string' ? args.body : undefined;
   const timeoutMs = typeof args.timeout_ms === 'number' ? args.timeout_ms : HTTP_TIMEOUT_MS;
 
@@ -274,33 +287,45 @@ async function handleHttpRequest(toolId: string, args: Record<string, unknown>):
     }
   }
 
-  try {
+  return invokeRunAction(options?.runControl, options?.signal, 'tool', async () => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: ['POST', 'PUT', 'PATCH'].includes(method) ? body : undefined,
-      signal: controller.signal,
-    });
-
-    clearTimeout(timer);
-
-    const responseBody = truncate(await response.text(), MAX_OUTPUT_BYTES);
-
-    return toolResult(toolId, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries()),
-      body: responseBody,
-    });
-  } catch (err) {
-    return toolError('HTTP_REQUEST_FAILED', errorMessage(err));
-  }
+    const timer = setTimeout(
+      () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
+      timeoutMs,
+    );
+    const signal = options?.signal
+      ? AbortSignal.any([options.signal, controller.signal])
+      : controller.signal;
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: ['POST', 'PUT', 'PATCH'].includes(method) ? body : undefined,
+        signal,
+      });
+      const responseBody = truncate(await response.text(), MAX_OUTPUT_BYTES);
+      return toolResult(toolId, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: responseBody,
+      });
+    } catch {
+      return toolError(
+        'HTTP_OUTCOME_UNKNOWN',
+        'The remote request may have completed. Check its effect before trying again.',
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  });
 }
 
-async function handleDownloadFile(toolId: string, args: Record<string, unknown>): Promise<Output> {
+async function handleDownloadFile(
+  toolId: string,
+  args: Record<string, unknown>,
+  options?: MediumRiskExecutionOptions,
+): Promise<Output> {
   const url = stringArg(args, 'url');
   const filePath = stringArg(args, 'path');
   if (!url.trim() || !filePath.trim()) {
@@ -314,56 +339,59 @@ async function handleDownloadFile(toolId: string, args: Record<string, unknown>)
 
   const timeoutMs = typeof args.timeout_ms === 'number' ? args.timeout_ms : HTTP_TIMEOUT_MS;
 
-  try {
+  return invokeRunAction(options?.runControl, options?.signal, 'tool', async () => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      return toolError('DOWNLOAD_FAILED', `HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    if (!response.body) {
-      return toolError('DOWNLOAD_FAILED', 'No response body');
-    }
-
-    // Check content-length before downloading
-    const contentLength = response.headers.get('content-length');
-    if (contentLength && Number.parseInt(contentLength, 10) > MAX_DOWNLOAD_SIZE) {
-      return toolError('DOWNLOAD_TOO_LARGE', `File exceeds ${MAX_DOWNLOAD_SIZE} byte limit`);
-    }
-
-    // Ensure parent directory exists
-    await mkdir(dirname(resolve(filePath)), { recursive: true });
-
-    const dest = createWriteStream(resolve(filePath));
-    // Node 18+ fetch body is a web ReadableStream; convert to Node stream
-    const nodeStream = await import('node:stream');
-    const readable = nodeStream.Readable.fromWeb(
-      response.body as import('node:stream/web').ReadableStream,
+    const timer = setTimeout(
+      () => controller.abort(new DOMException('Download timed out', 'TimeoutError')),
+      timeoutMs,
     );
-    await pipeline(readable, dest);
-
-    return toolResult(toolId, { downloaded: true, path: resolve(filePath), url });
-  } catch (err) {
-    return toolError('DOWNLOAD_FAILED', errorMessage(err));
-  }
+    const signal = options?.signal
+      ? AbortSignal.any([options.signal, controller.signal])
+      : controller.signal;
+    try {
+      const response = await fetch(url, { signal });
+      if (!response.ok)
+        return toolError('DOWNLOAD_FAILED', `HTTP ${response.status}: ${response.statusText}`);
+      if (!response.body) return toolError('DOWNLOAD_FAILED', 'No response body');
+      const contentLength = response.headers.get('content-length');
+      if (contentLength && Number.parseInt(contentLength, 10) > MAX_DOWNLOAD_SIZE)
+        return toolError('DOWNLOAD_TOO_LARGE', `File exceeds ${MAX_DOWNLOAD_SIZE} byte limit`);
+      assertRunActive(options?.runControl, signal);
+      await mkdir(dirname(resolve(filePath)), { recursive: true });
+      assertRunActive(options?.runControl, signal);
+      const dest = createWriteStream(resolve(filePath));
+      const readable = Readable.fromWeb(response.body as import('node:stream/web').ReadableStream);
+      await pipeline(readable, dest, { signal });
+      return toolResult(toolId, { downloaded: true, path: resolve(filePath), url });
+    } catch {
+      return toolError(
+        'DOWNLOAD_OUTCOME_UNKNOWN',
+        'The download may have left a partial file. Check its outcome before trying again.',
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Executor
 // ---------------------------------------------------------------------------
 
-const HANDLERS: Record<string, (toolId: string, args: Record<string, unknown>) => Promise<Output>> =
-  {
-    [MEDIUM_RISK_IDS.appendFile]: handleAppendFile,
-    [MEDIUM_RISK_IDS.copyFile]: handleCopyFile,
-    [MEDIUM_RISK_IDS.createDirectory]: handleCreateDirectory,
-    [MEDIUM_RISK_IDS.httpRequest]: handleHttpRequest,
-    [MEDIUM_RISK_IDS.downloadFile]: handleDownloadFile,
-  };
+const HANDLERS: Record<
+  string,
+  (
+    toolId: string,
+    args: Record<string, unknown>,
+    options?: MediumRiskExecutionOptions,
+  ) => Promise<Output>
+> = {
+  [MEDIUM_RISK_IDS.appendFile]: handleAppendFile,
+  [MEDIUM_RISK_IDS.copyFile]: handleCopyFile,
+  [MEDIUM_RISK_IDS.createDirectory]: handleCreateDirectory,
+  [MEDIUM_RISK_IDS.httpRequest]: handleHttpRequest,
+  [MEDIUM_RISK_IDS.downloadFile]: handleDownloadFile,
+};
 
 /**
  * Execute a medium-risk tool. Returns null if toolId is not a medium-risk tool.
@@ -371,8 +399,13 @@ const HANDLERS: Record<string, (toolId: string, args: Record<string, unknown>) =
 export async function executeMediumRiskTool(
   toolId: string,
   args: Record<string, unknown>,
+  options?: MediumRiskExecutionOptions,
 ): Promise<Output | null> {
   const handler = HANDLERS[toolId];
   if (!handler) return null;
-  return handler(toolId, args);
+  if (toolId === MEDIUM_RISK_IDS.httpRequest || toolId === MEDIUM_RISK_IDS.downloadFile)
+    return handler(toolId, args, options);
+  return invokeRunAction(options?.runControl, options?.signal, 'tool', () =>
+    handler(toolId, args, options),
+  );
 }

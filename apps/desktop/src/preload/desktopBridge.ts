@@ -1,5 +1,9 @@
 import type {
   DiagnosticScope,
+  MonitoringStatus,
+  MonitoringWindowInput,
+  MonitoringPreferenceInputSchema,
+  MonitoringPreferenceResultSchema,
   DiagnosticPartialFailure,
   DesktopCreateProjectFolderRequest,
   DesktopOpenProjectIdeRequest,
@@ -175,12 +179,33 @@ export interface DesktopWorkspaceApi {
   ) => DesktopWorkspaceWebViewUnsubscribe;
 }
 
+export type DesktopMonitoringExportResult =
+  | { ok: true; status: 'cancelled' }
+  | {
+      ok: true;
+      status: 'saved';
+      filename: string;
+      summary: string;
+      incomplete: boolean;
+      continuation?: MonitoringWindowInput;
+    };
+
 export interface DesktopDiagnosticsApi {
+  readonly getMonitoringStatus: () => Promise<MonitoringStatus>;
+  readonly setMonitoringPreference: (
+    input: ReturnType<typeof MonitoringPreferenceInputSchema.parse>,
+  ) => Promise<ReturnType<typeof MonitoringPreferenceResultSchema.parse>>;
+  readonly saveMonitoringReport: (
+    input: MonitoringWindowInput,
+  ) => Promise<DesktopMonitoringExportResult>;
   readonly saveReport: (scope: DiagnosticScope) => Promise<DesktopWorkspaceExportResult>;
   readonly savePartial: (
     failure: DiagnosticPartialFailure,
   ) => Promise<DesktopWorkspaceExportResult>;
 }
+export const getMonitoringStatusIpcChannel = 'agent-platform:monitoring:status';
+export const setMonitoringPreferenceIpcChannel = 'agent-platform:monitoring:preference';
+export const saveMonitoringReportIpcChannel = 'agent-platform:monitoring:save-history';
 export const saveDiagnosticReportIpcChannel = 'agent-platform:diagnostics:save-report';
 export const savePartialDiagnosticReportIpcChannel = 'agent-platform:diagnostics:save-partial';
 

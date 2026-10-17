@@ -335,7 +335,9 @@ describe('Git delivery through real SDK, HTTP approvals, SQLite and Git', () => 
       expect(result.text).toContain(
         change === 'extra-field'
           ? 'APPROVAL_RESUME_STATE_INVALID'
-          : 'GIT_DELIVERY_APPROVAL_INVALID',
+          : change === 'expired'
+            ? 'APPROVAL_EXPIRED'
+            : 'GIT_DELIVERY_APPROVAL_INVALID',
       );
       expect(git(f.repo, ['diff', '--cached', '--name-only'])).toBe('');
       expect(f.provider.requests).toHaveLength(1);
@@ -601,41 +603,187 @@ describe('Git delivery through real SDK, HTTP approvals, SQLite and Git', () => 
     expect(getGitDeliveryOperation(f.db, other.id)?.receipt.state).toBe('prepared');
     expect(git(f.repo, ['diff', '--cached', '--name-only'])).toBe('');
   }, 30000);
-  it('client abort after approval claim but before dispatch cancels the unexecuted owned receipt', async () => {
-    const f = await setup([tool()]);
-    await f.ask();
-    const a = f.pending();
-    await f.approve(a);
-    let release!: () => void;
-    let entered!: () => void;
-    const started = new Promise<void>((resolve) => {
-      entered = resolve;
-    });
-    const wait = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    f.setBeforeStart(async () => {
-      entered();
-      await wait;
-    });
-    const address = f.server.address();
-    if (!address || typeof address === 'string') throw new Error('Missing address');
-    const abort = new AbortController();
-    const pending = fetch(`http://127.0.0.1:${address.port}/v1/sessions/${f.sessionId}/resume`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approvalRequestId: a.id }),
-      signal: abort.signal,
-    }).catch(() => undefined);
-    await started;
-    abort.abort();
-    await pending;
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    release();
-    await expect.poll(() => f.operation(a).receipt.state, { timeout: 3000 }).toBe('cancelled');
-    expect(git(f.repo, ['diff', '--cached', '--name-only'])).toBe('');
-    expect(f.provider.requests).toHaveLength(1);
-  }, 30000);
+  it.each(['user_stop', 'client_disconnect'] as const)(
+    '%s after approval claim but before dispatch cancels the unexecuted owned receipt',
+    async (reason) => {
+      const f = await setup([tool()]);
+      await f.ask();
+      const a = f.pending();
+      await f.approve(a);
+      let release!: () => void;
+      let entered!: () => void;
+      let settled!: () => void;
+      const started = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const wait = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const finished = new Promise<void>((resolve) => {
+        settled = resolve;
+      });
+      f.setBeforeStart(async () => {
+        entered();
+        await wait;
+        settled();
+      });
+      const address = f.server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing address');
+      const abort = new AbortController();
+      const pending = fetch(`http://127.0.0.1:${address.port}/v1/sessions/${f.sessionId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvalRequestId: a.id }),
+        signal: abort.signal,
+      })
+        .then(async (response) => ({ status: response.status, text: await response.text() }))
+        .catch(() => undefined);
+      try {
+        await started;
+        expect(getApprovalRequest(f.db, a.id).resumedAtMs).toBeTypeOf('number');
+        const current = await request(f.server)
+          .get(`/v1/sessions/${f.sessionId}/active-run`)
+          .expect(200);
+        const logicalRunId = current.body.data.id as string;
+        if (reason === 'user_stop') {
+          await request(f.server)
+            .post(`/v1/sessions/${f.sessionId}/runs/${logicalRunId}/stop`)
+            .send({})
+            .expect(200);
+          expect((await pending)?.status).toBe(200);
+        } else {
+          abort.abort();
+          await pending;
+        }
+        // Cancellation must be durable while the original setup hook is still held.
+        await expect.poll(() => f.operation(a).receipt.state, { timeout: 3000 }).toBe('cancelled');
+        const cancelled = f.operation(a).receipt;
+        expect(git(f.repo, ['diff', '--cached', '--name-only'])).toBe('');
+        expect(f.provider.requests).toHaveLength(1);
+        const interrupted = await request(f.server)
+          .get(`/v1/sessions/${f.sessionId}/runs/${logicalRunId}`)
+          .expect(200);
+        expect(interrupted.body.data).toMatchObject({
+          state: 'outcome_unknown',
+          reason,
+          inFlight: 1,
+        });
+        release();
+        await finished;
+        await expect
+          .poll(async () => {
+            const result = await request(f.server)
+              .get(`/v1/sessions/${f.sessionId}/runs/${logicalRunId}`)
+              .expect(200);
+            return result.body.data.inFlight;
+          })
+          .toBe(0);
+        if (reason === 'user_stop') {
+          const result = await request(f.server)
+            .get(`/v1/sessions/${f.sessionId}/runs/${logicalRunId}`)
+            .expect(200);
+          expect(result.body.data.state).toBe('cancelled');
+        }
+        expect(f.operation(a).receipt).toEqual(cancelled);
+        expect(git(f.repo, ['diff', '--cached', '--name-only'])).toBe('');
+        expect(f.provider.requests).toHaveLength(1);
+      } finally {
+        release();
+        await finished;
+        await pending;
+      }
+    },
+    30000,
+  );
+  it.each(['changed-actor', 'executing', 'unknown'] as const)(
+    'Stop during claimed setup cannot relabel a %s Git receipt',
+    async (change) => {
+      const f = await setup([tool()]);
+      await f.ask();
+      const a = f.pending();
+      await f.approve(a);
+      let enter!: () => void;
+      let release!: () => void;
+      let settle!: () => void;
+      const entered = new Promise<void>((resolve) => {
+        enter = resolve;
+      });
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const settled = new Promise<void>((resolve) => {
+        settle = resolve;
+      });
+      f.setBeforeStart(async () => {
+        enter();
+        await held;
+        settle();
+      });
+      const pending = f.resume(a);
+      try {
+        await entered;
+        expect(getApprovalRequest(f.db, a.id).resumedAtMs).toBeTypeOf('number');
+        const current = await request(f.server)
+          .get(`/v1/sessions/${f.sessionId}/active-run`)
+          .expect(200);
+        const logicalRunId = current.body.data.id as string;
+        if (change === 'changed-actor') {
+          const other = (
+            await request(f.server)
+              .post('/v1/agents')
+              .send({
+                name: 'Replacement actor after claim',
+                systemPrompt: 'Other actor',
+                allowedSkillIds: [],
+                allowedToolIds: [],
+                allowedMcpServerIds: [],
+                executionLimits: { maxSteps: 2, maxParallelTasks: 1, timeoutMs: 20000 },
+              })
+              .expect(201)
+          ).body.data;
+          f.sqlite.prepare('UPDATE sessions SET agent_id=? WHERE id=?').run(other.id, f.sessionId);
+        } else {
+          // Metadata-only competing-state fixture; no Git effect is claimed or executed.
+          const op = f.operation(a);
+          expect(
+            transitionGitDeliveryOperation(f.db, op.receipt.id, 'prepared', {
+              ...op.receipt,
+              state: change,
+            }),
+          ).toBe(true);
+        }
+        const protectedReceipt = f.operation(a).receipt;
+        await request(f.server)
+          .post(`/v1/sessions/${f.sessionId}/runs/${logicalRunId}/stop`)
+          .send({})
+          .expect(200);
+        await pending;
+        expect(f.operation(a).receipt).toEqual(protectedReceipt);
+        expect(git(f.repo, ['diff', '--cached', '--name-only'])).toBe('');
+        expect(f.provider.requests).toHaveLength(1);
+        release();
+        await settled;
+        await expect
+          .poll(
+            async () =>
+              (
+                await request(f.server)
+                  .get(`/v1/sessions/${f.sessionId}/runs/${logicalRunId}`)
+                  .expect(200)
+              ).body.data.inFlight,
+          )
+          .toBe(0);
+        expect(f.operation(a).receipt).toEqual(protectedReceipt);
+        expect(git(f.repo, ['diff', '--cached', '--name-only'])).toBe('');
+        expect(f.provider.requests).toHaveLength(1);
+      } finally {
+        release();
+        await settled;
+        await pending;
+      }
+    },
+    30000,
+  );
   it.each([false, true])(
     'accounts for abandoned siblings after a multi-tool SDK response (stale=%s)',
     async (stale) => {

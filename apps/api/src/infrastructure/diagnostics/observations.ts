@@ -10,6 +10,7 @@ import {
 import { createLogger } from '@agent-platform/logger';
 import type { HarnessStateType } from '@agent-platform/harness';
 import type { RequestHandler } from 'express';
+import type { ControlObservation } from '../../application/runControl/service.js';
 import { hasDiagnosticAccess, type DiagnosticAccess } from './localAccess.js';
 
 const log = createLogger('api:diagnostics');
@@ -27,6 +28,7 @@ type Context = {
   parentOperationId?: string;
   modelMetadata?: Partial<DiagnosticEvent>;
   modelStartedAt?: number;
+  terminal?: Pick<DiagnosticEvent, 'outcome' | 'errorCode'>;
 };
 const context = new AsyncLocalStorage<Context>();
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -63,7 +65,10 @@ export function diagnosticIngress(
 ): RequestHandler {
   return (req, res, next) => {
     // Avoid recursive diagnostic reads and unrelated platform instrumentation in this MVP.
-    if (req.method !== 'POST' || !/^\/v1\/(chat(?:\/|$)|sessions\/[^/]+\/resume$)/.test(req.path))
+    if (
+      req.method !== 'POST' ||
+      !/^\/v1\/(chat(?:\/|$)|sessions\/[^/]+\/(?:resume|runs\/[^/]+\/stop)$)/.test(req.path)
+    )
       return next();
     const requestId: unknown = res.locals.requestId;
     if (typeof requestId !== 'string' || !uuid.test(requestId)) return next();
@@ -124,19 +129,94 @@ export function beginDiagnosticRun(sessionId: string, runId: string): () => void
   return () =>
     emit({
       phase: 'request',
-      outcome: completionOutcome(current.waiting, current.halted),
+      outcome: current.terminal?.outcome ?? completionOutcome(current.waiting, current.halted),
       ...(current.halted && !current.waiting
         ? { errorCode: current.haltError ?? ('internal_error' as const) }
         : {}),
+      ...current.terminal,
       durationMs: performance.now() - started,
     });
 }
 
-export function failDiagnosticRun(signal: AbortSignal): void {
-  emit({
-    phase: 'request',
-    outcome: signal.aborted ? 'cancelled' : 'failed',
+export function failDiagnosticRun(signal: AbortSignal, unknown = false): void {
+  const terminal: Pick<DiagnosticEvent, 'outcome' | 'errorCode'> = {
+    outcome: runFailureOutcome(signal, unknown),
     errorCode: runFailureCode(signal),
+  };
+  const current = context.getStore();
+  if (current) current.terminal = terminal;
+  emit({ phase: 'request', ...terminal });
+}
+
+function runFailureOutcome(signal: AbortSignal, unknown: boolean): DiagnosticEvent['outcome'] {
+  if (unknown) return 'unknown';
+  return signal.aborted ? 'cancelled' : 'failed';
+}
+
+function terminalControlOutcome(
+  state: ControlObservation['record']['state'],
+): DiagnosticEvent['outcome'] | undefined {
+  if (state === 'outcome_unknown' || state === 'interrupted') return 'unknown';
+  if (state === 'failed') return 'failed';
+  if (state === 'cancelled') return 'cancelled';
+  return undefined;
+}
+
+function controlOutcome(
+  state: ControlObservation['record']['state'],
+  stage: ControlObservation['stage'],
+): DiagnosticEvent['outcome'] {
+  const terminal = terminalControlOutcome(state);
+  if (terminal) return terminal;
+  if (state === 'waiting_for_approval' || stage === 'requested') return 'waiting';
+  return stage === 'admitted' ? 'started' : 'succeeded';
+}
+
+function controlReasonError(
+  reason: unknown,
+  fallback: DiagnosticEvent['errorCode'],
+): DiagnosticEvent['errorCode'] {
+  if (reason === 'user_stop') return 'cancelled';
+  if (reason === 'timeout') return 'timeout';
+  if (reason === 'client_disconnect') return 'connection_lost';
+  return fallback;
+}
+
+/** A safe observation of mandatory authority, never the authority itself. */
+export function observeDiagnosticRunControl({
+  record,
+  stage,
+  kind,
+  durationMs,
+  executionId,
+}: ControlObservation): void {
+  const current = context.getStore();
+  if (!current) return;
+  current.sessionId = record.sessionId;
+  if (executionId) current.runId = executionId;
+  const terminal = terminalControlOutcome(record.state);
+  if (terminal) {
+    current.terminal = {
+      outcome: terminal,
+      errorCode: controlReasonError(
+        record.reason,
+        current.haltError ?? current.terminal?.errorCode ?? 'internal_error',
+      ),
+    };
+  }
+  emit({
+    phase: 'control',
+    outcome: controlOutcome(record.state, stage),
+    durationMs,
+    control: {
+      logicalRunId: record.id,
+      state: record.state,
+      reason: record.reason,
+      stage,
+      kind,
+      version: record.version,
+      inFlight: record.inFlight,
+    },
   });
 }
 
@@ -177,12 +257,13 @@ export function observeDiagnosticNode<A extends unknown[]>(
         observeNodeResult(parent, phase, result, metadata, current.modelStartedAt ?? started);
         return result;
       } catch (error) {
+        const category = interruptionFromError(error, phase);
+        if (category.outcome === 'cancelled') parent.terminal = category;
         if (phase !== 'model' || current.modelStartedAt !== undefined) {
           emit({
             phase,
-            outcome: 'failed',
+            ...category,
             durationMs: performance.now() - (current.modelStartedAt ?? started),
-            errorCode: phase === 'model' ? 'provider_error' : 'tool_error',
           });
         }
         throw error;
@@ -287,13 +368,44 @@ function completionOutcome(waiting: boolean, failed: boolean): DiagnosticEvent['
 
 function runFailureCode(signal: AbortSignal): DiagnosticEvent['errorCode'] {
   if (!signal.aborted) return 'internal_error';
-  return signal.reason === 'timeout' ? 'timeout' : 'cancelled';
+  return controlReasonError(signal.reason, 'cancelled');
+}
+
+function interruptionFromError(
+  error: unknown,
+  phase: 'model' | 'tool',
+): Pick<DiagnosticEvent, 'outcome' | 'errorCode'> {
+  if (error instanceof Error) {
+    if ('code' in error && error.code === 'USER_STOP')
+      return { outcome: 'cancelled', errorCode: 'cancelled' };
+    if (error.name === 'TimeoutError') return { outcome: 'cancelled', errorCode: 'timeout' };
+    if (error.name === 'AbortError') return { outcome: 'cancelled', errorCode: 'connection_lost' };
+  }
+  return { outcome: 'failed', errorCode: phase === 'model' ? 'provider_error' : 'tool_error' };
 }
 
 function nodeMetadata(phase: 'model' | 'tool', state: HarnessStateType): Partial<DiagnosticEvent> {
   if (phase === 'tool') return { toolId: 'other' };
   const provider = DiagnosticEventSchema.shape.provider.safeParse(state.modelConfig?.provider);
   return { provider: provider.success ? provider.data : 'other' };
+}
+
+function interruptedTrace(
+  traces: NonNullable<NodeResult['trace']>,
+): Pick<DiagnosticEvent, 'outcome' | 'errorCode'> | undefined {
+  const aborted = traces.find((event) => event.type === 'stream_aborted');
+  if (aborted?.type !== 'stream_aborted') return undefined;
+  return { outcome: 'cancelled', errorCode: controlReasonError(aborted.reason, 'cancelled') };
+}
+
+function nodeFailureMetadata(
+  failed: boolean,
+  haltError: DiagnosticEvent['errorCode'],
+  waiting: boolean,
+  phase: 'model' | 'tool',
+): Pick<DiagnosticEvent, 'errorCode'> {
+  if ((!failed && !haltError) || waiting) return {};
+  return { errorCode: haltError ?? (phase === 'model' ? 'provider_error' : 'tool_error') };
 }
 
 function observeNodeResult(
@@ -304,6 +416,8 @@ function observeNodeResult(
   started: number,
 ): void {
   const traces = result.trace ?? [];
+  const interrupted = interruptedTrace(traces);
+  if (interrupted) parent.terminal = interrupted;
   if (result.halted) parent.halted = true;
   const haltError = observedContextHalt(result) ?? observedMcpHalt(result);
   if (haltError) parent.haltError = haltError;
@@ -324,13 +438,8 @@ function observeNodeResult(
     ...metadata,
     outcome: completionOutcome(waiting, failed || Boolean(haltError)),
     durationMs: performance.now() - started,
-    ...((failed || haltError) && !waiting
-      ? {
-          errorCode:
-            haltError ??
-            (phase === 'model' ? ('provider_error' as const) : ('tool_error' as const)),
-        }
-      : {}),
+    ...nodeFailureMetadata(failed, haltError, waiting, phase),
+    ...interrupted,
     ...observedTokenUsage(traces),
   });
 }

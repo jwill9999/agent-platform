@@ -20,6 +20,8 @@ export interface SessionLock {
 
   /** Number of sessions currently locked (observable for metrics). */
   readonly activeCount: number;
+  /** Actual callers waiting to acquire; absent for externally supplied lock implementations. */
+  readonly waitingCount?: number;
 }
 
 const DEFAULT_LOCK_TIMEOUT_MS = 120_000;
@@ -33,14 +35,20 @@ const DEFAULT_LOCK_TIMEOUT_MS = 120_000;
  */
 export function createInProcessSessionLock(): SessionLock {
   const locks = new Map<string, Promise<void>>();
+  let waiting = 0;
 
   return {
     get activeCount() {
       return locks.size;
     },
+    get waitingCount() {
+      return waiting;
+    },
 
     async acquire(sessionId: string, timeoutMs = DEFAULT_LOCK_TIMEOUT_MS): Promise<() => void> {
-      const existing = locks.get(sessionId) ?? Promise.resolve();
+      const previous = locks.get(sessionId);
+      const existing = previous ?? Promise.resolve();
+      if (previous) waiting++;
 
       let release!: () => void;
       const gate = new Promise<void>((resolve) => {
@@ -70,6 +78,8 @@ export function createInProcessSessionLock(): SessionLock {
         release();
         if (locks.get(sessionId) === gate) locks.delete(sessionId);
         throw err;
+      } finally {
+        if (previous) waiting--;
       }
 
       return () => {

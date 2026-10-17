@@ -271,6 +271,21 @@ async function coldProjectReopen() {
 }
 
 describe('HomePage asynchronous selection ownership', () => {
+  it('refreshes retained session visibility on Project reopen and revokes the old navigation guard', async () => {
+    await openProject('alpha');
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+    const firstGuard = mocks.refresh.mock.calls[0]?.[0] as () => boolean;
+    expect(firstGuard()).toBe(true);
+    await navigate(workspaceHomeRequestedEvent);
+    expect(firstGuard()).toBe(false);
+    await openProject('alpha');
+    expect(mocks.refresh).toHaveBeenCalledTimes(2);
+    const currentGuard = mocks.refresh.mock.calls[1]?.[0] as () => boolean;
+    expect(currentGuard()).toBe(true);
+    expect(firstGuard()).toBe(false);
+    expect(current()).toBe('bound-alpha');
+  });
+
   it('preserves Git selection through delayed project binding while resetting session-owned chat', async () => {
     const pending = deferred<{ session: SessionRecord; created: boolean }>();
     mocks.picker.mockResolvedValueOnce({ project: project('alpha'), created: false });
@@ -554,7 +569,13 @@ describe('HomePage asynchronous selection ownership', () => {
     'does not publish a delayed new %s session after returning Home',
     async (mode) => {
       if (mode === 'personal') await openPersonal();
-      else await openProject();
+      else {
+        await openProject();
+        expect(mocks.refresh).toHaveBeenCalledOnce();
+        // Navigation refresh is legitimate; only the abandoned creation below
+        // must not publish another refresh after its owner returned Home.
+        mocks.refresh.mockClear();
+      }
       const pending = deferred<SessionRecord>();
       mocks.post.mockReturnValueOnce(pending.promise);
       await click('New conversation');
