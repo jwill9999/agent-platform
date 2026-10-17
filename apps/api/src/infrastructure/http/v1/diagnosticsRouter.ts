@@ -1,12 +1,14 @@
 import {
   DiagnosticScopeSchema,
   DiagnosticReportSchema,
+  DiagnosticHealthSchema,
   type DiagnosticStore,
   type MonitoringStore,
 } from '@agent-platform/contracts';
 import { getSession, DiagnosticStoreError, type DrizzleDb } from '@agent-platform/db';
 import { buildDiagnosticReport } from '@agent-platform/plugin-observability';
 import { Router } from 'express';
+import { createLogger } from '@agent-platform/logger';
 import { z } from 'zod';
 import { hasDiagnosticAccess, type DiagnosticAccess } from '../../diagnostics/localAccess.js';
 import { asyncHandler } from '../asyncHandler.js';
@@ -18,6 +20,7 @@ const reportInput = z
   .object({ scope: DiagnosticScopeSchema, cursor: z.string().max(2048).optional() })
   .strict();
 const listInput = z.object({ limit: z.number().int().min(1).max(100).optional() }).strict();
+const log = createLogger('diagnostics-read');
 
 export function createDiagnosticsRouter(
   db: DrizzleDb,
@@ -48,11 +51,15 @@ export function createDiagnosticsRouter(
       if ('sessionId' in scope && !getSession(db, scope.sessionId)) {
         throw new HttpError(404, 'NOT_FOUND', 'Diagnostic scope not found');
       }
+      const startedAt = performance.now();
+      let phase: 'flush' | 'query' | 'report' = 'flush';
       try {
         await flushForRead(store);
+        phase = 'query';
         const page = await store.query(scope, { cursor, limit: 1000 });
         if (!page.events.length && !cursor)
           throw new HttpError(404, 'NOT_FOUND', 'Diagnostic scope not found');
+        phase = 'report';
         const report = buildDiagnosticReport(page, {
           appVersion: version.success ? version.data : undefined,
           platform: diagnosticPlatform(),
@@ -60,7 +67,29 @@ export function createDiagnosticsRouter(
         if (page.nextCursor) res.setHeader('x-diagnostics-next-cursor', page.nextCursor);
         res.json(report);
       } catch (error) {
-        throw diagnosticReadError(error);
+        const failure = diagnosticReadError(error);
+        if (failure.status >= 500) {
+          try {
+            const health = DiagnosticHealthSchema.safeParse(store.health());
+            // Fixed categories/counters only. Raw errors, scope, SQL and paths stay private.
+            log.warn('Diagnostic report read unavailable', {
+              phase,
+              elapsedMs: performance.now() - startedAt,
+              ...(health.success
+                ? {
+                    state: health.data.state,
+                    reason: health.data.reason,
+                    pending: health.data.pending,
+                    dropped: health.data.dropped,
+                    acknowledgedSequence: health.data.acknowledgedSequence,
+                  }
+                : { state: 'unknown' }),
+            });
+          } catch {
+            // Observing a failed read must never replace its original safe response.
+          }
+        }
+        throw failure;
       }
     }),
   );

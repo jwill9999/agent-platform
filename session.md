@@ -1,3 +1,35 @@
+# Migration CI — diagnostics export evidence follow-up
+
+PR345 remains open into `feature/desktop-secure-storage-startup`; merge authority is separately
+reserved. All executed hosted jobs on `4124faab` passed, but independent artifact review found
+CI-E01: the Electron report contains69 expected passes and one retry. The failed browser export
+returned503 in205.803ms before the test waited for a download. The API flush deadline is200ms;
+this is a causal lead, not proof, because the failed fixture deleted its backend logs.
+
+The bounded follow-up keeps all production deadlines, assertions and workload limits. Report-read
+failures now retain fixed phase/timing and validated health counters through the existing structured
+logger, without raw errors, paths, scope or credentials. Observation failure cannot replace the
+original safe HTTP response. The connected test observes the single real response before awaiting
+a download and preserves only allowlisted error categories and read observations before cleanup,
+even when shutdown fails. It does not retry an export automatically.
+
+The focused API suite passes19 cases, including pending-flush/query failures, instrumentation failure,
+invalid-health privacy and denied-access controls. All3 connected Electron cases pass without retries.
+Actual final-source Electron and hosted qualification are recorded in the
+[results](docs/reviews/desktop-migration-history-results.md); source changes do not inherit earlier
+CI success. CI-E01 remains open until fresh evidence qualifies the change or identifies a repair.
+
+The owner's existing app/profile remain untouched. Current OpenAI authentication succeeds; the
+confirmed model failure is unsupported `max_tokens`, owned by the separate SDK/interoperability
+work. No additional paid call, key change, owner stress trial, main promotion, external publication,
+Docker gateway change or paused orchestration work is included. Security maintenance uses the
+separate dependency-security worktree and is not mixed into this PR.
+
+Earlier checkpoint bodies below remain historical source; their pending states do not override this
+handoff. Canonical Beads: `agent-platform-desktop-migration-history` remains IN_PROGRESS.
+
+<!-- markdownlint-disable MD025 -->
+
 # Migration-history regression repair — implementation checkpoint
 
 ## Current authorized migration follow-up

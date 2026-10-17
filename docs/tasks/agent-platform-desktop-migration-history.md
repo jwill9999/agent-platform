@@ -97,3 +97,19 @@ desktop/type/lint/build, connected Electron success and failure, source-aware in
 normal hooks and hosted default database/Electron CI on the final head. Startup failure precedes
 V1 store creation, so its safe backend log/process evidence is required; no agent/provider requests
 are needed and agent-execution report review is not applicable to this startup-only slice.
+
+## Hosted export finding and recurring failure evidence
+
+CI-E01 was found by independent artifact review after all jobs on4124faab passed. The existing
+export journey returned503 in205.803ms on its first attempt, then succeeded on retry. Its missing
+backend logs prevent a proven cause; the200ms flush deadline is a lead only. Keep this P1 open.
+
+The authorized bounded follow-up preserves production deadlines and original success/privacy/
+restart assertions. Safe server-side report-read observations distinguish flush, query and report
+failures; telemetry failure must preserve the original safe response. API regression controls cover
+pending flush, rejected query, broken health/logger observation and denied access with no store
+side effect. The connected Electron/browser journey must assert the one actual report response
+before expecting a download, retain fixed failure categories/projected read observations even when
+shutdown fails, then remove its disposable resources. No automated export retry qualifies a failed
+first attempt. These tests remain in the existing default API and Electron suites, so normal CI
+executes them; fresh exact-head artifact review is required before resolving CI-E01.

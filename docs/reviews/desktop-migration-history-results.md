@@ -1,9 +1,56 @@
 # Desktop migration-history regression verification
 
 Task: [agent-platform-desktop-migration-history](../tasks/agent-platform-desktop-migration-history.md).
-Date: 17 October 2026. Status: implemented and locally tested; hosted qualification pending.
+Date: 17 October 2026. Status: hosted jobs passed at4124faab; CI-E01 artifact finding remains open.
 
-## Current CI repair checkpoint
+## CI-E01: failed export observation
+
+Actual CI38998546853 attempt1 is terminal SUCCESS on4124faab. All25 migration regressions
+passed inside214 database tests; both MIG-R06 Electron cases passed without retries. The full
+Electron report is69 expected passes plus one flaky case, not a clean70-pass result. Independent
+review verified the source/run/archive bindings and found CI-E01 in the existing export journey.
+The first browser report POST returned503 after205.803ms, then download waiting reached120040ms;
+retry1 passed8836ms. Its preserved trace is
+`~/.codex/migration-regression-20261017/ci-electron-report-4124faab.zip`, member
+`data/7b11adac423cbbff2e7f9f5ef3202df4ddef6350.zip`.
+
+The failed fixture deleted its backend logs. Its205.803ms response is close to the API's200ms
+flush-read deadline, but no retained flush/query state establishes the exact cause. The BFF maps
+several upstream/report failures to503, so neither a network-speed cause nor a flush cause is proven.
+This gap is explicitly retained instead of accepting the retry as qualification.
+
+The follow-up adds best-effort structured failure observations with fixed flush/query/report phase,
+monotonic elapsed time and schema-validated health counters/categories. It never logs raw errors,
+SQL, scope, paths or capabilities. Logging/health failures preserve the original safe HTTP status.
+The production200ms flush and5000ms BFF deadlines remain unchanged. Five new API cases cover
+pending flush, query rejection, health failure, logger failure and invalid-health privacy; denied
+requests also assert no flush/query/read-failure log. All19 focused API cases pass in8.32seconds,
+recorded in `~/.codex/migration-regression-20261017/ci-e01-final-api-regressions.log`.
+
+The connected fixture now observes one actual report response before awaiting a download, records
+only allowlisted BFF error categories, and retains projected read-failure evidence before removing
+its isolated profile/log directory. Download listeners are removed on failure; both owned fixture
+shutdowns settle before evidence attachment, and shutdown failures still fail the test. No export
+retry or relaxed assertion is added. Initial connected draft passed once in9.6seconds; a later
+critic correction requires the final-source rerun. Fresh hosted evidence remains pending; this is
+an evidence repair, not a claim that the original transient failure's cause is fixed.
+
+Independent review approved the bounded observation plan. Source review CI-E02 required evidence
+preservation despite shutdown failure; CI-E03 required the fixed BFF category in addition to status.
+Both are implemented; final review and actual-source results govern qualification.
+
+Final corrected-source local Electron report `ci-e01-qualified-electron.json` has3 expected passes,
+0 unexpected/flaky/skipped, with retries disabled. The real browser/BFF/API/SQLite export succeeds;
+its evidence receipt is a persisted file as well as a Playwright attachment, so both list and hosted
+HTML reporters retain it. Both MIG-R06 startup journeys pass again. Native and browser reports each
+contain13 events with ready/verified/durable coverage,0 pending/dropped/conflicts, and no prompt
+canaries; the restarted report preserves the original13 events. The actual backend-down report has
+0 events and explicitly unverified/non-durable coverage. All providers are deterministic fixtures;
+this proves no live OpenAI compatibility or owner stress workload. Typecheck, scoped lint, formatting
+and direct Markdown API checks pass. Final source-aware review and new hosted qualification follow;
+this local pass does not establish the historical transient cause.
+
+## Earlier CI repair checkpoint
 
 CI `38995982248` at `769a5517` passed all25 migration unit cases, the full214-test database
 suite and browser journeys (41 passed, one existing context-fixture skip). It failed the rejected

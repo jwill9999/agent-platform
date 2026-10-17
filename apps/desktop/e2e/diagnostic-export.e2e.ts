@@ -6,9 +6,10 @@ import {
   type Browser,
 } from 'playwright';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DiagnosticHealthSchema } from '@agent-platform/contracts';
 import { getOpenPort, seedDesktopDatabase } from './support/runtime.js';
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
@@ -30,6 +31,8 @@ test('local diagnostics export connects real browser, BFF, API, SQLite and nativ
   const rendererPort = await getOpenPort();
   let app: ElectronApplication | undefined;
   let browser: Browser | undefined;
+  let stopDownloadObservation = () => {};
+  let browserExportEvidence: { status: number; elapsedMs: number; code: string } | undefined;
   try {
     const launchOptions = {
       cwd: desktopDir,
@@ -45,6 +48,7 @@ test('local diagnostics export connects real browser, BFF, API, SQLite and nativ
         AGENT_PLATFORM_DESKTOP_RENDERER: 'standalone',
         AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(rendererPort),
         AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
+        AGENT_PLATFORM_DESKTOP_LOG_DIR: join(runtimeDir, 'logs'),
         AGENT_PLATFORM_DESKTOP_TEST_SAVE_DIAGNOSTIC_PATHS: JSON.stringify([
           null,
           destination,
@@ -115,9 +119,47 @@ test('local diagnostics export connects real browser, BFF, API, SQLite and nativ
       web.getByText('Deterministic diagnostic journey complete.', { exact: true }),
     ).toBeVisible();
     await expect(webInput).toBeEnabled({ timeout: 30000 });
-    const downloaded = web.waitForEvent('download');
+    // Observe the one real request before clicking; a 503 must not become a download timeout.
+    const responded = web
+      .waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === '/api/diagnostics/report' &&
+          response.request().method() === 'POST',
+      )
+      .catch(() => undefined);
+    const downloaded = new Promise<import('playwright').Download>((resolveDownload) => {
+      web.once('download', resolveDownload);
+      stopDownloadObservation = () => web.off('download', resolveDownload);
+    });
+    const exportStartedAt = performance.now();
     await web.getByRole('button', { name: 'Export diagnostic report', exact: true }).click();
+    const response = await responded;
+    expect(response, 'The browser export must receive an actual report response').toBeDefined();
+    browserExportEvidence = {
+      status: response!.status(),
+      elapsedMs: performance.now() - exportStartedAt,
+      code: response!.status() === 200 ? 'success' : 'unknown',
+    };
+    if (response!.status() !== 200) {
+      try {
+        const body = await response!.json();
+        if (
+          [
+            'DIAGNOSTICS_DENIED',
+            'INVALID_SCOPE',
+            'DIAGNOSTICS_UNAVAILABLE',
+            'REPORT_TOO_LARGE',
+            'SCOPE_MISMATCH',
+          ].includes(body?.error?.code)
+        )
+          browserExportEvidence.code = body.error.code;
+      } catch {
+        // An unreadable error body remains unknown; never retain raw upstream content.
+      }
+    }
+    expect(response!.status(), JSON.stringify(browserExportEvidence)).toBe(200);
     await (await downloaded).saveAs(browserDestination);
+    stopDownloadObservation();
     const browserReport = JSON.parse(readFileSync(browserDestination, 'utf8'));
     expect(browserReport.events.length).toBeGreaterThan(0);
     expect(browserReport.source).toBe('local-store');
@@ -256,8 +298,63 @@ test('local diagnostics export connects real browser, BFF, API, SQLite and nativ
       contentType: 'application/json',
     });
   } finally {
-    await browser?.close();
-    await app?.close();
-    rmSync(tempRoot, { recursive: true, force: true });
+    stopDownloadObservation();
+    const shutdown = await Promise.allSettled([browser?.close(), app?.close()]);
+    try {
+      // Retain only the fixed read-failure categories, not general backend/user output.
+      const logPath = join(runtimeDir, 'logs', 'backend.stdout.log');
+      const observations = existsSync(logPath)
+        ? readFileSync(logPath, 'utf8')
+            .split('\n')
+            .flatMap((line) => {
+              try {
+                const row = JSON.parse(line);
+                if (
+                  row.service !== 'diagnostics-read' ||
+                  !['flush', 'query', 'report'].includes(row.phase) ||
+                  !Number.isFinite(row.elapsedMs)
+                )
+                  return [];
+                const state = DiagnosticHealthSchema.shape.state.safeParse(row.state);
+                const reason = DiagnosticHealthSchema.shape.reason.safeParse(row.reason);
+                return [
+                  {
+                    phase: row.phase,
+                    elapsedMs: row.elapsedMs,
+                    state: state.success ? state.data : 'unknown',
+                    reason: reason.success ? reason.data : 'unknown',
+                    ...Object.fromEntries(
+                      ['pending', 'dropped', 'acknowledgedSequence'].map((key) => [
+                        key,
+                        Number.isSafeInteger(row[key]) && row[key] >= 0 ? row[key] : null,
+                      ]),
+                    ),
+                  },
+                ];
+              } catch {
+                return [];
+              }
+            })
+        : [];
+      const evidencePath = testInfo.outputPath('diagnostic-export-read-evidence.json');
+      writeFileSync(
+        evidencePath,
+        JSON.stringify({
+          browserExport: browserExportEvidence ?? null,
+          observations,
+          shutdown: shutdown.map(({ status }) => status),
+        }),
+      );
+      await testInfo.attach('diagnostic-export-read-evidence', {
+        path: evidencePath,
+        contentType: 'application/json',
+      });
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+    expect(
+      shutdown.map(({ status }) => status),
+      'Both owned fixtures must close',
+    ).toEqual(['fulfilled', 'fulfilled']);
   }
 });
