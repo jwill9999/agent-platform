@@ -1,3 +1,25 @@
+# Current delivery checkpoint — 17 October 2026
+
+Owner authorized PR345 and feature-to-staging merges after all current checks/review findings pass.
+PR345 merged into the existing feature at `d92efe38`; protected PR347 is open. Its security/VM
+successes are source-bound and cannot waive the active-hook injection review finding.
+
+The bounded follow-up on `task/desktop-hook-review` replaces package-name shell evaluation and
+package-path JavaScript interpolation with static JSON reads and argument-array execution. Discover
+changed package paths using NUL Git output; preserve legitimate missing/deleted package behavior,
+reject malformed present manifests/unsafe package selectors, and retain exact API selection,
+Git-local environment isolation, ordinary-suite/fresh-benchmark order and failure propagation.
+Malicious names and quoted/newline/metacharacter paths must cause no injected effects and must
+never silently skip the appropriate package checks. Existing hook and Git-isolation controls remain.
+
+Independent source review and every new executed/required feature/staging gate are required. Resolve
+the actual fixed PR347 thread only after the repaired source reaches its feature head. No product
+runtime, SDK, paused orchestration, owner-profile or global changes belong in this hook repair.
+The existing migration requirements below remain unchanged; canonical Beads stays IN_PROGRESS
+until actual protected delivery. Earlier qualification/authority wording below is historical.
+
+<!-- markdownlint-disable MD025 -->
+
 # Detect desktop migration history and schema divergence
 
 **Beads:** `agent-platform-desktop-migration-history`, P1 IN_PROGRESS.

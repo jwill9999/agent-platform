@@ -1,3 +1,50 @@
+# Staging review repair checkpoint — 17 October 2026
+
+PR345 at `7bc52436` was independently qualified: nine executed checks passed;70 Electron tests
+passed without retries, DB214 included25 new migration regressions, API547 included19 diagnostics
+controls, and the raw nine-vector benchmark passed unchanged limits. The owner subsequently
+authorized merge, completed at feature merge `d92efe38`, with tree `5c09da3a9ca16aaad8879173911d8935c19cc000`
+matching reviewed source and the actual staging rehearsal.
+
+Protected PR347 at that source completed two genuine full Promptfoo analyses with no reported
+findings; source/run/attempt-bound proof and SARIF digests were verified independently. The real
+macOS secure-storage round trip and20 packaged VM tests passed; signing, pinned assets and healthy/
+Stop-outcome-unknown receipts matched the source, with no host-path/secret exposure in those journeys.
+These passes do not qualify changed hook source or override review findings.
+
+Review thread `PRRT_kwDOSBqCws6teuMH` found package-name command injection through shell `eval`.
+Related discovery inserts a package path into JavaScript source. Both are in scope for the bounded
+active-hook repair: static Node JSON reads and argument arrays, NUL path discovery, safe validated
+package identities, unchanged test sequencing/failure propagation and malicious-name/path controls.
+Original-hook controls retain16 passes and22 failures before repair. The corrected source passes
+all38 hook controls, plus4 unchanged real-Git isolation cases, without skips. Independent reviewer
+verified all3 frozen source hashes and reran those controls: APPROVED, no actionable findings.
+Node/shell syntax, scoped ESLint, formatting and diff checks pass. Fresh exact-head hosted
+qualification remains pending; earlier-source passes are not inherited.
+
+The first hosted repair `06f9c79` failed Sonar: explicit sorting and lower orchestration complexity
+were required, plus fixed executable resolution and a concise environment-name regex. The follow-up
+uses literal fixed command names resolved to absolute executable regular files, skips empty/relative
+PATH entries, preserves Corepack symlink dispatch and fails closed when no candidate qualifies.
+Absolute PATH entries remain developer-trusted configuration; installation immutability is not
+claimed. New controls demonstrate marker execution through empty/relative PATH entries on the prior
+helper (45 passes/2 failures); corrected-source47 controls pass without failures/skips. Existing
+benchmark workload/options/deadlines and Git isolation remain unchanged. That47-control draft was
+rejected by independent review: HOOK-R01 demonstrated current-directory Node execution in the
+wrapper before filtering and through inherited Corepack child PATH. The final wrapper filters PATH
+with shell builtins before any external launch, derives its directory without external dirname,
+and the helper sanitizes every child environment independently. Final54 controls retain49 passes/
+5 failures on the prior source and54 passes/0 failures/cancellations/skips on the correction
+(14.148seconds); all4 unchanged real-Git isolation controls pass in2.20seconds. Frozen source and
+log hashes are in `hook-review/hook-r01-worker-evidence.json`. Final independent source review is
+approved; fresh hosted Sonar/CI remain required, with no suppression or green-check waiver.
+
+Evidence root: `/Users/letuscode/.codex/migration-regression-20261017/`. Earlier original failures and
+results follow unchanged. The historical export503 cause is still unproven; clean subsequent runs
+do not establish its cause. Model compatibility and security package remediation remain separate.
+
+<!-- markdownlint-disable MD025 -->
+
 # Desktop migration-history regression verification
 
 Task: [agent-platform-desktop-migration-history](../tasks/agent-platform-desktop-migration-history.md).

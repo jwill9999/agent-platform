@@ -1,3 +1,45 @@
+# Desktop migration — staging hook review repair
+
+Owner authorized PR345 and feature-to-staging delivery after current checks and comments clear.
+PR345 merged into `feature/desktop-secure-storage-startup` at `d92efe38`; its tree equals reviewed
+`7bc52436`. Protected PR347 is open against staging `d55f20ed`. Both genuine full security scans,
+CodeQL and Sonar passed; the real packaged macOS VM job passed20 tests. Those results qualify that
+source only. No protected merge or owner stress trial has occurred.
+
+GitHub Advanced Security review identified command injection through package names passed to
+`eval` in the push hook. Discovery also interpolates package paths into JavaScript source. This
+branch, `task/desktop-hook-review`, repairs only those active developer-hook boundaries and their
+regressions. Static JSON reads, NUL paths, validated package names and argument-array process calls
+replace command construction; existing test selection, Git-environment isolation, failure propagation
+and fresh benchmark limits remain mandatory. The final54 hook controls and4 unchanged real-Git
+isolation tests pass without skips; final independent source review is approved. New exact-head checks are
+required before the feature/staging merge. The actual source must contain the fix before resolving
+PR347's review thread.
+
+The first repair head `06f9c79` failed Sonar on sort/complexity and executable-resolution findings.
+The follow-up uses explicit lexical sorting, focused orchestration helpers and absolute executable
+resolution. Independent review then found HOOK-R01: the wrapper could launch a current-directory
+Node before filtering PATH, and Corepack children inherited that unsafe PATH. The wrapper now
+filters PATH using shell builtins before launching any executable; the helper independently filters
+PATH for direct invocation and every child. Five new marker controls fail on the prior source
+(49 passes/5 failures), then all54 pass on the correction. Fixed Git/pnpm names preserve normal
+installation/Corepack dispatch. Developer-selected absolute PATH
+entries and their mutable installation files remain trusted; this is not a sandbox or an immutable
+toolchain guarantee. Fresh Sonar and hosted checks are required for the corrected source.
+
+The owner app still uses the earlier checkout and is untouched. Its installed AI SDK4.3.19/OpenAI
+adapter1.3.24 emits `max_tokens` for the configured model; rebuilding unchanged source cannot fix
+that compatibility gap. An offline compiled connection-test fixture also incorrectly treats the
+HTTP400 rejection as success. Supported SDK correction and diagnostics tests remain separate from
+this migration/hook delivery and dependency-security draft; no additional paid request or key change.
+No main promotion, external publication, Docker gateway change or paused orchestration work.
+
+Canonical Beads: `agent-platform-desktop-migration-history` remains IN_PROGRESS. Earlier complete
+handoff bodies follow as historical snapshots; their pending authority/check states are superseded
+by this dated checkpoint and canonical Beads.
+
+<!-- markdownlint-disable MD025 -->
+
 # Migration CI — diagnostics export evidence follow-up
 
 Current hosted follow-up: Sonar's check on `14cbbe84` reports SUCCESS, but its findings API
