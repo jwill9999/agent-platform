@@ -1,3 +1,139 @@
+# Migration CI — diagnostics export evidence follow-up
+
+Current hosted follow-up: Sonar's check on `14cbbe84` reports SUCCESS, but its findings API
+contains one OPEN CRITICAL S3776 issue: report-handler cognitive complexity16 exceeds15.
+The bounded repair extracts the unchanged best-effort observation block into a helper. No status,
+privacy projection, deadline or export behavior changes. Independent source review is approved and all19 affected API tests pass in7.24seconds. Fresh
+hosted Sonar/CI qualification remains required; the green check did not dispose this finding.
+
+PR345 remains open into `feature/desktop-secure-storage-startup`; merge authority is separately
+reserved. All executed hosted jobs on `4124faab` passed, but independent artifact review found
+CI-E01: the Electron report contains69 expected passes and one retry. The failed browser export
+returned503 in205.803ms before the test waited for a download. The API flush deadline is200ms;
+this is a causal lead, not proof, because the failed fixture deleted its backend logs.
+
+The bounded follow-up keeps all production deadlines, assertions and workload limits. Report-read
+failures now retain fixed phase/timing and validated health counters through the existing structured
+logger, without raw errors, paths, scope or credentials. Observation failure cannot replace the
+original safe HTTP response. The connected test observes the single real response before awaiting
+a download and preserves only allowlisted error categories and read observations before cleanup,
+even when shutdown fails. It does not retry an export automatically.
+
+The focused API suite passes19 cases, including pending-flush/query failures, instrumentation failure,
+invalid-health privacy and denied-access controls. All3 connected Electron cases pass without retries.
+Actual final-source Electron and hosted qualification are recorded in the
+[results](docs/reviews/desktop-migration-history-results.md); source changes do not inherit earlier
+CI success. CI-E01 remains open until fresh evidence qualifies the change or identifies a repair.
+
+The owner's existing app/profile remain untouched. Current OpenAI authentication succeeds; the
+confirmed model failure is unsupported `max_tokens`, owned by the separate SDK/interoperability
+work. No additional paid call, key change, owner stress trial, main promotion, external publication,
+Docker gateway change or paused orchestration work is included. Security maintenance uses the
+separate dependency-security worktree and is not mixed into this PR.
+
+Earlier checkpoint bodies below remain historical source; their pending states do not override this
+handoff. Canonical Beads: `agent-platform-desktop-migration-history` remains IN_PROGRESS.
+
+<!-- markdownlint-disable MD025 -->
+
+# Migration-history regression repair — implementation checkpoint
+
+## Current authorized migration follow-up
+
+Owner authorized implementing the P1 migration regression matrix and repairing exposed issues, with
+Beads, independent critique and actual CI execution before closure. Work is on
+`task/desktop-migration-history`, chained from startup `aa5848cd`, targeting existing
+`feature/desktop-secure-storage-startup`. The previous owner checkout is preserved; actual-app
+preflight now uses this updated build and the retained normal profile with its original Make key.
+Merges remain separately authorized; gateway, global and paused work remain unchanged.
+
+CI `38995982248` at `769a5517` exposed two failures: missing backend logs in the directly spawned
+Linux rejected-startup fixture and diagnostic benchmark overhead37.508ms above its20ms limit.
+The fixture now matches Playwright's existing Linux launch policy and always retains isolated stderr;
+both real migration Electron journeys pass locally again. The unchanged benchmark and its added
+timestamp/heap/ELU observations pass locally, all9vectors/900measured requests, with limits unchanged.
+Its hosted timing cause remains unproven. No production lifecycle changes or blind rerun are used.
+Fresh hosted checks remain required before reporting stress-test readiness; actual-app preflight
+results follow below. See the current [CI repair checkpoint](docs/reviews/desktop-migration-history-results.md#current-ci-repair-checkpoint).
+
+The normal push hook also exposed a reused-fork benchmark failure. It is aligned with CI's mandatory
+ordinary-suite/fresh-benchmark separation, with unchanged workload and thresholds; ten boundary
+controls and four unchanged Git-isolation controls pass. Actual retained-app recording, native export
+and clean restart now pass on this production source: all29 original application tables and112 settled
+monitoring samples/preferences were preserved. Updated [preflight evidence](docs/reviews/desktop-migration-history-results.md#updated-actual-app-preflight)
+records the source/report bindings and idle coverage limits. The live Models screen shows a failed
+connection status, so model-driven stress readiness is not established. No model configuration change
+or paid call was made by this work. Fresh hosted qualification remains pending; the prior source's
+green jobs do not qualify the local correction.
+
+Known committed migration metadata now drives one immediate SQLite transaction encompassing history
+checks, pending SQL/journal writes, existing legacy repair and scoped schema verification. Missing
+past migrations, conflicting history or changed Git/Stop contracts fail closed with a fixed safe
+recovery error; unknown rows are preserved and never replayed. Every failed open rolls back and closes.
+Ordinary upgrades and complete known schemas with a later unknown journal entry remain supported.
+
+Local verification: 214 database tests and 229 desktop unit tests passed; both real managed Electron
+retained-upgrade and rejected-history journeys passed without retries. The critic's atomicity,
+trigger, isolated constraint, safe-error and cleanup findings are addressed; independent final source
+and evidence review approved with no remaining findings. Hosted current-head gates remain pending.
+New cases are discovered by normal DB/Electron CI, with explicit
+workflow comments. P1 stays IN_PROGRESS until actual CI qualification. See the
+[task](docs/tasks/agent-platform-desktop-migration-history.md) and
+[results](docs/reviews/desktop-migration-history-results.md).
+
+Cumulative [PR345](https://github.com/jwill9999/agent-platform/pull/345) supersedes closed PR344 while
+retaining its ancestry/source. First head `92d249b7` received five Sonar findings; bounded repairs
+remove the unused fixture CLI, use Set membership and replace native Promise-chain style with an
+event-driven check. A never-pushed top-level readiness-await draft hit its unchanged watchdog and
+was corrected; the real native macOS check, all25 migration cases and both Electron journeys pass
+again. Fresh exact-head hosted checks remain pending; no suppression, bypass or task closure.
+The `77a4cca3` Sonar gate passed but still listed one style finding. The already-ready branch now
+awaits its native verification only after readiness is confirmed; the not-ready branch remains
+event-driven. The native macOS rerun passes, and final-head hosted qualification remains required.
+
+The escape analysis found that fixture master keys bypassed native Keychain initialization, while
+fresh seeded Electron profiles missed anomalous future history with absent earlier tables. PR344
+contains the earlier Electron42.4.1/native macOS check; this cumulative task-tip carries those changes
+forward. Feature CI skips the macOS staging-only job, so actual native hosted qualification still
+requires the later protected staging PR. The owner trial has not run; previous preflight follows.
+
+## Actual-app recording, export and restart preflight passed
+
+Stop/monitoring remain delivered in staging `d55f20ed`. The owner authorized actual-app preflight,
+then the bounded Electron42.4.1 patch and a separate reviewed one-time database recovery. Exact
+patch/regression source is committed/pushed at `f194f571`; final documentation/PR/check state is in
+canonical Beads. No new merge authority is inferred and the patch is not yet delivered to staging.
+
+The normal retained profile now opens with its authenticated original Make key. Two startup failures
+were diagnosed before repair: Electron42.0.1 async availability race, then missing Git/Stop tables
+because a later unknown migration journal entry skipped current0019/0020. The reviewed recovery
+retains a private backup and preserves all original rows/history. Source and native checks pass;
+desktop229unit tests/build/typecheck/lint/normalhooks pass. Original failures remain retained.
+
+Actual app controls enabled seven-day recording. Native Save As produced a safe report containing
+five samples across two process identities with30.001-second intervals, zero loss/conflicts and
+resource gaps0. Clean quit/relaunch retained all original three sample IDs and the preference; fresh
+periodic samples arrived after restart. Minimum app-volume free space60.50GiB exceeds20GiB.
+Final Downloads report `agent-platform-monitoring-after-restart-20261017T0157Z.json` is8857bytes,
+SHA256 `2f02b1719f78a7e38eb8c4bd51f8dfb4078772d7f0e6ffdf66deabc3dc8118ee`.
+Independent critique verified its metadata, cadence, process groups and health/coverage limits.
+
+This was idle preflight: no model/provider request or owner stress workload. Zero V1 events correctly
+leave combined coverage incomplete; first-process CPU/event-loop baselines are explicitly unknown.
+The actual app is left open with recording enabled for the bounded local owner trial: disposable
+Project, at most2sessions/20requests/30minutes, one active run per session and no implicit paid spend.
+The owner-trial task stays OPEN; patch PR/hosted delivery is separate from local preflight readiness.
+
+See [startup results](docs/tasks/agent-platform-desktop-secure-storage-startup.md),
+[authorized schema recovery](docs/tasks/agent-platform-owner-profile-schema-preflight.md) and
+[P1 general migration follow-up](docs/tasks/agent-platform-desktop-migration-history.md).
+Global Workspace Files still shows an unexpected error; monitoring works, and the observation is
+retained for trial triage without a speculative cause or repair claim. All24 original user-table rows
+remain identical. Main/paused PR283 work and disabled Docker gateway remain untouched. No new
+external publication. Earlier staged handoff follows unchanged.
+
+<!-- markdownlint-disable MD025 -->
+
 # Stop and durable monitoring — protected integration checkpoint
 
 Protected [PR336](https://github.com/jwill9999/agent-platform/pull/336) delivered the opt-in
