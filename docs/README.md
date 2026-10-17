@@ -46,10 +46,12 @@ Use the [planning procedure](../.agents/skills/feature-planning/SKILL.md) for de
 
 ## Publication and maintenance
 
-Native developer tasks use authorized direct publication tools. A planning-only or read-only review
-assignment returns material to its coordinator; those responsibilities do not attest tool isolation.
-Only publication owned by an explicitly selected prototype run uses its journaled broker.
-Publication alone is not implementation/merge/release authority.
+Native developer tasks maintain repository records using permitted tools. A planning-only or
+read-only review assignment returns material to its coordinator; those responsibilities do not
+attest tool isolation. Task authorization, available tools or an installed skill does not authorize
+external publication. That requires an explicit owner request covering the destination and documents.
+Only publication owned by an explicitly selected prototype run uses its journaled broker; the broker
+route does not expand this authority. Publication alone is not implementation/merge/release authority.
 
 Read back documents and Beads dependencies. Preserve source/review/owner-authorization provenance.
 An agreed end-to-end task permits routine planning refinements and implementation phases without
@@ -61,15 +63,15 @@ Validate changed Markdown and local references; preserve existing links. Session
 belongs in the repository's `session.md`, pointing to durable task and review records. Skills link this
 guide rather than maintain competing folder maps. Do not move old documents simply to satisfy the new map.
 
-## Notion publication
+## External publication
 
-For substantive documentation changes, use the repository
-[Notion publishing skill](../.agents/skills/agent-platform-documentation/SKILL.md) alongside the
-[documentation skill](../.agents/skills/documentation/SKILL.md). Publish the complete changed documents
-to the Agent Platform Notion hub and verify the returned content. This includes plans, task specs,
-reviews, guides, skills and session handoffs outside this folder. Explicit local-only requests take
-precedence. Repository files remain canonical; Beads remains authoritative for task status.
+Repository files remain canonical; Beads remains authoritative for task status. Use the
+[documentation skill](../.agents/skills/documentation/SKILL.md) to maintain these records.
+Publish documentation externally only when the owner explicitly requests the destination and
+content. This rule also applies to home-installed skills, portable fallbacks and older task plans;
+none supplies standing publication permission. Earlier mandatory-mirror instructions describe their
+historical delivery and do not override this policy for new work. Routine changes do not require
+Notion mirrors, duplicate historical session pages or generated publication payload/readback files
+under Codex home. Validate and read back an external copy only within the requested publication scope.
 
-Preserve human Notion notes and branch-specific mirror identity. A missing connection or unauthorized
-explicit-prototype publishing path leaves Notion publication pending; it does not justify broadening worker
-access or claiming sync. The skills guide agent actions; they do not install a background watcher.
+Preserve existing external pages and human notes unless their deletion is explicitly requested.
