@@ -157,7 +157,11 @@ test('MIG-R06 refuses inconsistent retained history with safe diagnostics and no
   const f = await fixture('blocked');
   const before = inspectMigrationProfile(f.sqlitePath);
   // A rejected app can exit before Playwright's Electron handshake; observe the real process instead.
-  const child = spawn(requireFromDesktop('electron') as string, f.options.args, {
+  // Match Playwright's Linux Electron launch policy for this disposable fixture. The direct
+  // failure-path launch must reach our main process, rather than fail in Chromium's CI sandbox.
+  // This changes no product launch flags or native macOS sandbox coverage.
+  const args = process.platform === 'linux' ? ['--no-sandbox', ...f.options.args] : f.options.args;
+  const child = spawn(requireFromDesktop('electron') as string, args, {
     cwd: f.options.cwd,
     env: f.options.env,
     detached: process.platform !== 'win32',
@@ -197,7 +201,16 @@ test('MIG-R06 refuses inconsistent retained history with safe diagnostics and no
       path: evidence,
     });
   } finally {
-    await stopRejectedGroup(child);
-    await removeReleasedFixture(f);
+    try {
+      // Retain isolated launch evidence even if Electron exits before creating backend logs.
+      // fixtureEnvironment excludes inherited credentials and all application/provider settings.
+      await info.attach('rejected-desktop-stderr', {
+        body: stderr,
+        contentType: 'text/plain',
+      });
+    } finally {
+      await stopRejectedGroup(child);
+      await removeReleasedFixture(f);
+    }
   }
 });

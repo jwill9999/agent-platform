@@ -3,6 +3,38 @@
 Task: [agent-platform-desktop-migration-history](../tasks/agent-platform-desktop-migration-history.md).
 Date: 17 October 2026. Status: implemented and locally tested; hosted qualification pending.
 
+## Current CI repair checkpoint
+
+CI `38995982248` at `769a5517` passed all25 migration unit cases, the full214-test database
+suite and browser journeys (41 passed, one existing context-fixture skip). It failed the rejected
+Electron launch twice because no backend log was created, and the fresh-process diagnostics benchmark
+failed repetition2 locked p95 overhead37.508ms against the unchanged20ms limit. Sonar passed with
+zero open issues. The passing jobs do not qualify either failure or a later changed head.
+
+Installed Playwright1.59.1 adds `--no-sandbox` to Linux Electron fixtures by default; the directly
+spawned rejected-startup fixture omitted it. That fixture now matches the existing Linux test launch
+policy and retains its bounded, isolated stderr even if startup fails before backend logs exist.
+Product launch flags and native macOS sandbox coverage are unchanged. A disposable Linux42.0.1
+control aborts before application startup on its SUID sandbox configuration without the flag and
+reports its version with the flag; this is supporting evidence, not an exact42.4.1 hosted replay.
+Both actual managed Electron migration journeys pass locally again, zero retries,4.5seconds:
+`~/.codex/migration-regression-20261017/electron-linux-policy-repair-local.log`.
+
+The unchanged benchmark passed all9 local vectors. Its hosted timing cause remains unproven:
+high event-loop delay and a25ms GC observation coexist without timestamp correlation. Additional
+observations now retain request start/duration windows, GC start/duration, heap, event-loop utilization
+and active-resource types around phases/cleanup. They neither subtract pauses nor change workload,
+mode order, sample counts, limits, deadlines or pass rules. Resource types are not proof of worker
+exit and can omit unreferenced timers. The instrumented local run also completes all900 measured
+requests/990 provider-fixture calls and all original assertions; numerical evidence is
+`~/.codex/migration-regression-20261017/local-benchmark-observed.json`.
+Thread termination after bounded store close and uncancelled session-lock timers are diagnostic
+leads, not established causes. No production lifecycle or lock changes are included in this repair.
+
+Fresh hosted qualification and actual-app preflight remain required; this checkpoint does not declare
+the app ready for owner stress testing. No live provider request, owner data change, merge or
+external publication occurred.
+
 ## Why the issue escaped
 
 Existing tests already covered ordinary retained-v18 upgrades and additive SQL rollback. Electron

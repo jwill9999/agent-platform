@@ -8,6 +8,15 @@ Beads, independent critique and actual CI execution before closure. Work is on
 `feature/desktop-secure-storage-startup`. This worktree is separate from the running owner app.
 Merges remain separately authorized; no owner profile/build, gateway, global or paused work changed.
 
+CI `38995982248` at `769a5517` exposed two failures: missing backend logs in the directly spawned
+Linux rejected-startup fixture and diagnostic benchmark overhead37.508ms above its20ms limit.
+The fixture now matches Playwright's existing Linux launch policy and always retains isolated stderr;
+both real migration Electron journeys pass locally again. The unchanged benchmark and its added
+timestamp/heap/ELU observations pass locally, all9vectors/900measured requests, with limits unchanged.
+Its hosted timing cause remains unproven. No production lifecycle changes or blind rerun are used.
+Fresh hosted checks and actual-app recording/export/restart preflight remain required before reporting
+stress-test readiness. See the current [CI repair checkpoint](docs/reviews/desktop-migration-history-results.md#current-ci-repair-checkpoint).
+
 Known committed migration metadata now drives one immediate SQLite transaction encompassing history
 checks, pending SQL/journal writes, existing legacy repair and scoped schema verification. Missing
 past migrations, conflicting history or changed Git/Stop contracts fail closed with a fixed safe
