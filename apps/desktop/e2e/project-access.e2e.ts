@@ -461,12 +461,13 @@ test.describe('Electron Project access', () => {
         `${rendererOrigin}/?projectId=${encodeURIComponent(project.id)}&sessionId=${encodeURIComponent(session.id)}`,
       );
       await expect(page.getByText('Opening Project chat...')).toHaveCount(0, { timeout: 15_000 });
-      await expect(page.getByRole('heading', { name: firstProjectName })).toBeVisible();
-      await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
-      await expectProjectLocationBreadcrumb(projectChatHeader);
+      // Restored messages remove the empty-state heading; use the persistent Project header.
       await expect(page.getByText('/help init', { exact: true }).last()).toBeVisible({
         timeout: 15_000,
       });
+      await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
+      await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
+      await expectProjectLocationBreadcrumb(projectChatHeader);
       await expect(page.getByText('Scope: Selected Project').last()).toBeVisible({
         timeout: 15_000,
       });

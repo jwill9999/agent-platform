@@ -26,6 +26,35 @@ documentation is canonical; new external publication, copies or readbacks requir
 request covering the destination and documents. Previously created pages/receipts are retained, but
 no further publication or persistent publication artifacts are requested.
 
+### PR342 restored-conversation assertion repair
+
+Exact `34320e59` completed every executed feature context successfully, but Electron reported
+67 passes plus one flaky Project-reopen case. Its first attempt failed the five-second
+`getByRole('heading', { name: firstProjectName })` check after a hard deep link; the retry passed.
+The retained first-attempt screenshot shows the correct persistent Project header and original
+`/help init` conversation. Source inspection confirms this heading belongs to the empty state,
+which is removed when messages restore. The actual failure is an invalid transient test oracle;
+no provider, network, backend or monitoring regression is established.
+
+Artifact `12083595028` from CI `38984539042` was downloaded completely: 522,529,393 bytes,
+SHA256 `d08b9da37044eb8b8eea2181f2e58ac2161f6616a4b8005af029fb11c322bd8d`, equal to the
+API digest. Selected screenshot/context/trace members pass ZIP CRC checks; the screenshot SHA256 is
+`7a553d483f2b09ac835c9ff417a1d9ee9bba7b8bf49572e2eecb42dfd05ff777`. The trace contains
+runner actions only, without browser network/snapshots, so request timings are not inferred.
+Raw evidence remains under the private temporary `pr342-electron-failure-9q991b6o` directory.
+
+A controlled real managed-Electron probe waits for the existing conversation before checking the
+old heading; it reproduces the same five-second failure in 17.3 seconds, without retries. Its
+screenshot/context/trace remain in `/tmp/pr342-reopen-old-heading-probe`. The correction moves the
+existing fifteen-second conversation assertion before the persistent scoped Project-header check,
+retains that check's five-second deadline, and preserves all remaining history, navigation, native
+IDE, approval and actual file-effect assertions. No runtime, permission, timeout, retry policy or
+monitoring collection changes. Both corrected real Electron Project-access cases passed on their
+first attempts: 11.1 and 3.3 seconds, 14.9-second suite, retries/skips/failures zero. Artifacts remain
+in `/tmp/pr342-reopen-corrected-header`. Fresh hosted checks and independent source review must
+qualify the new revision; no clean hosted result is inferred from the earlier retry. The source-identical monitoring functional evidence remains applicable, separate
+from fresh hosted delivery and the owner's bounded stress session.
+
 ## Historical source-bound qualification records
 
 ## Source and authority

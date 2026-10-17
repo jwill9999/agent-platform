@@ -10,14 +10,24 @@ Stop PR334 and monitoring PR339/PR340 are feature-delivered. PR340 merged at
 `8836b3acbb05c3611693da6c63bec7afe80af917`, with its tree equal to reviewed `4d0d33d4` and all nine
 executed feature checks successful. The owner authorized this monitoring feature's protected staging
 integration once every current-head check and review finding clears, followed by cleanup of delivered
-branches with recovery protection. Its application, tests and workflow remain the reviewed monitoring
-source; the current reconciliation adopts qualified staging and updates documentation only.
+branches with recovery protection. The reconciliation adopts qualified staging and preserves the reviewed monitoring runtime.
+Its bounded test-only correction checks the persistent Project header after conversation restoration,
+rather than an empty-state heading removed by successful restoration; workflow and product behavior
+remain unchanged.
 
 This handoff reconciles actual staging `a46407b5` with monitoring `f13fc391`. Actual later
 source/PR/run/merge identities and delivery state are recorded in canonical Beads
 `agent-platform-local-diagnostics-monitoring` and PR metadata. This source checkpoint does not claim
 that the new integration's checks, staging delivery or owner trial have already completed. It must
 pass its own full security/CodeQL/quality, browser/Electron, actual packaged VM and review gates.
+
+PR342 qualification exposed one Electron first-attempt failure despite a successful retry. The
+retained screenshot shows the correct Project and restored history; source inspection confirms the
+old heading exists only while messages are empty. A controlled real Electron probe reproduces the
+old assertion failure after history restoration. The corrected scenario keeps the existing history
+and header deadlines and all backend/file-effect checks. Actual corrected test results, source review
+and fresh hosted qualification are recorded in Beads and the results record; the earlier retry does
+not establish a clean original pass. No application or monitoring runtime repair is claimed.
 
 Repository documentation is canonical. External publication, mirrors and readbacks require an
 explicit owner request covering the destination and documents. Historical requirements provide no
