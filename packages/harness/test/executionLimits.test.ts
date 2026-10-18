@@ -9,19 +9,29 @@ import type { ExecutionLimits } from '@agent-platform/contracts';
 
 let mockTokenUsage = { promptTokens: 50, completionTokens: 50 };
 
-vi.mock('ai', () => ({
+vi.mock('ai', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('ai')>()),
   streamText: vi.fn(() => ({
     textStream: (async function* () {
       yield 'Response';
     })(),
+    responseMessages: Promise.resolve([
+      { role: 'assistant', content: [{ type: 'text', text: 'Response' }] },
+    ]),
     toolCalls: Promise.resolve([]),
-    usage: Promise.resolve(mockTokenUsage),
+    usage: Promise.resolve({
+      inputTokens: mockTokenUsage.promptTokens,
+      outputTokens: mockTokenUsage.completionTokens,
+    }),
   })),
   jsonSchema: vi.fn((s: unknown) => s),
 }));
 
 vi.mock('@ai-sdk/openai', () => ({
-  createOpenAI: vi.fn(() => vi.fn()),
+  createOpenAI: vi.fn(() => {
+    const model = vi.fn();
+    return Object.assign(model, { responses: model });
+  }),
 }));
 
 // ---------------------------------------------------------------------------

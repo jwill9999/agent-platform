@@ -1,6 +1,6 @@
 'use client';
 
-import type { UIMessage } from 'ai';
+import type { HarnessUiMessage as UIMessage } from '@/lib/harness-ui-message';
 
 import { Message } from '@/components/chat/message';
 

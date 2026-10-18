@@ -10,6 +10,9 @@ import {
   mockStreamResult,
 } from './helpers/aiMock.js';
 import { SYSTEM_TOOLS } from '../src/systemTools.js';
+import { GIT_DELIVERY_TOOLS } from '../src/tools/gitTools.js';
+import { createAgent, openDatabase, upsertTool } from '@agent-platform/db';
+import { buildAgentContext, destroyAgentContext } from '../src/factory.js';
 
 // ---------------------------------------------------------------------------
 // Mock the AI SDK before importing the node (delegates to shared helper)
@@ -19,7 +22,8 @@ vi.mock('ai', () => setupAiMock());
 vi.mock('@ai-sdk/openai', () => setupOpenAiProviderMock());
 
 // Import after mocks — use createLlmReasonNode (llmReasonNode is deprecated)
-const { createLlmReasonNode: _createNode } = await import('../src/nodes/llmReason.js');
+const { createLlmReasonNode: _createNode, buildToolNameMap } =
+  await import('../src/nodes/llmReason.js');
 const llmReasonNode = _createNode();
 
 // ---------------------------------------------------------------------------
@@ -104,7 +108,7 @@ describe('llmReasonNode', () => {
     expect(result.messages![0]).toHaveProperty('toolCalls');
   });
 
-  it('handles empty text and no tool calls gracefully', async () => {
+  it('halts safely on empty output rather than inventing a public answer', async () => {
     mockStreamText.mockReturnValueOnce(
       mockStreamResult({
         textChunks: [],
@@ -114,7 +118,9 @@ describe('llmReasonNode', () => {
 
     const result = await llmReasonNode(makeState());
 
-    expect(result.llmOutput).toEqual({ kind: 'text', content: '' });
+    expect(result.llmOutput).toBeNull();
+    expect(result.contextHalt?.code).toBe('MODEL_OUTPUT_INCOMPLETE');
+    expect(result.halted).toBe(true);
     expect(result.totalTokensUsed).toBe(0);
   });
 
@@ -198,9 +204,9 @@ describe('llmReasonNode', () => {
     await llmReasonNode(makeState({ toolDefinitions: toolDefs }));
 
     const call = mockStreamText.mock.calls.at(-1)?.[0] as {
-      tools?: Record<string, { parameters?: unknown }>;
+      tools?: Record<string, { inputSchema?: unknown }>;
     };
-    expect(JSON.stringify(call.tools?.browser_drop?.parameters)).not.toContain('propertyNames');
+    expect(JSON.stringify(call.tools?.browser_drop?.inputSchema)).not.toContain('propertyNames');
   });
 
   it('passes built-in system tools to the SDK with OpenAI-safe strict schemas', async () => {
@@ -216,10 +222,10 @@ describe('llmReasonNode', () => {
     );
 
     const call = mockStreamText.mock.calls.at(-1)?.[0] as {
-      tools?: Record<string, { parameters?: { jsonSchema?: Record<string, unknown> } }>;
+      tools?: Record<string, { inputSchema?: { jsonSchema?: Record<string, unknown> } }>;
     };
     expect(Object.keys(call.tools ?? {})).not.toContain(expect.stringContaining(':'));
-    const bashSchema = call.tools?.sys_bash?.parameters?.jsonSchema;
+    const bashSchema = call.tools?.sys_bash?.inputSchema?.jsonSchema;
     expect(bashSchema).toMatchObject({
       type: 'object',
       additionalProperties: false,
@@ -311,7 +317,7 @@ describe('createLlmReasonNode with emitter', () => {
 
     const node = createLlmReasonNode(emitter);
 
-    await expect(node(makeState())).rejects.toThrow('Invalid API key provided');
+    await expect(node(makeState())).rejects.toThrow('The provider request failed.');
   });
 });
 
@@ -474,7 +480,7 @@ describe('provider admission boundary', () => {
     expect(mockStreamText.mock.calls[0]![0].messages).toBe(
       mockStreamText.mock.calls[1]![0].messages,
     );
-    expect(mockStreamText.mock.calls[0]![0].maxTokens).toBe(123);
+    expect(mockStreamText.mock.calls[0]![0].maxOutputTokens).toBe(123);
     expect(onContextDecision).toHaveBeenCalledTimes(1);
     expect(onModelAttempt).toHaveBeenCalledTimes(2);
   });
@@ -516,3 +522,92 @@ describe('provider admission boundary', () => {
     expect(result.llmOutput).toEqual({ kind: 'text', content: 'ok' });
   });
 });
+
+it('rejects ambiguous sanitized tool names before any provider request', async () => {
+  mockStreamText.mockClear();
+  await expect(
+    _createNode()(
+      makeState({
+        toolDefinitions: [
+          { name: 'mcp:read', description: 'One', parameters: { type: 'object', properties: {} } },
+          { name: 'mcp__read', description: 'Two', parameters: { type: 'object', properties: {} } },
+        ],
+      }),
+    ),
+  ).rejects.toThrow('ambiguous');
+  expect(mockStreamText).not.toHaveBeenCalled();
+});
+
+it('coalesces the assigned canonical Git registry records into one provider tool identity', async () => {
+  const opened = openDatabase(':memory:');
+  let context: Awaited<ReturnType<typeof buildAgentContext>> | undefined;
+  try {
+    // The actual agents router persists assigned native Git tools this way.
+    for (const tool of GIT_DELIVERY_TOOLS) upsertTool(opened.db, tool);
+    const agent = createAgent(opened.db, {
+      name: 'Canonical Git registry fixture',
+      systemPrompt: 'Use reviewed Git tools.',
+      allowedSkillIds: [],
+      allowedToolIds: GIT_DELIVERY_TOOLS.map((tool) => tool.id),
+      allowedMcpServerIds: [],
+      executionLimits: { maxSteps: 6, maxParallelTasks: 1, timeoutMs: 30000 },
+    });
+    context = await buildAgentContext(opened.db, agent.id);
+    const definitions = contractToolsToDefinitions(context.tools);
+    for (const tool of GIT_DELIVERY_TOOLS)
+      expect(definitions.filter((definition) => definition.name === tool.id)).toHaveLength(2);
+    const mapped = buildToolNameMap(definitions);
+    for (const tool of GIT_DELIVERY_TOOLS) {
+      expect(Object.keys(mapped.tools).filter((id) => id === tool.id)).toHaveLength(1);
+      expect(mapped.mappedSchemas.filter((definition) => definition.name === tool.id)).toHaveLength(
+        1,
+      );
+      expect(
+        [...mapped.toOriginal].filter(
+          ([safe, original]) => safe === tool.id && original === tool.id,
+        ),
+      ).toHaveLength(1);
+    }
+    mockStreamText.mockClear();
+    mockStreamText.mockReturnValueOnce(mockStreamResult({ textChunks: ['Git ready'] }));
+    const result = await _createNode()(makeState({ toolDefinitions: definitions }));
+    expect(result.llmOutput).toEqual({ kind: 'text', content: 'Git ready' });
+    expect(mockStreamText).toHaveBeenCalledTimes(1);
+    expect(Object.keys(mockStreamText.mock.calls[0]![0].tools)).toHaveLength(SYSTEM_TOOLS.length);
+  } finally {
+    if (context) await destroyAgentContext(context);
+    opened.sqlite.close();
+  }
+});
+
+it.each(['description', 'schema', 'distinct-id'] as const)(
+  'rejects %s collisions in either input order before any provider request',
+  async (conflict) => {
+    const first: ToolDefinition = {
+      name: 'mcp:read',
+      description: 'Read',
+      parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+    };
+    const second: ToolDefinition =
+      conflict === 'description'
+        ? { ...first, description: 'Different' }
+        : conflict === 'schema'
+          ? {
+              ...first,
+              parameters: {
+                type: 'object',
+                properties: { path: { type: 'number' } },
+                required: ['path'],
+              },
+            }
+          : { ...first, name: 'mcp__read' };
+    for (const toolDefinitions of [
+      [first, second],
+      [second, first],
+    ]) {
+      mockStreamText.mockClear();
+      await expect(_createNode()(makeState({ toolDefinitions }))).rejects.toThrow('ambiguous');
+      expect(mockStreamText).not.toHaveBeenCalled();
+    }
+  },
+);

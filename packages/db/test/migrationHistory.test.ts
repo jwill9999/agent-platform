@@ -75,7 +75,14 @@ describe('retained migration history regressions', () => {
     for (let n = 0; n < 2; n++) openDatabase(path).sqlite.close();
     const after = inspect(path);
     for (const [name, rows] of Object.entries(before.rows)) {
-      if (name !== '__drizzle_migrations') expect(after.rows[name]).toEqual(rows);
+      if (name === '__drizzle_migrations') continue;
+      const expected =
+        name === 'messages'
+          ? rows.map((row) => ({ ...row, provider_continuation_format: 0 }))
+          : name === 'model_configs'
+            ? rows.map((row) => ({ ...row, base_url: null }))
+            : rows;
+      expect(after.rows[name]).toEqual(expected);
     }
     for (const table of [
       'git_delivery_operations',
@@ -86,7 +93,7 @@ describe('retained migration history regressions', () => {
       expect(after.rows[table]).toEqual([]);
     }
     expect(after.rows.__drizzle_migrations).toHaveLength(
-      before.rows.__drizzle_migrations.length + 2,
+      before.rows.__drizzle_migrations.length + 3,
     );
   });
   it('MIG-R02/04 rejects the escaped future-journal/missing-schema case repeatedly without mutation', () => {
@@ -223,6 +230,9 @@ describe('retained migration history regressions', () => {
     'run_executions',
     'run_attempts',
     'approval_requests',
+    'provider_continuations',
+    'messages',
+    'model_configs',
   ])('rejects an unexpected trigger on %s without firing it or changing records', (table) => {
     const path = profile('complete');
     const sqlite = new Database(path);
@@ -237,6 +247,12 @@ describe('retained migration history regressions', () => {
     );
   });
   it.each([
+    ['missing private table', 'DROP TABLE provider_continuations'],
+    [
+      'missing continuation marker',
+      'ALTER TABLE messages DROP COLUMN provider_continuation_format',
+    ],
+    ['missing endpoint column', 'ALTER TABLE model_configs DROP COLUMN base_url'],
     ['missing column', 'ALTER TABLE controlled_runs RENAME COLUMN state TO incompatible_state'],
     ['missing index', 'DROP INDEX run_attempts_run_idx'],
     [

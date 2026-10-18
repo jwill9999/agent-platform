@@ -1,5 +1,10 @@
 import { generateText } from 'ai';
-import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
+import {
+  createLanguageModel,
+  providerGenerationOptions,
+  toProviderRequestError,
+  type SupportedProvider,
+} from '@agent-platform/model-router';
 import { DodContractSchema, type DodContract } from '@agent-platform/contracts';
 
 import type { HarnessStateType } from '../graphState.js';
@@ -40,9 +45,13 @@ async function defaultPropose(state: HarnessStateType): Promise<string[]> {
     provider: (modelConfig.provider ?? 'openai') as SupportedProvider,
     model: modelConfig.model,
     apiKey: modelConfig.apiKey,
+    baseURL: modelConfig.baseURL,
   });
   const result = await generateText({
+    allowSystemInMessages: true,
     model,
+    ...providerGenerationOptions(modelConfig),
+    maxRetries: 0,
     messages: [
       {
         role: 'system',
@@ -54,6 +63,8 @@ async function defaultPropose(state: HarnessStateType): Promise<string[]> {
         content: `User request:\n${firstUser.content}`,
       },
     ],
+  }).catch((error: unknown) => {
+    throw toProviderRequestError(error);
   });
   const json = extractFirstJsonObject(result.text);
   if (!json) {

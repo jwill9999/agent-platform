@@ -4,6 +4,7 @@ import { parseToolId } from '@agent-platform/agent-validation';
 import {
   ContextDecisionMetadataSchema,
   DiagnosticEventSchema,
+  ProviderFailureCategorySchema,
   type DiagnosticEvent,
   type DiagnosticStore,
 } from '@agent-platform/contracts';
@@ -67,7 +68,9 @@ export function diagnosticIngress(
     // Avoid recursive diagnostic reads and unrelated platform instrumentation in this MVP.
     if (
       req.method !== 'POST' ||
-      !/^\/v1\/(chat(?:\/|$)|sessions\/[^/]+\/(?:resume|runs\/[^/]+\/stop)$)/.test(req.path)
+      !/^\/v1\/(chat(?:\/|$)|sessions\/[^/]+\/(?:resume|runs\/[^/]+\/stop)$|model-configs\/[^/]+\/test$)/.test(
+        req.path,
+      )
     )
       return next();
     const requestId: unknown = res.locals.requestId;
@@ -114,6 +117,43 @@ export function diagnosticIngress(
           );
       });
       next();
+    });
+  };
+}
+
+/** Settings probes use the same durable, allowlisted sink as execution, with their own operation. */
+export function beginDiagnosticProbe(
+  modelConfigId: string,
+  provider: string,
+): (result: { ok: boolean; category?: string }) => void {
+  const current = context.getStore();
+  if (!current) return () => {};
+  const operationId = randomUUID();
+  const parsedProvider = DiagnosticEventSchema.shape.provider.safeParse(provider);
+  const metadata = {
+    operationId,
+    ...(uuid.test(modelConfigId) ? { modelConfigId } : {}),
+    provider: parsedProvider.success ? parsedProvider.data : ('other' as const),
+  };
+  const started = performance.now();
+  emit({ phase: 'connection', outcome: 'started', attempt: 1, ...metadata });
+  let finished = false;
+  return (result) => {
+    if (finished) return;
+    finished = true;
+    const category = ProviderFailureCategorySchema.safeParse(result.category);
+    emit({
+      phase: 'connection',
+      outcome: result.ok ? 'succeeded' : 'failed',
+      durationMs: performance.now() - started,
+      attempt: 1,
+      ...metadata,
+      ...(!result.ok
+        ? {
+            errorCode: 'provider_error' as const,
+            providerFailure: category.success ? category.data : ('unknown' as const),
+          }
+        : {}),
     });
   };
 }

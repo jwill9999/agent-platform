@@ -19,10 +19,11 @@ type WireRequest = {
     tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
   }>;
 };
-// Independently reconstruct the counted message/schema envelope from captured OpenAI
-// wire JSON. Installed @ai-sdk/openai serializes call args and tool results as JSON
-// strings and omits result tool names, so reverse only those documented wire shapes.
-// This is the MVP character estimate, not a provider tokenizer or reported usage.
+// Independently reconstruct the SDK7 counted message/schema envelope from captured
+// OpenAI-compatible wire JSON. Call arguments are JSON, while text tool outputs stay
+// literal strings (including the security wrapper and untrusted-content note). Restore
+// SDK7 input/output fields without parsing or unwrapping tool text. This is the MVP
+// character estimate, not a provider tokenizer or reported usage.
 function inspectWireBudget(wire: WireRequest) {
   const names = new Map<string, string>();
   const outstanding = new Set<string>();
@@ -42,7 +43,7 @@ function inspectWireBudget(wire: WireRequest) {
             type: 'tool-result',
             toolCallId: id,
             toolName: names.get(id),
-            result: JSON.parse(message.content as string),
+            output: { type: 'text', value: message.content as string },
           },
         ],
       });
@@ -67,7 +68,7 @@ function inspectWireBudget(wire: WireRequest) {
         type: 'tool-call',
         toolCallId: call.id,
         toolName: call.function.name,
-        args: JSON.parse(call.function.arguments),
+        input: JSON.parse(call.function.arguments),
       });
     }
     messages.push({ role: 'assistant', content });
@@ -97,7 +98,7 @@ function inspectWireBudget(wire: WireRequest) {
     toolSchemaCount: tools.length,
     actualWireCharacters: JSON.stringify(wire).length,
     countBasis:
-      'serialized_request_chars_v1: ceil(JSON.stringify({messages,tools}).length/4), SDK wire JSON args/results decoded; approximate, not actual provider token usage',
+      'serialized_request_chars_v1: ceil(JSON.stringify({messages,tools}).length/4), SDK7 tool-call JSON input decoded and full text tool output preserved; approximate, not actual provider token usage',
   };
 }
 type Audit = { toolName: string; status: string; argsJson: string; resultJson?: string };

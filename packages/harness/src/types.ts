@@ -1,3 +1,5 @@
+import type { ProviderContinuationBinding } from '@agent-platform/db';
+import type { PrivateChatMetadata } from './providerContinuation.js';
 import type { RunExecutionControl } from './runControl.js';
 import type { McpApprovalBinding } from './security/mcpApproval.js';
 import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
@@ -6,11 +8,13 @@ import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
 // Chat messages (LLM conversation format)
 // ---------------------------------------------------------------------------
 
-export type ChatMessage =
-  | { role: 'system'; content: string }
-  | { role: 'user'; content: string }
-  | { role: 'assistant'; content: string; toolCalls?: ToolCallIntent[] }
-  | { role: 'tool'; content: string; toolCallId: string; toolName: string };
+export type ChatMessage = PrivateChatMetadata &
+  (
+    | { role: 'system'; content: string }
+    | { role: 'user'; content: string }
+    | { role: 'assistant'; content: string; toolCalls?: ToolCallIntent[] }
+    | { role: 'tool'; content: string; toolCallId: string; toolName: string }
+  );
 
 // ---------------------------------------------------------------------------
 // Tool definitions (OpenAI function-calling format)
@@ -57,6 +61,8 @@ export type LlmModelConfig = {
   provider: string;
   model: string;
   apiKey?: string;
+  baseURL?: string;
+  continuationBinding?: ProviderContinuationBinding;
 };
 
 // ---------------------------------------------------------------------------

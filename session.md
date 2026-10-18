@@ -1,3 +1,37 @@
+# Provider SDK and model choice — 18 October 2026
+
+Owner approved completion of the SDK/provider MVP: OpenAI, Claude, Gemini, DeepSeek, Grok plus
+OpenRouter alternatives; researched emulated services accepted, no new paid calls. Provider and
+model-connection-diagnostics Beads remain in_progress. See
+[plan](docs/planning/provider-sdk-compatibility.md),
+[verification](docs/testing/provider-sdk-compatibility.md) and
+[actual results/review](docs/reviews/provider-sdk-compatibility.md).
+
+Security delivery is staging `ece78d8a`; eleven advisories remain tracked. SDK task
+`task/provider-sdk-refresh-plan` and feature `feature/provider-sdk-refresh` start from that actual base.
+The pinned maintained SDK cohort, eight adapters, encrypted private continuation, honest probes and
+safe durable diagnostics are implemented but uncommitted. Independent source reviews approved the
+router135, DB236, contracts165 and focused20, configAPI8, harness819 and API90 qualification. Web431,
+full types/lint/format and builds passed, with affected packages rebuilt after the latest repair.
+Current rebuilt browser43/43 passed retry0/skip0, including all selected provider chat streams and
+existing Git/Stop/MCP/reply/context journeys. The broad native run finished68pass/4fail; both new SDK
+journeys passed. Correct-cwd MCP2 and independently reviewed MIG/label focused3 then passed, giving
+all72 unique scenarios passing evidence across runs. Original failures are retained. Pre-UX browser
+and broad native source bindings are explicit; no single-run72clean or post-UX full-suite claim.
+
+The final SDK-UX01 error projection/recovery guidance passed67 affected harness cases and41 context
+API cases, rebuilds/types/lint. Independent evidence review verified encrypted continuation, exactly
+one approved effect, denial, restart fences, durable diagnostic identities/coverage and private-data
+exclusion. The additive migration test retains every historical field and exact prior journal while
+explicitly checking the new default-zero column/table and three SQL hashes/timestamps. Normal push
+hooks, full affected suites/fresh benchmark and exact-head hosted gates remain open.
+No SDK PR, integration, owner-app rebuild or stress readiness is claimed yet. Preserve the owner
+app/profile/key, paused orchestration, main and disabled Docker gateway. Historical handoff below
+is retained verbatim; its superseded pending states do not override this current checkpoint.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Historical session follows; retain its original top-level headings verbatim. -->
+
 # Dependency security — protected staging review repair, 18 October 2026
 
 Beads `agent-platform-dependency-security` remains in progress; activation is open.

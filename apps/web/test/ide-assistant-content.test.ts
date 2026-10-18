@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { UIMessage } from 'ai';
+import type { HarnessUiMessage as UIMessage } from '@/lib/harness-ui-message';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { AssistantContent } from '@/components/ide/ide-with-chat';

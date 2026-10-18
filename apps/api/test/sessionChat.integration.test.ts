@@ -42,16 +42,20 @@ const HIDDEN_WRITE_TOOL_NAMES = [
   'coding_apply_patch',
 ] as const;
 
-vi.mock('ai', () => ({
-  streamText: (...args: unknown[]) => mockStreamText(...args),
-  generateText: (...args: unknown[]) => mockGenerateText(...args),
-  jsonSchema: (schema: unknown) => ({ type: 'json-schema', jsonSchema: schema }),
-}));
+vi.mock('ai', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ai')>();
+  return {
+    ...actual,
+    streamText: (...args: unknown[]) => mockStreamText(...args),
+    generateText: (...args: unknown[]) => mockGenerateText(...args),
+  };
+});
 
 vi.mock('@ai-sdk/openai', () => ({
-  createOpenAI:
-    ({ apiKey }: { apiKey: string }) =>
-    (model: string) => ({ provider: 'openai', modelId: model, apiKey }),
+  createOpenAI: ({ apiKey }: { apiKey: string }) => {
+    const factory = (model: string) => ({ provider: 'openai', modelId: model, apiKey });
+    return Object.assign(factory, { responses: factory });
+  },
 }));
 
 vi.mock('@ai-sdk/anthropic', () => ({
@@ -164,8 +168,15 @@ function mockToolCallStream(toolName: string, args: Record<string, unknown>) {
     fullStream: (async function* () {})(),
     text: Promise.resolve(''),
     reasoning: Promise.resolve(undefined),
-    toolCalls: Promise.resolve([{ toolCallId: 'tc-approval', toolName, args }]),
-    usage: Promise.resolve({ promptTokens: 1, completionTokens: 1 }),
+    toolCalls: Promise.resolve([{ toolCallId: 'tc-approval', toolName, input: args }]),
+    finishReason: Promise.resolve('tool-calls'),
+    responseMessages: Promise.resolve([
+      {
+        role: 'assistant',
+        content: [{ type: 'tool-call', toolCallId: 'tc-approval', toolName, input: args }],
+      },
+    ]),
+    usage: Promise.resolve({ inputTokens: 1, outputTokens: 1, totalTokens: 2 }),
   });
 }
 
@@ -907,6 +918,109 @@ describe('POST /v1/chat (session-aware)', () => {
     }
   });
 
+  it('records an SDK7 HTTP tool response and pending approval through the actual reasoning node', async () => {
+    const envSnap = snapshotChatEnv();
+    const previousMasterKey = process.env.SECRETS_MASTER_KEY;
+    const { app, db, sqlite } = await createSeededApp(dirs);
+    const providerRequests: { path: string; body: Record<string, unknown> }[] = [];
+    const provider = await listenLoopback((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        providerRequests.push({
+          path: req.url ?? '',
+          body: JSON.parse(Buffer.concat(chunks).toString()) as Record<string, unknown>,
+        });
+        res.writeHead(200, { 'content-type': 'text/event-stream' });
+        const delta = {
+          id: 'chat_fixture',
+          created: 1,
+          model: 'SDK7-Fixture',
+          choices: [
+            {
+              index: 0,
+              delta: {
+                role: 'assistant',
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: 'tc-sdk7-http',
+                    type: 'function',
+                    function: { name: 'sys_bash', arguments: '{"command":"date"}' },
+                  },
+                ],
+              },
+              finish_reason: null,
+            },
+          ],
+        };
+        const finish = {
+          id: 'chat_fixture',
+          created: 1,
+          model: 'SDK7-Fixture',
+          choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        };
+        res.end(
+          `data: ${JSON.stringify(delta)}\n\ndata: ${JSON.stringify(finish)}\n\ndata: [DONE]\n\n`,
+        );
+      });
+    });
+    servers.push(provider);
+    try {
+      delete process.env.AGENT_OPENAI_API_KEY;
+      const masterKey = Buffer.alloc(32, 19);
+      process.env.SECRETS_MASTER_KEY = masterKey.toString('base64');
+      const address = provider.address();
+      if (!address || typeof address === 'string')
+        throw new Error('Expected disposable loopback provider');
+      createModelConfig(
+        db,
+        {
+          name: 'SDK7 local transport',
+          provider: 'ollama',
+          model: 'SDK7-Fixture',
+          baseURL: `http://127.0.0.1:${address.port}/v1`,
+        },
+        masterKey,
+      );
+      const sessionId = await createDefaultSession(app);
+      const response = await request(app)
+        .post(CHAT_ENDPOINT)
+        .send({ sessionId, message: 'Run date' })
+        .expect(200);
+      const events = parseNdjsonEvents(response.text);
+      expect(events.find((event) => event.type === 'error')).toBeUndefined();
+      expect(events.find((event) => event.type === 'approval_required')).toMatchObject({
+        toolName: 'sys_bash',
+        argsPreview: { command: 'date' },
+        riskTier: 'high',
+      });
+      expect(providerRequests).toHaveLength(1);
+      expect(providerRequests[0]).toMatchObject({
+        path: '/v1/chat/completions',
+        body: { model: 'SDK7-Fixture', stream: true },
+      });
+      const { listMessagesBySession } = await import('@agent-platform/db');
+      expect(listMessagesBySession(db, sessionId)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'assistant',
+            toolCalls: [{ id: 'tc-sdk7-http', name: 'sys_bash', args: { command: 'date' } }],
+          }),
+        ]),
+      );
+      await expectToolExecutionCount(db, sessionId, 'pending', 1);
+      await expectToolExecutionCount(db, sessionId, 'success', 0);
+    } finally {
+      restoreChatEnv(envSnap);
+      if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;
+      else process.env.SECRETS_MASTER_KEY = previousMasterKey;
+      await closeLoopback(provider);
+      await closeFixture(app, sqlite);
+    }
+  });
+
   it('streams approval_required when a tool needs human approval', async () => {
     const envSnap = snapshotChatEnv();
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
@@ -1549,6 +1663,14 @@ describe('POST /v1/chat (session-aware)', () => {
         provider: 'openai',
         model: 'gpt-4.1-mini',
         apiKey: 'sk-platform-default-test-key',
+        baseURL: undefined,
+        continuationBinding: {
+          provider: 'openai',
+          model: 'gpt-4.1-mini',
+          apiMode: 'responses',
+          endpoint: 'https://api.openai.com/v1',
+          credentialRevision: expect.stringMatching(/^[0-9a-f]{64}$/),
+        },
       });
     } finally {
       restoreChatEnv(envSnap);

@@ -44,6 +44,18 @@ export const DiagnosticOutcomeSchema = z.enum([
   'disconnected',
   'unknown',
 ]);
+export const ProviderFailureCategorySchema = z.enum([
+  'authentication',
+  'access',
+  'quota',
+  'rate_limit',
+  'request',
+  'transport',
+  'timeout',
+  'invalid_response',
+  'output_limited',
+  'unknown',
+]);
 export const DiagnosticErrorCodeSchema = z.enum([
   'invalid_request',
   'backend_unavailable',
@@ -80,7 +92,21 @@ export const DiagnosticEventSchema = z
     observedAtMs: count,
     durationMs: duration.optional(),
     attempt: count.min(1).optional(),
-    provider: z.enum(['openai', 'anthropic', 'google', 'azure', 'ollama', 'other']).optional(),
+    provider: z
+      .enum([
+        'openai',
+        'anthropic',
+        'google',
+        'azure',
+        'ollama',
+        'deepseek',
+        'xai',
+        'openrouter',
+        'openai-compatible',
+        'other',
+      ])
+      .optional(),
+    providerFailure: ProviderFailureCategorySchema.optional(),
     // Fixed tool family, never arbitrary registry labels, shell commands or MCP names.
     toolId: z.enum(['read', 'write', 'command', 'search', 'http', 'mcp', 'other']).optional(),
     errorCode: DiagnosticErrorCodeSchema.optional(),

@@ -1,17 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
 import { streamOpenAiChat } from '../src/openai.js';
-
+const streamMock = vi.hoisted(() => vi.fn(() => ({ fullStream: new ReadableStream() })));
+vi.mock('ai', () => ({ streamText: streamMock }));
 describe('streamOpenAiChat', () => {
-  it('returns a stream result without logging the api key', () => {
+  it('uses the shared Responses configuration without sending a live request or logging keys', () => {
     const spy = vi.spyOn(console, 'log');
     const result = streamOpenAiChat({
       apiKey: 'sk-secret-do-not-print',
-      model: 'gpt-4o-mini',
+      model: 'gpt-6.1-sol',
       messages: [{ role: 'user', content: 'hi' }],
     });
     expect(result.textStream).toBeDefined();
-    const logText = spy.mock.calls.flat().join(' ');
-    expect(logText).not.toContain('sk-secret');
+    expect(streamMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxRetries: 0,
+        providerOptions: { openai: { store: false, include: ['reasoning.encrypted_content'] } },
+      }),
+    );
+    expect(spy.mock.calls.flat().join(' ')).not.toContain('sk-secret');
     spy.mockRestore();
   });
 });

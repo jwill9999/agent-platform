@@ -8,6 +8,11 @@ import type { SupportedProvider } from './providers.js';
 const PROVIDER_KEY_ENV: Record<SupportedProvider, string> = {
   openai: 'AGENT_OPENAI_API_KEY',
   anthropic: 'AGENT_ANTHROPIC_API_KEY',
+  google: 'AGENT_GOOGLE_API_KEY',
+  deepseek: 'AGENT_DEEPSEEK_API_KEY',
+  xai: 'AGENT_XAI_API_KEY',
+  openrouter: 'AGENT_OPENROUTER_API_KEY',
+  'openai-compatible': '',
   ollama: '', // Ollama doesn't need an API key
 };
 
@@ -15,6 +20,11 @@ const PROVIDER_KEY_ENV: Record<SupportedProvider, string> = {
 const PROVIDER_LEGACY_ENV: Record<SupportedProvider, string> = {
   openai: 'OPENAI_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
+  google: 'GOOGLE_GENERATIVE_AI_API_KEY',
+  deepseek: 'DEEPSEEK_API_KEY',
+  xai: 'XAI_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+  'openai-compatible': '',
   ollama: '',
 };
 
@@ -52,7 +62,7 @@ export function resolveApiKeyForProvider(options: {
   if (header) return { outcome: 'ok', key: header };
 
   // Ollama doesn't need a key
-  if (provider === 'ollama') return { outcome: 'not_required' };
+  if (provider === 'ollama' || provider === 'openai-compatible') return { outcome: 'not_required' };
 
   // Provider-specific env var
   const envVar = PROVIDER_KEY_ENV[provider];

@@ -1,6 +1,11 @@
 import { generateText } from 'ai';
 import { createLogger } from '@agent-platform/logger';
-import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
+import {
+  createLanguageModel,
+  providerGenerationOptions,
+  toProviderRequestError,
+  type SupportedProvider,
+} from '@agent-platform/model-router';
 import { DodContractSchema, type DodContract } from '@agent-platform/contracts';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 
@@ -112,9 +117,13 @@ async function defaultEvaluate(
     provider: (modelConfig.provider ?? 'openai') as SupportedProvider,
     model: modelConfig.model,
     apiKey: modelConfig.apiKey,
+    baseURL: modelConfig.baseURL,
   });
   const result = await generateText({
+    allowSystemInMessages: true,
     model,
+    ...providerGenerationOptions(modelConfig),
+    maxRetries: 0,
     messages: [
       {
         role: 'system',
@@ -126,6 +135,8 @@ async function defaultEvaluate(
         content: `Criteria:\n${criteriaText}\n\nEvidence:\n${evidenceText}`,
       },
     ],
+  }).catch((error: unknown) => {
+    throw toProviderRequestError(error);
   });
   const json = extractFirstJsonObject(result.text);
   if (!json) {

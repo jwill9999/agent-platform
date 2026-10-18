@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, writeFileSync, rmSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -48,11 +48,14 @@ async function setup(replies: unknown[], allowed = true) {
   writeFileSync(join(repo, 'file.txt'), 'changed');
   const opened = openDatabase(join(directory, 'test.sqlite'));
   const provider = await startGitDeliveryProvider({ model: 'git-delivery-chat', replies });
-  const oldTracing = {
+  const oldEnvironment = {
+    SECRETS_MASTER_KEY: process.env.SECRETS_MASTER_KEY,
     LANGSMITH_TRACING: process.env.LANGSMITH_TRACING,
     LANGCHAIN_TRACING_V2: process.env.LANGCHAIN_TRACING_V2,
     LANGSMITH_TRACING_V2: process.env.LANGSMITH_TRACING_V2,
   };
+  // Durable tool/approval bindings use only this fixture's disposable encryption key.
+  process.env.SECRETS_MASTER_KEY = randomBytes(32).toString('base64');
   process.env.LANGSMITH_TRACING = 'false';
   process.env.LANGSMITH_TRACING_V2 = 'false';
   process.env.LANGCHAIN_TRACING_V2 = 'false';
@@ -61,16 +64,25 @@ async function setup(replies: unknown[], allowed = true) {
   const listener: { server?: Server } = {};
   let beforeStart: (() => Promise<void>) | undefined;
   cleanups.push(async () => {
-    if (listener.server) await closeLoopback(listener.server);
-    await provider.close();
-    for (const [key, value] of Object.entries(oldTracing)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+    try {
+      try {
+        if (listener.server) await closeLoopback(listener.server);
+      } finally {
+        await provider.close();
+      }
+    } finally {
+      for (const [key, value] of Object.entries(oldEnvironment)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      if (oldBase === undefined) delete process.env.OLLAMA_BASE_URL;
+      else process.env.OLLAMA_BASE_URL = oldBase;
+      try {
+        closeDatabase(opened.sqlite);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
-    closeDatabase(opened.sqlite);
-    rmSync(directory, { recursive: true, force: true });
-    if (oldBase === undefined) delete process.env.OLLAMA_BASE_URL;
-    else process.env.OLLAMA_BASE_URL = oldBase;
   });
   const server = await listenLoopback(
     createApp({

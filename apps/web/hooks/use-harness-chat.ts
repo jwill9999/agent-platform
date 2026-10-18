@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { UIMessage } from 'ai';
+import type { HarnessUiMessage as UIMessage } from '@/lib/harness-ui-message';
 import { z } from 'zod';
 import { gitApprovalReceipt, isGitDeliveryTool, gitReceiptBinding } from '@/lib/git-chat-receipts';
 import {

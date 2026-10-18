@@ -1,6 +1,7 @@
 import { expect, test, type ElectronApplication } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createConnection } from 'node:net';
@@ -17,6 +18,15 @@ import { getDesktopLaunchPorts } from './support/runtime.js';
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const requireFromDesktop = createRequire(join(desktopDir, 'package.json'));
+
+function recordRows(value: unknown): Record<string, unknown>[] {
+  if (
+    !Array.isArray(value) ||
+    value.some((row) => typeof row !== 'object' || row === null || Array.isArray(row))
+  )
+    throw new Error('Expected synthetic fixture records');
+  return value as Record<string, unknown>[];
+}
 
 async function fixture(mode: 'legacy' | 'blocked') {
   const root = mkdtempSync(join(tmpdir(), 'electron-migration-'));
@@ -122,16 +132,55 @@ test('MIG-R06 opens a retained profile through the real managed desktop and pres
     const health = await page.request.get(`http://127.0.0.1:${f.ports.backendPort}/health/ready`);
     expect(health.status()).toBe(200);
     const after = inspectMigrationProfile(f.sqlitePath);
-    expect(after.retained).toEqual(before.retained);
+    // The additive SDK migration supplies a legacy default; every original
+    // record field must still match, including unrelated tables and credentials.
+    for (const message of recordRows(before.retained.messages))
+      expect(message).not.toHaveProperty('provider_continuation_format');
+    expect(after.retained).toEqual({
+      ...before.retained,
+      messages: recordRows(before.retained.messages).map((message) => ({
+        ...message,
+        provider_continuation_format: 0,
+      })),
+    });
+    expect(
+      recordRows(after.schema).find((row) => row.type === 'table' && row.name === 'messages')?.sql,
+    ).toMatch(/[`"]?provider_continuation_format[`"]? integer DEFAULT 0 NOT NULL/i);
+    expect(before.tables).not.toContain('provider_continuations');
     expect(after.tables).toEqual(
       expect.arrayContaining([
         'git_delivery_operations',
         'controlled_runs',
         'run_executions',
         'run_attempts',
+        'provider_continuations',
       ]),
     );
-    expect(after.journal).toHaveLength(before.journal.length + 2);
+    expect(after.journal.slice(0, before.journal.length)).toEqual(before.journal);
+    const pendingTags = [
+      '0019_git_delivery_operations',
+      '0020_run_control',
+      '0021_provider_continuation',
+    ];
+    const migrationRoot = resolve(desktopDir, '../../packages/db/drizzle');
+    const journal = JSON.parse(readFileSync(join(migrationRoot, 'meta/_journal.json'), 'utf8')) as {
+      entries: { tag: string; when: number }[];
+    };
+    const pending = journal.entries.filter((entry) => pendingTags.includes(entry.tag));
+    expect(pending.map((entry) => entry.tag)).toEqual(pendingTags);
+    expect(
+      recordRows(after.journal.slice(before.journal.length)).map(({ hash, created_at }) => ({
+        hash,
+        created_at,
+      })),
+    ).toEqual(
+      pending.map((entry) => ({
+        hash: createHash('sha256')
+          .update(readFileSync(join(migrationRoot, `${entry.tag}.sql`)))
+          .digest('hex'),
+        created_at: entry.when,
+      })),
+    );
     expect(after.integrity).toBe('ok');
     expect(after.foreignKeyViolations).toBe(0);
   } finally {

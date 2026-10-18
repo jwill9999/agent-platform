@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { UIMessage } from 'ai';
+import type { HarnessUiMessage as UIMessage } from '@/lib/harness-ui-message';
 
 import { uiMessageToOutputs } from '../lib/uiMessageToOutputs';
 

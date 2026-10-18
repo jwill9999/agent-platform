@@ -43,3 +43,5 @@ export {
   MonitoringStoreError,
   type MonitoringStoreOptions,
 } from './monitoring/store.js';
+
+export * from './repositories/providerContinuation.js';

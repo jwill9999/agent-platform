@@ -1,4 +1,6 @@
+import { createInProcessSessionLock } from '../src/infrastructure/http/sessionLock.js';
 import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
+import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,6 +8,8 @@ import {
   appendMessage,
   closeDatabase,
   createProject,
+  createModelConfig,
+  updateModelConfig,
   DEFAULT_AGENT_ID,
   getWorkingMemoryArtifact,
   listMessagesBySession,
@@ -16,6 +20,7 @@ import {
   updateSettings,
   upsertWorkingMemoryArtifact,
 } from '@agent-platform/db';
+import { PROVIDER_CONTINUATION_RECOVERY_MESSAGE } from '@agent-platform/harness';
 import { createObservabilityStore } from '@agent-platform/plugin-observability';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -35,13 +40,37 @@ function response(
 ) {
   return {
     fullStream: (async function* () {
-      if (text) yield { type: 'text-delta', textDelta: text };
+      if (calls.length) yield { type: 'reasoning-delta', text: 'PRIVATE_REASONING_SENTINEL' };
+      if (text) yield { type: 'text-delta', text };
     })(),
     text: Promise.resolve(text),
-    reasoning: Promise.resolve(undefined),
-    toolCalls: Promise.resolve(calls),
+    reasoningText: Promise.resolve(undefined),
+    toolCalls: Promise.resolve(calls.map(({ args, ...call }) => ({ ...call, input: args }))),
+    responseMessages: Promise.resolve([
+      {
+        role: 'assistant',
+        content: [
+          ...(calls.length
+            ? [
+                {
+                  type: 'reasoning',
+                  text: 'PRIVATE_REASONING_SENTINEL',
+                  providerOptions: {
+                    openai: {
+                      itemId: 'reasoning-fixture',
+                      reasoningEncryptedContent: 'PRIVATE_SDK_CONTINUATION',
+                    },
+                  },
+                },
+              ]
+            : []),
+          ...(text ? [{ type: 'text', text }] : []),
+          ...calls.map(({ args, ...call }) => ({ type: 'tool-call', ...call, input: args })),
+        ],
+      },
+    ]),
     finishReason: Promise.resolve(finishReason),
-    usage: Promise.resolve({ promptTokens: 2, completionTokens: 2 }),
+    usage: Promise.resolve({ inputTokens: 2, outputTokens: 2 }),
   };
 }
 
@@ -51,6 +80,22 @@ async function makeFixture() {
   const file = join(dir, 'db.sqlite');
   let connection = openDatabase(file);
   runSeed(connection.db);
+  const mutex = createInProcessSessionLock();
+  let nextLock: { entered: () => void; gate: Promise<void> } | undefined;
+  const sessionLock = {
+    get activeCount() {
+      return mutex.activeCount;
+    },
+    async acquire(sessionId: string, timeoutMs?: number) {
+      const waiting = nextLock;
+      nextLock = undefined;
+      if (waiting) {
+        waiting.entered();
+        await waiting.gate;
+      }
+      return mutex.acquire(sessionId, timeoutMs);
+    },
+  };
   let effects = 0;
   let result = 'effect completed';
   const observations = createObservabilityStore();
@@ -60,6 +105,7 @@ async function makeFixture() {
       v1: {
         observabilityStore: observations,
         chat: {
+          sessionLock,
           systemToolExecutorFactory: () => async () => {
             effects++;
             return { type: 'tool_result', toolId: 'sys_bash', data: result };
@@ -69,6 +115,7 @@ async function makeFixture() {
     });
   let app = await listenLoopback(makeApp());
   return {
+    directory: dir,
     get app() {
       return app;
     },
@@ -82,6 +129,18 @@ async function makeFixture() {
       return effects;
     },
     observations,
+    pauseNextAcquire() {
+      let entered!: () => void;
+      let release!: () => void;
+      const enteredPromise = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      nextLock = { entered, gate };
+      return { entered: enteredPromise, release };
+    },
     setResult(value: string) {
       result = value;
     },
@@ -102,10 +161,10 @@ async function makeFixture() {
           DEFAULT_AGENT_ID,
         );
     },
-    async session() {
+    async session(projectId?: string) {
       const res = await request(app)
         .post('/v1/sessions')
-        .send({ agentId: DEFAULT_AGENT_ID })
+        .send({ agentId: DEFAULT_AGENT_ID, ...(projectId ? { mode: 'project', projectId } : {}) })
         .expect(201);
       return res.body.data.id as string;
     },
@@ -156,6 +215,7 @@ describe('context admission through API and SQLite', () => {
   let env: ReturnType<typeof snapshotChatEnv>;
   beforeEach(async () => {
     vi.resetModules();
+    vi.stubEnv('SECRETS_MASTER_KEY', randomBytes(32).toString('base64'));
     vi.stubEnv('LANGCHAIN_TRACING_V2', 'false');
     vi.stubEnv('LANGSMITH_TRACING', 'false');
     vi.stubEnv('LANGSMITH_TRACING_V2', 'false');
@@ -224,7 +284,7 @@ describe('context admission through API and SQLite', () => {
       expect(input).toContain(value);
     expect(input).not.toContain('old-a');
     expect(input).not.toContain('old-b');
-    expect(stream.mock.calls[0]![0].maxTokens).toBe(73);
+    expect(stream.mock.calls[0]![0].maxOutputTokens).toBe(73);
     expect(listMessagesBySession(f.db, sessionId).slice(0, original.length)).toEqual(original);
     expect(listMessagesBySession(f.db, sessionId)).toHaveLength(original.length + 2);
   });
@@ -408,7 +468,7 @@ describe('context admission through API and SQLite', () => {
       expect(input).toContain('Original user goal');
       expect(input).not.toContain('FOREIGN_SESSION_CANARY');
       expect(input).not.toContain('Resume reviewed tool call.');
-      expect(stream.mock.calls[1]![0].maxTokens).toBe(73);
+      expect(stream.mock.calls[1]![0].maxOutputTokens).toBe(73);
       expect(f.effects).toBe(decision === 'approve' ? 1 : 0);
       await resume(f, sessionId, approvalRequestId);
       expect(stream).toHaveBeenCalledTimes(2);
@@ -445,31 +505,408 @@ describe('context admission through API and SQLite', () => {
     expect(getWorkingMemoryArtifact(f.db, sessionId)?.projectId).toBe(project.id);
   });
 
-  it('persists a missing legacy assistant reconstruction exactly once on real guarded resume', async () => {
+  it.each(['personal', 'project'] as const)(
+    'persists a missing legacy %s assistant reconstruction exactly once on real guarded resume',
+    async (scope) => {
+      const project =
+        scope === 'project'
+          ? createProject(f.db, {
+              name: 'Scoped legacy',
+              metadata: {
+                backendProjectRoot: f.directory,
+                repositoryRoot: f.directory,
+                capabilityState: 'backend_accessible',
+                onboardingState: 'approved',
+                defaultAgentProfile: 'coding',
+                instructionFiles: [],
+              },
+            })
+          : undefined;
+      const sessionId = await f.session(project?.id);
+      const approvalRequestId = await pending(f, sessionId);
+      // This case models an actual pre-private-format legacy record, rather than corruption.
+      f.sqlite.prepare('DELETE FROM provider_continuations WHERE session_id = ?').run(sessionId);
+      f.sqlite
+        .prepare('UPDATE messages SET provider_continuation_format = 0 WHERE session_id = ?')
+        .run(sessionId);
+      f.sqlite
+        .prepare('UPDATE messages SET tool_calls_json = NULL WHERE session_id = ? AND role = ?')
+        .run(sessionId, 'assistant');
+      await request(f.app)
+        .post(`/v1/approval-requests/${approvalRequestId}/approve`)
+        .send({})
+        .expect(200);
+      stream.mockReturnValueOnce(response());
+      await resume(f, sessionId, approvalRequestId);
+      const rows = listMessagesBySession(f.db, sessionId);
+      expect(rows.map((row) => row.role)).toEqual([
+        'user',
+        'assistant',
+        'assistant',
+        'tool',
+        'assistant',
+      ]);
+      expect(rows[2]?.toolCalls?.[0]?.id).toBe('reviewed-call');
+      await resume(f, sessionId, approvalRequestId);
+      expect(listMessagesBySession(f.db, sessionId)).toEqual(rows);
+      expect(f.effects).toBe(1);
+    },
+  );
+  it.each(['missing', 'corrupt', 'changed-key'] as const)(
+    'fails closed before approval claim or effect on %s required continuation',
+    async (failure) => {
+      const sessionId = await f.session();
+      const approvalRequestId = await pending(f, sessionId);
+      await request(f.app)
+        .post(`/v1/approval-requests/${approvalRequestId}/approve`)
+        .send({})
+        .expect(200);
+      if (failure === 'missing')
+        f.sqlite.prepare('DELETE FROM provider_continuations WHERE session_id = ?').run(sessionId);
+      else if (failure === 'corrupt')
+        f.sqlite
+          .prepare(
+            "UPDATE provider_continuations SET ciphertext_b64 = 'corrupt' WHERE session_id = ?",
+          )
+          .run(sessionId);
+      else process.env.AGENT_OPENAI_API_KEY = 'changed-fixture-key';
+      await f.restart();
+      const res = await resume(f, sessionId, approvalRequestId);
+      expect(res.text).toMatch(
+        /PROVIDER_CONTINUATION_UNAVAILABLE|MODEL_CONTINUATION_CHANGED|configuration changed/,
+      );
+      if (failure !== 'changed-key') {
+        const errors = res.text
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line))
+          .filter((event) => event.type === 'error');
+        expect(errors).toEqual([
+          {
+            type: 'error',
+            code: 'PROVIDER_CONTINUATION_UNAVAILABLE',
+            message: PROVIDER_CONTINUATION_RECOVERY_MESSAGE,
+          },
+        ]);
+        expect(res.text).not.toContain('Start a new request.');
+      }
+      expect(res.text).not.toMatch(/PRIVATE_SDK_CONTINUATION|PRIVATE_REASONING_SENTINEL/);
+      expect(f.effects).toBe(0);
+      expect(stream).toHaveBeenCalledTimes(1);
+      expect(listApprovalRequests(f.db, { sessionId })[0]?.status).toBe('approved');
+      expect(
+        listMessagesBySession(f.db, sessionId).filter((message) => message.role === 'tool'),
+      ).toHaveLength(0);
+    },
+  );
+
+  it.each(['apiKey', 'baseURL', 'provider'] as const)(
+    'refreshes %s changed while waiting for the session lock before approval claim',
+    async (field) => {
+      const key = Buffer.from(process.env.SECRETS_MASTER_KEY!, 'base64');
+      const config = createModelConfig(
+        f.db,
+        {
+          name: 'Selected fixture',
+          provider: 'openai',
+          model: 'ExactCase',
+          apiKey: 'fixture-key',
+          baseURL: 'http://127.0.0.1:18445/v1',
+        },
+        key,
+        1,
+      );
+      const sessionId = await f.session();
+      const approvalRequestId = await pending(f, sessionId);
+      await request(f.app)
+        .post(`/v1/approval-requests/${approvalRequestId}/approve`)
+        .send({})
+        .expect(200);
+      const wait = f.pauseNextAcquire();
+      const pendingResume = request(f.app)
+        .post(`/v1/sessions/${sessionId}/resume`)
+        .send({ approvalRequestId })
+        .then((result) => result);
+      await wait.entered;
+      const changes =
+        field === 'apiKey'
+          ? { apiKey: 'changed-fixture-key' }
+          : field === 'baseURL'
+            ? { baseURL: 'http://127.0.0.1:18446/v1' }
+            : { provider: 'anthropic', apiKey: 'changed-fixture-key' };
+      updateModelConfig(f.db, config.id, changes, key, 1);
+      wait.release();
+      const result = await pendingResume;
+      expect(result.text).toContain('MODEL_CONTINUATION_CHANGED');
+      expect(result.text).not.toMatch(/PRIVATE_SDK|PRIVATE_REASONING/);
+      expect(stream).toHaveBeenCalledTimes(1);
+      expect(f.effects).toBe(0);
+      expect(listApprovalRequests(f.db, { sessionId })[0]?.resumedAtMs).toBeUndefined();
+    },
+  );
+
+  it('keeps opaque reasoning private in list, public stream and plugins while replaying it after approval/restart', async () => {
     const sessionId = await f.session();
     const approvalRequestId = await pending(f, sessionId);
-    f.sqlite
-      .prepare('UPDATE messages SET tool_calls_json = NULL WHERE session_id = ? AND role = ?')
-      .run(sessionId, 'assistant');
+    expect(
+      (await request(f.app).get(`/v1/sessions/${sessionId}/messages`).expect(200)).text,
+    ).not.toMatch(/PRIVATE_SDK_CONTINUATION|PRIVATE_REASONING_SENTINEL|providerContinuation/);
+    expect(JSON.stringify(f.observations.getLogs({ sessionId }))).not.toContain(
+      'PRIVATE_SDK_CONTINUATION',
+    );
     await request(f.app)
       .post(`/v1/approval-requests/${approvalRequestId}/approve`)
       .send({})
       .expect(200);
-    stream.mockReturnValueOnce(response());
-    await resume(f, sessionId, approvalRequestId);
-    const rows = listMessagesBySession(f.db, sessionId);
-    expect(rows.map((row) => row.role)).toEqual([
+    await f.restart();
+    stream.mockReturnValueOnce(response('Done'));
+    const resumed = await resume(f, sessionId, approvalRequestId);
+    expect(f.effects).toBe(1);
+    expect(JSON.stringify(stream.mock.calls[1]![0].messages)).toContain('PRIVATE_SDK_CONTINUATION');
+    expect(resumed.text).not.toMatch(/PRIVATE_SDK_CONTINUATION|PRIVATE_REASONING_SENTINEL/);
+    expect(listMessagesBySession(f.db, sessionId).map((row) => row.role)).toEqual([
       'user',
-      'assistant',
       'assistant',
       'tool',
       'assistant',
     ]);
-    expect(rows[2]?.toolCalls?.[0]?.id).toBe('reviewed-call');
-    await resume(f, sessionId, approvalRequestId);
-    expect(listMessagesBySession(f.db, sessionId)).toEqual(rows);
-    expect(f.effects).toBe(1);
   });
+
+  it.each(['provider-error', 'stop'] as const)(
+    'keeps the committed assistant once and saves only subsequent partial text after %s',
+    async (failure) => {
+      const sessionId = await f.session();
+      const firstCall = {
+        toolCallId: 'completed-call',
+        toolName: 'sys_json_stringify',
+        args: { data: 'safe' },
+      };
+      stream.mockReturnValueOnce(response('FIRST_PERSISTED', [firstCall], 'tool-calls'));
+      let entered!: () => void;
+      const partialEntered = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      let release!: () => void;
+      const hold = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      stream.mockImplementationOnce((options: { abortSignal?: AbortSignal }) => ({
+        ...response('LATER_PARTIAL'),
+        fullStream: (async function* () {
+          yield { type: 'reasoning-delta', text: 'PRIVATE_REASONING_SENTINEL' };
+          yield { type: 'text-delta', text: 'LATER_PARTIAL' };
+          entered();
+          if (failure === 'provider-error')
+            throw Object.assign(new Error('PRIVATE_PROVIDER_BODY'), { statusCode: 400 });
+          await Promise.race([
+            hold,
+            new Promise<never>((_, reject) => {
+              if (options.abortSignal?.aborted) reject(options.abortSignal.reason);
+              else
+                options.abortSignal?.addEventListener(
+                  'abort',
+                  () => reject(options.abortSignal?.reason),
+                  { once: true },
+                );
+            }),
+          ]);
+        })(),
+      }));
+      const inFlight = request(f.app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Run then explain the result' })
+        .then((result) => result);
+      try {
+        await partialEntered;
+        if (failure === 'stop') {
+          const active = await request(f.app)
+            .get(`/v1/sessions/${sessionId}/active-run`)
+            .expect(200);
+          await request(f.app)
+            .post(`/v1/sessions/${sessionId}/runs/${active.body.data.id}/stop`)
+            .send({})
+            .expect(200);
+        }
+        const result = await inFlight;
+        expect(result.text).not.toMatch(/PRIVATE_REASONING|PRIVATE_PROVIDER/);
+        const rows = listMessagesBySession(f.db, sessionId);
+        expect(rows.map((row) => row.role)).toEqual(['user', 'assistant', 'tool', 'assistant']);
+        expect(rows.filter((row) => row.content === 'FIRST_PERSISTED')).toHaveLength(1);
+        expect(rows.at(-1)?.content).toBe('LATER_PARTIAL');
+        expect(rows.at(-1)?.toolCalls).toBeUndefined();
+        expect(JSON.stringify(rows)).not.toMatch(/PRIVATE_REASONING|PRIVATE_SDK/);
+        expect(f.effects).toBe(1);
+        expect(stream).toHaveBeenCalledTimes(2);
+      } finally {
+        release();
+        await inFlight;
+      }
+    },
+  );
+
+  it('retains displayed public text when the atomic private barrier fails before its checkpoint', async () => {
+    const sessionId = await f.session();
+    f.sqlite.exec(
+      "CREATE TRIGGER reject_private BEFORE INSERT ON provider_continuations BEGIN SELECT RAISE(ABORT, 'fixture private failure'); END",
+    );
+    stream.mockReturnValueOnce(response('UNCOMMITTED_PUBLIC_TEXT', [reviewedCall], 'tool-calls'));
+    const result = await request(f.app)
+      .post('/v1/chat')
+      .send({ sessionId, message: 'Commit failure control' })
+      .expect(200);
+    const errors = result.text
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+      .filter((event) => event.type === 'error');
+    expect(errors).toEqual([
+      {
+        type: 'error',
+        code: 'PROVIDER_CONTINUATION_UNAVAILABLE',
+        message: PROVIDER_CONTINUATION_RECOVERY_MESSAGE,
+      },
+    ]);
+    expect(result.text).not.toContain('Start a new request.');
+    const rows = listMessagesBySession(f.db, sessionId);
+    expect(rows.map((row) => row.role)).toEqual(['user', 'assistant']);
+    expect(rows.at(-1)?.content).toBe('UNCOMMITTED_PUBLIC_TEXT');
+    expect(rows.at(-1)?.toolCalls).toBeUndefined();
+    expect(f.sqlite.prepare('SELECT count(*) AS count FROM provider_continuations').get()).toEqual({
+      count: 0,
+    });
+    expect(listApprovalRequests(f.db, { sessionId })).toHaveLength(0);
+    expect(f.effects).toBe(0);
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect(result.text).not.toMatch(/PRIVATE_REASONING|PRIVATE_SDK|fixture private failure/);
+  });
+
+  it('sanitizes provider SDK errors before public NDJSON, plugin observations and persistence', async () => {
+    const sessionId = await f.session();
+    const raw = Object.assign(new Error('PRIVATE_SDK_ERROR credential=secret body=private'), {
+      statusCode: 401,
+      responseBody: 'PRIVATE_SDK_BODY',
+      requestBodyValues: { private: 'PRIVATE_SDK_REQUEST' },
+    });
+    stream.mockImplementationOnce(() => {
+      throw raw;
+    });
+    const result = await request(f.app)
+      .post('/v1/chat')
+      .send({ sessionId, message: 'Check failure handling' })
+      .expect(200);
+    expect(result.text).toContain('MODEL_AUTH_FAILED');
+    expect(result.text).not.toContain('Start a new chat.');
+    expect(result.text).not.toMatch(/PRIVATE_SDK|credential=|body=private/);
+    expect(JSON.stringify(f.observations.getLogs({ sessionId }))).not.toMatch(
+      /PRIVATE_SDK|credential=|body=private/,
+    );
+    expect(JSON.stringify(listMessagesBySession(f.db, sessionId))).not.toContain('PRIVATE_SDK');
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect(f.effects).toBe(0);
+  });
+
+  it.each(['ollama', 'openai-compatible'] as const)(
+    'allows explicit saved keyless %s without an OpenAI credential fallback',
+    async (provider) => {
+      delete process.env.AGENT_OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.SECRETS_MASTER_KEY;
+      const config = createModelConfig(
+        f.db,
+        {
+          name: 'Local fixture',
+          provider,
+          model: 'ExactCase',
+          baseURL: 'http://127.0.0.1:18445/v1',
+        },
+        undefined,
+        1,
+      );
+      const sessionId = await f.session();
+      stream.mockReturnValueOnce(response('Local ready'));
+      const result = await request(f.app)
+        .post('/v1/chat')
+        .set('x-model-config-id', config.id)
+        .send({ sessionId, message: 'Use the selected local model' })
+        .expect(200);
+      expect(result.text).toContain('Local ready');
+      expect(result.text).not.toContain('error');
+      expect(stream).toHaveBeenCalledTimes(1);
+      expect(
+        f.sqlite.prepare('SELECT COUNT(*) AS count FROM provider_continuations').get(),
+      ).toEqual({ count: 0 });
+      expect(
+        f.sqlite
+          .prepare(
+            'SELECT MAX(provider_continuation_format) AS format FROM messages WHERE session_id = ?',
+          )
+          .get(sessionId),
+      ).toEqual({ format: 0 });
+      expect(listMessagesBySession(f.db, sessionId).map((row) => row.role)).toEqual([
+        'user',
+        'assistant',
+      ]);
+    },
+  );
+
+  it('rejects a nonthinking tool turn without private storage before approval or tool effects', async () => {
+    delete process.env.SECRETS_MASTER_KEY;
+    const sessionId = await f.session();
+    const output = response('', [reviewedCall], 'tool-calls');
+    output.responseMessages = Promise.resolve([
+      {
+        role: 'assistant',
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: reviewedCall.toolCallId,
+            toolName: reviewedCall.toolName,
+            input: reviewedCall.args,
+          },
+        ],
+      },
+    ]);
+    stream.mockReturnValueOnce(output);
+    const result = await request(f.app)
+      .post('/v1/chat')
+      .send({ sessionId, message: 'No private storage' })
+      .expect(200);
+    expect(result.text).toContain('error');
+    expect(listApprovalRequests(f.db, { sessionId })).toHaveLength(0);
+    expect(f.effects).toBe(0);
+    expect(listMessagesBySession(f.db, sessionId).some((row) => row.toolCalls?.length)).toBe(false);
+    expect(f.sqlite.prepare('SELECT COUNT(*) AS count FROM provider_continuations').get()).toEqual({
+      count: 0,
+    });
+  });
+
+  it('strips foreign opaque parts after a completed turn but keeps public tool/result groups', async () => {
+    const sessionId = await f.session();
+    updateSettings(f.db, { executionPolicy: { unknownCommandPolicy: 'block' } });
+    stream.mockReturnValueOnce(response('', [reviewedCall], 'tool-calls'));
+    stream.mockReturnValueOnce(response('Completed denied turn'));
+    await request(f.app).post('/v1/chat').send({ sessionId, message: 'First turn' }).expect(200);
+    expect(stream).toHaveBeenCalledTimes(2);
+    expect(listMessagesBySession(f.db, sessionId).map((row) => row.role)).toEqual([
+      'user',
+      'assistant',
+      'tool',
+      'assistant',
+    ]);
+    process.env.AGENT_OPENAI_API_KEY = 'changed-fixture-key';
+    stream.mockReturnValueOnce(response('New credential turn'));
+    const next = await request(f.app)
+      .post('/v1/chat')
+      .send({ sessionId, message: 'Next turn' })
+      .expect(200);
+    expect(next.text).not.toContain('error');
+    const replay = JSON.stringify(stream.mock.calls[2]![0].messages);
+    expect(replay).not.toMatch(/PRIVATE_SDK_CONTINUATION|PRIVATE_REASONING_SENTINEL/);
+    expect(replay).toContain('reviewed-call');
+    expect(replay).toContain('COMMAND_POLICY_DENIED');
+    expect(f.effects).toBe(0);
+  });
+
   it('reports a missing original user turn explicitly on rejected resume', async () => {
     const sessionId = await f.session();
     const approvalRequestId = await pending(f, sessionId);
@@ -632,7 +1069,11 @@ describe('context admission through API and SQLite', () => {
         .post('/v1/chat')
         .send({ sessionId, message: 'Try another question' })
         .expect(200);
-      expect(res.text).toContain('CONTEXT_INVALID_HISTORY');
+      expect(res.text).toContain(
+        corruption === 'changed-arguments'
+          ? 'PROVIDER_CONTINUATION_UNAVAILABLE'
+          : 'CONTEXT_INVALID_HISTORY',
+      );
       expect(stream).toHaveBeenCalledTimes(1);
       expect(f.effects).toBe(0);
       expect(listMessagesBySession(f.db, sessionId).slice(0, before.length)).toEqual(before);

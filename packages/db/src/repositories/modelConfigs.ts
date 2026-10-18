@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { eq } from 'drizzle-orm';
 
@@ -6,6 +6,7 @@ import type { DrizzleDb } from '../database.js';
 import { decryptUtf8, encryptUtf8 } from '../crypto/envelope.js';
 import { SecretDecryptionError } from '../crypto/errors.js';
 import * as schema from '../schema.js';
+import { withTransaction } from '../transaction.js';
 
 // ---------------------------------------------------------------------------
 // Types (safe — no key material)
@@ -16,6 +17,7 @@ export type ModelConfig = {
   name: string;
   provider: string;
   model: string;
+  baseURL?: string | null;
   /** true when an API key is stored for this config */
   hasApiKey: boolean;
   createdAtMs: number;
@@ -26,6 +28,7 @@ export type ModelConfigCreateBody = {
   name: string;
   provider: string;
   model: string;
+  baseURL?: string | null;
   /** Plaintext API key — will be encrypted before storage. Optional for Ollama. */
   apiKey?: string;
 };
@@ -34,6 +37,7 @@ export type ModelConfigUpdateBody = {
   name?: string;
   provider?: string;
   model?: string;
+  baseURL?: string | null;
   /** Provide to rotate the key; omit to keep the existing key. */
   apiKey?: string;
 };
@@ -48,6 +52,7 @@ function rowToModelConfig(row: typeof schema.modelConfigs.$inferSelect): ModelCo
     name: row.name,
     provider: row.provider,
     model: row.model,
+    baseURL: row.baseURL,
     hasApiKey: row.secretRefId != null,
     createdAtMs: row.createdAtMs,
     updatedAtMs: row.updatedAtMs,
@@ -67,7 +72,7 @@ export function getModelConfig(db: DrizzleDb, id: string): ModelConfig | undefin
   return row ? rowToModelConfig(row) : undefined;
 }
 
-export function createModelConfig(
+function insertModelConfig(
   db: DrizzleDb,
   body: ModelConfigCreateBody,
   masterKey: Buffer | undefined,
@@ -101,6 +106,7 @@ export function createModelConfig(
       name: body.name,
       provider: body.provider,
       model: body.model,
+      baseURL: body.baseURL ?? null,
       secretRefId,
       createdAtMs: now,
       updatedAtMs: now,
@@ -112,13 +118,14 @@ export function createModelConfig(
     name: body.name,
     provider: body.provider,
     model: body.model,
+    baseURL: body.baseURL ?? null,
     hasApiKey: secretRefId != null,
     createdAtMs: now,
     updatedAtMs: now,
   };
 }
 
-export function updateModelConfig(
+function changeModelConfig(
   db: DrizzleDb,
   id: string,
   body: ModelConfigUpdateBody,
@@ -134,6 +141,10 @@ export function updateModelConfig(
 
   const now = Date.now();
   let secretRefId = existing.secretRefId;
+  if (body.provider !== undefined && body.provider !== existing.provider && secretRefId) {
+    db.delete(schema.secretRefs).where(eq(schema.secretRefs.id, secretRefId)).run();
+    secretRefId = null;
+  }
 
   if (body.apiKey !== undefined) {
     if (body.apiKey === '') {
@@ -180,6 +191,12 @@ export function updateModelConfig(
     name: body.name ?? existing.name,
     provider: body.provider ?? existing.provider,
     model: body.model ?? existing.model,
+    baseURL:
+      body.baseURL !== undefined
+        ? body.baseURL
+        : body.provider !== undefined && body.provider !== existing.provider
+          ? null
+          : existing.baseURL,
     secretRefId,
     updatedAtMs: now,
   };
@@ -191,13 +208,14 @@ export function updateModelConfig(
     name: updated.name,
     provider: updated.provider,
     model: updated.model,
+    baseURL: updated.baseURL,
     hasApiKey: secretRefId != null,
     createdAtMs: existing.createdAtMs,
     updatedAtMs: now,
   };
 }
 
-export function deleteModelConfig(db: DrizzleDb, id: string): boolean {
+function removeModelConfig(db: DrizzleDb, id: string): boolean {
   const existing = db
     .select()
     .from(schema.modelConfigs)
@@ -212,6 +230,55 @@ export function deleteModelConfig(db: DrizzleDb, id: string): boolean {
 
   db.delete(schema.modelConfigs).where(eq(schema.modelConfigs.id, id)).run();
   return true;
+}
+
+/** Config and encrypted credential changes commit atomically. */
+export function createModelConfig(
+  db: DrizzleDb,
+  body: ModelConfigCreateBody,
+  masterKey: Buffer | undefined,
+  keyVersion: number,
+): ModelConfig {
+  return withTransaction(db, (tx) => insertModelConfig(tx, body, masterKey, keyVersion));
+}
+export function updateModelConfig(
+  db: DrizzleDb,
+  id: string,
+  body: ModelConfigUpdateBody,
+  masterKey: Buffer | undefined,
+  keyVersion: number,
+): ModelConfig | undefined {
+  return withTransaction(db, (tx) => changeModelConfig(tx, id, body, masterKey, keyVersion));
+}
+export function deleteModelConfig(db: DrizzleDb, id: string): boolean {
+  return withTransaction(db, (tx) => removeModelConfig(tx, id));
+}
+
+/** Internal revision digest; never return or log this credential-bound identity. */
+export function modelConfigCredentialRevision(db: DrizzleDb, id: string): string {
+  const config = db.select().from(schema.modelConfigs).where(eq(schema.modelConfigs.id, id)).get();
+  if (!config) throw new Error('MODEL_CONFIGURATION_UNAVAILABLE');
+  const credential = config.secretRefId
+    ? db.select().from(schema.secretRefs).where(eq(schema.secretRefs.id, config.secretRefId)).get()
+    : null;
+  if (config.secretRefId && !credential) throw new Error('MODEL_CONFIGURATION_UNAVAILABLE');
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        id: config.id,
+        provider: config.provider,
+        model: config.model,
+        endpoint: config.baseURL,
+        credential: credential && {
+          ciphertext: credential.ciphertextB64,
+          iv: credential.ivB64,
+          tag: credential.authTagB64,
+          algorithm: credential.algorithm,
+          version: credential.keyVersion,
+        },
+      }),
+    )
+    .digest('hex');
 }
 
 /**

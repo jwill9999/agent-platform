@@ -217,7 +217,7 @@ async function createModelConfig(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Add Model' }).first().click();
   await expect(page.getByRole('heading', { name: 'Add Model Config' })).toBeVisible();
   await page.getByLabel('Name').fill('E2E persisted OpenAI');
-  await page.getByLabel('Model').fill('gpt-4o-mini-e2e');
+  await page.getByLabel('Model', { exact: true }).fill('gpt-4o-mini-e2e');
   await page.getByLabel('API Key').fill('sk-e2e-persisted-key');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: 'Models & API Keys' })).toBeVisible({

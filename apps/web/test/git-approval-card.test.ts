@@ -9,7 +9,7 @@ import type {
   ToolTraceEvent,
 } from '@/hooks/use-harness-chat';
 import { Chat } from '@/components/chat/chat';
-import type { UIMessage } from 'ai';
+import type { HarnessUiMessage as UIMessage } from '@/lib/harness-ui-message';
 import { GitApprovalCard, GitRecoveryCard } from '@/components/chat/git-approval-card';
 
 vi.mock('@/components/chat/chat-input', () => ({ ChatInput: () => null }));
