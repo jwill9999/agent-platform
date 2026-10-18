@@ -12,8 +12,8 @@ Feature `feature/dependency-security` and task `task/dependency-security` start 
 `/Users/letuscode/.codex/worktrees/openai-parameter-repair/agent-platform`.
 Migration PR345 and hook repair PR348 are now delivered through protected PR347 at staging
 `5c2f6553b1169abc0fa4fcd53432b2207f538313`. The task locally merged that independently qualified
-source with reviewed checkpoint`6f622ac6` at`b6e3b614`; the feature baseline is locally refreshed,
-while successful publication and combined qualification remain pending. Preserve dependency repairs and both complete session histories through exact
+source with reviewed checkpoint`6f622ac6` at`b6e3b614`; the feature baseline is refreshed and both branches are pushed. Draft PR350 targets that feature;
+local combined qualification passed, while connected and hosted qualification remain in progress. Preserve dependency repairs and both complete session histories through exact
 unique-prefix/common-body reconstruction, rather than duplicating their shared historical body.
 
 ## Bounded stages
@@ -30,7 +30,11 @@ unique-prefix/common-body reconstruction, rather than duplicating their shared h
    malformed or missing data, and compare the vendor's complete `dependency-changes` output with
    that guarded inventory. Normalize only the pinned vendor schema/defaults; retain all advisory
    metadata, omitted-scope distinctions and duplicate counts. The guard retains source/ref/inventory
-   provenance and does not implement vulnerability matching. Missing or oversized action output
+   provenance and does not implement vulnerability matching. Transport complete output through bounded
+   private files, using the runner Node shell and a standalone JSON string literal rather than bulk
+   environment values. Actual reverse-ancestor API comparison was empty under merge-base semantics;
+   the negative fallback runs the verified unmodified official bundle against deterministic API fixtures
+   and records the live negative graph gap. Missing or oversized action output
    fails unqualified; no truncation or filtered-inventory fallback is permitted.
 3. Configure weekly pnpm/npm and GitHub Action update proposals, with limited concurrency and no
    automatic merge. Owner explicitly selected `staging` as default, now verified via API. Config and

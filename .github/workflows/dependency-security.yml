@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '24'
       - name: Test comparison completeness controls
-        run: node --test scripts/dependency-review.test.mjs
+        run: node --test scripts/dependency-review.test.mjs scripts/dependency-output.test.mjs
       - name: Reject newly introduced vulnerable dependencies
         id: vendor
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
@@ -37,6 +37,16 @@ jobs:
           comment-summary-in-pr: never
           warn-only: false
           retry-on-snapshot-warnings: false
+      - name: Preserve the complete vendor output without environment size limits
+        if: always()
+        shell: node {0}
+        run: |
+          const { join } = require('node:path');
+          const { pathToFileURL } = require('node:url');
+          const data = ${{ toJSON(steps.vendor.outputs['dependency-changes']) }};
+          import(pathToFileURL(join(process.env.GITHUB_WORKSPACE, 'scripts/dependency-output.mjs')).href)
+            .then(({ writeVendorOutput }) => writeVendorOutput({ directory: process.env.RUNNER_TEMP, kind: 'dependency-changes', data }))
+            .catch(() => { console.error('Unable to preserve complete vendor inventory'); process.exitCode = 1; });
       - name: Bind complete exact-revision data to the vendor's actual inventory
         if: always()
         env:
@@ -45,7 +55,7 @@ jobs:
           DEPENDENCY_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           DEPENDENCY_RECEIPT: ${{ runner.temp }}/dependency-comparison.json
           VENDOR_OUTCOME: ${{ steps.vendor.outcome }}
-          VENDOR_CHANGES: ${{ steps.vendor.outputs.dependency-changes }}
+          VENDOR_CHANGES_FILE: ${{ runner.temp }}/dependency-vendor-changes.json
         run: node scripts/dependency-review.mjs
       - name: Retain comparison provenance
         if: always()
@@ -56,9 +66,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  reverse-control:
-    name: Dependency review negative control
-    # Read existing revisions in reverse; never install or execute vulnerable source.
+  vendor-fixture-control:
+    name: Official dependency review fixture controls
+    # A reverse ancestor comparison is empty under GitHub merge-base semantics.
+    # These deterministic official-bundle controls do not claim live negative graph coverage.
     if: github.event_name == 'pull_request' && github.head_ref == 'task/dependency-security'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -69,42 +80,29 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
-      - name: Vendor must reject reintroduced development and runtime advisories
-        id: reverse
-        continue-on-error: true
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
-        with:
-          base-ref: ${{ github.event.pull_request.head.sha }}
-          head-ref: ${{ github.event.pull_request.base.sha }}
-          fail-on-severity: high
-          fail-on-scopes: runtime, development, unknown
-          vulnerability-check: true
-          license-check: false
-          show-openssf-scorecard: false
-          comment-summary-in-pr: never
-          warn-only: false
-          retry-on-snapshot-warnings: false
-      - name: Verify specific rejections and complete exact-revision data
-        if: always()
+      - name: Test fixture failure and evidence controls
+        run: node --test scripts/dependency-vendor-fixture.test.mjs
+      - name: Download the exact official action runtime
         env:
-          GH_TOKEN: ${{ github.token }}
-          DEPENDENCY_BASE_SHA: ${{ github.event.pull_request.head.sha }}
-          DEPENDENCY_HEAD_SHA: ${{ github.event.pull_request.base.sha }}
-          DEPENDENCY_RECEIPT: ${{ runner.temp }}/dependency-negative-comparison.json
-          DEPENDENCY_NEGATIVE_CONTROL: 'true'
-          VENDOR_OUTCOME: ${{ steps.reverse.outcome }}
-          VENDOR_CHANGES: ${{ steps.reverse.outputs.dependency-changes }}
-          VENDOR_VULNERABLE_CHANGES: ${{ steps.reverse.outputs.vulnerable-changes }}
-          EXPECTED_ADVISORIES: >-
-            [{"name":"vitest","version":"2.1.9","scope":"development","ghsa":"GHSA-5xrq-8626-4rwp","severity":"critical"},
-             {"name":"next","version":"15.5.15","scope":"runtime","ghsa":"GHSA-p293-qw3h-jr36","severity":"critical"}]
-        run: node scripts/dependency-review.mjs
-      - name: Retain negative-control provenance
+          VENDOR_DIRECTORY: ${{ runner.temp }}/dependency-review-vendor
+        run: |
+          mkdir -m 700 "$VENDOR_DIRECTORY"
+          for file in index.js index.js.map sourcemap-register.js; do
+            curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 60 --max-filesize 7000000 \
+              "https://raw.githubusercontent.com/actions/dependency-review-action/a1d282b36b6f3519aa1f3fc636f609c47dddb294/dist/$file" \
+              --output "$VENDOR_DIRECTORY/$file"
+          done
+      - name: Verify runtime hashes and actual vendor pass and rejection behavior
+        env:
+          VENDOR_DIRECTORY: ${{ runner.temp }}/dependency-review-vendor
+          RECEIPT_DIRECTORY: ${{ runner.temp }}/dependency-vendor-fixture-results
+        run: node scripts/dependency-vendor-fixture.mjs "$VENDOR_DIRECTORY" "$RECEIPT_DIRECTORY"
+      - name: Retain deterministic control provenance and limitations
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: dependency-negative-control
-          path: ${{ runner.temp }}/dependency-negative-comparison.json
+          name: dependency-vendor-fixture-control
+          path: ${{ runner.temp }}/dependency-vendor-fixture-results/
           if-no-files-found: error
           retention-days: 14
 

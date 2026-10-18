@@ -5,6 +5,7 @@ import process from 'node:process';
 import { pathToFileURL, URL } from 'node:url';
 import { TextDecoder } from 'node:util';
 import { createHash } from 'node:crypto';
+import { readVendorOutput } from './dependency-output.mjs';
 
 const { fetch: defaultFetch, AbortSignal } = globalThis;
 
@@ -209,11 +210,10 @@ export async function readComparison({ repository, base, head, token, fetchImpl 
   if (!SHA.test(base ?? '') || !SHA.test(head ?? '')) reject('immutable revision required');
   if (!token) reject('token unavailable');
   const pathname = `/repos/${repository}/dependency-graph/compare/${base}...${head}`;
-  let url = new URL(`${API}${pathname}?per_page=100&page=1`);
   const changes = [];
   const requestIds = [];
   let pages = 0;
-  while (url) {
+  async function collectPage(url) {
     if (++pages > 25) reject('pagination limit exceeded');
     const response = await fetchImpl(url, {
       headers: {
@@ -242,8 +242,10 @@ export async function readComparison({ repository, base, head, token, fetchImpl 
     }
     changes.push(...data);
     requestIds.push(response.headers.get('x-github-request-id'));
-    url = nextPage(response.headers.get('link'), pages, pathname);
+    const next = nextPage(response.headers.get('link'), pages, pathname);
+    if (next) await collectPage(next);
   }
+  await collectPage(new URL(`${API}${pathname}?per_page=100&page=1`));
   return {
     repository,
     base,
@@ -285,23 +287,35 @@ export function verifyNegativeControl({ outcome, vendorChanges, comparison, expe
 }
 
 async function main() {
+  const negative = process.env.DEPENDENCY_NEGATIVE_CONTROL === 'true';
+  const vendorChanges = readVendorOutput({
+    directory: process.env.RUNNER_TEMP,
+    kind: 'dependency-changes',
+    path: process.env.VENDOR_CHANGES_FILE,
+  });
+  const vulnerableChanges = negative
+    ? readVendorOutput({
+        directory: process.env.RUNNER_TEMP,
+        kind: 'vulnerable-changes',
+        path: process.env.VENDOR_VULNERABLE_CHANGES_FILE,
+      })
+    : undefined;
   const comparison = await readComparison({
     repository: process.env.GITHUB_REPOSITORY,
     base: process.env.DEPENDENCY_BASE_SHA,
     head: process.env.DEPENDENCY_HEAD_SHA,
     token: process.env.GH_TOKEN,
   });
-  const negative = process.env.DEPENDENCY_NEGATIVE_CONTROL === 'true';
   const vendor = verifyVendorInventory({
     outcome: process.env.VENDOR_OUTCOME,
-    vendorChanges: process.env.VENDOR_CHANGES,
+    vendorChanges,
     comparison,
     expectedOutcome: negative ? 'failure' : 'success',
   });
   if (negative) {
     verifyNegativeControl({
       outcome: process.env.VENDOR_OUTCOME,
-      vendorChanges: process.env.VENDOR_VULNERABLE_CHANGES,
+      vendorChanges: vulnerableChanges,
       comparison,
       expected: JSON.parse(process.env.EXPECTED_ADVISORIES ?? '[]'),
     });
@@ -327,12 +341,14 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error(
       error instanceof Error && error.message.startsWith('Dependency review incomplete:')
         ? error.message
         : 'Dependency comparison/control failed during transport or configuration.',
     );
     process.exitCode = 1;
-  });
+  }
 }

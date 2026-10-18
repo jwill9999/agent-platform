@@ -3,8 +3,12 @@ import { test } from 'node:test';
 import { Buffer } from 'node:buffer';
 import { readComparison, verifyNegativeControl } from './dependency-review.mjs';
 import * as guard from './dependency-review.mjs';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { readVendorOutput, writeVendorOutput } from './dependency-output.mjs';
 
-const { Response, AbortSignal, DOMException } = globalThis;
+const { Response, AbortSignal, DOMException, structuredClone, Headers } = globalThis;
 
 const base = '1'.repeat(40);
 const head = '2'.repeat(40);
@@ -377,4 +381,102 @@ test('vendor inventory equality binds all parsed changes, defaults and duplicate
     /inventory mismatch/,
   );
   guard.verifyVendorInventory({ ...valid, outcome: 'failure', expectedOutcome: 'failure' });
+});
+
+test('large file transport preserves complete vendor metadata and duplicate mismatch checks', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'dependency-inventory-'));
+  try {
+    const rows = [{ ...structuredClone(changes[0]), name: 'literal " ; $() \n \u2028' }];
+    rows[0].vulnerabilities[0] = {
+      ...rows[0].vulnerabilities[0],
+      advisory_summary: 'a'.repeat(171_440),
+    };
+    const path = writeVendorOutput({
+      directory,
+      kind: 'dependency-changes',
+      data: JSON.stringify(rows),
+    });
+    const vendorChanges = readVendorOutput({ directory, kind: 'dependency-changes', path });
+    const verified = guard.verifyVendorInventory({
+      outcome: 'success',
+      vendorChanges,
+      comparison: { changes: rows },
+    });
+    assert.equal(verified.changes, 1);
+    for (const comparison of [
+      { changes: [] },
+      { changes: [...rows, rows[0]] },
+      { changes: [{ ...rows[0], version: 'different' }] },
+    ]) {
+      assert.throws(
+        () => guard.verifyVendorInventory({ outcome: 'success', vendorChanges, comparison }),
+        /inventory mismatch/,
+      );
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('all 25 permitted pages are read sequentially through body settlement and preserve order', async () => {
+  let active = false;
+  let completed = 0;
+  const result = await readComparison({
+    ...options,
+    fetchImpl: async (url, init) => {
+      assert.equal(active, false, 'no page may start before the prior body settles');
+      const page = Number(url.searchParams.get('page'));
+      assert.equal(page, completed + 1);
+      assert.equal(init.headers.Authorization, 'Bearer fixture-only-token');
+      assert.equal(init.redirect, 'error');
+      active = true;
+      const link =
+        page < 25
+          ? `<${url.origin}${url.pathname}?per_page=100&page=${page + 1}>; rel=next`
+          : undefined;
+      const headers = new Headers({
+        'x-github-request-id': `request-${page}`,
+        ...(link ? { link } : {}),
+      });
+      return {
+        status: 200,
+        headers,
+        text: async () => {
+          await Promise.resolve();
+          assert.equal(active, true);
+          completed++;
+          active = false;
+          return JSON.stringify([{ page }]);
+        },
+      };
+    },
+  });
+  assert.equal(completed, 25);
+  assert.equal(result.pages, 25);
+  assert.deepEqual(
+    result.changes.map(({ page }) => page),
+    Array.from({ length: 25 }, (_, index) => index + 1),
+  );
+  assert.deepEqual(
+    result.requestIds,
+    Array.from({ length: 25 }, (_, index) => `request-${index + 1}`),
+  );
+});
+
+test('a 26th page is rejected before dispatch rather than accepting a truncated inventory', async () => {
+  let calls = 0;
+  await assert.rejects(
+    readComparison({
+      ...options,
+      fetchImpl: async (url) => {
+        calls++;
+        assert.equal(Number(url.searchParams.get('page')), calls);
+        return response([{ page: calls }], {
+          link: `<${url.origin}${url.pathname}?per_page=100&page=${calls + 1}>; rel=next`,
+        });
+      },
+    }),
+    /pagination limit exceeded/,
+  );
+  assert.equal(calls, 25);
 });

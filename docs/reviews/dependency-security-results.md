@@ -1,8 +1,9 @@
 # Dependency security results
 
 Plan/spec/verification are linked in the [plan](../planning/dependency-security.md).
-Current checkpoint: setup-source controls reviewed and locally passing; package remediation and
-hosted/protection qualification remain in progress. No completed security delivery is claimed.
+Current checkpoint: exact12a09516 normal push passed all3667 ordinary tests,77 existing optional
+skips,15 workspace builds/types and the fresh900/990 benchmark. Draft PR350 is open; connected
+regressions and hosted/protection qualification remain in progress. No completed security delivery is claimed.
 
 ## Baseline and setup gaps
 
@@ -278,3 +279,31 @@ combined workspace typecheck also passes (`security-combined-typecheck.log`). Ex
 `d33e175e2d2ef87c20de7337ceaca1bbcbde579624616ed09da102c9da9f35db` and actual focused JSON/logs
 are bound in `web-approval-mock-typing/source-review.json` and `checks.json`. The corrected normal
 push and full test/benchmark/connected/hosted qualification remain required.
+
+## PR350 local qualification and first hosted failures
+
+Exact12a09516 was pushed normally with the reviewed staging baseline5c2. All3667 ordinary tests
+passed with77 existing optional workflow skips; all15 builds/typechecks passed. Independent review
+recomputed all900 measured/990 fixture-call benchmark values: maximum positive request-p95 overhead
+1.138959ms remains below20ms, maximum enqueue-p95 0.008708ms below2ms. This is not owner stress testing.
+Lint and formatting passed. Evidence: `security-12a-local-push-qualification.json`, corrected normal
+push log and benchmark receipts under the existing external evidence root.
+
+Actual hosted Dependency Security39144548686 did not qualify: the official action's171440-character
+complete inventory exceeded Linux's environment-string limit before the guard could start. The
+reverse-ancestor comparison correctly returned an empty merge-base diff, so it did not establish
+known-vulnerability rejection. Neither job qualifies the security gate; the forward vendor completed analysis, but output binding failed.
+The bounded private-file output transport and actual unmodified vendor deterministic-API fallback
+are being requalified. Hosted negative graph coverage remains an explicit gap.
+
+The first disposable browser phase recorded19passes/4failures/9blocked dependencies. Four real422
+responses showed fixture roots outside the mounted private workspace; two nonpaused specs now honor
+the existing workspace-root environment convention, preserving defaults/assertions/deadlines. The
+repeat improved to22passes/1failure/9blocked: the remaining slash-init action pressed Enter while Send
+was disabled, and the trace confirms no chat POST. Its test must wait for actual Send readiness.
+All first-attempt traces remain retained; no product root-cause or timeout change is inferred.
+
+The initial native secure-storage check timed out awaiting macOS Keychain access; a process sample
+retains that wait. After the owner handled the local dialog, Electron42.11.15 passed real asynchronous
+secure-storage availability and encryption/decryption without an environment key or app credentials.
+Full connected Electron/browser evidence remains pending at this checkpoint.

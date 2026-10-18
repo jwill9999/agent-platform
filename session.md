@@ -1,39 +1,31 @@
-# Dependency security — combined-source qualification, 18 October 2026
+# Dependency security — PR350 qualification, 18 October 2026
 
-Canonical Beads: `agent-platform-dependency-security` is IN_PROGRESS; activation remains open.
-Owner-authorized Dependabot/dependency review and security remediation remain separate from the
-SDK upgrade and paused orchestration. No security merge authority or external publication is implied.
+Canonical Beads: `agent-platform-dependency-security` IN_PROGRESS; activation remains open.
+Draft PR350 is pushed at12a09516 into `feature/dependency-security` based on qualified staging
+5c2f6553. Migration delivery and recovery cleanup are complete; in-use task branches and owner app
+remain intact. Security merge authority is separate; no new merge or stress readiness is claimed.
 
-The reviewed security checkpoint `6f622ac6124bbe124bfa79ba96eb945e7eb8fade` was locally merged with actual protected staging
-`5c2f6553b1169abc0fa4fcd53432b2207f538313` at `b6e3b614`. PR347's migration delivery is complete and independently qualified, its Beads task
-closed and synced, and delivered feature/hook branches recovery-protected and cleaned up.
-The two in-use migration/startup task branches and owner app/profile remain intact.
+The normal combined push passed3667 ordinary tests with77 existing optional skips,15 package
+builds/typechecks and the fresh900measured/990call benchmark under unchanged limits. Independent
+raw-data review, lint and formatting passed. Both owner-approved paused test-file repairs retain
+assertions, short-expiry/takeover behavior and product deadlines; paused runtime and PR283 are unchanged.
 
-This combined task retains reviewed Electron42.11.15, Vitest4.1.12/Vite7.3.7 and the complete security
-lockfile, adding staging's native secure-storage check and unchanged migration/diagnostics source.
-The imported push hook contains only the reviewed Vitest4 option adjustment. Normal-hook qualification
-will use command-scoped pnpm workspace concurrency1, matching CI without changing another paused
-test file. All54 hook controls and four Git-isolation cases pass; combined regressions remain
-pending. Existing security and benchmark limits stay intact.
+First hosted security qualification exposed complete171440-character output exceeding Linux's env
+limit, and an empty reverse-ancestor merge-base comparison. Bounded private-file output transport
+and actual pinned vendor deterministic-API controls are being qualified; no analysis bypass or live
+negative graph claim. Current hosted Sonar has3 actionable findings despite an OK gate; repairs and
+fresh zero-issue verification remain required.
 
-The first normal atomic push passed all package builds, then stopped at four web test mock typing
-errors introduced by Vitest4's broader untyped mock signature. Neither remote branch changed.
-The test-only correction uses the actual approval-handler type; compiled test JavaScript is identical,
-all36 affected tests pass without skips/retries, and the complete workspace typecheck now passes.
-The corrected push, full ordinary tests/fresh benchmark and connected/hosted qualification remain pending.
+Disposable browser traces diagnosed fixture-root mismatch, then a premature slash-init action while
+Send was disabled. Test-only corrections preserve defaults/assertions/deadlines. Native42.11.15 secure
+storage passed after the owner handled Keychain permission; initial timeout evidence is retained.
+Full browser/Electron, diagnostics and hosted/protection checks still need final qualification.
 
-Before reconciliation, the approved two-file workflow repairs passed66 focused cases without skips
-or retries, then the full package passed1141 cases with77 existing optional skips and zero failures
-in454.02seconds. The exact13/24 bootstrap budgets, nine storage fixture cases, explicit expiry/takeover
-assertions and all other20 storage cases were independently reviewed. Runtime and PR283 are unchanged.
-These results qualify that package; current combined full-workspace, fresh benchmark, browser/Electron,
-diagnostics, native checks and exact-head hosted analysis/reviews remain required before delivery.
-
-The last draft audit has11 distinct GHSAs (0critical/3high/6moderate/2low), with remaining SDK/LangChain,
-Kit tooling and unpatched Braces debt disclosed. All eight AI package identities/integrities remain
-frozen with only the reviewed compatible Nanoid edge. No zero-vulnerability or stress-ready claim.
-The valid-key model parameter failure remains a separate SDK plan; no additional paid request,
-owner app rebuild/restart, credential/global change, Docker gateway enabling or main promotion.
+Remaining audit debt is11 distinct GHSAs (0critical/3high/6moderate/2low), with SDK/LangChain, Kit
+and unpatched Braces ownership disclosed. Eight AI package identities/integrities remain frozen,
+with the reviewed Nanoid edge only. SDK upgrade remains planning-only; valid-key max_tokens failure
+is unresolved. No additional paid call, owner-app rebuild/restart, credential/global change, Notion
+publication, Docker gateway enabling, main promotion or paused orchestration resumption is included.
 
 ## Preserved source histories
 
