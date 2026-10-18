@@ -1,7 +1,7 @@
 # Provider SDK compatibility review and results
 
-Status: 19 October 2026. The repaired source at2a62817b passed normal hooks and a fresh benchmark and is pushed. Final exact-head hosted quality, security, review and connected qualification remains outstanding.
-No hosted qualification, integration, owner-app rebuild or stress readiness is claimed.
+Status: 19 October 2026. Hosted6ea passed clean Electron72, browser42 plus its existing context-fixture skip, Sonar and dependency review, but failed48 Git API cases. A controlled predecessor-order probe reproduced a cached test-mock defect; its reviewed fixture-only repair is being qualified. No merge-ready claim.
+No complete hosted qualification, integration, owner-app rebuild or stress readiness is claimed.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
 
@@ -392,3 +392,41 @@ Independent review found no behavior difference in65,551 character/edge comparis
 formatting/lint checks passed; this test-helper notation change does not alter application runtime
 or invalidate the earlier connected outcomes. The final hosted run still must bind the pushed
 helper bytes; no earlier green gate or minor severity substitutes for that qualification.
+
+## Hosted6ea result and Git test-order repair
+
+CI39175948211 attempt1 tested merge485da84f, whose tree equals source6ea. Its Electron report
+is genuinely clean:72 expected/passed, every case exactly one attempt/retry0, no flaky/skipped/
+unexpected cases. The earlier direct-write launch case passed in9914ms; that does not explain the
+historical946 launch timeout. Both SDK native cases passed with durable correlated diagnostics,
+encrypted one-to-three-row history, privacy checks, exactly one effect, completed-history replay
+and interrupted409/no new effects. Artifact digests and every outer/nested ZIP member were verified.
+Browser42 passed with one existing context-fixture skip; its separate local passing evidence and
+successful-phase detailed-artifact gap remain disclosed. See `pr362-6ea-hosted-connected-verification.json`.
+
+Actual Sonar on6ea was OK with zero open issues/all conditions OK. Dependency Review bound45 changes
+and zero introduced advisories, with pinned controls and live comparison independently verified.
+Those security/results bind6ea; a later changed test head still requires fresh automatic qualification.
+
+The required verify job failed its ordinary API suite:533 passed and48 Git-chat cases failed before
+expected approvals/receipts, reporting safe provider-reachability errors. No benchmark ran afterward.
+The same49-case file had passed in local full suites. This is not evidence of a slow connection.
+Controlled standalone first cases made two actual owned requests each and passed; forcing a context
+mocking case before them reproduced the safe failure with zero fetch/wire calls. A safe counter then
+proved the retained context SDK mock closure ran three times inside each failing Git case, returning
+undefined after its scripted responses were exhausted. The resulting TypeError was classified as
+transport failure. This proves the order-dependent fixture defect; hosted logs lacked that marker,
+so exact hosted attribution remains an inference from matching source/order/failure evidence.
+
+The independently reviewed repair changes only the Git API test. Hoisted cache reset/unmocking
+loads a fresh actual SDK graph and leaves a clean cache afterward. A saved fixture endpoint and
+explicit configuration selection remove ambient model routing. A fail-closed exact provider/API
+origin guard preserves the direct Stop path, rejects other transport before dispatch and checks
+real provider counts. All49 original assertions, permission/receipt/effect checks and deadlines remain;
+one negative egress control is added. Forced Session→Context→Git and reverse-order slices both
+passed5/5 under CI=true with a deliberately wrong ambient Ollama endpoint. Each actual Git case
+made two owned requests with zero foreign dispatch; the exhausted marker appeared only in its
+intended context case. Static lint/format/diff passed. The full50-case file passed without skip, retry or unhandled
+error in28.98seconds. Normal hooks and fresh exact-head hosted gates remain pending at this
+checkpoint. No product or paused source changed,
+and no unchanged rerun, retry increase or deadline waiver is used.

@@ -9,34 +9,34 @@ Beads provider-interoperability and model-connection-diagnostics remain in_progr
 
 [PR362](https://github.com/jwill9999/agent-platform/pull/362) integrates
 `task/provider-sdk-refresh-plan` into `feature/provider-sdk-refresh`, based on stagingece78d8a.
-Runtime/source2a62817b is pushed and clean after reviewed Sonar/Git fixture repairs. All affected
-builds/types and1,771 ordinary cases passed (router135/DB236/harness819/API581), plus the unchanged
-fresh nine-vector900/990 benchmark; maximum positive overhead3.491375ms stayed below20ms. The
-prior ledger and20.732750ms benchmark failures are retained with causes/unknowns distinguished.
-One predeclared observed diagnostic benchmark passed separately; it did not replace normal hooks.
+Product runtime2a62817b passed normal affected builds/types and1,771 ordinary cases, plus the
+unchanged900/990 benchmark with maximum overhead3.491375ms below20ms. Its earlier20.732750ms
+failure remains retained with unknown cause. Later6ea changes were reviewed docs and an equivalent
+anchored test-selector shorthand; actual Sonar cleared all issues, with zero open findings.
 
-The maintained SDK cohort, eight configurable adapters, encrypted bound continuation and honest
-safe durable probes are implemented. Fresh repair qualification includes314 affected cases,97 CI
-Node controls, browser SDK1 across eight adapters and native SDK2 without retries/skips. Native
-reports verify durable correlated events across restart, encrypted private rows1to3, exactly one
-approved effect and denied/interrupted no-effects. Independent source/artifact review is retained.
-Initial broad browser43/local native72 scenario evidence keeps its explicit earlier source bindings.
+Hosted6ea CI39175948211 verified clean Electron72: every case passed retry0/no flaky/skip, including
+the SDK diagnostics, encrypted-history, restart and exactly-once/denied-effect journeys. Browser42
+passed plus the existing context-fixture skip with separate local passing evidence. All selected
+artifact/member hashes and source/tested-merge bindings were independently verified. The old946
+launch timeout remains unexplained; SDK-OBS01 safe pre-handle diagnostics is recorded separately.
+Current6ea Dependency Review verified45 changes/zero introduced advisories, not zero total audit.
 
-Old946 hosted Sonar16 and verify failure do not qualify the changed source. Its green Electron job
-was71passed/1flaky due to an unresolved pre-handle launch timeout; browser was42passed/1context
-fixture skip. SDK-OBS01 safe early-launch diagnostics is recorded in the existing desktop-startup
-Beads record. Require a new exact-head full72 retry-zero/no-flaky desktop run; if launch fails again,
-improve safe evidence before another attempt. No deadline, rule, assertion or retry waiver applies.
+The required verify job nevertheless failed48 Git-chat API cases, with533 passing; it did not reach
+the fresh benchmark. Controlled predecessor-order probes proved a retained context SDK mock closure
+can produce those pre-transport errors with zero network traffic, while standalone cases pass.
+Hosted logs lack the marker, so their exact cause remains an evidence-based inference. A reviewed
+Git-test-only cache reset/unmock plus explicit owned configuration and transport guard preserves all
+49 original assertions/deadlines and adds one negative egress control. Both forced order slices
+passed5/5 and all50 Git cases passed without skip/retry/unhandled error in28.98seconds. Normal
+hooks and fresh exact-head hosted qualification remain pending here.
+No application or paused runtime source changed in that follow-up.
 
-Refresh all final-head workflows, reviews and actual Sonar/CodeQL findings. The45-row Dependency
-Review inventory on946 had no introduced advisories but is not later-head proof or zero-total-audit.
-Sourcery skipped because the diff exceeds150,000 characters; independent review remains essential.
-A later concise-digit-class correction preserves the anchored latency test selector; independent
-equivalence review and static checks passed, with no application runtime change. Fresh final-head
-hosted qualification remains outstanding at
-this checkpoint; current Beads/PR checks provide later status without rewriting historical results.
+Refresh all final-head workflows, reviews and actual Sonar/CodeQL findings. Sourcery skips the
+150,000-character diff limit; independent source-aware review is retained. Later status belongs in
+current Beads/PR checks without rewriting these historical checkpoints. Do not merge old6ea on the
+strength of its green desktop/security jobs; every executed/required final-head job must pass.
 
-Owner app/profile/key and original dirty/paused work remain unchanged. No owner-app rebuild, live
+Owner app/profile/key and original dirty/paused work remain untouched. No owner-app rebuild, live
 provider compatibility, stress trial/readiness, SDK integration or merge is claimed. Keep paused
 orchestration/PR283 separate, main unpromoted and Docker gateway disabled. No Notion publication,
 global change, credential replacement or additional paid request. Historical session below remains
