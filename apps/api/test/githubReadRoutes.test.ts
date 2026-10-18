@@ -70,6 +70,60 @@ async function until(predicate: () => boolean) {
   }
 }
 
+// The child appends JSONL while readiness polling can read an unfinished tail.
+// Only newline-terminated records are published; malformed complete records fail.
+function parseCompleteCalls(contents: string): string[][] {
+  const lastNewline = contents.lastIndexOf('\n');
+  if (lastNewline < 0) return [];
+  return contents
+    .slice(0, lastNewline)
+    .split('\n')
+    .map((line) => {
+      const record: unknown = JSON.parse(line);
+      if (!Array.isArray(record) || !record.every((value) => typeof value === 'string')) {
+        throw new Error('Invalid complete GitHub fixture call record');
+      }
+      return record;
+    });
+}
+
+function observePending<T>(pending: Promise<T>): Promise<T> {
+  // Setup assertions may fail before awaiting the request; cleanup can then reject it.
+  // Observe that rejection now without replacing the original promise or its outcome.
+  void pending.catch(() => undefined);
+  return pending;
+}
+
+describe('GitHub fixture ledger framing', () => {
+  it('does not publish empty or unterminated records', () => {
+    expect(parseCompleteCalls('')).toEqual([]);
+    expect(parseCompleteCalls('["pr","view"')).toEqual([]);
+  });
+
+  it('publishes a partial append only after its terminating newline', () => {
+    const complete = '["--version"]\n';
+    const partial = '["pr","view"';
+    expect(parseCompleteCalls(complete + partial)).toEqual([['--version']]);
+    expect(parseCompleteCalls(complete + partial + ']')).toEqual([['--version']]);
+    expect(parseCompleteCalls(complete + partial + ']\n')).toEqual([['--version'], ['pr', 'view']]);
+  });
+
+  it.each(['{bad\n', '\n', '{}\n', '["pr",1]\n'])(
+    'rejects a malformed complete record %j',
+    (contents) => {
+      expect(() => parseCompleteCalls(contents)).toThrow();
+    },
+  );
+
+  it('keeps the original pending rejection observable to its later await', async () => {
+    const failure = new Error('fixture request failed');
+    const pending = Promise.reject(failure);
+    expect(observePending(pending)).toBe(pending);
+    await delay(0);
+    await expect(pending).rejects.toBe(failure);
+  });
+});
+
 describe('bounded GitHub read API integration', () => {
   let root: string;
   let repo: string;
@@ -92,10 +146,7 @@ describe('bounded GitHub read API integration', () => {
   };
   const calls = (): string[][] =>
     existsSync(join(fixture, 'calls.jsonl'))
-      ? readFileSync(join(fixture, 'calls.jsonl'), 'utf8')
-          .trim()
-          .split('\n')
-          .map((line) => JSON.parse(line))
+      ? parseCompleteCalls(readFileSync(join(fixture, 'calls.jsonl'), 'utf8'))
       : [];
   const queries = () =>
     calls().filter(
@@ -171,8 +222,12 @@ describe('bounded GitHub read API integration', () => {
 
   it('completes health and persisted session reads before two held GitHub queries release', async () => {
     setConfig({ hold: true });
-    const checks = fetch(base + endpoint('git/checks')).then((response) => response.json());
-    const list = fetch(base + endpoint('github/pull-requests')).then((response) => response.json());
+    const checks = observePending(
+      fetch(base + endpoint('git/checks')).then((response) => response.json()),
+    );
+    const list = observePending(
+      fetch(base + endpoint('github/pull-requests')).then((response) => response.json()),
+    );
     await until(() => queries().length === 2);
     const started = performance.now();
     await request(server).get('/health').expect(200);
@@ -215,7 +270,9 @@ describe('bounded GitHub read API integration', () => {
     'returns unavailable after repository %s changes during a read',
     async (change) => {
       setConfig({ hold: true });
-      const pending = fetch(base + endpoint('git/checks')).then((response) => response.json());
+      const pending = observePending(
+        fetch(base + endpoint('git/checks')).then((response) => response.json()),
+      );
       await until(() => queries().length === 1);
       if (change === 'branch') git('checkout', '-b', 'different');
       if (change === 'head') git('commit', '--allow-empty', '-m', 'next');
@@ -233,8 +290,8 @@ describe('bounded GitHub read API integration', () => {
 
   it('does not mark a PR list as belonging to a branch changed during the read', async () => {
     setConfig({ hold: true });
-    const pending = fetch(base + endpoint('github/pull-requests')).then((response) =>
-      response.json(),
+    const pending = observePending(
+      fetch(base + endpoint('github/pull-requests')).then((response) => response.json()),
     );
     await until(() => queries().length === 1);
     git('checkout', '-b', 'changed-list');
@@ -297,9 +354,11 @@ describe('bounded GitHub read API integration', () => {
     setConfig({ hold: true });
     const controllers = Array.from({ length: 4 }, () => new AbortController());
     const pending = controllers.map((controller) =>
-      fetch(base + endpoint('git/checks'), { signal: controller.signal }).then(
-        (r) => r.json(),
-        () => undefined,
+      observePending(
+        fetch(base + endpoint('git/checks'), { signal: controller.signal }).then(
+          (r) => r.json(),
+          () => undefined,
+        ),
       ),
     );
     await until(() => queries().length === 4);
@@ -313,7 +372,9 @@ describe('bounded GitHub read API integration', () => {
     controllers[0]!.abort();
     await pending[0];
     await delay(350);
-    const recovered = fetch(base + endpoint('github/pull-requests')).then((r) => r.json());
+    const recovered = observePending(
+      fetch(base + endpoint('github/pull-requests')).then((r) => r.json()),
+    );
     await until(() => queries().length === 5);
     release();
     expect((await recovered).data.available).toBe(true);
@@ -336,9 +397,9 @@ describe('bounded GitHub read API integration', () => {
       .send({ path: otherRepo, name: 'Other' })
       .expect(201);
     setConfig({ hold: true });
-    const first = fetch(base + endpoint('git/checks')).then((r) => r.json());
-    const second = fetch(base + `/v1/projects/${other.body.data.id}/git/checks`).then((r) =>
-      r.json(),
+    const first = observePending(fetch(base + endpoint('git/checks')).then((r) => r.json()));
+    const second = observePending(
+      fetch(base + `/v1/projects/${other.body.data.id}/git/checks`).then((r) => r.json()),
     );
     await until(() => queries().length === 2);
     release();
@@ -382,7 +443,7 @@ describe('bounded GitHub read API integration', () => {
     async (stage) => {
       setConfig({ holdStage: stage });
       const started = performance.now();
-      const pending = fetch(base + endpoint('git/checks'));
+      const pending = observePending(fetch(base + endpoint('git/checks')));
       await until(() => existsSync(join(fixture, 'stage-ready')));
       const response = await pending;
       const elapsedMs = performance.now() - started;
@@ -438,7 +499,7 @@ describe('bounded GitHub read API integration', () => {
         return operation;
       });
       const started = performance.now();
-      const pending = fetch(base + endpoint('github/pull-requests'));
+      const pending = observePending(fetch(base + endpoint('github/pull-requests')));
       await until(() => existsSync(join(fixture, 'stage-ready')));
       const response = await pending;
       const elapsedMs = performance.now() - started;

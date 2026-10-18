@@ -1,6 +1,6 @@
 # Provider SDK compatibility review and results
 
-Status: 18 October 2026. The initial normal push passed. Reviewed repairs for hosted findings now have affected local qualification; their next normal push and fresh hosted qualification remain outstanding.
+Status: 18 October 2026. The initial normal push passed. The hosted-finding repair push stopped on an active Git fixture ledger read; its reviewed test-only framing repair is being qualified before a new normal push and fresh hosted checks.
 No hosted qualification, integration, owner-app rebuild or stress readiness is claimed.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
@@ -319,3 +319,28 @@ remain required. The45-row Dependency Review gate on946 was independently qualif
 advisories, but must bind the later head normally. Sourcery declined that diff because it exceeds
 150,000 characters; that is a review limitation, not a weekly-budget skip or an independent approval.
 No live model/account, owner-app rebuild, stress readiness, integration or merge authority is inferred.
+
+## Active-ledger fixture follow-up
+
+The normal push at local `0e518068` stopped before upload and the fresh benchmark. Router135,
+DB236 and harness819 passed; the ordinary API suite passed573 cases and failed one Git read-origin
+case. Its active ledger reader used trim/split/JSON.parse while a child could be appending, so an
+empty file or unterminated record could throw. The historical ledger bytes were not retained;
+which transient state occurred and its operating-system cause remain unproven. The original log
+also records a pending fetch rejection during teardown; neither failure is hidden by a retry.
+
+The independently approved test-only repair parses complete newline-terminated records and leaves
+an incomplete tail for the next existing poll. Complete malformed JSON, blank records and wrong
+record shapes still fail. Held requests receive immediate rejection observation while the original
+Promise identity and awaited rejection remain unchanged. All original integration assertions,
+origin-change checks and deadlines are preserved. Seven deterministic controls cover framing
+transitions and rejection identity. All33 focused cases passed without unhandled rejection, skip
+or retry in52.43seconds; lint, formatting and diff checks passed. The original26 integration cases
+and their deadlines remain intact. Normal hooks and fresh hosted qualification remain outstanding. No application or paused source changed. The earlier connected source evidence
+remains bound to its runtime; fresh hosted qualification must still use the final pushed head.
+
+The earlier946 hosted Electron job reports71 passed and one flaky case, despite its successful job
+conclusion: the direct-write permission-policy journey timed out at60seconds before passing on retry.
+Its report/trace review is still in progress. That result is not a clean72-case qualification and
+cannot qualify the later repair head. The original failure remains retained; no test deadline,
+retry policy or application behavior is changed on that evidence alone.

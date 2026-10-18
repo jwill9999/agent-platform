@@ -10,8 +10,12 @@ Beads provider-interoperability and model-connection-diagnostics remain in_progr
 The task is `task/provider-sdk-refresh-plan` into `feature/provider-sdk-refresh`, based on actual
 staging `ece78d8a`. [PR362](https://github.com/jwill9999/agent-platform/pull/362) is open. Its946e4735
 snapshot has16 actual Sonar issues and an SDK4-shaped Git Node fixture failure; neither is waived.
-Seven reviewed Sonar source repairs and the SDK7 Git test adaptation are now locally qualified,
-awaiting normal push and fresh exact-head hosted checks. No new source is hosted-qualified yet.
+Seven reviewed Sonar source repairs and the SDK7 Git test adaptation are locally qualified.
+Their normal push at0e518068 stopped before upload on one Git active-ledger fixture read;573 other
+API cases passed. A reviewed test-only newline-framing/rejection-observation repair preserves all
+original assertions and deadlines. All33 focused cases passed without unhandled rejection or skips;
+the new normal push and hosted checks remain pending here.
+No new source is hosted-qualified yet.
 
 The maintained SDK cohort, eight configurable adapters, encrypted bound continuation and honest
 safe durable probes are implemented. Initial runtime5d157be9 passed all affected builds/types and
