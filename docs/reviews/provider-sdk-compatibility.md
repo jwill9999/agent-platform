@@ -1,6 +1,6 @@
 # Provider SDK compatibility review and results
 
-Status: 18 October 2026. Local connected qualification, independent review and normal push hooks passed as recorded below; hosted qualification remains outstanding.
+Status: 18 October 2026. The initial normal push passed. Reviewed repairs for hosted findings now have affected local qualification; their next normal push and fresh hosted qualification remain outstanding.
 No hosted qualification, integration, owner-app rebuild or stress readiness is claimed.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
@@ -12,16 +12,19 @@ app/profile remains unchanged; paused orchestration, main and the disabled Docke
 
 ## Current qualification
 
-| Area                                      | Actual evidence                                                                                                                                                      | Remaining gate                                       |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Native providers                          | Router135, including83 HTTP protocol/privacy controls across eight adapters and five representative model IDs; browser43 passed                                      | Exact-head hosted qualification                      |
-| Private persistence/configuration         | DB236, contracts166 plus20 focused controls and saved-configAPI8 passed; reviewed source                                                                             | Hosted qualification                                 |
-| Harness/private continuation              | Harness819, API90 focused and complete574-case API suite passed; browser and native effects/restart evidence independently reviewed                                  | Hosted regressions                                   |
-| Existing chat API fixture migration       | Original40 cases retained as39 mocked plus one dedicated actual SDK HTTP case; mixed96 and full574 API cases passed                                                  | Hosted API regression                                |
-| Web public message/configuration contract | Web431 and browser43 passed; app-owned renderer type and accessible visible failures                                                                                 | Hosted regressions                                   |
-| Durable probe diagnostics                 | Actual SDK/API/SQLite/export/restart cases passed; diagnostic source and artifact review approved                                                                    | Hosted gates and later owner-app preflight           |
-| Native desktop journeys                   | Broad68pass/4fail retained; MCP2 and MIG/label3 focused repairs passed, both new SDK journeys passed. All72 unique scenarios have passing evidence across runs       | Fresh full hosted suite; no clean single-run72 claim |
-| Build/static quality and hooks            | Affected builds/types and3,868 ordinary tests passed with77 existing optional skips; lint/format/review passed. Nine-vector900/990 benchmark passed unchanged limits | Exact-head hosted quality/security/reviews           |
+Full ordinary-suite counts bind5d157be9. Later repairs have the explicitly named affected slices
+and connected evidence below; earlier browser/native artifacts retain their own source bindings.
+
+| Area                                      | Actual evidence                                                                                                                                                                                                                         | Remaining gate                                                   |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Native providers                          | Router135, including83 HTTP protocol/privacy controls across eight adapters and five representative model IDs; browser43 passed                                                                                                         | Exact-head hosted qualification                                  |
+| Private persistence/configuration         | Initial DB236/contracts166 plus20 focused/configAPI8; latest DB16 and API96 repair controls passed                                                                                                                                      | New normal hook and hosted qualification                         |
+| Harness/private continuation              | Initial harness819/fullAPI574; latest harness67/API96 plus SDK browser/native repairs passed                                                                                                                                            | New normal hook and hosted regressions                           |
+| Existing chat API fixture migration       | Original40 retained as39 mocked plus one actual SDK HTTP case; full574 passed initially, latest mixed96 passed                                                                                                                          | New normal hook and hosted API regression                        |
+| Web public message/configuration contract | Prior web431/browser43; fresh SDK browser1 across all8 adapters passed after helper repair                                                                                                                                              | Hosted regressions                                               |
+| Durable probe diagnostics                 | Actual SDK/API/SQLite/export/restart cases passed; diagnostic source and artifact review approved                                                                                                                                       | Hosted gates and later owner-app preflight                       |
+| Native desktop journeys                   | Prior68pass/4fail plus focused repairs give72 unique passing scenarios across runs. Latest two SDK cases passed on repaired source                                                                                                      | Fresh full hosted suite; no clean single-run72 claim             |
+| Build/static quality and hooks            | Initial5d157be9:3,868 ordinary tests/77 existing optional skips and900/990 benchmark passed. Latest hosted-finding repairs:314 affected tests,97 CI Node controls and3 connected cases passed; affected builds/types/lint/format passed | Normal push and fresh exact-head hosted gates on repaired source |
 
 The native journeys exercise saved configurations, honest failed probes, OpenRouter recovery, durable
 exports and native Save As. The tool journey verifies a valid pre-restart approval and exactly one
@@ -87,9 +90,10 @@ contract, without production fallbacks, waived assertions, retries or increased 
 
 ## Outstanding delivery and readiness
 
-Local browser/desktop scenarios, independent diagnostic review, full affected suites, the unchanged
-900-measurement/990-call benchmark and normal hooks passed as recorded below. Exact-head hosted
-quality/security/reviews remain outstanding.
+The initial full affected suites, unchanged900-measurement/990-call benchmark and normal hooks
+passed at5d157be9. Subsequent reviewed hosted-finding repairs have the affected and connected
+qualification below; their normal push and fresh exact-head hosted quality/security/reviews remain
+outstanding. Earlier broad connected results retain their explicit source bindings.
 Protected staging still needs actual authority, full ordinary analysis and packaged macOS VM gates.
 Owner stress readiness additionally needs a tested rebuilt app with preserved profile/DB/key and an
 owner-run or separately authorized real usable model request. No new paid calls are authorized.
@@ -254,7 +258,7 @@ The critic approved this wording clarification, with no runtime change. The owne
 record remains open and now explicitly depends on provider interoperability; older startup-ready
 notes do not establish usable model generation or stress readiness for the unchanged owner build.
 
-## Final local hook qualification
+## Full local hook qualification before hosted findings
 
 Commit `5d157be969bfff01fb2cc5c205a719f0844b1ca5` passed the normal commit and push hooks.
 All affected builds/types and3,868 ordinary tests passed, including the complete574-case/56-file
@@ -270,7 +274,48 @@ intentional coverage, not healthy success. Source bytes match protected staging'
 See `fourth-push-benchmark.json` and `fourth-push-benchmark-verified.json`. This measures that workload;
 it does not claim owner stress testing or live-provider compatibility.
 
-Only results and current handoff change after this passing source. Fresh exact-head hosted checks,
+At that checkpoint only results and current handoff changed after the passing source. The hosted
+findings below subsequently required reviewed source repairs. Fresh exact-head hosted checks,
 security findings and comments remain mandatory. Protected full analysis and packaged macOS VM
 qualification belong to any later staging promotion. The owner's running older app/profile remains
 untouched, so owner-app rebuild/preflight and stress readiness are not claimed.
+
+## Hosted Sonar and Git fixture follow-up
+
+PR362 at `946e4735` reported16 actual open Sonar issues, including three critical complexity
+findings, and failed its security-rating condition. These were not waived even though other rating,
+duplication and hotspot conditions passed. Seven bounded repairs extract equivalent DB credential,
+endpoint and private-continuation branches, keep safe probe error classifications, and replace two
+unnecessarily async callbacks with synchronous Promise executors. Their SQLite work still runs
+synchronously, thrown failures still reject, and the caller still awaits persistence before effects.
+The test helpers now use fixed absolute Docker/node executables and fixed child PATHs, typed safe
+error fallback, a byte-identical String.raw runner, anchored numeric latency and equivalent native
+credential branches. No rules, suppressions, limits, validation, paused code or product deadlines changed.
+
+The reviewed source passed314 affected tests: DB16, router135, harness67 and API96, plus affected
+builds/types/lint/format. Fresh connected checks passed the browser SDK journey across all eight
+adapters (one case/10.5seconds) and both native SDK cases (40.1seconds), retry0/skip0. The native
+reports retain the same four failed-probe IDs after restart, verified durable coverage with no
+pending/drop/conflict, encrypted private rows1to3 without plaintext/invalid rows, one approved effect,
+and no new effects for denial or interrupted409. The deliberately interrupted prior process remains
+visible as unfinished coverage. Both shutdowns fulfilled; only owned disposable services stopped.
+`sonar-helper-qualification.json` binds seven source hashes,13 image bindings,14 native source/dist
+bindings per case and28 artifact digests. Independent critique read the ZIP members and verified these
+facts; the later Git fixture test-only delta does not change that runtime evidence.
+
+The separate hosted verify failure occurred before the ordinary suite/benchmark in an existing
+Git Node fixture still using SDK4 parameters/args/result fields. Its SDK7 inputSchema/input/typed
+JSON output adaptation retains fragmented quoted/newline arguments, explicit absence of provider
+execution, both finish reasons, two requests and no errors. Canonical SDK response messages carry
+continuation; an added wire assertion checks the exact tool-result value. The failure is retained in
+`pr362-946-verify-job.log`. Detection scope matters: the ordinary Vitest push hook does not include
+these separately required CI Node commands. All relevant CI-only controls now pass locally:
+Git22, Stop3, diagnostic/monitoring/hook67, and the already-qualified provider protocol5, total97,
+without failure/cancellation/skip. `ci-node-followup-terminal.json` and raw logs retain the commands.
+
+All eight changed source files received independent review. These passing local controls do not clear
+the old hosted failure: the next normal push, fresh benchmark and new exact-head hosted Sonar/checks
+remain required. The45-row Dependency Review gate on946 was independently qualified, with no introduced
+advisories, but must bind the later head normally. Sourcery declined that diff because it exceeds
+150,000 characters; that is a review limitation, not a weekly-budget skip or an independent approval.
+No live model/account, owner-app rebuild, stress readiness, integration or merge authority is inferred.

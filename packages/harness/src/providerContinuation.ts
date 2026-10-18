@@ -66,9 +66,7 @@ function object(value: unknown): Record<string, unknown> | undefined {
     ? (value as Record<string, unknown>)
     : undefined;
 }
-function validateRouterDetail(value: unknown): Record<string, unknown> {
-  const detail = object(value);
-  if (!detail || typeof detail.type !== 'string') invalidContinuation();
+function validateRouterMetadata(detail: Record<string, unknown>): void {
   if (detail.id != null && typeof detail.id !== 'string') invalidContinuation();
   if (
     detail.index !== undefined &&
@@ -77,26 +75,49 @@ function validateRouterDetail(value: unknown): Record<string, unknown> {
     invalidContinuation();
   if (detail.format != null && typeof detail.format !== 'string') invalidContinuation();
   if (detail.signature != null && typeof detail.signature !== 'string') invalidContinuation();
-  if (detail.type === 'reasoning.encrypted' && !nonempty(detail.data)) invalidContinuation();
-  if (detail.type === 'reasoning.summary' && typeof detail.summary !== 'string')
+}
+function validateRouterText(detail: Record<string, unknown>): void {
+  if (detail.text != null && typeof detail.text !== 'string') invalidContinuation();
+  const format = detail.format ?? 'anthropic-claude-v1';
+  if (
+    (format === 'anthropic-claude-v1' || format === 'google-gemini-v1') &&
+    !nonempty(detail.signature)
+  )
     invalidContinuation();
-  if (detail.type === 'reasoning.text') {
-    if (detail.text != null && typeof detail.text !== 'string') invalidContinuation();
-    const format = detail.format ?? 'anthropic-claude-v1';
-    if (
-      (format === 'anthropic-claude-v1' || format === 'google-gemini-v1') &&
-      !nonempty(detail.signature)
-    )
+}
+function validateRouterPayload(detail: Record<string, unknown>): void {
+  switch (detail.type) {
+    case 'reasoning.encrypted':
+      if (!nonempty(detail.data)) invalidContinuation();
+      return;
+    case 'reasoning.summary':
+      if (typeof detail.summary !== 'string') invalidContinuation();
+      return;
+    case 'reasoning.text':
+      validateRouterText(detail);
+      return;
+    default:
       invalidContinuation();
-  } else if (!['reasoning.encrypted', 'reasoning.summary'].includes(detail.type))
-    invalidContinuation();
+  }
+}
+function validateRouterDetail(value: unknown): Record<string, unknown> {
+  const detail = object(value);
+  if (!detail || typeof detail.type !== 'string') invalidContinuation();
+  validateRouterMetadata(detail);
+  validateRouterPayload(detail);
   return detail;
+}
+function routerDetailIdentity(detail: Record<string, unknown>): string {
+  const prefix = `${String(detail.type)}:`;
+  if (typeof detail.id === 'string') return prefix + detail.id;
+  if (typeof detail.index === 'number') return prefix + detail.index;
+  return prefix + JSON.stringify(detail);
 }
 function validateRouterArray(details: unknown[], seen: Map<string, Record<string, unknown>>): void {
   const local = new Set<string>();
   for (const value of details) {
     const detail = validateRouterDetail(value);
-    const identity = `${String(detail.type)}:${typeof detail.id === 'string' ? detail.id : typeof detail.index === 'number' ? detail.index : JSON.stringify(detail)}`;
+    const identity = routerDetailIdentity(detail);
     if (local.has(identity)) invalidContinuation();
     local.add(identity);
     const previous = seen.get(identity);
@@ -124,41 +145,49 @@ function usesSignedGoogleCalls(model: string): boolean {
     /(^|[/.])gemini-robotics-er-1\.5(?:[.-]|$)/i.test(model);
   return gemini && !legacy;
 }
+function metadataRequiresContinuation(vendor: unknown): boolean {
+  const metadata = object(vendor);
+  if (!metadata) return false;
+  if (
+    ['reasoningEncryptedContent', 'signature', 'redactedData', 'thoughtSignature'].some(
+      (key) => metadata[key] != null,
+    )
+  )
+    return true;
+  const details = metadata.reasoning_details;
+  return details !== undefined && (!Array.isArray(details) || details.length > 0);
+}
+function containerRequiresContinuation(container: Record<string, unknown>): boolean {
+  return Object.values(object(container.providerOptions) ?? {}).some(metadataRequiresContinuation);
+}
+function requiresSignedGoogleGroup(
+  parts: unknown[],
+  model?: Pick<ProviderContinuationBinding, 'provider' | 'model'>,
+): boolean {
+  return (
+    model?.provider === 'google' &&
+    usesSignedGoogleCalls(model.model) &&
+    parts.some((part) => object(part)?.type === 'tool-call')
+  );
+}
+function messageRequiresContinuation(
+  value: unknown,
+  model?: Pick<ProviderContinuationBinding, 'provider' | 'model'>,
+): boolean {
+  const message = object(value);
+  if (message?.role !== 'assistant') return false;
+  const parts = Array.isArray(message.content) ? message.content : [];
+  const containers = [message, ...parts.map(object).filter((part) => part !== undefined)];
+  if (parts.some((part) => object(part)?.type === 'reasoning')) return true;
+  if (requiresSignedGoogleGroup(parts, model)) return true;
+  return containers.some(containerRequiresContinuation);
+}
 /** Canonical SDK parts that cannot safely be reduced to public text/tool history. */
 export function requiresProviderContinuation(
   responseMessages: unknown[],
   model?: Pick<ProviderContinuationBinding, 'provider' | 'model'>,
 ): boolean {
-  for (const value of responseMessages) {
-    const message = object(value);
-    if (!message || message.role !== 'assistant') continue;
-    const parts = Array.isArray(message.content) ? message.content : [];
-    const containers = [message, ...parts.map(object).filter((part) => part !== undefined)];
-    if (parts.some((part) => object(part)?.type === 'reasoning')) return true;
-    if (
-      model?.provider === 'google' &&
-      usesSignedGoogleCalls(model.model) &&
-      parts.some((part) => object(part)?.type === 'tool-call')
-    )
-      return true;
-    for (const container of containers) {
-      const options = object(container.providerOptions);
-      if (!options) continue;
-      for (const vendor of Object.values(options)) {
-        const metadata = object(vendor);
-        if (!metadata) continue;
-        if (
-          ['reasoningEncryptedContent', 'signature', 'redactedData', 'thoughtSignature'].some(
-            (key) => metadata[key] != null,
-          )
-        )
-          return true;
-        const details = metadata.reasoning_details;
-        if (details !== undefined && (!Array.isArray(details) || details.length > 0)) return true;
-      }
-    }
-  }
-  return false;
+  return responseMessages.some((value) => messageRequiresContinuation(value, model));
 }
 function validateGoogleGroup(parts: OpaquePart[], binding: ProviderContinuationBinding): void {
   if (binding.provider !== 'google' || !usesSignedGoogleCalls(binding.model)) return;

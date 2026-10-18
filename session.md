@@ -1,58 +1,44 @@
 # Provider SDK and model choice — 18 October 2026
 
-Owner approved completion of the SDK/provider MVP: OpenAI, Claude, Gemini, DeepSeek, Grok plus
-OpenRouter alternatives; researched emulated services accepted, no new paid calls. Provider and
-model-connection-diagnostics Beads remain in_progress. See
+Owner approved completion of the SDK/provider MVP with OpenAI, Claude, Gemini, DeepSeek and Grok,
+plus OpenRouter alternatives; researched emulators are accepted, with no additional paid calls.
+Beads provider-interoperability and model-connection-diagnostics remain in_progress. See the
 [plan](docs/planning/provider-sdk-compatibility.md),
 [verification](docs/testing/provider-sdk-compatibility.md) and
-[actual results/review](docs/reviews/provider-sdk-compatibility.md).
+[actual source-bound results](docs/reviews/provider-sdk-compatibility.md).
 
-Security delivery is staging `ece78d8a`; eleven advisories remain tracked. SDK task
-`task/provider-sdk-refresh-plan` and feature `feature/provider-sdk-refresh` start from that actual base.
-The pinned maintained SDK cohort, eight adapters, encrypted private continuation, honest probes and
-safe durable diagnostics are implemented; follow-up qualification is in progress. Independent reviews approved the
-router135, DB236, contracts165 and focused20, configAPI8, harness819 and API90 qualification. Web431,
-full types/lint/format and builds passed, with affected packages rebuilt after the latest repair.
-Current rebuilt browser43/43 passed retry0/skip0, including all selected provider chat streams and
-existing Git/Stop/MCP/reply/context journeys. The broad native run finished68pass/4fail; both new SDK
-journeys passed. Correct-cwd MCP2 and independently reviewed MIG/label focused3 then passed, giving
-all72 unique scenarios passing evidence across runs. Original failures are retained. Pre-UX browser
-and broad native source bindings are explicit; no single-run72clean or post-UX full-suite claim.
+The task is `task/provider-sdk-refresh-plan` into `feature/provider-sdk-refresh`, based on actual
+staging `ece78d8a`. [PR362](https://github.com/jwill9999/agent-platform/pull/362) is open. Its946e4735
+snapshot has16 actual Sonar issues and an SDK4-shaped Git Node fixture failure; neither is waived.
+Seven reviewed Sonar source repairs and the SDK7 Git test adaptation are now locally qualified,
+awaiting normal push and fresh exact-head hosted checks. No new source is hosted-qualified yet.
 
-The final SDK-UX01 error projection/recovery guidance passed67 affected harness cases and41 context
-API cases, rebuilds/types/lint. Independent evidence review verified encrypted continuation, exactly
-one approved effect, denial, restart fences, durable diagnostic identities/coverage and private-data
-exclusion. The additive migration test retains every historical field and exact prior journal while
-explicitly checking the new default-zero column/table and three SQL hashes/timestamps. Normal push
-hooks and full affected suites/fresh benchmark have now passed as recorded below; exact-head hosted gates remain open.
-First SDK commit `b533f0f4` passed its commit hook, but its push stopped at a shared metadata type
-cycle before package tests; nothing was pushed. The independently reviewed leaf-module repair
-preserves one Symbol and unchanged private behavior. Rebuilds, harness/API types, lint, 67 affected
-cases and the actual cycle check now pass; normal follow-up push checks remain required.
-Follow-up commit `700ca012` passed builds/types but its second normal push stopped on six unchanged
-workflow-control timing/reservation cases (1135 passed/6 failed/77 existing optional skips), before
-API/benchmark. Original failures remain retained. A source-verified config-only probe shows Vitest4
-ignores old fork-limit variables and accepts command-scoped `VITEST_MAX_WORKERS=1`. Independent review
-approved the next normal push with that supported setting; no hook, paused code/test, assertions or
-deadlines changed, and concurrency alone is not claimed as the cause of all six failures.
-The third normal push at `4dfba18f` passed all non-API packages, including workflow1,141 with77
-existing optional skips, but stopped on8 ordinary API failures (566passed); no fresh benchmark ran.
-The five Stop/resume fixture prerequisites were independently repaired and passed alongside41
-missing-master/private controls. Reviewed test-only module-cache boundaries and a dedicated real
-HTTP fixture then passed the forced mixed96-case slice (13.31seconds, no retries/skips); original
-failures remain retained. No production, paused-work, assertion or deadline changed. The next
-normal full push then passed at `5d157be9`:3,868 ordinary tests,77 existing optional skips and
-all nine benchmark vectors/900 measured requests/990 fixture calls. Raw p95 recomputation gives
-10.692751ms maximum positive overhead under the unchanged20ms limit. Source and remote refs were
-verified; only results/handoff change afterward. Hosted qualification is next. SDK-CONTRACT01
-clarifies visible errors versus header/report correlation, and the open owner stress review now
-explicitly depends on provider interoperability. No owner trial has happened.
-[PR362](https://github.com/jwill9999/agent-platform/pull/362) is open into
-`feature/provider-sdk-refresh`; hosted checks and security review are in progress. Runtime source
-`5d157be9` passed the full normal hook, and `b63dd5d9` records its results. Integration, owner-app
-rebuild and stress readiness remain pending. Preserve the owner app/profile/key, paused orchestration,
-main and disabled Docker gateway. Historical handoff below
-is retained verbatim; its superseded pending states do not override this current checkpoint.
+The maintained SDK cohort, eight configurable adapters, encrypted bound continuation and honest
+safe durable probes are implemented. Initial runtime5d157be9 passed all affected builds/types and
+3,868 ordinary tests, with77 existing optional skips, plus the unchanged900/990 benchmark; raw
+maximum positive overhead10.692751ms stayed below20ms. Later result/handoff-only commits are
+retained in history. Those initial passes do not qualify changed repair source automatically.
+
+The current repairs passed314 affected DB/router/harness/API tests and97 separate CI Node controls,
+with affected builds/types/lint/format. Fresh browser SDK1/eight adapters and native SDK2 passed
+without retries/skips. Native evidence verifies durable correlated events across restart, encrypted
+private rows1to3, exactly one approved effect and denied/interrupted no-effects. Owned disposable
+services stopped with data retained. Independent source/artifact review is complete; the earlier
+browser43 and broad native68pass/4fail plus focused repairs retain their earlier source bindings.
+All72 unique native scenarios had passing evidence across those runs; no clean single-run72 claim.
+
+Refresh every current-head workflow/check, review thread and actual Sonar/CodeQL finding before
+acceptance. Dependency Review independently verified946's45-row inventory with no introduced
+advisories; this is not a zero-total-audit claim or later-head proof. Sourcery skipped because the
+diff exceeds150,000 characters. Preserve the independent review and that limitation. SDK-CONTRACT01
+keeps accessible visible errors separate from response-header/durable-report correlation; UI UUID
+visibility was not an approved requirement. The stress-review task explicitly depends on this feature.
+
+Owner app/profile/key and original dirty/paused work remain unchanged. No owner-app rebuild, live
+provider compatibility, stress trial/readiness, SDK integration or merge is claimed. Keep paused
+orchestration/PR283 separate, main unpromoted and Docker gateway disabled. No Notion publication,
+global change, credential replacement or additional paid request. Historical session below remains
+verbatim; superseded pending states there do not override this current checkpoint.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Historical session follows; retain its original top-level headings verbatim. -->

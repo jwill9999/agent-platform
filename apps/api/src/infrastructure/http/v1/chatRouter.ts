@@ -1464,28 +1464,31 @@ function buildRuntimeGraph({
           dispatcher,
           onContextDecision: observeDiagnosticContextDecision,
           onModelAttempt: observeDiagnosticModelAttempt,
-          hydrateMessages: async (messages) => {
-            // Preserve settled tool outcomes before the next model can fail or be stopped.
-            const context = resolveSessionProjectContext(db, getSession(db, sessionId)!);
-            persistNewMessages(
-              db,
-              sessionId,
-              sanitizeProjectAssistantMessages(messages, context),
-              0,
-            );
-            onMessagesPersisted?.();
-            return rehydrateContinuation(db, sessionId, messages);
-          },
-          onAssistantMessage: async (message, previousMessages) => {
-            const context = resolveSessionProjectContext(db, getSession(db, sessionId)!);
-            persistNewMessages(
-              db,
-              sessionId,
-              sanitizeProjectAssistantMessages([...previousMessages, message], context),
-              0,
-            );
-            onMessagesPersisted?.();
-          },
+          hydrateMessages: (messages) =>
+            new Promise<ChatMessage[]>((resolve) => {
+              // Preserve settled tool outcomes before the next model can fail or be stopped.
+              const context = resolveSessionProjectContext(db, getSession(db, sessionId)!);
+              persistNewMessages(
+                db,
+                sessionId,
+                sanitizeProjectAssistantMessages(messages, context),
+                0,
+              );
+              onMessagesPersisted?.();
+              resolve(rehydrateContinuation(db, sessionId, messages));
+            }),
+          onAssistantMessage: (message, previousMessages) =>
+            new Promise<void>((resolve) => {
+              const context = resolveSessionProjectContext(db, getSession(db, sessionId)!);
+              persistNewMessages(
+                db,
+                sessionId,
+                sanitizeProjectAssistantMessages([...previousMessages, message], context),
+                0,
+              );
+              onMessagesPersisted?.();
+              resolve();
+            }),
         }),
       { deferModelStart: !options.llmReasonNode },
     ),

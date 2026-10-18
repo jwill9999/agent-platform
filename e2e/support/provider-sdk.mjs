@@ -213,16 +213,14 @@ function emitTool(res, provider, model, tool) {
   res.end();
 }
 function credentialMatches(headers, provider) {
-  const actual =
-    provider === 'google'
-      ? headers['x-goog-api-key']
-      : provider === 'anthropic'
-        ? headers['x-api-key']
-        : headers.authorization;
-  return (
-    actual ===
-    (['google', 'anthropic'].includes(provider) ? SDK_FIXTURE_KEY : `Bearer ${SDK_FIXTURE_KEY}`)
-  );
+  switch (provider) {
+    case 'google':
+      return headers['x-goog-api-key'] === SDK_FIXTURE_KEY;
+    case 'anthropic':
+      return headers['x-api-key'] === SDK_FIXTURE_KEY;
+    default:
+      return headers.authorization === `Bearer ${SDK_FIXTURE_KEY}`;
+  }
 }
 
 function expectedPath(provider, model, stream) {

@@ -26,6 +26,12 @@ export type TestConnectionResult =
       statusCode?: number;
       retryable: boolean;
     };
+function connectionFailure(error: unknown): ProviderRequestError {
+  const safe = toProviderRequestError(error);
+  if (safe instanceof ProviderRequestError) return safe;
+  if (safe.name === 'AbortError') return new ProviderRequestError('timeout');
+  return new ProviderRequestError('unknown');
+}
 /** Exactly one bounded SDK generation, never reinterpret a rejected request as success. */
 export async function testModelConnection(
   options: TestConnectionOptions,
@@ -55,11 +61,7 @@ export async function testModelConnection(
       throw new ProviderRequestError('invalid_response');
     return { ok: true, latencyMs: Math.round(performance.now() - start) };
   } catch (error: unknown) {
-    const safe = toProviderRequestError(error);
-    const failure =
-      safe instanceof ProviderRequestError
-        ? safe
-        : new ProviderRequestError(safe.name === 'AbortError' ? 'timeout' : 'unknown');
+    const failure = connectionFailure(error);
     return {
       ok: false,
       latencyMs: Math.round(performance.now() - start),

@@ -125,6 +125,76 @@ function insertModelConfig(
   };
 }
 
+function clearModelSecret(db: DrizzleDb, secretRefId: string | null): string | null {
+  if (!secretRefId) return secretRefId;
+  db.delete(schema.secretRefs).where(eq(schema.secretRefs.id, secretRefId)).run();
+  return null;
+}
+
+function storeModelSecret(
+  db: DrizzleDb,
+  id: string,
+  apiKey: string,
+  masterKey: Buffer | undefined,
+  keyVersion: number,
+  secretRefId: string | null,
+): string {
+  if (!masterKey) throw new Error('SECRETS_MASTER_KEY is required to store an API key');
+  const payload = encryptUtf8(apiKey, masterKey, keyVersion);
+  if (secretRefId) {
+    // Re-encrypt in place.
+    db.update(schema.secretRefs)
+      .set({
+        ciphertextB64: payload.ciphertextB64,
+        ivB64: payload.ivB64,
+        authTagB64: payload.authTagB64,
+        keyVersion: payload.keyVersion,
+        algorithm: payload.algorithm,
+      })
+      .where(eq(schema.secretRefs.id, secretRefId))
+      .run();
+    return secretRefId;
+  }
+  const secretId = randomUUID();
+  db.insert(schema.secretRefs)
+    .values({
+      id: secretId,
+      label: `model-config:${id}`,
+      ciphertextB64: payload.ciphertextB64,
+      ivB64: payload.ivB64,
+      authTagB64: payload.authTagB64,
+      keyVersion: payload.keyVersion,
+      algorithm: payload.algorithm,
+    })
+    .run();
+  return secretId;
+}
+
+function changeModelSecret(
+  db: DrizzleDb,
+  id: string,
+  body: ModelConfigUpdateBody,
+  existing: typeof schema.modelConfigs.$inferSelect,
+  masterKey: Buffer | undefined,
+  keyVersion: number,
+): string | null {
+  let secretRefId = existing.secretRefId;
+  if (body.provider !== undefined && body.provider !== existing.provider && secretRefId)
+    secretRefId = clearModelSecret(db, secretRefId);
+  if (body.apiKey === undefined) return secretRefId;
+  if (body.apiKey === '') return clearModelSecret(db, secretRefId);
+  return storeModelSecret(db, id, body.apiKey, masterKey, keyVersion, secretRefId);
+}
+
+function changedModelEndpoint(
+  existing: typeof schema.modelConfigs.$inferSelect,
+  body: ModelConfigUpdateBody,
+): string | null {
+  if (body.baseURL !== undefined) return body.baseURL;
+  if (body.provider !== undefined && body.provider !== existing.provider) return null;
+  return existing.baseURL;
+}
+
 function changeModelConfig(
   db: DrizzleDb,
   id: string,
@@ -140,63 +210,12 @@ function changeModelConfig(
   if (!existing) return undefined;
 
   const now = Date.now();
-  let secretRefId = existing.secretRefId;
-  if (body.provider !== undefined && body.provider !== existing.provider && secretRefId) {
-    db.delete(schema.secretRefs).where(eq(schema.secretRefs.id, secretRefId)).run();
-    secretRefId = null;
-  }
-
-  if (body.apiKey !== undefined) {
-    if (body.apiKey === '') {
-      // Empty string = clear the key
-      if (secretRefId) {
-        db.delete(schema.secretRefs).where(eq(schema.secretRefs.id, secretRefId)).run();
-        secretRefId = null;
-      }
-    } else {
-      if (!masterKey) throw new Error('SECRETS_MASTER_KEY is required to store an API key');
-      const payload = encryptUtf8(body.apiKey, masterKey, keyVersion);
-      if (secretRefId) {
-        // Re-encrypt in place
-        db.update(schema.secretRefs)
-          .set({
-            ciphertextB64: payload.ciphertextB64,
-            ivB64: payload.ivB64,
-            authTagB64: payload.authTagB64,
-            keyVersion: payload.keyVersion,
-            algorithm: payload.algorithm,
-          })
-          .where(eq(schema.secretRefs.id, secretRefId))
-          .run();
-      } else {
-        // Create new secret ref
-        const secretId = randomUUID();
-        db.insert(schema.secretRefs)
-          .values({
-            id: secretId,
-            label: `model-config:${id}`,
-            ciphertextB64: payload.ciphertextB64,
-            ivB64: payload.ivB64,
-            authTagB64: payload.authTagB64,
-            keyVersion: payload.keyVersion,
-            algorithm: payload.algorithm,
-          })
-          .run();
-        secretRefId = secretId;
-      }
-    }
-  }
-
+  const secretRefId = changeModelSecret(db, id, body, existing, masterKey, keyVersion);
   const updated = {
     name: body.name ?? existing.name,
     provider: body.provider ?? existing.provider,
     model: body.model ?? existing.model,
-    baseURL:
-      body.baseURL !== undefined
-        ? body.baseURL
-        : body.provider !== undefined && body.provider !== existing.provider
-          ? null
-          : existing.baseURL,
+    baseURL: changedModelEndpoint(existing, body),
     secretRefId,
     updatedAtMs: now,
   };
