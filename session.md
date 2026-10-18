@@ -1,38 +1,46 @@
-# Dependency security — PR350 qualification, 18 October 2026
+# Dependency security — protected staging review repair, 18 October 2026
 
 Beads `agent-platform-dependency-security` remains in progress; activation is open.
-PR350's first CI repair was pushed at `a9e7e19f` into `feature/dependency-security`, based on qualified
-staging `5c2f6553`. Migration delivery and recovery cleanup are complete. In-use task branches,
-paused orchestration/PR283 and the owner app/profile remain intact. Security merge authority is separate.
+Owner authorized PR350, then feature-to-staging delivery after all current checks and comments clear,
+followed by cleanup of verified delivered branches. SDK upgrades and paused orchestration remain separate.
 
-The normal combined push passed 3,667 ordinary tests with 77 existing optional skips, all 15 package
-builds/typechecks and the fresh 900-measurement/990-call benchmark. Independent review recomputed the
-raw measurements under unchanged limits. Lint and formatting passed. The two owner-approved paused
-test-file exceptions retain assertions, explicit expiry/takeover checks and product deadlines.
+PR350 merged normally at `e95afc403111c582f99a40eb5e92b3adc50bf0bd`. Its tree equals reviewed
+`d785bbf4` and the conflict-free qualified staging `5c2f6553` rehearsal. All11 executed feature checks
+passed; fresh Sonar had zero open or accepted issues, no unresolved threads remained, and independent
+review verified the source, CI artifact digests and every selected member. The normal combined push
+passed 3,667 ordinary tests with77 existing optional skips,15 builds/types and the fresh900/990 benchmark.
+Local browser32/Git5/Stop5/Electron70 passed without retries or skips; hosted Electron70 was retry-free,
+while browser31 retained one existing context-fixture skip that passed locally.
 
-The first hosted security run failed on the 171,440-character environment value and an empty reverse
-ancestor comparison. The reviewed private-file transport and official-vendor deterministic controls
-then passed on `a9e7e19f`, including complete binding of all 440 changes. Live negative dependency-graph
-coverage remains unavailable. Sonar's earlier three findings cleared, but six new harness findings
-required the reviewed fixed-path CLI, canonical Git identity and sequential/parser follow-up.
-Fresh hosted/Sonar qualification of that follow-up remains required.
+Protected PR351 is open at `e95afc40` against staging `5c2f6553`. Its ordinary full Promptfoo run
+39150944305 performed genuine analysis with provider success, batchCount2, CLI0.124.1 and no reported
+LLM vulnerabilities. Its official Dependency Review run39150944316 bound all440 inventory changes.
+Independent critique verified both artifacts, exact refs/run/attempt, pinned action/guard and SARIF.
+Fresh Sonar is clear for that head. These results do not qualify a later changed head.
 
-Local connected checks now pass without retries or skips: 32 browser, five Git, five Stop and 70
-Electron cases. Native Electron 42.11.15 secure storage passed after the owner handled Keychain
-permission; the initial timeout is retained. Independent review verified diagnostics recording,
-export and restart, durable monitoring samples and both retained-database migration journeys.
-Packaged VM fixtures do not establish actual protected macOS VM qualification.
+CodeQL then reported alert11, `js/bad-code-sanitization`, in the generated dependency-output test
+fixture. This branch, `task/dependency-codeql-transport`, repairs that test boundary without suppressing
+the alert, changing application runtime or weakening the adversarial transport controls. All30 affected
+Node controls and scoped ESLint pass. The fixed preload now has a positive invocation probe before
+the missing-file no-effect checks. Final source/document review and new hosted task-to-feature checks
+precede merging this repair. PR351 must
+then receive fresh full analysis, actual macOS VM, all live quality/security checks and clear comments
+before guarded protected squash. No protected security delivery is claimed yet.
 
-Browser traces exposed fixture-root mismatch, premature slash-init submission, and chat starting
-before onboarding approval completed. Reviewed test corrections preserve assertions and deadlines.
-The historical MCP agent-selection failure remains unexplained; an instrumented attempt passed and
-its timing limitation is disclosed. All original failures and new evidence remain retained.
+Earlier browser failures and the initial native Keychain wait remain retained. The historical MCP
+agent-selection failure remains unexplained; bounded evidence capture passed with its timing limit
+disclosed. Diagnostic exports/restart, durable monitoring and migration safety passed on the reviewed
+runtime. No new local runtime repeat is needed for the test-only source repair; hosted checks remain
+mandatory. The two owner-approved paused test-file exceptions preserve assertions, short-expiry and
+takeover checks, other test budgets and all product deadlines; PR283 and paused runtime are untouched.
 
-The remaining audit debt is 11 distinct GHSAs: zero critical, three high, six moderate and two low.
-SDK/LangChain, Kit and unpatched Braces ownership remains recorded. Eight AI package identities and
-integrities are frozen, with the reviewed Nanoid edge only. The SDK plan and valid-key model
-`max_tokens` failure remain separate. No stress readiness, additional paid call, owner-app restart,
+Remaining audit debt is11 distinct GHSAs: zero critical, three high, six moderate and two low, with
+SDK/LangChain, Kit and unpatched Braces ownership recorded. Eight AI package identities/integrities
+stay frozen, with the reviewed Nanoid edge only. The separate SDK plan and valid-key `max_tokens`
+failure remain unresolved. No owner stress readiness, additional paid call, owner-app/profile restart,
 credential/global change, Notion publication, Docker gateway enabling or main promotion is claimed.
+Disposable QA containers were removed without deleting retained data, volumes or caches. Protected
+staging activation/enforcement remains required before task closure; cleanup follows actual delivery.
 
 ## Preserved source histories
 

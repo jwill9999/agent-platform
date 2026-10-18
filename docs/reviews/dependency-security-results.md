@@ -1,9 +1,37 @@
 # Dependency security results
 
 Plan/spec/verification are linked in the [plan](../planning/dependency-security.md).
-Current checkpoint: exact12a09516 normal push passed all3667 ordinary tests,77 existing optional
-skips,15 workspace builds/types and the fresh900/990 benchmark. Draft PR350 is open; local connected32browser/5Git/5Stop/70Electron cases now pass.
-Fresh hosted/protection qualification of the follow-up remains in progress. No completed security delivery is claimed.
+PR350 merged normally at`e95afc40` after all11 executed exact`d785bbf4` checks passed, no unresolved
+threads or scoped code-scanning alerts remained, fresh Sonar was clear and independent source/artifact
+review qualified the feature. The merged tree equals reviewed source and the staging`5c2f6553` rehearsal.
+Local3667 ordinary tests/77 existing optional skips,15 builds/types, fresh900/990 benchmark and connected
+browser32/Git5/Stop5/Electron70 passed. Hosted Electron70 was retry-free; browser31 had one existing
+context-fixture skip that passed locally. These are actual feature results, not protected delivery.
+
+Protected PR351 is open. Original`e95` full Promptfoo39150944305 and DependencySecurity39150944316
+attempt1 passed; independent review verified genuine provider analysis/batch2/CLI0.124.1, exact
+refs/run/attempt/action/guard/SARIF and all440 official-vendor inventory changes. Sonar is clear.
+CodeQL alert11 then identified constructed source in the dependency-output test fixture. The bounded
+repair on`task/dependency-codeql-transport` requires affected regression/source review, a normal
+feature repair PR and fresh protected checks. No dismissal, staging merge or security task closure
+has occurred. Earlier dated checkpoints below retain their original failures and pending states.
+
+## Protected CodeQL transport-fixture repair
+
+PR351 CodeQL alert11 (`js/bad-code-sanitization`, security medium/error) identified the generated
+fetch-preload function containing a JSON-serialized fixture path. This follow-up makes that preload
+fixed source and passes only its small marker path through an explicit child environment. The large
+adversarial output test still executes its standalone evaluated JSON string literal; only module and
+destination paths move to small fixture environment values. No bulk environment/argv transport,
+production source, workflow, timeout, assertion or vulnerability policy changes are included.
+
+A positive preload probe now verifies the mock actually records a call and produces the expected
+failure before the original missing-file tests prove zero API calls. This prevents a broken preload
+from producing an empty-marker false pass. All30 affected Node controls and scoped ESLint pass;
+three changed Markdown files, explicit formatting and preserved-history equality also pass.
+Independent final source/document review and actual fresh hosted CodeQL/Sonar/CI remain required.
+The original alert, full analysis and CI evidence remain retained; no dismissal or unchanged rerun
+is used to qualify this changed source.
 
 ## Baseline and setup gaps
 
