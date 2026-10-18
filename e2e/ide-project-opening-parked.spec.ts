@@ -1,13 +1,20 @@
 import { expect, test } from '@playwright/test';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+
+function workspaceHostPath(): string {
+  if (process.env.AGENT_WORKSPACE_HOST_PATH?.trim()) {
+    return resolve(process.env.AGENT_WORKSPACE_HOST_PATH);
+  }
+  return join(process.cwd(), '.agent-platform', 'workspaces', 'default');
+}
 
 test.describe('IDE Project opening is parked for desktop', () => {
   test('opens desktop Project into Project chat by default and guards IDE handoff in browser', async ({
     page,
   }) => {
     const projectId = `agent-platform-e2e-project-chat-${Date.now()}`;
-    const projectRoot = join(process.cwd(), '.agent-platform', 'workspaces', 'default', projectId);
+    const projectRoot = join(workspaceHostPath(), projectId);
     const backendProjectRoot = `/workspace/${projectId}`;
     const projectName = `Desktop Project Chat ${Date.now()}`;
     mkdirSync(join(projectRoot, 'docs'), { recursive: true });
@@ -94,7 +101,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
 
   test('opens desktop Project files through the backend-bound Project root', async ({ page }) => {
     const projectId = `agent-platform-e2e-project-${Date.now()}`;
-    const projectRoot = join(process.cwd(), '.agent-platform', 'workspaces', 'default', projectId);
+    const projectRoot = join(workspaceHostPath(), projectId);
     const backendProjectRoot = `/workspace/${projectId}`;
     const projectName = `Desktop E2E Project ${Date.now()}`;
     mkdirSync(join(projectRoot, 'docs'), { recursive: true });
@@ -142,7 +149,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
 
   test('runs slash init against the opened desktop Project session', async ({ page }) => {
     const projectId = `agent-platform-e2e-slash-init-${Date.now()}`;
-    const projectRoot = join(process.cwd(), '.agent-platform', 'workspaces', 'default', projectId);
+    const projectRoot = join(workspaceHostPath(), projectId);
     const backendProjectRoot = `/workspace/${projectId}`;
     const projectName = `Desktop Slash Init ${Date.now()}`;
     mkdirSync(join(projectRoot, 'src'), { recursive: true });
@@ -175,6 +182,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
       await expect(page.getByRole('navigation', { name: 'Project location' })).toBeVisible();
 
       await page.getByPlaceholder('Ask about this Project...').fill('/init');
+      await expect(page.getByRole('button', { name: 'Send message' })).toBeEnabled();
       await page.getByPlaceholder('Ask about this Project...').press('Enter');
 
       await expect(page.getByText('/init')).toBeVisible();

@@ -1,4 +1,11 @@
-import { expect, type APIRequestContext, type Page, type TestInfo } from '@playwright/test';
+import {
+  expect,
+  type APIRequestContext,
+  type Page,
+  type Request,
+  type Response,
+  type TestInfo,
+} from '@playwright/test';
 import { test } from './support/mcp-test';
 import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -147,6 +154,78 @@ async function attach(testInfo: TestInfo, name: string, value: unknown) {
   await testInfo.attach(name, { path, contentType: 'application/json' });
 }
 
+async function startBindingDiagnostics(page: Page, info: TestInfo, targetLabel: string) {
+  // Only the owned block fixture enables this trace, after credential setup. Stop
+  // at the binding boundary, before chat, and retain no screenshots or source files.
+  await page.context().tracing.start({ screenshots: false, snapshots: true, sources: false });
+  const started = performance.now();
+  const origin = new URL(page.url()).origin;
+  const observations: Array<Record<string, string | number | boolean | null>> = [];
+  let dropped = 0;
+  let stopped = false;
+  const record = (value: Record<string, string | number | boolean | null>) => {
+    if (observations.length < 64)
+      observations.push({ atMs: performance.now() - started, ...value });
+    else dropped += 1;
+  };
+  const captureBinding = (request: Request, status?: number) => {
+    const url = new URL(request.url());
+    if (
+      request.method() !== 'POST' ||
+      url.origin !== origin ||
+      url.pathname !== '/api/v1/sessions/project'
+    )
+      return;
+    try {
+      const body: unknown = request.postDataJSON();
+      const id = (key: string) => {
+        const value = body && typeof body === 'object' ? Reflect.get(body, key) : null;
+        return typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value) ? value : null;
+      };
+      record({
+        event: status === undefined ? 'binding-request' : 'binding-response',
+        agentId: id('agentId'),
+        projectId: id('projectId'),
+        status: status ?? null,
+      });
+    } catch {
+      record({ event: 'binding-metadata-unavailable', status: status ?? null });
+    }
+  };
+  const onRequest = (request: Request) => captureBinding(request);
+  const onResponse = (response: Response) => captureBinding(response.request(), response.status());
+  page.on('request', onRequest);
+  page.on('response', onResponse);
+  const selector = async (phase: string) => {
+    const state = await page.evaluate((target) => {
+      const element = document.querySelector('[role="combobox"][aria-label="Active agent"]');
+      return {
+        present: Boolean(element),
+        targetSelected: element?.textContent?.trim() === target,
+        expanded: element?.getAttribute('aria-expanded') === 'true',
+        disabled:
+          element?.hasAttribute('disabled') === true ||
+          element?.getAttribute('aria-disabled') === 'true',
+      };
+    }, targetLabel);
+    record({ event: 'selector', phase, ...state });
+  };
+  const tracePath = info.outputPath('mcp-binding-trace.zip');
+  return {
+    selector,
+    stop: async () => {
+      if (stopped) return;
+      stopped = true;
+      page.off('request', onRequest);
+      page.off('response', onResponse);
+      await page.context().tracing.stop({ path: tracePath });
+    },
+    attachTrace: () =>
+      info.attach('mcp-binding-trace.zip', { path: tracePath, contentType: 'application/zip' }),
+    attachReceipt: () => attach(info, 'mcp-binding-evidence.json', { observations, dropped }),
+  };
+}
+
 for (const mode of ['approve', 'reject', 'block', 'stale', 'unknown'] as const) {
   test(`Browser MCP ${mode}: real chat permission and settled effect boundary`, async ({
     page,
@@ -165,6 +244,7 @@ for (const mode of ['approve', 'reject', 'block', 'stale', 'unknown'] as const) 
     let sessionId: string | undefined;
     let previousPolicy: unknown;
     let passed = false;
+    let bindingDiagnostics: Awaited<ReturnType<typeof startBindingDiagnostics>> | undefined;
     const cleanupFailures: string[] = [];
     try {
       nodeInContainer(
@@ -237,6 +317,7 @@ for (const mode of ['approve', 'reject', 'block', 'stale', 'unknown'] as const) 
                 .unknownToolPolicy,
           )
           .toBe('block');
+        bindingDiagnostics = await startBindingDiagnostics(page, info, `${prefix}-agent`);
       }
       const [initialBinding] = await Promise.all([
         page.waitForResponse(
@@ -252,6 +333,7 @@ for (const mode of ['approve', 'reject', 'block', 'stale', 'unknown'] as const) 
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeEnabled();
       const agentSelector = page.getByRole('combobox', { name: 'Active agent' });
       await expect(agentSelector).toBeEnabled();
+      await bindingDiagnostics?.selector('before-agent-selection');
       if (initialSession.agentId === agentId) {
         sessionId = initialSession.id;
       } else {
@@ -265,6 +347,7 @@ for (const mode of ['approve', 'reject', 'block', 'stale', 'unknown'] as const) 
           (async () => {
             await agentSelector.click();
             await page.getByRole('option', { name: `${prefix}-agent`, exact: true }).click();
+            await bindingDiagnostics?.selector('after-option-click');
           })(),
         ]);
         expect(bound.ok()).toBe(true);
@@ -273,6 +356,7 @@ for (const mode of ['approve', 'reject', 'block', 'stale', 'unknown'] as const) 
       if (!sessionId) throw new Error('Disposable Project session was not bound');
       await expect(agentSelector).toContainText(`${prefix}-agent`);
       expect(snapshot(container, sessionId).session.agent_id).toBe(agentId);
+      await bindingDiagnostics?.stop();
       await send(page, '/init');
       await page.getByRole('button', { name: 'Approve instructions', exact: true }).click();
       await expect(page.getByText('Project instructions approved').last()).toBeVisible();
@@ -411,6 +495,18 @@ for (const mode of ['approve', 'reject', 'block', 'stale', 'unknown'] as const) 
           cleanupFailures.push(label);
         }
       };
+      await attempt('binding selector evidence', async () => {
+        await bindingDiagnostics?.selector('finally-before-cleanup');
+      });
+      await attempt('binding trace stop', async () => {
+        await bindingDiagnostics?.stop();
+      });
+      await attempt('binding trace attachment', async () => {
+        await bindingDiagnostics?.attachTrace();
+      });
+      await attempt('binding receipt', async () => {
+        await bindingDiagnostics?.attachReceipt();
+      });
       // A failed screenshot/readback must not prevent independent owned cleanup.
       await attempt('failure evidence', async () => {
         if (!passed) {

@@ -131,7 +131,7 @@ function runChecks(names, check) {
 
 function runApiChecks(check) {
   // Match CI: every ordinary API test, then the complete benchmark in a fresh process.
-  const options = ['--maxWorkers=1', '--minWorkers=1', '--no-file-parallelism'];
+  const options = ['--maxWorkers=1', '--no-file-parallelism'];
   const ordinary = check([
     '--filter',
     '@agent-platform/api',

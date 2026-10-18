@@ -207,7 +207,22 @@ try { const id=process.argv[1]; console.log(JSON.stringify({messages:sqlite.prep
     await expect(input).toHaveValue('/init');
     await expect(submit).toBeEnabled();
     await submit.click();
-    await page.getByRole('button', { name: 'Approve instructions' }).click();
+    const [instructionsApproval] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().endsWith(`/api/v1/projects/${projectId}/onboarding/approve`) &&
+          response.request().method() === 'POST',
+      ),
+      page.getByRole('button', { name: 'Approve instructions' }).click(),
+    ]);
+    expect(instructionsApproval.status()).toBe(200);
+    const approvedProject = (await instructionsApproval.json()) as {
+      data: { metadata: { onboardingState: string } };
+    };
+    expect(approvedProject.data.metadata.onboardingState).toBe('approved');
+    await expect(
+      page.getByRole('heading', { name: 'Project instructions approved', exact: true }),
+    ).toBeVisible();
     progress('instructions-approved');
     await expect(input).toBeEnabled();
     await input.fill('GH_DOCKER_PROMPT_CANARY write the disposable file.');

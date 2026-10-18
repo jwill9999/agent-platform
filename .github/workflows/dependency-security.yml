@@ -1,0 +1,140 @@
+name: Dependency Security
+
+on:
+  pull_request:
+    branches: [main, staging, 'feature/**']
+  workflow_dispatch:
+  schedule:
+    - cron: '17 7 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Test comparison completeness controls
+        run: node --test scripts/dependency-review.test.mjs scripts/dependency-output.test.mjs
+      - name: Reject newly introduced vulnerable dependencies
+        id: vendor
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime, development, unknown
+          vulnerability-check: true
+          license-check: false
+          show-openssf-scorecard: false
+          comment-summary-in-pr: never
+          warn-only: false
+          retry-on-snapshot-warnings: false
+      - name: Preserve the complete vendor output without environment size limits
+        if: always()
+        shell: node {0}
+        run: |
+          const { join } = require('node:path');
+          const { pathToFileURL } = require('node:url');
+          const data = ${{ toJSON(steps.vendor.outputs['dependency-changes']) }};
+          import(pathToFileURL(join(process.env.GITHUB_WORKSPACE, 'scripts/dependency-output.mjs')).href)
+            .then(({ writeVendorOutput }) => writeVendorOutput({ directory: process.env.RUNNER_TEMP, kind: 'dependency-changes', data }))
+            .catch(() => { console.error('Unable to preserve complete vendor inventory'); process.exitCode = 1; });
+      - name: Bind complete exact-revision data to the vendor's actual inventory
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPENDENCY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DEPENDENCY_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DEPENDENCY_RECEIPT: ${{ runner.temp }}/dependency-comparison.json
+          VENDOR_OUTCOME: ${{ steps.vendor.outcome }}
+          VENDOR_CHANGES_FILE: ${{ runner.temp }}/dependency-vendor-changes.json
+        run: node scripts/dependency-review.mjs
+      - name: Retain comparison provenance
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependency-comparison
+          path: ${{ runner.temp }}/dependency-comparison.json
+          if-no-files-found: error
+          retention-days: 14
+
+  vendor-fixture-control:
+    name: Official dependency review fixture controls
+    # A reverse ancestor comparison is empty under GitHub merge-base semantics.
+    # These deterministic official-bundle controls do not claim live negative graph coverage.
+    if: github.event_name == 'pull_request' && github.head_ref == 'task/dependency-security'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Test fixture failure and evidence controls
+        run: node --test scripts/dependency-vendor-fixture.test.mjs
+      - name: Download the exact official action runtime
+        env:
+          VENDOR_DIRECTORY: /tmp/agent-platform-dependency-vendor
+        run: |
+          mkdir -m 700 "$VENDOR_DIRECTORY"
+          for file in index.js index.js.map sourcemap-register.js; do
+            curl --fail --silent --show-error --proto '=https' --connect-timeout 10 --max-time 60 --max-filesize 7000000 \
+              "https://raw.githubusercontent.com/actions/dependency-review-action/a1d282b36b6f3519aa1f3fc636f609c47dddb294/dist/$file" \
+              --output "$VENDOR_DIRECTORY/$file"
+          done
+      - name: Verify runtime hashes and actual vendor pass and rejection behavior
+        env:
+          VENDOR_DIRECTORY: /tmp/agent-platform-dependency-vendor
+          TMPDIR: /tmp
+        run: node scripts/dependency-vendor-fixture.mjs
+      - name: Retain deterministic control provenance and limitations
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependency-vendor-fixture-control
+          path: /tmp/agent-platform-dependency-vendor-results/
+          if-no-files-found: error
+          retention-days: 14
+
+  full-development-audit:
+    name: Full staging dependency audit
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: staging
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Record actual scanned revision
+        env:
+          RECEIPT: ${{ runner.temp }}/audit-source.txt
+        run: git rev-parse HEAD > "$RECEIPT"
+      - name: Audit the complete lockfile without installing packages
+        env:
+          AUDIT_REPORT: ${{ runner.temp }}/dependency-audit.json
+        run: pnpm audit --audit-level=high --json > "$AUDIT_REPORT"
+      - name: Retain audit and source evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: staging-dependency-audit
+          path: |
+            ${{ runner.temp }}/dependency-audit.json
+            ${{ runner.temp }}/audit-source.txt
+          if-no-files-found: error
+          retention-days: 14

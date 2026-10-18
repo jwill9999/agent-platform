@@ -23,7 +23,10 @@ import type { ApprovalRequest } from '@agent-platform/contracts';
 import { createApp } from '../src/infrastructure/http/createApp.js';
 import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
 
-const providerModule = '../../../e2e/support/git-delivery/model-provider.mjs';
+const providerModule = new URL(
+  '../../../e2e/support/git-delivery/model-provider.mjs',
+  import.meta.url,
+).href;
 const { startGitDeliveryProvider } = await import(providerModule);
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -469,8 +472,12 @@ describe('Git delivery through real SDK, HTTP approvals, SQLite and Git', () => 
       const f = await setup(replies);
       const bare = join(f.directory, 'remote.git');
       execFileSync('/usr/bin/git', ['init', '--bare', bare], { stdio: 'ignore' });
-      const transportModule = '../../../e2e/support/git-delivery/git-transport.mjs';
-      const ghModule = '../../../e2e/support/git-delivery/gh-ledger.mjs';
+      const transportModule = new URL(
+        '../../../e2e/support/git-delivery/git-transport.mjs',
+        import.meta.url,
+      ).href;
+      const ghModule = new URL('../../../e2e/support/git-delivery/gh-ledger.mjs', import.meta.url)
+        .href;
       const { createGitTransportFixture } = await import(transportModule);
       const { createGhLedgerFixture } = await import(ghModule);
       const transport = await createGitTransportFixture({ bareRoot: bare });

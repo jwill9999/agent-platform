@@ -8,8 +8,7 @@ export default defineConfig({
     // many test files open ephemeral HTTP servers simultaneously (e.g. pre-push hook).
     pool: 'forks',
     fileParallelism: false,
-    poolOptions: {
-      forks: { minForks: 1, maxForks: 1, isolate: false },
-    },
+    maxWorkers: 1,
+    isolate: false,
   },
 });

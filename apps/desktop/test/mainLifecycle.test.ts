@@ -139,10 +139,12 @@ describe('Electron main startup and quit wiring', () => {
     mocks.backend.mockResolvedValue({ url: 'http://fixture', stop: backendStop });
     mocks.renderer.mockResolvedValue({ url: 'http://renderer', stop: rendererStop });
     const getURL = vi.fn(() => 'http://renderer');
-    mocks.windows.mockReturnValue({
-      loadURL: async () => {},
-      once: vi.fn(),
-      webContents: { setWindowOpenHandler: vi.fn(), on: vi.fn(), getURL },
+    mocks.windows.mockImplementation(function () {
+      return {
+        loadURL: async () => {},
+        once: vi.fn(),
+        webContents: { setWindowOpenHandler: vi.fn(), on: vi.fn(), getURL },
+      };
     });
     await import('../src/main/main.js');
     mocks.listeners.get('ready')?.();
@@ -170,11 +172,13 @@ describe('Electron main startup and quit wiring', () => {
     const stop = vi.fn(async () => {});
     mocks.backend.mockResolvedValue({ url: 'http://fixture', stop });
     mocks.renderer.mockResolvedValue({ url: 'http://renderer', stop });
-    mocks.windows.mockReturnValue({
-      loadURL: () => loaded.promise,
-      isDestroyed: () => false,
-      destroy,
-      webContents: { setWindowOpenHandler: vi.fn(), on: vi.fn() },
+    mocks.windows.mockImplementation(function () {
+      return {
+        loadURL: () => loaded.promise,
+        isDestroyed: () => false,
+        destroy,
+        webContents: { setWindowOpenHandler: vi.fn(), on: vi.fn() },
+      };
     });
     await import('../src/main/main.js');
     mocks.listeners.get('ready')?.();
