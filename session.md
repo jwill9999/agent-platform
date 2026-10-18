@@ -47,8 +47,11 @@ all nine benchmark vectors/900 measured requests/990 fixture calls. Raw p95 reco
 verified; only results/handoff change afterward. Hosted qualification is next. SDK-CONTRACT01
 clarifies visible errors versus header/report correlation, and the open owner stress review now
 explicitly depends on provider interoperability. No owner trial has happened.
-No SDK PR, integration, owner-app rebuild or stress readiness is claimed yet. Preserve the owner
-app/profile/key, paused orchestration, main and disabled Docker gateway. Historical handoff below
+[PR362](https://github.com/jwill9999/agent-platform/pull/362) is open into
+`feature/provider-sdk-refresh`; hosted checks and security review are in progress. Runtime source
+`5d157be9` passed the full normal hook, and `b63dd5d9` records its results. Integration, owner-app
+rebuild and stress readiness remain pending. Preserve the owner app/profile/key, paused orchestration,
+main and disabled Docker gateway. Historical handoff below
 is retained verbatim; its superseded pending states do not override this current checkpoint.
 
 <!-- markdownlint-disable MD025 -->
