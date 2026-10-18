@@ -1,48 +1,44 @@
-# Provider SDK and model choice — 18 October 2026
+# Provider SDK and model choice — 19 October 2026
 
-Owner approved completion of the SDK/provider MVP with OpenAI, Claude, Gemini, DeepSeek and Grok,
-plus OpenRouter alternatives; researched emulators are accepted, with no additional paid calls.
+Owner approved the bounded SDK/provider MVP with OpenAI, Claude, Gemini, DeepSeek and Grok,
+plus OpenRouter alternatives. Researched emulators are accepted; no additional paid calls.
 Beads provider-interoperability and model-connection-diagnostics remain in_progress. See the
 [plan](docs/planning/provider-sdk-compatibility.md),
 [verification](docs/testing/provider-sdk-compatibility.md) and
-[actual source-bound results](docs/reviews/provider-sdk-compatibility.md).
+[source-bound results](docs/reviews/provider-sdk-compatibility.md).
 
-The task is `task/provider-sdk-refresh-plan` into `feature/provider-sdk-refresh`, based on actual
-staging `ece78d8a`. [PR362](https://github.com/jwill9999/agent-platform/pull/362) is open. Its946e4735
-snapshot has16 actual Sonar issues and an SDK4-shaped Git Node fixture failure; neither is waived.
-Seven reviewed Sonar source repairs and the SDK7 Git test adaptation are locally qualified.
-Their normal push at0e518068 stopped before upload on one Git active-ledger fixture read;573 other
-API cases passed. A reviewed test-only newline-framing/rejection-observation repair preserves all
-original assertions and deadlines. All33 focused cases passed without unhandled rejection or skips;
-the new normal push and hosted checks remain pending here.
-No new source is hosted-qualified yet.
+[PR362](https://github.com/jwill9999/agent-platform/pull/362) integrates
+`task/provider-sdk-refresh-plan` into `feature/provider-sdk-refresh`, based on stagingece78d8a.
+Runtime/source2a62817b is pushed and clean after reviewed Sonar/Git fixture repairs. All affected
+builds/types and1,771 ordinary cases passed (router135/DB236/harness819/API581), plus the unchanged
+fresh nine-vector900/990 benchmark; maximum positive overhead3.491375ms stayed below20ms. The
+prior ledger and20.732750ms benchmark failures are retained with causes/unknowns distinguished.
+One predeclared observed diagnostic benchmark passed separately; it did not replace normal hooks.
 
 The maintained SDK cohort, eight configurable adapters, encrypted bound continuation and honest
-safe durable probes are implemented. Initial runtime5d157be9 passed all affected builds/types and
-3,868 ordinary tests, with77 existing optional skips, plus the unchanged900/990 benchmark; raw
-maximum positive overhead10.692751ms stayed below20ms. Later result/handoff-only commits are
-retained in history. Those initial passes do not qualify changed repair source automatically.
+safe durable probes are implemented. Fresh repair qualification includes314 affected cases,97 CI
+Node controls, browser SDK1 across eight adapters and native SDK2 without retries/skips. Native
+reports verify durable correlated events across restart, encrypted private rows1to3, exactly one
+approved effect and denied/interrupted no-effects. Independent source/artifact review is retained.
+Initial broad browser43/local native72 scenario evidence keeps its explicit earlier source bindings.
 
-The current repairs passed314 affected DB/router/harness/API tests and97 separate CI Node controls,
-with affected builds/types/lint/format. Fresh browser SDK1/eight adapters and native SDK2 passed
-without retries/skips. Native evidence verifies durable correlated events across restart, encrypted
-private rows1to3, exactly one approved effect and denied/interrupted no-effects. Owned disposable
-services stopped with data retained. Independent source/artifact review is complete; the earlier
-browser43 and broad native68pass/4fail plus focused repairs retain their earlier source bindings.
-All72 unique native scenarios had passing evidence across those runs; no clean single-run72 claim.
+Old946 hosted Sonar16 and verify failure do not qualify the changed source. Its green Electron job
+was71passed/1flaky due to an unresolved pre-handle launch timeout; browser was42passed/1context
+fixture skip. SDK-OBS01 safe early-launch diagnostics is recorded in the existing desktop-startup
+Beads record. Require a new exact-head full72 retry-zero/no-flaky desktop run; if launch fails again,
+improve safe evidence before another attempt. No deadline, rule, assertion or retry waiver applies.
 
-Refresh every current-head workflow/check, review thread and actual Sonar/CodeQL finding before
-acceptance. Dependency Review independently verified946's45-row inventory with no introduced
-advisories; this is not a zero-total-audit claim or later-head proof. Sourcery skipped because the
-diff exceeds150,000 characters. Preserve the independent review and that limitation. SDK-CONTRACT01
-keeps accessible visible errors separate from response-header/durable-report correlation; UI UUID
-visibility was not an approved requirement. The stress-review task explicitly depends on this feature.
+Refresh all final-head workflows, reviews and actual Sonar/CodeQL findings. The45-row Dependency
+Review inventory on946 had no introduced advisories but is not later-head proof or zero-total-audit.
+Sourcery skipped because the diff exceeds150,000 characters; independent review remains essential.
+Final result/handoff-only updates preserve runtime. Fresh hosted qualification remains outstanding at
+this checkpoint; current Beads/PR checks provide later status without rewriting historical results.
 
 Owner app/profile/key and original dirty/paused work remain unchanged. No owner-app rebuild, live
 provider compatibility, stress trial/readiness, SDK integration or merge is claimed. Keep paused
 orchestration/PR283 separate, main unpromoted and Docker gateway disabled. No Notion publication,
 global change, credential replacement or additional paid request. Historical session below remains
-verbatim; superseded pending states there do not override this current checkpoint.
+verbatim; superseded pending states there do not override this checkpoint.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Historical session follows; retain its original top-level headings verbatim. -->

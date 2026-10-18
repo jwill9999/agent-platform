@@ -1,6 +1,6 @@
 # Provider SDK compatibility review and results
 
-Status: 18 October 2026. The initial normal push passed. The hosted-finding repair push stopped on an active Git fixture ledger read; its reviewed test-only framing repair is being qualified before a new normal push and fresh hosted checks.
+Status: 19 October 2026. The repaired source at2a62817b passed normal hooks and a fresh benchmark and is pushed. Final exact-head hosted quality, security, review and connected qualification remains outstanding.
 No hosted qualification, integration, owner-app rebuild or stress readiness is claimed.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
@@ -15,16 +15,16 @@ app/profile remains unchanged; paused orchestration, main and the disabled Docke
 Full ordinary-suite counts bind5d157be9. Later repairs have the explicitly named affected slices
 and connected evidence below; earlier browser/native artifacts retain their own source bindings.
 
-| Area                                      | Actual evidence                                                                                                                                                                                                                         | Remaining gate                                                   |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Native providers                          | Router135, including83 HTTP protocol/privacy controls across eight adapters and five representative model IDs; browser43 passed                                                                                                         | Exact-head hosted qualification                                  |
-| Private persistence/configuration         | Initial DB236/contracts166 plus20 focused/configAPI8; latest DB16 and API96 repair controls passed                                                                                                                                      | New normal hook and hosted qualification                         |
-| Harness/private continuation              | Initial harness819/fullAPI574; latest harness67/API96 plus SDK browser/native repairs passed                                                                                                                                            | New normal hook and hosted regressions                           |
-| Existing chat API fixture migration       | Original40 retained as39 mocked plus one actual SDK HTTP case; full574 passed initially, latest mixed96 passed                                                                                                                          | New normal hook and hosted API regression                        |
-| Web public message/configuration contract | Prior web431/browser43; fresh SDK browser1 across all8 adapters passed after helper repair                                                                                                                                              | Hosted regressions                                               |
-| Durable probe diagnostics                 | Actual SDK/API/SQLite/export/restart cases passed; diagnostic source and artifact review approved                                                                                                                                       | Hosted gates and later owner-app preflight                       |
-| Native desktop journeys                   | Prior68pass/4fail plus focused repairs give72 unique passing scenarios across runs. Latest two SDK cases passed on repaired source                                                                                                      | Fresh full hosted suite; no clean single-run72 claim             |
-| Build/static quality and hooks            | Initial5d157be9:3,868 ordinary tests/77 existing optional skips and900/990 benchmark passed. Latest hosted-finding repairs:314 affected tests,97 CI Node controls and3 connected cases passed; affected builds/types/lint/format passed | Normal push and fresh exact-head hosted gates on repaired source |
+| Area                                      | Actual evidence                                                                                                                                                                                                                         | Remaining gate                                       |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Native providers                          | Router135, including83 HTTP protocol/privacy controls across eight adapters and five representative model IDs; browser43 passed                                                                                                         | Exact-head hosted qualification                      |
+| Private persistence/configuration         | Initial DB236/contracts166 plus20 focused/configAPI8; latest DB16 and API96 repair controls passed                                                                                                                                      | Fresh exact-head hosted qualification                |
+| Harness/private continuation              | Initial harness819/fullAPI574; latest harness67/API96 plus SDK browser/native repairs passed                                                                                                                                            | Fresh exact-head hosted regressions                  |
+| Existing chat API fixture migration       | Original40 retained as39 mocked plus one actual SDK HTTP case; full574 passed initially, latest mixed96 passed                                                                                                                          | Fresh exact-head hosted API regression               |
+| Web public message/configuration contract | Prior web431/browser43; fresh SDK browser1 across all8 adapters passed after helper repair                                                                                                                                              | Hosted regressions                                   |
+| Durable probe diagnostics                 | Actual SDK/API/SQLite/export/restart cases passed; diagnostic source and artifact review approved                                                                                                                                       | Hosted gates and later owner-app preflight           |
+| Native desktop journeys                   | Prior68pass/4fail plus focused repairs give72 unique passing scenarios across runs. Latest two SDK cases passed on repaired source                                                                                                      | Fresh full hosted suite; no clean single-run72 claim |
+| Build/static quality and hooks            | Initial5d157be9:3,868 ordinary tests/77 existing optional skips and900/990 benchmark passed. Latest hosted-finding repairs:314 affected tests,97 CI Node controls and3 connected cases passed; affected builds/types/lint/format passed | Fresh exact-head hosted gates on repaired source     |
 
 The native journeys exercise saved configurations, honest failed probes, OpenRouter recovery, durable
 exports and native Save As. The tool journey verifies a valid pre-restart approval and exactly one
@@ -92,8 +92,8 @@ contract, without production fallbacks, waived assertions, retries or increased 
 
 The initial full affected suites, unchanged900-measurement/990-call benchmark and normal hooks
 passed at5d157be9. Subsequent reviewed hosted-finding repairs have the affected and connected
-qualification below; their normal push and fresh exact-head hosted quality/security/reviews remain
-outstanding. Earlier broad connected results retain their explicit source bindings.
+qualification below; normal hooks subsequently passed at2a62817b. Fresh exact-head hosted
+quality/security/reviews remain outstanding. Earlier broad connected results retain their explicit source bindings.
 Protected staging still needs actual authority, full ordinary analysis and packaged macOS VM gates.
 Owner stress readiness additionally needs a tested rebuilt app with preserved profile/DB/key and an
 owner-run or separately authorized real usable model request. No new paid calls are authorized.
@@ -341,6 +341,46 @@ remains bound to its runtime; fresh hosted qualification must still use the fina
 
 The earlier946 hosted Electron job reports71 passed and one flaky case, despite its successful job
 conclusion: the direct-write permission-policy journey timed out at60seconds before passing on retry.
-Its report/trace review is still in progress. That result is not a clean72-case qualification and
+Its report/trace review is complete; the pre-handle startup cause remains unknown. That result is not a clean72-case qualification and
 cannot qualify the later repair head. The original failure remains retained; no test deadline,
 retry policy or application behavior is changed on that evidence alone.
+
+## Final normal-hook qualification, 19 October
+
+Commit `2a62817bb59afca4dd7c30dc07af326ec247fbb7` is pushed and clean. Its normal hook passed
+all affected builds/types and1,771 ordinary cases: router135, DB236, harness819 and the full API581
+across56 files. The33-case Git ledger file passed within that full suite. The earlier all-package
+3,868 result remains bound to its earlier source; unchanged packages were not redundantly rerun by
+this affected-package hook. Fresh hosted CI still runs the required complete qualification.
+
+SDK-PERF01 retains the preceding genuine hook failure: the third locked vector's p9539.087250ms
+minus disabled18.354500ms was20.732750ms, above the unchanged20ms limit. All900 measurements and
+990 provider calls were retained; enqueue/queue/healthy loss controls passed. Event-loop and observed
+GC data did not establish a cause. A post-failure host snapshot was not contemporaneous, and a bounded
+power-log query timed out; neither proves resource contention or sleep caused the result.
+
+Independent critique approved one predeclared diagnostic run of the unchanged full benchmark with
+an external one-hertz resource sampler and a five-second sampler-only baseline. It passed900/990
+with maximum overhead3.7655ms. Sampling commands consumed41to126.5ms wall time; incremental CPU
+overhead was not quantified. Coarse phase correlation is explicit, with no per-request absolute-clock
+inference. This diagnostic run did not replace the failed hook or justify a threshold change.
+
+The subsequent complete normal push, without that sampler, independently passed its fresh full
+nine-vector benchmark:900 measured requests/990 fixture calls, maximum positive overhead3.491375ms
+under20ms, enqueue p95 below2ms, queue at most256 and healthy zero loss. All raw windows were
+recomputed against the byte-identical staged benchmark. `requalified-sdk-push.log`, its terminal
+receipt and `requalified-sdk-push-benchmark.json` retain the actual source-bound result; the original
+failed hook and observed diagnostic artifacts remain retained. This qualifies the current local
+revision without claiming that the historical timing cause was identified or fixed.
+
+SDK-OBS01, the earlier946 pre-handle Electron launch evidence gap, is recorded in the existing
+`agent-platform-desktop-secure-storage-startup` Beads record. The next current-head hosted Electron
+suite must pass all72 cases on retry zero with no flaky cases. If launch fails again, collect safe
+pre-handle process/startup evidence before another attempt; do not infer a provider or policy failure,
+raise a deadline or treat a successful retry as clean. Earlier hosted browser evidence is42passed
+plus one context-fixture skip, whose scenario has separate local passing evidence. Successful first
+phase detailed artifacts were not uploaded by the existing CI rule; the actual job log is retained.
+
+These final result/handoff updates do not alter runtime. Every latest exact-head workflow, Sonar
+finding, security alert and review thread still needs inspection before acceptance. No merge,
+protected staging, owner-app rebuild, live-provider compatibility or owner stress readiness is claimed.
