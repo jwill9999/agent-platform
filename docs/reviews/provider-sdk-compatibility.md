@@ -193,3 +193,19 @@ The actual cycle check now passes with no circular dependencies (93 unresolved-m
 remain disclosed in its log). Earlier broad connected evidence remains bound to its earlier source;
 this mechanical module move does not establish a new broad run. Normal hooks must still execute
 fully on the follow-up commit, with a fresh benchmark and hosted qualification.
+
+## Supported Vitest 4 worker configuration
+
+The second normal push at `700ca012` reached all affected builds/types and package tests, then stopped
+on six unchanged workflow-control timing/reservation cases: 1,135 passed, six failed and 77 existing
+optional skips. It did not reach the ordinary API suite or benchmark. The full raw log is retained;
+these failures are not waived and do not establish a product root cause.
+
+Installed Vitest 4.1.12 reads `VITEST_MAX_WORKERS`, while the former MAX_FORKS/MIN_FORKS variables
+are absent from its installed JavaScript. A config-only probe using the real package configuration
+resolved maxWorkers as unset with the old variables and exactly1 with `VITEST_MAX_WORKERS=1`;
+no tests or prototype runs were executed by that probe. See `vitest4-single-worker-config-proof.json`.
+The next normal push uses this supported command-scoped setting, preserving all hooks, test bodies,
+assertions, deadlines and filters. CI already specifies one worker explicitly. No global setting,
+paused test/runtime or hook source changed. Independent review approved the bounded requalification;
+parallel execution is a supported cause to investigate, not proof it alone explains every failure.

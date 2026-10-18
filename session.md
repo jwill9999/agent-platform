@@ -29,6 +29,12 @@ First SDK commit `b533f0f4` passed its commit hook, but its push stopped at a sh
 cycle before package tests; nothing was pushed. The independently reviewed leaf-module repair
 preserves one Symbol and unchanged private behavior. Rebuilds, harness/API types, lint, 67 affected
 cases and the actual cycle check now pass; normal follow-up push checks remain required.
+Follow-up commit `700ca012` passed builds/types but its second normal push stopped on six unchanged
+workflow-control timing/reservation cases (1135 passed/6 failed/77 existing optional skips), before
+API/benchmark. Original failures remain retained. A source-verified config-only probe shows Vitest4
+ignores old fork-limit variables and accepts command-scoped `VITEST_MAX_WORKERS=1`. Independent review
+approved the next normal push with that supported setting; no hook, paused code/test, assertions or
+deadlines changed, and concurrency alone is not claimed as the cause of all six failures.
 No SDK PR, integration, owner-app rebuild or stress readiness is claimed yet. Preserve the owner
 app/profile/key, paused orchestration, main and disabled Docker gateway. Historical handoff below
 is retained verbatim; its superseded pending states do not override this current checkpoint.

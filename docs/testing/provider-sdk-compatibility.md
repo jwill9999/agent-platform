@@ -5,6 +5,9 @@ Status: implementation and qualification in progress; partial results are record
 Owner permits researched emulated services; no paid CI calls. Disposable DB/Projects/keys/ports,
 Node24.14/normal hooks/single worker/scoped tracingfalse, Docker gateway disabled.
 Provider task owns final integration; diagnostics task owns S04/S05. Preserve failures and raw evidence.
+For the pinned Vitest 4 cohort, use command-scoped `VITEST_MAX_WORKERS=1`; its old MAX_FORKS/MIN_FORKS
+variables do not select a worker limit. CI retains its explicit maxWorkers/file-serial flags. Do not
+change test assertions/deadlines or global configuration to accommodate a failed local run.
 
 | Scenario                            | Requirement    | Method and evidence                                                                                                                                                                                                                                                                                                                                                       |
 | ----------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
