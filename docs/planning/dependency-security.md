@@ -1,8 +1,9 @@
 # Dependency security maintenance
 
 Owner authorized Dependabot, GitHub's Dependency Review Action and remediation with regression
-tests and independent critique on 17 October 2026. The SDK upgrade remains separate. No merge,
-main promotion, paid provider request, Docker gateway activation or paused orchestration is included.
+tests and independent critique on 17 October 2026. The SDK upgrade remains separate. On18October the owner additionally authorized guarded PR350 and
+feature-to-staging merges after all checks/comments clear, followed by delivered-branch cleanup.
+No main promotion, paid provider request, Docker gateway activation or paused orchestration is included.
 
 ## Source and delivery
 
@@ -12,8 +13,10 @@ Feature `feature/dependency-security` and task `task/dependency-security` start 
 `/Users/letuscode/.codex/worktrees/openai-parameter-repair/agent-platform`.
 Migration PR345 and hook repair PR348 are now delivered through protected PR347 at staging
 `5c2f6553b1169abc0fa4fcd53432b2207f538313`. The task locally merged that independently qualified
-source with reviewed checkpoint`6f622ac6` at`b6e3b614`; the feature baseline is refreshed and both branches are pushed. Draft PR350 targets that feature;
-local combined qualification passed, while connected and hosted qualification remain in progress. Preserve dependency repairs and both complete session histories through exact
+source with reviewed checkpoint`6f622ac6` at`b6e3b614`; the feature baseline was refreshed and both branches pushed. PR350 subsequently merged normally
+at`e95afc40` after exact`d785bbf4` source/connected/hosted qualification. Protected PR351 is open;
+CodeQL alert11 in its generated transport test fixture requires a narrow follow-up and new current-head
+qualification before staging delivery. Preserve dependency repairs and both complete session histories through exact
 unique-prefix/common-body reconstruction, rather than duplicating their shared historical body.
 
 ## Bounded stages
@@ -46,7 +49,8 @@ unique-prefix/common-body reconstruction, rather than duplicating their shared h
    unique advisories and instances separately. Do not use blanket audit fixes, suppressions or an
    arbitrary transitive major override. AI SDK/provider upgrades stay on their separate P1.
 5. Run affected regressions, obtain independent final review, push and open task-to-feature PR.
-   New source requires actual hosted checks. Final acceptance and merging remain separate.
+   New source requires actual hosted checks. Owner18October merge authority covers this delivery
+   after every actual required/executed check and actionable finding clears; it does not waive gates.
 
 Dependabot proposals target development `staging`, now the default branch. Adopt approved
 changes through the normal task/feature delivery route rather than merging bot proposals directly.

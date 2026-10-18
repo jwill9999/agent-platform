@@ -148,12 +148,16 @@ test('evaluated Node scripts preserve large adversarial data without environment
   ).href;
   writeFileSync(
     script,
-    `import {writeVendorOutput} from ${JSON.stringify(module)};\nconst data = ${JSON.stringify(data)};\nwriteVendorOutput({directory:${JSON.stringify(input.directory)},kind:'dependency-changes',data});\n`,
+    `const data = ${JSON.stringify(data)};\nconst {writeVendorOutput} = await import(process.env.DEPENDENCY_TEST_OUTPUT_MODULE);\nwriteVendorOutput({directory:process.env.RUNNER_TEMP,kind:'dependency-changes',data});\n`,
     { mode: 0o600 },
   );
   const result = spawnSync(process.execPath, [script], {
     encoding: 'utf8',
-    env: { PATH: process.env.PATH },
+    env: {
+      PATH: process.env.PATH,
+      RUNNER_TEMP: input.directory,
+      DEPENDENCY_TEST_OUTPUT_MODULE: module,
+    },
     timeout: 10_000,
   });
   assert.equal(result.status, 0, result.stderr);
@@ -170,9 +174,21 @@ test('missing ordinary or negative-control files fail before any API request', (
     const preload = join(input.directory, 'fetch-fixture.mjs');
     writeFileSync(
       preload,
-      `import {writeFileSync} from 'node:fs';globalThis.fetch=()=>{writeFileSync(${JSON.stringify(marker)},'called');throw new Error('unexpected request');};`,
+      "import {writeFileSync} from 'node:fs';globalThis.fetch=()=>{writeFileSync(process.env.DEPENDENCY_TEST_API_MARKER,'called');throw new Error('unexpected request');};",
       { mode: 0o600 },
     );
+    const probe = join(input.directory, 'invoke-fetch-fixture.mjs');
+    writeFileSync(probe, 'globalThis.fetch();\n', { mode: 0o600 });
+    const observed = spawnSync(process.execPath, ['--import', pathToFileURL(preload).href, probe], {
+      encoding: 'utf8',
+      timeout: 10_000,
+      env: { PATH: process.env.PATH, DEPENDENCY_TEST_API_MARKER: marker },
+    });
+    assert.equal(observed.status, 1);
+    assert.equal(observed.error, undefined);
+    assert.match(observed.stderr, /unexpected request/);
+    assert.equal(readFileSync(marker, 'utf8'), 'called');
+    rmSync(marker);
     const script = fileURLToPath(new URL('./dependency-review.mjs', import.meta.url));
     const result = spawnSync(process.execPath, ['--import', pathToFileURL(preload).href, script], {
       encoding: 'utf8',
@@ -180,6 +196,7 @@ test('missing ordinary or negative-control files fail before any API request', (
       env: {
         PATH: process.env.PATH,
         RUNNER_TEMP: input.directory,
+        DEPENDENCY_TEST_API_MARKER: marker,
         GITHUB_REPOSITORY: 'fixture/repository',
         DEPENDENCY_BASE_SHA: '1'.repeat(40),
         DEPENDENCY_HEAD_SHA: '2'.repeat(40),
