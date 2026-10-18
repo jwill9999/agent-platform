@@ -4,10 +4,11 @@ import { fileURLToPath } from 'node:url';
 
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { readMigrationFiles } from 'drizzle-orm/migrator';
 
 import * as schema from './schema.js';
-import { repairLegacySlugMigrationIfNeeded } from './legacyRepair.js';
+import { applyVerifiedMigrations } from './migrationHistory.js';
+import { MigrationHistoryError } from './errors.js';
 
 const packageRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -18,11 +19,17 @@ export function openDatabase(sqlitePath: string): { db: DrizzleDb; sqlite: Datab
   const dir = path.dirname(sqlitePath);
   mkdirSync(dir, { recursive: true });
   const sqlite = new Database(sqlitePath);
-  sqlite.pragma('foreign_keys = ON');
-  const db = drizzle(sqlite, { schema });
-  migrate(db, { migrationsFolder: path.join(packageRoot, 'drizzle') });
-  repairLegacySlugMigrationIfNeeded(sqlite);
-  return { db, sqlite };
+  try {
+    sqlite.pragma('foreign_keys = ON');
+    applyVerifiedMigrations(
+      sqlite,
+      readMigrationFiles({ migrationsFolder: path.join(packageRoot, 'drizzle') }),
+    );
+    return { db: drizzle(sqlite, { schema }), sqlite };
+  } catch {
+    sqlite.close();
+    throw new MigrationHistoryError();
+  }
 }
 
 export function closeDatabase(sqlite: Database.Database): void {
