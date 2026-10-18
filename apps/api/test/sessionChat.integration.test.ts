@@ -43,7 +43,10 @@ const HIDDEN_WRITE_TOOL_NAMES = [
 ] as const;
 
 vi.mock('ai', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('ai')>();
+  const actual =
+    await importOriginal<
+      typeof import('../../../packages/harness/node_modules/ai/dist/index.js')
+    >();
   return {
     ...actual,
     streamText: (...args: unknown[]) => mockStreamText(...args),
@@ -53,7 +56,11 @@ vi.mock('ai', async (importOriginal) => {
 
 vi.mock('@ai-sdk/openai', () => ({
   createOpenAI: ({ apiKey }: { apiKey: string }) => {
-    const factory = (model: string) => ({ provider: 'openai', modelId: model, apiKey });
+    const factory = (model: string) => ({
+      provider: 'openai',
+      modelId: model,
+      apiKey,
+    });
     return Object.assign(factory, { responses: factory });
   },
 }));
@@ -173,7 +180,14 @@ function mockToolCallStream(toolName: string, args: Record<string, unknown>) {
     responseMessages: Promise.resolve([
       {
         role: 'assistant',
-        content: [{ type: 'tool-call', toolCallId: 'tc-approval', toolName, input: args }],
+        content: [
+          {
+            type: 'tool-call',
+            toolCallId: 'tc-approval',
+            toolName,
+            input: args,
+          },
+        ],
       },
     ]),
     usage: Promise.resolve({ inputTokens: 1, outputTokens: 1, totalTokens: 2 }),
@@ -213,7 +227,7 @@ function createChatProject(
     repositoryRoot: string;
     capabilityState: 'backend_accessible' | 'readonly' | 'unavailable';
     onboardingState?: 'missing' | 'approved' | 'needs_review' | 'in_progress';
-    instructionFiles?: unknown[];
+    instructionFiles?: NonNullable<Parameters<typeof createProject>[1]['metadata']>[string][];
   },
 ) {
   return createProject(db, {
@@ -487,7 +501,10 @@ describe('POST /v1/chat (session-aware)', () => {
         return vi.fn();
       }),
     };
-    const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true, sessionLock: lock });
+    const { app, sqlite } = await createSeededApp(dirs, {
+      mockLlm: true,
+      sessionLock: lock,
+    });
 
     try {
       process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
@@ -532,7 +549,11 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(201);
       const sessionRes = await request(app)
         .post('/v1/sessions')
-        .send({ agentId: DEFAULT_AGENT_ID, mode: 'project', projectId: opened.body.data.id })
+        .send({
+          agentId: DEFAULT_AGENT_ID,
+          mode: 'project',
+          projectId: opened.body.data.id,
+        })
         .expect(201);
 
       await expectHandledSlashMessage(
@@ -564,7 +585,10 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(201);
       const sessionRes = await request(app)
         .post('/v1/sessions/project')
-        .send({ agentId: DEFAULT_AGENT_ID, projectId: registered.body.data.project.id })
+        .send({
+          agentId: DEFAULT_AGENT_ID,
+          projectId: registered.body.data.project.id,
+        })
         .expect(201);
 
       await expectHandledSlashMessage(
@@ -610,7 +634,10 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(201);
       const sessionRes = await request(app)
         .post('/v1/sessions/project')
-        .send({ agentId: DEFAULT_AGENT_ID, projectId: bound.body.data.project.id })
+        .send({
+          agentId: DEFAULT_AGENT_ID,
+          projectId: bound.body.data.project.id,
+        })
         .expect(201);
       const sessionId = sessionRes.body.data.session.id as string;
       upsertWorkingMemoryArtifact(db, {
@@ -681,13 +708,19 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(201);
       const sessionRes = await request(app)
         .post('/v1/sessions/project')
-        .send({ agentId: DEFAULT_AGENT_ID, projectId: registered.body.data.project.id })
+        .send({
+          agentId: DEFAULT_AGENT_ID,
+          projectId: registered.body.data.project.id,
+        })
         .expect(201);
 
       mockToolCalls.mockReturnValueOnce('Read the desktop Project instructions');
       await request(app)
         .post(CHAT_ENDPOINT)
-        .send({ sessionId: sessionRes.body.data.session.id, message: 'Inspect README.md' })
+        .send({
+          sessionId: sessionRes.body.data.session.id,
+          message: 'Inspect README.md',
+        })
         .expect(200);
 
       const state = getLastChatPromptState();
@@ -834,7 +867,10 @@ describe('POST /v1/chat (session-aware)', () => {
       const messagesRes = await request(app).get(`/v1/sessions/${sessionId}/messages`).expect(200);
       expect(messagesRes.body.data).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ role: 'assistant', content: 'Hello from chat' }),
+          expect.objectContaining({
+            role: 'assistant',
+            content: 'Hello from chat',
+          }),
         ]),
       );
       const evaluatorPrompts = mockGenerateText.mock.calls
@@ -918,109 +954,6 @@ describe('POST /v1/chat (session-aware)', () => {
     }
   });
 
-  it('records an SDK7 HTTP tool response and pending approval through the actual reasoning node', async () => {
-    const envSnap = snapshotChatEnv();
-    const previousMasterKey = process.env.SECRETS_MASTER_KEY;
-    const { app, db, sqlite } = await createSeededApp(dirs);
-    const providerRequests: { path: string; body: Record<string, unknown> }[] = [];
-    const provider = await listenLoopback((req, res) => {
-      const chunks: Buffer[] = [];
-      req.on('data', (chunk: Buffer) => chunks.push(chunk));
-      req.on('end', () => {
-        providerRequests.push({
-          path: req.url ?? '',
-          body: JSON.parse(Buffer.concat(chunks).toString()) as Record<string, unknown>,
-        });
-        res.writeHead(200, { 'content-type': 'text/event-stream' });
-        const delta = {
-          id: 'chat_fixture',
-          created: 1,
-          model: 'SDK7-Fixture',
-          choices: [
-            {
-              index: 0,
-              delta: {
-                role: 'assistant',
-                tool_calls: [
-                  {
-                    index: 0,
-                    id: 'tc-sdk7-http',
-                    type: 'function',
-                    function: { name: 'sys_bash', arguments: '{"command":"date"}' },
-                  },
-                ],
-              },
-              finish_reason: null,
-            },
-          ],
-        };
-        const finish = {
-          id: 'chat_fixture',
-          created: 1,
-          model: 'SDK7-Fixture',
-          choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }],
-          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
-        };
-        res.end(
-          `data: ${JSON.stringify(delta)}\n\ndata: ${JSON.stringify(finish)}\n\ndata: [DONE]\n\n`,
-        );
-      });
-    });
-    servers.push(provider);
-    try {
-      delete process.env.AGENT_OPENAI_API_KEY;
-      const masterKey = Buffer.alloc(32, 19);
-      process.env.SECRETS_MASTER_KEY = masterKey.toString('base64');
-      const address = provider.address();
-      if (!address || typeof address === 'string')
-        throw new Error('Expected disposable loopback provider');
-      createModelConfig(
-        db,
-        {
-          name: 'SDK7 local transport',
-          provider: 'ollama',
-          model: 'SDK7-Fixture',
-          baseURL: `http://127.0.0.1:${address.port}/v1`,
-        },
-        masterKey,
-      );
-      const sessionId = await createDefaultSession(app);
-      const response = await request(app)
-        .post(CHAT_ENDPOINT)
-        .send({ sessionId, message: 'Run date' })
-        .expect(200);
-      const events = parseNdjsonEvents(response.text);
-      expect(events.find((event) => event.type === 'error')).toBeUndefined();
-      expect(events.find((event) => event.type === 'approval_required')).toMatchObject({
-        toolName: 'sys_bash',
-        argsPreview: { command: 'date' },
-        riskTier: 'high',
-      });
-      expect(providerRequests).toHaveLength(1);
-      expect(providerRequests[0]).toMatchObject({
-        path: '/v1/chat/completions',
-        body: { model: 'SDK7-Fixture', stream: true },
-      });
-      const { listMessagesBySession } = await import('@agent-platform/db');
-      expect(listMessagesBySession(db, sessionId)).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            role: 'assistant',
-            toolCalls: [{ id: 'tc-sdk7-http', name: 'sys_bash', args: { command: 'date' } }],
-          }),
-        ]),
-      );
-      await expectToolExecutionCount(db, sessionId, 'pending', 1);
-      await expectToolExecutionCount(db, sessionId, 'success', 0);
-    } finally {
-      restoreChatEnv(envSnap);
-      if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;
-      else process.env.SECRETS_MASTER_KEY = previousMasterKey;
-      await closeLoopback(provider);
-      await closeFixture(app, sqlite);
-    }
-  });
-
   it('streams approval_required when a tool needs human approval', async () => {
     const envSnap = snapshotChatEnv();
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
@@ -1041,7 +974,12 @@ describe('POST /v1/chat (session-aware)', () => {
 
       const { listApprovalRequests } = await import('@agent-platform/db');
       expect(
-        listApprovalRequests(db, { sessionId, status: 'pending', limit: 10, offset: 0 }),
+        listApprovalRequests(db, {
+          sessionId,
+          status: 'pending',
+          limit: 10,
+          offset: 0,
+        }),
       ).toHaveLength(1);
       const messages = await import('@agent-platform/db').then((mod) =>
         mod.listMessagesBySession(db, sessionId),
@@ -1068,7 +1006,9 @@ describe('POST /v1/chat (session-aware)', () => {
       process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
-      mockToolCallStream('sys_bash', { command: 'gh repo create test --private' });
+      mockToolCallStream('sys_bash', {
+        command: 'gh repo create test --private',
+      });
       const chatRes = await request(app)
         .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Create a GitHub repository' })
@@ -1116,7 +1056,12 @@ describe('POST /v1/chat (session-aware)', () => {
 
       const { listApprovalRequests } = await import('@agent-platform/db');
       expect(
-        listApprovalRequests(db, { sessionId, status: 'pending', limit: 10, offset: 0 }),
+        listApprovalRequests(db, {
+          sessionId,
+          status: 'pending',
+          limit: 10,
+          offset: 0,
+        }),
       ).toHaveLength(1);
       await expectToolExecutionCount(db, sessionId, 'success', 0);
     } finally {
@@ -1237,7 +1182,10 @@ describe('POST /v1/chat (session-aware)', () => {
               kind: 'start',
               sessionId,
               status: 'succeeded',
-              policyDecision: { state: 'allowed', matchedRule: 'browser_url_approved' },
+              policyDecision: {
+                state: 'allowed',
+                matchedRule: 'browser_url_approved',
+              },
             },
           };
         }
@@ -1258,7 +1206,11 @@ describe('POST /v1/chat (session-aware)', () => {
                 },
           };
         }
-        return { type: 'error', code: 'TOOL_NOT_FOUND', message: `Unknown tool: ${toolId}` };
+        return {
+          type: 'error',
+          code: 'TOOL_NOT_FOUND',
+          message: `Unknown tool: ${toolId}`,
+        };
       };
       return executor;
     };
@@ -1413,7 +1365,9 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(201);
       const sessionId = sessionRes.body.data.session.id as string;
 
-      mockToolCallStream('sys_bash', { command: 'touch /workspace/command-note.txt' });
+      mockToolCallStream('sys_bash', {
+        command: 'touch /workspace/command-note.txt',
+      });
       const chatRes = await request(app)
         .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Create the command note' })
@@ -1465,7 +1419,11 @@ describe('POST /v1/chat (session-aware)', () => {
       });
       const sessionRes = await request(app)
         .post('/v1/sessions')
-        .send({ agentId: DEFAULT_AGENT_ID, mode: 'project', projectId: project.id })
+        .send({
+          agentId: DEFAULT_AGENT_ID,
+          mode: 'project',
+          projectId: project.id,
+        })
         .expect(201);
       const sessionId = sessionRes.body.data.id as string;
       mockProjectWrite('tc-project-write-allowed', 'written before onboarding');
@@ -1735,7 +1693,10 @@ describe('POST /v1/chat (session-aware)', () => {
       );
       await request(app)
         .post(CHAT_ENDPOINT)
-        .send({ sessionId, message: 'Implement agent-platform-memory.2 for agent-platform' })
+        .send({
+          sessionId,
+          message: 'Implement agent-platform-memory.2 for agent-platform',
+        })
         .expect(200);
 
       const memoryRes = await request(app)
@@ -1810,7 +1771,10 @@ describe('POST /v1/chat (session-aware)', () => {
       mockToolCalls.mockReturnValueOnce('Using approved memory.');
       await request(app)
         .post(CHAT_ENDPOINT)
-        .send({ sessionId, message: 'How should memory retrieval prompt bundles work?' })
+        .send({
+          sessionId,
+          message: 'How should memory retrieval prompt bundles work?',
+        })
         .expect(200);
 
       const state = getLastChatPromptState();
@@ -1922,7 +1886,10 @@ describe('POST /v1/chat (session-aware)', () => {
       const pending = await request(app)
         .get(`/v1/approval-requests/${approvalRequestId}`)
         .expect(200);
-      expect(pending.body.data).toMatchObject({ id: approvalRequestId, status: 'pending' });
+      expect(pending.body.data).toMatchObject({
+        id: approvalRequestId,
+        status: 'pending',
+      });
       expect(pending.body.data.resumedAtMs).toBeUndefined();
     } finally {
       restoreChatEnv(envSnap);

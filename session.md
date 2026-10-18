@@ -35,6 +35,15 @@ API/benchmark. Original failures remain retained. A source-verified config-only 
 ignores old fork-limit variables and accepts command-scoped `VITEST_MAX_WORKERS=1`. Independent review
 approved the next normal push with that supported setting; no hook, paused code/test, assertions or
 deadlines changed, and concurrency alone is not claimed as the cause of all six failures.
+The third normal push at `4dfba18f` passed all non-API packages, including workflow1,141 with77
+existing optional skips, but stopped on8 ordinary API failures (566passed); no fresh benchmark ran.
+The five Stop/resume fixture prerequisites were independently repaired and passed alongside41
+missing-master/private controls. Reviewed test-only module-cache boundaries and a dedicated real
+HTTP fixture then passed the forced mixed96-case slice (13.31seconds, no retries/skips); original
+failures remain retained. No production, paused-work, assertion or deadline changed. The next
+normal full push and fresh benchmark still must pass. SDK-CONTRACT01
+clarifies visible errors versus header/report correlation, and the open owner stress review now
+explicitly depends on provider interoperability. No owner trial has happened.
 No SDK PR, integration, owner-app rebuild or stress readiness is claimed yet. Preserve the owner
 app/profile/key, paused orchestration, main and disabled Docker gateway. Historical handoff below
 is retained verbatim; its superseded pending states do not override this current checkpoint.

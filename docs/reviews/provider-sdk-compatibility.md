@@ -209,3 +209,45 @@ The next normal push uses this supported command-scoped setting, preserving all 
 assertions, deadlines and filters. CI already specifies one worker explicitly. No global setting,
 paused test/runtime or hook source changed. Independent review approved the bounded requalification;
 parallel execution is a supported cause to investigate, not proof it alone explains every failure.
+
+## Full normal-hook API boundary follow-up
+
+The third normal push at `4dfba18f`, using supported `VITEST_MAX_WORKERS=1`, passed every
+non-API package: workflow1,141 with77 existing optional skips, harness819, DB236, web431,
+desktop229, router135 and contracts166. Its ordinary API suite finished566passed/8failed
+across55files; the fresh benchmark was not reached. The original full log and terminal receipt
+are retained. No SDK refs were uploaded and no PR or final qualification is implied.
+
+Five Stop/resume cases reached exactly one owned provider request and then failed before approval
+because their real bound-tool fixture omitted the now-required private-storage master key. An
+independently approved per-test synthetic random key preserves every behavioral assertion and the
+existing cleanup. All five cases plus41 separate missing-master/private-storage context controls
+passed (46total/9.51seconds), with no inherited credentials or master key. Production guards,
+exactly-once effects, Stop fences and the no-master denial controls remain unchanged.
+
+The saved-config unit fixture also exposed a shared-module-cache boundary: API tests use
+`isolate:false`, so a production router cached before its mock retains a different SDK binding.
+A preload reproduction retained both failures; the reviewed hoisted reset/shared mock fixes that
+boundary. Teardown unmocks and resets the cached router for later real-SDK tests. Each unit case
+now rejects any attempted fetch and restores the exact original fetch/master setting before DB
+cleanup. Standalone8, preloaded8 and forced unit-to-real-SDK10 passed; the final restoration-order
+change is a separately reviewed cleanup-only delta qualified by the mixed run below.
+
+The actual chat HTTP case also passed alone but failed after the context fixtures before any
+provider transport (zero owned or foreign calls). Its real-SDK case now lives in a dedicated clean
+integration module, with explicit saved loopback configuration and one-owned/zero-foreign fetch
+assertions. Semantic AST review confirms the other39 mocked chat test bodies are unchanged and the
+moved case retains its original SSE, pending approval, persisted assistant history and zero-effect
+assertions. A forced mixed sequence of context41, mocked chat39, real HTTP1, saved-config8,
+actual diagnostic2 and Stop/resume5 passed all96 cases in13.31seconds, without retries or skips.
+The source, exact module-cache direction reproductions and original failures remain retained.
+No production, paused-work, deadline or behavioral assertion changed in these repairs. The normal
+full hook and fresh benchmark still have to qualify the final source; isolated passing slices alone
+are not final delivery or evidence of a usable owner app.
+
+SDK-CONTRACT01 reconciles Beads acceptance with approved planR4/R6: accessible safe errors are
+visible in the app; response headers and durable exportable reports carry request/operation
+correlation. A visible UUID field was not an approved requirement and is not claimed as delivered.
+The critic approved this wording clarification, with no runtime change. The owner stress-review
+record remains open and now explicitly depends on provider interoperability; older startup-ready
+notes do not establish usable model generation or stress readiness for the unchanged owner build.

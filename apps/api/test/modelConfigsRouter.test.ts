@@ -7,22 +7,35 @@ import { closeDatabase, openDatabase, resolveModelConfigKey } from '@agent-platf
 import { PROVIDER_CATALOGUE, testModelConnection } from '@agent-platform/model-router';
 import express from 'express';
 import request from 'supertest';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 import { createModelConfigsRouter } from '../src/infrastructure/http/v1/modelConfigsRouter.js';
 import { closeLoopback, listenLoopback } from './support/loopbackServer.js';
 
+// The API suite shares its module cache (isolate:false). Reload the router after
+// this file's mock is registered, rather than retaining another file's real probe.
+const { probeMock } = vi.hoisted(() => {
+  vi.resetModules();
+  return { probeMock: vi.fn() };
+});
 vi.mock('@agent-platform/model-router', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent-platform/model-router')>()),
-  testModelConnection: vi.fn(),
+  testModelConnection: probeMock,
 }));
 let directory: string;
 let opened: ReturnType<typeof openDatabase>;
 let server: Awaited<ReturnType<typeof listenLoopback>>;
 const key = randomBytes(32);
 let originalMasterKey: string | undefined;
+let originalFetch: typeof fetch;
+const blockedFetch = vi.fn<typeof fetch>(() =>
+  Promise.reject(new Error('Unit probe must not dispatch network requests')),
+);
 beforeEach(async () => {
+  originalFetch = globalThis.fetch;
+  blockedFetch.mockClear();
+  globalThis.fetch = blockedFetch;
   originalMasterKey = process.env['SECRETS_MASTER_KEY'];
   process.env['SECRETS_MASTER_KEY'] = key.toString('base64');
   directory = mkdtempSync(path.join(tmpdir(), 'model-config-api-'));
@@ -38,11 +51,18 @@ afterEach(async () => {
   try {
     await closeLoopback(server);
   } finally {
-    closeDatabase(opened.sqlite);
-    rmSync(directory, { recursive: true, force: true });
+    globalThis.fetch = originalFetch;
     if (originalMasterKey === undefined) delete process.env['SECRETS_MASTER_KEY'];
     else process.env['SECRETS_MASTER_KEY'] = originalMasterKey;
+    closeDatabase(opened.sqlite);
+    rmSync(directory, { recursive: true, force: true });
+    expect(blockedFetch).not.toHaveBeenCalled();
   }
+});
+afterAll(() => {
+  // Do not leave this unit's mocked router closure cached for later real-SDK suites.
+  vi.doUnmock('@agent-platform/model-router');
+  vi.resetModules();
 });
 async function create() {
   const response = await request(server).post('/v1/model-configs').send({
