@@ -260,3 +260,21 @@ and all four unchanged isolation cases passed in2.66seconds. The original55-pass
 evidence is retained separately. A first isolation command targeted the wrong package and collected
 no tests; its log is retained and does not qualify anything. The corrected package command ran the
 real four cases. Combined workspace and connected/hosted checks remain pending.
+
+## Combined-source push and web mock typing
+
+The normal-hook staging reconciliation committed locally at`b6e3b614`, with both reviewed parent
+histories retained. The first normal atomic push passed builds for all15 packages but stopped during
+web typechecking: fourTS2769 errors in `apps/web/test/git-approval-card.test.ts`. Vitest4's untyped
+`ReturnType<typeof vi.fn>` includes constructor signatures and no longer satisfies the callable
+`ApprovalDecisionHandler`. Neither remote ref changed; the failed push log is retained as
+`security-combined-normal-push.log`. No benchmark or complete test pass is claimed from that attempt.
+
+The test-only correction declares `Mock<ApprovalDecisionHandler>` and supplies that same actual
+handler type to `vi.fn`, with no casts or production type widening. Independently transpiled test
+JavaScript is byte-identical before/after: assertions, mock behavior and deadlines are unchanged.
+All36 affected cases pass without retries/skips in978ms; web typecheck/lint/format pass. The full
+combined workspace typecheck also passes (`security-combined-typecheck.log`). Exact source hash
+`d33e175e2d2ef87c20de7337ceaca1bbcbde579624616ed09da102c9da9f35db` and actual focused JSON/logs
+are bound in `web-approval-mock-typing/source-review.json` and `checks.json`. The corrected normal
+push and full test/benchmark/connected/hosted qualification remain required.

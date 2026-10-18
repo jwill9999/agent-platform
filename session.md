@@ -4,17 +4,23 @@ Canonical Beads: `agent-platform-dependency-security` is IN_PROGRESS; activation
 Owner-authorized Dependabot/dependency review and security remediation remain separate from the
 SDK upgrade and paused orchestration. No security merge authority or external publication is implied.
 
-The reviewed security checkpoint `6f622ac6124bbe124bfa79ba96eb945e7eb8fade` is now being reconciled with actual protected staging
-`5c2f6553b1169abc0fa4fcd53432b2207f538313`. PR347's migration delivery is complete and independently qualified, its Beads task
+The reviewed security checkpoint `6f622ac6124bbe124bfa79ba96eb945e7eb8fade` was locally merged with actual protected staging
+`5c2f6553b1169abc0fa4fcd53432b2207f538313` at `b6e3b614`. PR347's migration delivery is complete and independently qualified, its Beads task
 closed and synced, and delivered feature/hook branches recovery-protected and cleaned up.
 The two in-use migration/startup task branches and owner app/profile remain intact.
 
 This combined task retains reviewed Electron42.11.15, Vitest4.1.12/Vite7.3.7 and the complete security
 lockfile, adding staging's native secure-storage check and unchanged migration/diagnostics source.
-The imported push hook needs only the reviewed Vitest4 option adjustment. Normal-hook qualification
+The imported push hook contains only the reviewed Vitest4 option adjustment. Normal-hook qualification
 will use command-scoped pnpm workspace concurrency1, matching CI without changing another paused
 test file. All54 hook controls and four Git-isolation cases pass; combined regressions remain
 pending. Existing security and benchmark limits stay intact.
+
+The first normal atomic push passed all package builds, then stopped at four web test mock typing
+errors introduced by Vitest4's broader untyped mock signature. Neither remote branch changed.
+The test-only correction uses the actual approval-handler type; compiled test JavaScript is identical,
+all36 affected tests pass without skips/retries, and the complete workspace typecheck now passes.
+The corrected push, full ordinary tests/fresh benchmark and connected/hosted qualification remain pending.
 
 Before reconciliation, the approved two-file workflow repairs passed66 focused cases without skips
 or retries, then the full package passed1141 cases with77 existing optional skips and zero failures
