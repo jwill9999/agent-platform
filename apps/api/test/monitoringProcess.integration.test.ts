@@ -14,7 +14,10 @@ import { expect, it } from 'vitest';
 
 const apiRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const capability = 'e'.repeat(64);
-const providerModule = '../../../e2e/support/project-chat-stop/provider.mjs';
+const providerModule = new URL(
+  '../../../e2e/support/project-chat-stop/provider.mjs',
+  import.meta.url,
+).href;
 const { startStopProvider } = await import(providerModule);
 async function freePort(): Promise<number> {
   const server = createServer();

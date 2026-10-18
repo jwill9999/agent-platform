@@ -21,7 +21,7 @@ const hook =
   process.env.PRE_PUSH_TEST_HOOK_PATH ??
   fileURLToPath(new URL('../.husky/pre-push', import.meta.url));
 const benchmark = 'test/diagnostics.performance.test.ts';
-const vitestOptions = ['--maxWorkers=1', '--minWorkers=1', '--no-file-parallelism'];
+const vitestOptions = ['--maxWorkers=1', '--no-file-parallelism'];
 
 function runHook(packages, failure = '', options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'pre-push-measurement-'));

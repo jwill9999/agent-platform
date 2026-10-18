@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
 import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { GitDeliveryReceipt } from '@agent-platform/contracts';
-import type { ApprovalCardState, ToolTraceEvent } from '@/hooks/use-harness-chat';
+import type {
+  ApprovalCardState,
+  ApprovalDecisionHandler,
+  ToolTraceEvent,
+} from '@/hooks/use-harness-chat';
 import { Chat } from '@/components/chat/chat';
 import type { UIMessage } from 'ai';
 import { GitApprovalCard, GitRecoveryCard } from '@/components/chat/git-approval-card';
@@ -50,7 +54,7 @@ const approval: ApprovalCardState = {
 let container: HTMLDivElement;
 let root: Root;
 let request: ReturnType<typeof vi.fn>;
-let onDecision: ReturnType<typeof vi.fn>;
+let onDecision: Mock<ApprovalDecisionHandler>;
 function response(receipt: unknown = base, ok = true) {
   return {
     ok,
@@ -105,7 +109,7 @@ beforeEach(() => {
   root = createRoot(container);
   request = vi.fn(async () => response());
   vi.stubGlobal('fetch', request);
-  onDecision = vi.fn(() => ({
+  onDecision = vi.fn<ApprovalDecisionHandler>(() => ({
     accepted: true,
     completion: Promise.resolve(),
     isCurrent: () => true,

@@ -35,6 +35,8 @@ import { ContentAddressedArtifactStore, JournaledArtifactRecorder } from '../src
 import { ProcessCapabilityBroker } from '../src/authorization.js';
 import { SecureEvidenceVault } from '../src/secureEvidence.js';
 
+// Owner-approved aggregate budget for thirteen composite integration cases; not a product SLA.
+const bootstrapIntegrationTimeout = 30_000;
 const roots: string[] = [];
 afterEach(() => {
   vi.restoreAllMocks();
@@ -375,100 +377,104 @@ describe('approved bootstrap task artifact production composition', () => {
       if (effect === 'push') expect(readFileSync(countPath, 'utf8')).toBe('push\n');
       raw.close();
     },
+    bootstrapIntegrationTimeout,
   );
-  it.each(['adoption', 'commit', 'push'] as const)(
-    'rejects lease expiry during the final %s observation before dispatch',
-    async (stage) => {
-      const f = await fixture();
-      let now = Date.now();
-      vi.spyOn(Date, 'now').mockImplementation(() => now);
-      let insideMutation = false;
-      let afterCommit = false;
-      let expired = false;
-      let pushes = 0;
-      const original = WorkflowStore.prototype.withinDeliveryMutation;
-      vi.spyOn(WorkflowStore.prototype, 'withinDeliveryMutation').mockImplementation(function (
-        this: WorkflowStore,
-        runId,
-        operation,
-        capability,
-      ) {
-        return original.call(
-          this,
+  for (const stage of ['adoption', 'commit', 'push'] as const) {
+    it(
+      `rejects lease expiry during the final ${stage} observation before dispatch`,
+      async () => {
+        const f = await fixture();
+        let now = Date.now();
+        vi.spyOn(Date, 'now').mockImplementation(() => now);
+        let insideMutation = false;
+        let afterCommit = false;
+        let expired = false;
+        let pushes = 0;
+        const original = WorkflowStore.prototype.withinDeliveryMutation;
+        vi.spyOn(WorkflowStore.prototype, 'withinDeliveryMutation').mockImplementation(function (
+          this: WorkflowStore,
           runId,
-          () => {
-            insideMutation = true;
-            try {
-              return operation();
-            } finally {
-              insideMutation = false;
-            }
-          },
+          operation,
           capability,
-        );
-      });
-      if (stage === 'adoption') {
-        const advance = BootstrapJournal.prototype.advance;
-        vi.spyOn(BootstrapJournal.prototype, 'advance').mockImplementation(function (
-          this: BootstrapJournal,
-          runId,
-          policy,
-          observation,
-          fence,
-          nowMs,
-          observe,
         ) {
-          return advance.call(this, runId, policy, observation, fence, nowMs, () => {
-            observe();
-            now += 60_001;
-            expired = true;
-          });
+          return original.call(
+            this,
+            runId,
+            () => {
+              insideMutation = true;
+              try {
+                return operation();
+              } finally {
+                insideMutation = false;
+              }
+            },
+            capability,
+          );
         });
-      }
-      const coordinator = BootstrapCoordinator.createForTest(
-        f.database,
-        'bootstrap-run',
-        f.policy,
-        {
-          readBeads: () => {
-            if (
-              insideMutation &&
-              !expired &&
-              (stage === 'commit' || (stage === 'push' && afterCommit))
-            ) {
+        if (stage === 'adoption') {
+          const advance = BootstrapJournal.prototype.advance;
+          vi.spyOn(BootstrapJournal.prototype, 'advance').mockImplementation(function (
+            this: BootstrapJournal,
+            runId,
+            policy,
+            observation,
+            fence,
+            nowMs,
+            observe,
+          ) {
+            return advance.call(this, runId, policy, observation, fence, nowMs, () => {
+              observe();
               now += 60_001;
               expired = true;
-            }
-            return f.policy.beadsSnapshot;
+            });
+          });
+        }
+        const coordinator = BootstrapCoordinator.createForTest(
+          f.database,
+          'bootstrap-run',
+          f.policy,
+          {
+            readBeads: () => {
+              if (
+                insideMutation &&
+                !expired &&
+                (stage === 'commit' || (stage === 'push' && afterCommit))
+              ) {
+                now += 60_001;
+                expired = true;
+              }
+              return f.policy.beadsSnapshot;
+            },
+            observeRemote: () => null,
+            pushRemote: () => {
+              pushes++;
+            },
           },
-          observeRemote: () => null,
-          pushRemote: () => {
-            pushes++;
+          (boundary) => {
+            if (boundary === 'after_commit') afterCommit = true;
           },
-        },
-        (boundary) => {
-          if (boundary === 'after_commit') afterCommit = true;
-        },
-      );
-      await expect(coordinator.commitAndPush()).rejects.toThrow('fence');
-      expect(expired).toBe(true);
-      expect(pushes).toBe(0);
-      if (stage !== 'push')
-        expect(git(f.source, ['rev-parse', 'HEAD'])).toBe(f.policy.initialHeadSha);
-      const raw = new Database(f.database);
-      if (stage === 'adoption') {
-        expect(raw.prepare('SELECT state,version FROM runs').get()).toEqual({
-          state: 'approved',
-          version: 0,
-        });
-        expect(raw.prepare('SELECT count(*) n FROM delivery_approved_heads').get()).toEqual({
-          n: 0,
-        });
-      }
-      raw.close();
-      coordinator.close();
-    },
-  );
+        );
+        await expect(coordinator.commitAndPush()).rejects.toThrow('fence');
+        expect(expired).toBe(true);
+        expect(pushes).toBe(0);
+        if (stage !== 'push')
+          expect(git(f.source, ['rev-parse', 'HEAD'])).toBe(f.policy.initialHeadSha);
+        const raw = new Database(f.database);
+        if (stage === 'adoption') {
+          expect(raw.prepare('SELECT state,version FROM runs').get()).toEqual({
+            state: 'approved',
+            version: 0,
+          });
+          expect(raw.prepare('SELECT count(*) n FROM delivery_approved_heads').get()).toEqual({
+            n: 0,
+          });
+        }
+        raw.close();
+        coordinator.close();
+      },
+      stage === 'push' ? bootstrapIntegrationTimeout : 5_000,
+    );
+  }
   it('rejects a successor takeover during push observation before any remote dispatch', async () => {
     const f = await fixture();
     const successor = new WorkflowStore(f.database);
@@ -503,75 +509,83 @@ describe('approved bootstrap task artifact production composition', () => {
     successor.close();
     coordinator.close();
   });
-  it('reopens cancellation after approval invalidation without allowing execution', async () => {
-    const f = await fixture();
-    const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
-    const evidence = await coordinator.commitAndPush();
-    coordinator.close();
-    const db = new Database(f.database);
-    db.prepare("UPDATE plan_approvals SET status='invalidated' WHERE run_id=?").run(
-      'bootstrap-run',
-    );
-    db.close();
-    writeFileSync(join(f.source, 'fixture-spec.md'), 'changed after approval');
-    const cleanup = BootstrapCoordinator.createForCleanup(f.database, 'bootstrap-run', f.policy);
-    expect(() => cleanup.adopt()).toThrow('cleanup cannot execute');
-    await expect(cleanup.commitAndPush()).rejects.toThrow('cleanup cannot execute');
-    await expect(cleanup.terminalize('fixture-owner')).rejects.toThrow('lease is held');
-    const expired = new Database(f.database);
-    expired.prepare('UPDATE leases SET expires_at_ms=0').run();
-    expired.close();
-    const result = await cleanup.terminalize('fixture-owner');
-    expect(result.status).toBe('cancelled');
-    expect(result.retainedEvidence[0]).toMatchObject({ digest: evidence.digest });
-    cleanup.close();
-  });
-  it('crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases', async () => {
-    const f = await fixture((policy) => {
-      policy.evidence[0]!.producer = '/root/bootstrap_verification_astra';
-      policy.evidence[1]!.producer = '/root/progression_critic_astra';
-    });
-    expect(bootstrapPreflight(f.database, 'bootstrap-run', f.policy).mutations).toBe(false);
-    const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
-    const evidence = await coordinator.commitAndPush();
-    const head = git(f.source, ['rev-parse', 'HEAD']);
-    expect(head).not.toBe(f.policy.initialHeadSha);
-    expect(git(f.remote, ['rev-parse', f.policy.ref])).toBe(head);
-    expect(git(f.source, ['rev-parse', `${head}^{tree}`])).toBe(f.policy.treeSha);
-    expect(readFileSync(join(f.canonical, 'owner-note.txt'), 'utf8')).toBe('not task content');
-    expect(git(f.source, ['ls-tree', '-r', '--name-only', head])).not.toContain('owner-note');
-    const result = await coordinator.terminalize('fixture-owner');
-    expect(result.status).toBe('cancelled');
-    expect(result.retainedEvidence[0]).toMatchObject({ digest: evidence.digest });
-    coordinator.close();
-    const raw = new Database(f.database);
-    const attestation = raw.prepare('SELECT attestation_json FROM bootstrap_artifacts').get() as {
-      attestation_json: string;
-    };
-    expect(JSON.parse(attestation.attestation_json).evidence).toEqual(f.policy.evidence);
-    expect(
-      raw
-        .prepare('SELECT redaction_count FROM secure_evidence WHERE digest=?')
-        .get(evidence.digest),
-    ).toEqual({ redaction_count: 0 });
-    expect(
-      raw.prepare('SELECT 1 FROM leases WHERE expires_at_ms>?').get(Date.now()),
-    ).toBeUndefined();
-    expect(
-      raw.prepare('SELECT operation FROM transitions ORDER BY expected_run_version').all(),
-    ).toEqual([
-      { operation: 'workflow.bootstrap_task_observed' },
-      { operation: 'workflow.bootstrap_candidate_adopted' },
-    ]);
-    expect(
-      raw
-        .prepare(
-          "SELECT count(*) n FROM delivery_operations WHERE kind='git.preexisting_ref_observed'",
-        )
-        .get(),
-    ).toEqual({ n: 1 });
-    raw.close();
-  });
+  it(
+    'reopens cancellation after approval invalidation without allowing execution',
+    async () => {
+      const f = await fixture();
+      const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
+      const evidence = await coordinator.commitAndPush();
+      coordinator.close();
+      const db = new Database(f.database);
+      db.prepare("UPDATE plan_approvals SET status='invalidated' WHERE run_id=?").run(
+        'bootstrap-run',
+      );
+      db.close();
+      writeFileSync(join(f.source, 'fixture-spec.md'), 'changed after approval');
+      const cleanup = BootstrapCoordinator.createForCleanup(f.database, 'bootstrap-run', f.policy);
+      expect(() => cleanup.adopt()).toThrow('cleanup cannot execute');
+      await expect(cleanup.commitAndPush()).rejects.toThrow('cleanup cannot execute');
+      await expect(cleanup.terminalize('fixture-owner')).rejects.toThrow('lease is held');
+      const expired = new Database(f.database);
+      expired.prepare('UPDATE leases SET expires_at_ms=0').run();
+      expired.close();
+      const result = await cleanup.terminalize('fixture-owner');
+      expect(result.status).toBe('cancelled');
+      expect(result.retainedEvidence[0]).toMatchObject({ digest: evidence.digest });
+      cleanup.close();
+    },
+    bootstrapIntegrationTimeout,
+  );
+  it(
+    'crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases',
+    async () => {
+      const f = await fixture((policy) => {
+        policy.evidence[0]!.producer = '/root/bootstrap_verification_astra';
+        policy.evidence[1]!.producer = '/root/progression_critic_astra';
+      });
+      expect(bootstrapPreflight(f.database, 'bootstrap-run', f.policy).mutations).toBe(false);
+      const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
+      const evidence = await coordinator.commitAndPush();
+      const head = git(f.source, ['rev-parse', 'HEAD']);
+      expect(head).not.toBe(f.policy.initialHeadSha);
+      expect(git(f.remote, ['rev-parse', f.policy.ref])).toBe(head);
+      expect(git(f.source, ['rev-parse', `${head}^{tree}`])).toBe(f.policy.treeSha);
+      expect(readFileSync(join(f.canonical, 'owner-note.txt'), 'utf8')).toBe('not task content');
+      expect(git(f.source, ['ls-tree', '-r', '--name-only', head])).not.toContain('owner-note');
+      const result = await coordinator.terminalize('fixture-owner');
+      expect(result.status).toBe('cancelled');
+      expect(result.retainedEvidence[0]).toMatchObject({ digest: evidence.digest });
+      coordinator.close();
+      const raw = new Database(f.database);
+      const attestation = raw.prepare('SELECT attestation_json FROM bootstrap_artifacts').get() as {
+        attestation_json: string;
+      };
+      expect(JSON.parse(attestation.attestation_json).evidence).toEqual(f.policy.evidence);
+      expect(
+        raw
+          .prepare('SELECT redaction_count FROM secure_evidence WHERE digest=?')
+          .get(evidence.digest),
+      ).toEqual({ redaction_count: 0 });
+      expect(
+        raw.prepare('SELECT 1 FROM leases WHERE expires_at_ms>?').get(Date.now()),
+      ).toBeUndefined();
+      expect(
+        raw.prepare('SELECT operation FROM transitions ORDER BY expected_run_version').all(),
+      ).toEqual([
+        { operation: 'workflow.bootstrap_task_observed' },
+        { operation: 'workflow.bootstrap_candidate_adopted' },
+      ]);
+      expect(
+        raw
+          .prepare(
+            "SELECT count(*) n FROM delivery_operations WHERE kind='git.preexisting_ref_observed'",
+          )
+          .get(),
+      ).toEqual({ n: 1 });
+      raw.close();
+    },
+    bootstrapIntegrationTimeout,
+  );
   it.each(['changed', 'additional'] as const)(
     'rejects %s producer identifiers before bootstrap evidence persistence',
     async (substitution) => {
@@ -667,67 +681,71 @@ describe('approved bootstrap task artifact production composition', () => {
         coordinator.close();
       }
     },
+    bootstrapIntegrationTimeout,
   );
-  it.each([
+  for (const boundary of [
     'after_task_observation',
     'after_candidate_adoption',
     'after_commit',
     'after_push',
     'after_attestation',
-  ] as BootstrapFault[])(
-    'recovers response loss at %s without duplicate transitions or push',
-    async (boundary) => {
-      const f = await fixture();
-      let remote: string | null = null;
-      let pushes = 0;
-      const clients = {
-        readBeads: () => f.policy.beadsSnapshot,
-        observeRemote: () => remote,
-        pushRemote: ({
-          expectedOldSha,
-          newSha,
-        }: {
-          expectedOldSha: string | null;
-          newSha: string;
-        }) => {
-          if (remote !== expectedOldSha) throw Error('CAS conflict');
-          remote = newSha;
-          pushes++;
-        },
-      };
-      let crash = true;
-      const first = BootstrapCoordinator.createForTest(
-        f.database,
-        'bootstrap-run',
-        f.policy,
-        clients,
-        (at) => {
-          if (crash && at === boundary) {
-            crash = false;
-            throw Error('response lost');
-          }
-        },
-      );
-      await expect(first.commitAndPush()).rejects.toThrow('response lost');
-      first.close();
-      f.expire();
-      const next = BootstrapCoordinator.createForTest(
-        f.database,
-        'bootstrap-run',
-        f.policy,
-        clients,
-      );
-      await next.commitAndPush();
-      next.close();
-      expect(pushes).toBe(1);
-      const raw = new Database(f.database);
-      expect(raw.prepare('SELECT count(*) n FROM transitions').get()).toEqual({ n: 2 });
-      expect(raw.prepare('SELECT status FROM bootstrap_artifacts').get()).toEqual({
-        status: 'attested',
-      });
-      raw.close();
-    },
-  );
+  ] as BootstrapFault[]) {
+    it(
+      `recovers response loss at ${boundary} without duplicate transitions or push`,
+      async () => {
+        const f = await fixture();
+        let remote: string | null = null;
+        let pushes = 0;
+        const clients = {
+          readBeads: () => f.policy.beadsSnapshot,
+          observeRemote: () => remote,
+          pushRemote: ({
+            expectedOldSha,
+            newSha,
+          }: {
+            expectedOldSha: string | null;
+            newSha: string;
+          }) => {
+            if (remote !== expectedOldSha) throw Error('CAS conflict');
+            remote = newSha;
+            pushes++;
+          },
+        };
+        let crash = true;
+        const first = BootstrapCoordinator.createForTest(
+          f.database,
+          'bootstrap-run',
+          f.policy,
+          clients,
+          (at) => {
+            if (crash && at === boundary) {
+              crash = false;
+              throw Error('response lost');
+            }
+          },
+        );
+        await expect(first.commitAndPush()).rejects.toThrow('response lost');
+        first.close();
+        f.expire();
+        const next = BootstrapCoordinator.createForTest(
+          f.database,
+          'bootstrap-run',
+          f.policy,
+          clients,
+        );
+        await next.commitAndPush();
+        next.close();
+        expect(pushes).toBe(1);
+        const raw = new Database(f.database);
+        expect(raw.prepare('SELECT count(*) n FROM transitions').get()).toEqual({ n: 2 });
+        expect(raw.prepare('SELECT status FROM bootstrap_artifacts').get()).toEqual({
+          status: 'attested',
+        });
+        raw.close();
+      },
+      bootstrapIntegrationTimeout,
+    );
+  }
   it('rejects changed observations between the two real lifecycle transitions', async () => {
     const f = await fixture();
     let calls = 0;
@@ -847,27 +865,33 @@ describe('approved bootstrap task artifact production composition', () => {
     expect(check.prepare('SELECT max(version) v FROM schema_migrations').get()).toEqual(before);
     check.close();
   });
-  it('does not fabricate an artifact receipt when owned work remains', async () => {
-    const f = await fixture();
-    const journal = new BootstrapJournal(f.database);
-    journal.database
-      .prepare(
-        "INSERT INTO approval_notifications(event_id,run_id,task_id,event_json,state,created_at_ms,updated_at_ms) VALUES('pending','bootstrap-run','bootstrap.task','{}','delivery_pending',1,1)",
-      )
-      .run();
-    expect(journal.pendingWork('bootstrap-run')).toEqual(['approval-delivery']);
-    journal.close();
-    const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
-    await expect(coordinator.commitAndPush()).rejects.toThrow('settled published head');
-    const raw = new Database(f.database);
-    expect(raw.prepare('SELECT attestation_digest,status FROM bootstrap_artifacts').get()).toEqual({
-      attestation_digest: null,
-      status: 'adopted',
-    });
-    raw.close();
-    await expect(coordinator.terminalize('fixture-owner')).rejects.toThrow();
-    coordinator.close();
-  });
+  it(
+    'does not fabricate an artifact receipt when owned work remains',
+    async () => {
+      const f = await fixture();
+      const journal = new BootstrapJournal(f.database);
+      journal.database
+        .prepare(
+          "INSERT INTO approval_notifications(event_id,run_id,task_id,event_json,state,created_at_ms,updated_at_ms) VALUES('pending','bootstrap-run','bootstrap.task','{}','delivery_pending',1,1)",
+        )
+        .run();
+      expect(journal.pendingWork('bootstrap-run')).toEqual(['approval-delivery']);
+      journal.close();
+      const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
+      await expect(coordinator.commitAndPush()).rejects.toThrow('settled published head');
+      const raw = new Database(f.database);
+      expect(
+        raw.prepare('SELECT attestation_digest,status FROM bootstrap_artifacts').get(),
+      ).toEqual({
+        attestation_digest: null,
+        status: 'adopted',
+      });
+      raw.close();
+      await expect(coordinator.terminalize('fixture-owner')).rejects.toThrow();
+      coordinator.close();
+    },
+    bootstrapIntegrationTimeout,
+  );
   it('rolls back the adoption receipt, head ledger and second transition together on storage failure', async () => {
     const f = await fixture();
     const raw = new Database(f.database);

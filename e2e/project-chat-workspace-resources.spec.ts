@@ -6,6 +6,13 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryDirectories: string[] = [];
 
+function workspaceHostPath(): string {
+  if (process.env.AGENT_WORKSPACE_HOST_PATH?.trim()) {
+    return resolve(process.env.AGENT_WORKSPACE_HOST_PATH);
+  }
+  return join(repoRoot, '.agent-platform', 'workspaces', 'default');
+}
+
 test.afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -16,14 +23,7 @@ test('Project Chat opens generated outputs and file changes without losing conte
   page,
 }) => {
   const projectDirectoryName = `resource-export-${Date.now()}`;
-  const projectDirectory = join(
-    repoRoot,
-    '.agent-platform',
-    'workspaces',
-    'default',
-    'e2e',
-    projectDirectoryName,
-  );
+  const projectDirectory = join(workspaceHostPath(), 'e2e', projectDirectoryName);
   temporaryDirectories.push(projectDirectory);
   mkdirSync(join(projectDirectory, 'generated'), { recursive: true });
   writeFileSync(

@@ -24,8 +24,11 @@ type GhFixture = {
   close(): Promise<void>;
 };
 type Transport = { remoteUrl: string; sshCommand: string; close(): Promise<void> };
-const transportModule = '../../../e2e/support/git-delivery/git-transport.mjs';
-const ghModule = '../../../e2e/support/git-delivery/gh-ledger.mjs';
+const transportModule = new URL(
+  '../../../e2e/support/git-delivery/git-transport.mjs',
+  import.meta.url,
+).href;
+const ghModule = new URL('../../../e2e/support/git-delivery/gh-ledger.mjs', import.meta.url).href;
 const { createGitTransportFixture } = (await import(transportModule)) as {
   createGitTransportFixture(options: { bareRoot: string }): Promise<Transport>;
 };

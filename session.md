@@ -1,3 +1,122 @@
+# Dependency security — protected staging review repair, 18 October 2026
+
+Beads `agent-platform-dependency-security` remains in progress; activation is open.
+Owner authorized PR350, then feature-to-staging delivery after all current checks and comments clear,
+followed by cleanup of verified delivered branches. SDK upgrades and paused orchestration remain separate.
+
+PR350 merged normally at `e95afc403111c582f99a40eb5e92b3adc50bf0bd`. Its tree equals reviewed
+`d785bbf4` and the conflict-free qualified staging `5c2f6553` rehearsal. All11 executed feature checks
+passed; fresh Sonar had zero open or accepted issues, no unresolved threads remained, and independent
+review verified the source, CI artifact digests and every selected member. The normal combined push
+passed 3,667 ordinary tests with77 existing optional skips,15 builds/types and the fresh900/990 benchmark.
+Local browser32/Git5/Stop5/Electron70 passed without retries or skips; hosted Electron70 was retry-free,
+while browser31 retained one existing context-fixture skip that passed locally.
+
+Protected PR351 is open at `e95afc40` against staging `5c2f6553`. Its ordinary full Promptfoo run
+39150944305 performed genuine analysis with provider success, batchCount2, CLI0.124.1 and no reported
+LLM vulnerabilities. Its official Dependency Review run39150944316 bound all440 inventory changes.
+Independent critique verified both artifacts, exact refs/run/attempt, pinned action/guard and SARIF.
+Fresh Sonar is clear for that head. These results do not qualify a later changed head.
+
+CodeQL then reported alert11, `js/bad-code-sanitization`, in the generated dependency-output test
+fixture. This branch, `task/dependency-codeql-transport`, repairs that test boundary without suppressing
+the alert, changing application runtime or weakening the adversarial transport controls. All30 affected
+Node controls and scoped ESLint pass. The fixed preload now has a positive invocation probe before
+the missing-file no-effect checks. Final source/document review and new hosted task-to-feature checks
+precede merging this repair. PR351 must
+then receive fresh full analysis, actual macOS VM, all live quality/security checks and clear comments
+before guarded protected squash. No protected security delivery is claimed yet.
+
+Earlier browser failures and the initial native Keychain wait remain retained. The historical MCP
+agent-selection failure remains unexplained; bounded evidence capture passed with its timing limit
+disclosed. Diagnostic exports/restart, durable monitoring and migration safety passed on the reviewed
+runtime. No new local runtime repeat is needed for the test-only source repair; hosted checks remain
+mandatory. The two owner-approved paused test-file exceptions preserve assertions, short-expiry and
+takeover checks, other test budgets and all product deadlines; PR283 and paused runtime are untouched.
+
+Remaining audit debt is11 distinct GHSAs: zero critical, three high, six moderate and two low, with
+SDK/LangChain, Kit and unpatched Braces ownership recorded. Eight AI package identities/integrities
+stay frozen, with the reviewed Nanoid edge only. The separate SDK plan and valid-key `max_tokens`
+failure remain unresolved. No owner stress readiness, additional paid call, owner-app/profile restart,
+credential/global change, Notion publication, Docker gateway enabling or main promotion is claimed.
+Disposable QA containers were removed without deleting retained data, volumes or caches. Protected
+staging activation/enforcement remains required before task closure; cleanup follows actual delivery.
+
+## Preserved source histories
+
+Complete earlier sessions reconstruct byte-for-byte from their preserved unique prefixes plus the
+shared baseline body stored exactly once. Old pending states and publication instructions are historical.
+The fenced prefixes preserve original bytes, not scanner exclusions or active instructions.
+
+- Security checkpoint: 469895bytes/SHA256 `05a0ae948423d0a00df0b8d486dd6b1c27d623aa7619513205b22cd33c4e3fa8`; prefix4163bytes/SHA256 `47f7e6038b83f041ac4cdfb00d2247eb44435bf61c419d113a428e068183e649`.
+- Qualified staging checkpoint: 479350bytes/SHA256 `3c9479e7e1ca6e23d63ca769582d3b661e9815f403d63b5d8ff4a89f5981b349`; prefix13618bytes/SHA256 `fd45e5ed2ecd69079218a8030031d705ffdd69f155c3a05bf5d8757eb37a121b`.
+- Common staging `d55f20ed034ec79ebe60af3a2f734699fe7ba264` body: 465732bytes/SHA256 `71d9dc34c0b86555f6f2c6217d0e77f305a5ea993da1c50cb96fca6dade896ab`.
+
+<!-- markdownlint-disable MD024 MD025 -->
+
+## Historical Dependency-security checkpoint at 6f622ac6124bbe124bfa79ba96eb945e7eb8fade
+
+```text
+# Dependency security — local qualification checkpoint, 18 October 2026
+
+Canonical Beads: `agent-platform-dependency-security` is IN_PROGRESS; activation remains open.
+The owner authorized GitHub-native dependency maintenance and security repairs while keeping the
+SDK upgrade separate. Default branch is staging; main promotion and automatic merges are excluded.
+This branch, `task/dependency-security`, contains an uncommitted setup/package/test draft, not a
+completed or deployed security feature. Repository documentation remains canonical; no external
+publication is requested.
+
+Setup guard18 controls and the43 parent-edge/four disclosed pin-exception review passed. The last
+saved lockfile audit has11 distinct GHSAs (0critical/3high/6moderate/2low), versus158 at the staged
+baseline; instance counts differ. Remaining SDK-owned and unpatched debt is still open. All eight
+AI package identities/integrities are frozen; one permitted Nanoid dependency edge changed.
+
+Local evidence includes191 database tests,229 desktop unit tests,773 harness tests and542 ordinary
+API tests passing. The first API attempt had fixture-import collection failures; its seven imports
+now resolve the same module-relative fixtures. A later long API attempt overlapped confirmed Mac
+sleep and failed; its awake repeat passed542/542 with unchanged deadlines. Failures remain retained.
+
+The initial eight owner-approved composite bootstrap budgets passed37 focused cases. A later awake
+full workflow run exposed five additional five-second budget failures and two storage fixture-lease
+failures:7failed/1134passed/77existing optional skips in527.56seconds. Those failures remain retained.
+The owner explicitly approved a follow-up limited to two test files: five more composite budgets
+at30seconds (final13at30s/24at5s), plus nine storage cases with60second fixture leases and safe cleanup.
+Independent source/AST review confirms all original assertions, short-expiry/takeover checks and
+the other20 storage cases are preserved. All66 focused cases passed without skips/retries in115.58s.
+The full workflow package then passed1141 cases with77 existing optional skips and zero failures
+in454.02seconds, on unchanged reviewed source. Product deadlines, runtime and PR283 are unchanged.
+
+The subsequent full recursive run lasted26614.79seconds and failed56 workflow cases, including
+stale-lease and timing failures, after the long host interruption. Its later power-log capture was
+unavailable: do not claim suspension explains every failure. Full workspace, fresh benchmark,
+build/types, connected journeys and hosted activation remain required. The two explicit test-only
+exceptions above do not authorize broader timeouts, lease changes, retries or runtime changes.
+
+Separately, protected migration PR347 merged at `5c2f6553b1169abc0fa4fcd53432b2207f538313`.
+All14 executed checks passed with clear reviews/security; independent critique verified genuine
+full analysis,70 retry-free Electron cases,214DB/547API tests, raw benchmark and20 actual packaged
+macOS VM cases. Only the VM reran after its original setup-only download failure. The migration task
+is closed and synced. Recovery tags protect all four delivered tips; the feature and hook branches
+were cleaned up, while the two in-use task branches remain. This security draft is still based on
+older staging `d55f20ed`; reconciliation with the qualified migration source has not happened yet.
+
+The owner's running app/profile/credentials remain untouched. Its old provider SDK still emits
+unsupported `max_tokens` for the configured model; rebuilding unchanged source cannot fix it.
+The separate SDK plan has an unresolved private continuation/persistence prerequisite and has not
+been approved for implementation. No additional paid request, key change, Docker gateway enabling,
+global edit, main promotion or paused orchestration resumption is included. Stress testing is not ready.
+
+Historical handoff follows unchanged; canonical Beads and this dated checkpoint supersede its
+older pending states. See the dependency-security plan, task, verification and results for evidence.
+
+<!-- markdownlint-disable MD025 -->
+
+
+```
+
+## Historical Qualified migration staging checkpoint at 5c2f6553b1169abc0fa4fcd53432b2207f538313
+
+```text
 # Desktop migration — staging hook review repair
 
 Owner authorized PR345 and feature-to-staging delivery after current checks and comments clear.
@@ -175,6 +294,11 @@ remain identical. Main/paused PR283 work and disabled Docker gateway remain unto
 external publication. Earlier staged handoff follows unchanged.
 
 <!-- markdownlint-disable MD025 -->
+
+
+```
+
+## Shared complete historical body
 
 # Stop and durable monitoring — protected integration checkpoint
 
