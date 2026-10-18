@@ -1,31 +1,38 @@
 # Dependency security — PR350 qualification, 18 October 2026
 
-Canonical Beads: `agent-platform-dependency-security` IN_PROGRESS; activation remains open.
-Draft PR350 is pushed at12a09516 into `feature/dependency-security` based on qualified staging
-5c2f6553. Migration delivery and recovery cleanup are complete; in-use task branches and owner app
-remain intact. Security merge authority is separate; no new merge or stress readiness is claimed.
+Beads `agent-platform-dependency-security` remains in progress; activation is open.
+PR350's first CI repair was pushed at `a9e7e19f` into `feature/dependency-security`, based on qualified
+staging `5c2f6553`. Migration delivery and recovery cleanup are complete. In-use task branches,
+paused orchestration/PR283 and the owner app/profile remain intact. Security merge authority is separate.
 
-The normal combined push passed3667 ordinary tests with77 existing optional skips,15 package
-builds/typechecks and the fresh900measured/990call benchmark under unchanged limits. Independent
-raw-data review, lint and formatting passed. Both owner-approved paused test-file repairs retain
-assertions, short-expiry/takeover behavior and product deadlines; paused runtime and PR283 are unchanged.
+The normal combined push passed 3,667 ordinary tests with 77 existing optional skips, all 15 package
+builds/typechecks and the fresh 900-measurement/990-call benchmark. Independent review recomputed the
+raw measurements under unchanged limits. Lint and formatting passed. The two owner-approved paused
+test-file exceptions retain assertions, explicit expiry/takeover checks and product deadlines.
 
-First hosted security qualification exposed complete171440-character output exceeding Linux's env
-limit, and an empty reverse-ancestor merge-base comparison. Bounded private-file output transport
-and actual pinned vendor deterministic-API controls are being qualified; no analysis bypass or live
-negative graph claim. Current hosted Sonar has3 actionable findings despite an OK gate; repairs and
-fresh zero-issue verification remain required.
+The first hosted security run failed on the 171,440-character environment value and an empty reverse
+ancestor comparison. The reviewed private-file transport and official-vendor deterministic controls
+then passed on `a9e7e19f`, including complete binding of all 440 changes. Live negative dependency-graph
+coverage remains unavailable. Sonar's earlier three findings cleared, but six new harness findings
+required the reviewed fixed-path CLI, canonical Git identity and sequential/parser follow-up.
+Fresh hosted/Sonar qualification of that follow-up remains required.
 
-Disposable browser traces diagnosed fixture-root mismatch, then a premature slash-init action while
-Send was disabled. Test-only corrections preserve defaults/assertions/deadlines. Native42.11.15 secure
-storage passed after the owner handled Keychain permission; initial timeout evidence is retained.
-Full browser/Electron, diagnostics and hosted/protection checks still need final qualification.
+Local connected checks now pass without retries or skips: 32 browser, five Git, five Stop and 70
+Electron cases. Native Electron 42.11.15 secure storage passed after the owner handled Keychain
+permission; the initial timeout is retained. Independent review verified diagnostics recording,
+export and restart, durable monitoring samples and both retained-database migration journeys.
+Packaged VM fixtures do not establish actual protected macOS VM qualification.
 
-Remaining audit debt is11 distinct GHSAs (0critical/3high/6moderate/2low), with SDK/LangChain, Kit
-and unpatched Braces ownership disclosed. Eight AI package identities/integrities remain frozen,
-with the reviewed Nanoid edge only. SDK upgrade remains planning-only; valid-key max_tokens failure
-is unresolved. No additional paid call, owner-app rebuild/restart, credential/global change, Notion
-publication, Docker gateway enabling, main promotion or paused orchestration resumption is included.
+Browser traces exposed fixture-root mismatch, premature slash-init submission, and chat starting
+before onboarding approval completed. Reviewed test corrections preserve assertions and deadlines.
+The historical MCP agent-selection failure remains unexplained; an instrumented attempt passed and
+its timing limitation is disclosed. All original failures and new evidence remain retained.
+
+The remaining audit debt is 11 distinct GHSAs: zero critical, three high, six moderate and two low.
+SDK/LangChain, Kit and unpatched Braces ownership remains recorded. Eight AI package identities and
+integrities are frozen, with the reviewed Nanoid edge only. The SDK plan and valid-key model
+`max_tokens` failure remain separate. No stress readiness, additional paid call, owner-app restart,
+credential/global change, Notion publication, Docker gateway enabling or main promotion is claimed.
 
 ## Preserved source histories
 

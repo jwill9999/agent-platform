@@ -84,7 +84,7 @@ jobs:
         run: node --test scripts/dependency-vendor-fixture.test.mjs
       - name: Download the exact official action runtime
         env:
-          VENDOR_DIRECTORY: ${{ runner.temp }}/dependency-review-vendor
+          VENDOR_DIRECTORY: /tmp/agent-platform-dependency-vendor
         run: |
           mkdir -m 700 "$VENDOR_DIRECTORY"
           for file in index.js index.js.map sourcemap-register.js; do
@@ -94,15 +94,15 @@ jobs:
           done
       - name: Verify runtime hashes and actual vendor pass and rejection behavior
         env:
-          VENDOR_DIRECTORY: ${{ runner.temp }}/dependency-review-vendor
-          RECEIPT_DIRECTORY: ${{ runner.temp }}/dependency-vendor-fixture-results
-        run: node scripts/dependency-vendor-fixture.mjs "$VENDOR_DIRECTORY" "$RECEIPT_DIRECTORY"
+          VENDOR_DIRECTORY: /tmp/agent-platform-dependency-vendor
+          TMPDIR: /tmp
+        run: node scripts/dependency-vendor-fixture.mjs
       - name: Retain deterministic control provenance and limitations
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dependency-vendor-fixture-control
-          path: ${{ runner.temp }}/dependency-vendor-fixture-results/
+          path: /tmp/agent-platform-dependency-vendor-results/
           if-no-files-found: error
           retention-days: 14
 

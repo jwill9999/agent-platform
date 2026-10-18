@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
+import { spawnSync } from 'node:child_process';
+import process from 'node:process';
 import { mkdtempSync, rmSync, symlinkSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   fixtureEnvironment,
+  gitBlobId,
+  vendorDirectory,
+  receiptDirectory,
   parseOutputs,
   readRegularBounded,
   verifyRuntime,
@@ -141,4 +146,26 @@ test('inert malformed-output unit control retains logs before rejecting output f
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }
+});
+
+test('canonical fixed Git command computes exact blob identities', () => {
+  assert.equal(gitBlobId(Buffer.from('hello\n')), 'ce013625030ba8dba906f756967f9e9ca394464a');
+  assert.equal(gitBlobId(Buffer.alloc(0)), 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391');
+});
+
+test('CLI runtime and result destinations use fixed temporary-directory basenames', () => {
+  assert.equal(vendorDirectory, join(tmpdir(), 'agent-platform-dependency-vendor'));
+  assert.equal(receiptDirectory, join(tmpdir(), 'agent-platform-dependency-vendor-results'));
+});
+
+test('CLI rejects caller-supplied paths before reading or writing fixture destinations', () => {
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/dependency-vendor-fixture.mjs', '/untrusted/source', '/untrusted/result'],
+    { encoding: 'utf8' },
+  );
+  assert.equal(result.status, 1);
+  assert.equal(result.signal, null);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /Official dependency vendor fixtures did not qualify/);
 });

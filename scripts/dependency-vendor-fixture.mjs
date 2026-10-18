@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import console from 'node:console';
 import { setTimeout, clearTimeout, setInterval, clearInterval } from 'node:timers';
@@ -49,6 +49,8 @@ export const runtimeFiles = Object.freeze(
     },
   ].map(Object.freeze),
 );
+export const vendorDirectory = join(tmpdir(), 'agent-platform-dependency-vendor');
+export const receiptDirectory = join(tmpdir(), 'agent-platform-dependency-vendor-results');
 const base = '1'.repeat(40);
 const head = '2'.repeat(40);
 const route = `/repos/fixture-owner/fixture-repo/dependency-graph/compare/${base}...${head}?per_page=5`;
@@ -78,13 +80,38 @@ export function readRegularBounded(path, limit) {
   }
 }
 
+export function gitBlobId(bytes) {
+  const result = spawnSync(
+    '/usr/bin/git',
+    ['hash-object', '--stdin', '-t', 'blob', '--no-filters'],
+    {
+      input: bytes,
+      cwd: '/',
+      env: {
+        PATH: '/usr/bin:/bin',
+        HOME: '/',
+        LC_ALL: 'C',
+        GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_GLOBAL: '/dev/null',
+        GIT_TERMINAL_PROMPT: '0',
+      },
+      encoding: 'utf8',
+      timeout: 5000,
+      maxBuffer: 128,
+    },
+  );
+  assert.equal(result.status, 0, 'Canonical Git blob computation failed');
+  assert.equal(result.signal, null, 'Canonical Git blob computation terminated');
+  assert.match(result.stdout, /^[0-9a-f]{40}\n$/, 'Malformed Git blob identity');
+  return result.stdout.trimEnd();
+}
+
 export function verifyRuntime(directory) {
   return runtimeFiles.map((expected) => {
     const bytes = readRegularBounded(join(directory, expected.name), expected.bytes);
     assert.equal(bytes.length, expected.bytes, 'Vendor size mismatch');
     assert.equal(hash(bytes), expected.sha256, 'Vendor SHA-256 mismatch');
-    const blob = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
-    assert.equal(blob, expected.gitBlob, 'Vendor Git blob mismatch');
+    assert.equal(gitBlobId(bytes), expected.gitBlob, 'Vendor Git blob mismatch');
     return { ...expected, bytes };
   });
 }
@@ -94,15 +121,22 @@ export function parseOutputs(bytes) {
   const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   const outputs = Object.create(null);
   const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i] === '' && i === lines.length - 1) break;
-    const match = /^([a-z][a-z-]*)<<(ghadelimiter_[0-9a-f-]+)$/.exec(lines[i]);
+  let cursor = 0;
+  while (cursor < lines.length) {
+    const line = lines[cursor];
+    cursor++;
+    if (line === '' && cursor === lines.length) break;
+    const match = /^([a-z][a-z-]*)<<(ghadelimiter_[0-9a-f-]+)$/.exec(line);
     assert.ok(match, 'Unexpected action output framing');
     const [, key, delimiter] = match;
     assert.ok(!Object.hasOwn(outputs, key), 'Duplicate action output');
     const parts = [];
-    for (i++; i < lines.length && lines[i] !== delimiter; i++) parts.push(lines[i]);
-    assert.ok(i < lines.length && i < lines.length - 1, 'Truncated action output');
+    while (cursor < lines.length && lines[cursor] !== delimiter) {
+      parts.push(lines[cursor]);
+      cursor++;
+    }
+    assert.ok(cursor < lines.length - 1, 'Truncated action output');
+    cursor++;
     outputs[key] = parts.join('\n');
   }
   return outputs;
@@ -387,18 +421,23 @@ export async function runCase(fixture, bundle, root) {
   }
 }
 
-export async function runFixtures(vendorDirectory, receiptDirectory) {
-  const verified = verifyRuntime(vendorDirectory);
+async function runFixtureSequence(index, bundle, directory) {
+  if (index === fixtures.length) return [];
+  const result = await runCase(fixtures[index], bundle, directory);
+  const remaining = await runFixtureSequence(index + 1, bundle, directory);
+  return [result, ...remaining];
+}
+
+export async function runFixtures(runtimeDirectory, resultsDirectory) {
+  const verified = verifyRuntime(runtimeDirectory);
   const scratch = mkdtempSync(join(tmpdir(), 'dependency-vendor-fixture-'));
-  mkdirSync(receiptDirectory, { mode: 0o700, recursive: true });
+  mkdirSync(resultsDirectory, { mode: 0o700, recursive: true });
   const runtime = join(scratch, 'runtime');
   mkdirSync(runtime, { mode: 0o700 });
   try {
     // Execute private copies of precisely verified bytes, avoiding a mutable download-path race.
     for (const file of verified) privateWrite(join(runtime, file.name), file.bytes);
-    const results = [];
-    for (const fixture of fixtures)
-      results.push(await runCase(fixture, join(runtime, 'index.js'), receiptDirectory));
+    const results = await runFixtureSequence(0, join(runtime, 'index.js'), resultsDirectory);
     const sourceSha256 = hash(readFileSync(fileURLToPath(import.meta.url)));
     const receipt = {
       node: process.version,
@@ -425,7 +464,7 @@ export async function runFixtures(vendorDirectory, receiptDirectory) {
       results,
     };
     privateWrite(
-      join(receiptDirectory, 'qualified-result.json'),
+      join(resultsDirectory, 'qualified-result.json'),
       `${JSON.stringify(receipt, null, 2)}\n`,
     );
     return receipt;
@@ -438,10 +477,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     assert.equal(
       process.argv.length,
-      4,
-      'Usage: dependency-vendor-fixture.mjs VENDOR_DIRECTORY RECEIPT_DIRECTORY',
+      2,
+      'The dependency vendor fixture command accepts no path arguments',
     );
-    const receipt = await runFixtures(resolve(process.argv[2]), resolve(process.argv[3]));
+    const receipt = await runFixtures(vendorDirectory, receiptDirectory);
     console.log(JSON.stringify({ qualified: receipt.results.length, revision: receipt.revision }));
   } catch {
     console.error(

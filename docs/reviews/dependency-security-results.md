@@ -2,8 +2,8 @@
 
 Plan/spec/verification are linked in the [plan](../planning/dependency-security.md).
 Current checkpoint: exact12a09516 normal push passed all3667 ordinary tests,77 existing optional
-skips,15 workspace builds/types and the fresh900/990 benchmark. Draft PR350 is open; connected
-regressions and hosted/protection qualification remain in progress. No completed security delivery is claimed.
+skips,15 workspace builds/types and the fresh900/990 benchmark. Draft PR350 is open; local connected32browser/5Git/5Stop/70Electron cases now pass.
+Fresh hosted/protection qualification of the follow-up remains in progress. No completed security delivery is claimed.
 
 ## Baseline and setup gaps
 
@@ -306,4 +306,37 @@ All first-attempt traces remain retained; no product root-cause or timeout chang
 The initial native secure-storage check timed out awaiting macOS Keychain access; a process sample
 retains that wait. After the owner handled the local dialog, Electron42.11.15 passed real asynchronous
 secure-storage availability and encryption/decryption without an environment key or app credentials.
-Full connected Electron/browser evidence remains pending at this checkpoint.
+At that checkpoint full connected qualification was pending; the later results below supersede it.
+
+## Native and connected qualification after reviewed CI repair
+
+All70 local Electron cases passed without retries, failures, skips or flakes in798947.881ms.
+Source-bound receipt `connected-12a09516/electron-70-qualified-local.json` records every test and
+380 artifact file hashes. Application/package trees remain identical to12a09516 through these
+CI/test-only repairs. This covers real managed startup, retained migration history, diagnostics
+recording/export/restart, Git, MCP and Stop; the packaged VM journeys here use fixtures and do not
+substitute for actual protected macOS VM qualification. Providers are deterministic, without paid
+requests or owner-profile access. The independent evidence review is still required.
+
+Five Docker Git browser journeys passed in53.2s and five Stop journeys in44.3s, without retries.
+The instrumented MCP block attempt passed with two successful binding responses and independent
+persisted target-agent identity, `MCP_POLICY_DENIED`, zero approvals and zero effects. Its earlier
+agent-selection failure remains unexplained; instrumentation can alter timing. This is a current
+revision result, not a historical cause fix.
+
+A later full browser phase recorded24passes/1GitHub-read failure/7blocked. The trace proves chat
+started44.321ms before onboarding approval returned200; the actual provider tool inventory lacked
+the requested write tool and the stream reported an unavailable-tool error. The test now awaits
+registered approval response, approved backend metadata and visible confirmation before continuing.
+Original actions/assertions/deadlines remain unchanged; Electron already awaited that state.
+The subsequent full browser phase passes32cases without skips or retries in61.814924seconds; all original failures remain retained.
+
+Actual Dependency Security39146651566 attempt1 at a9e7e19f passed forward comparison and official
+fixture controls. Downloaded API artifact digests and every ZIP member were checked; the forward
+receipt binds all440 changes to the complete vendor inventory and exact base/head. This proves the
+large-output transport in the hosted runner; the negative controls remain deterministic API fixtures.
+New harness Sonar findings require another revision: arbitrary CLI paths are removed in favor of
+fixed temporary-directory names, Git blob identity uses canonical fixed Git instead of a weak-hash
+call, and strict parsing/sequential execution are refactored. Nine safety controls plus all six
+actual official-bundle cases pass independently reviewed source. Fresh hosted/Sonar qualification
+of this changed source remains required; previous green jobs cannot qualify it.
