@@ -31,7 +31,9 @@ improve safe evidence before another attempt. No deadline, rule, assertion or re
 Refresh all final-head workflows, reviews and actual Sonar/CodeQL findings. The45-row Dependency
 Review inventory on946 had no introduced advisories but is not later-head proof or zero-total-audit.
 Sourcery skipped because the diff exceeds150,000 characters; independent review remains essential.
-Final result/handoff-only updates preserve runtime. Fresh hosted qualification remains outstanding at
+A later concise-digit-class correction preserves the anchored latency test selector; independent
+equivalence review and static checks passed, with no application runtime change. Fresh final-head
+hosted qualification remains outstanding at
 this checkpoint; current Beads/PR checks provide later status without rewriting historical results.
 
 Owner app/profile/key and original dirty/paused work remain unchanged. No owner-app rebuild, live

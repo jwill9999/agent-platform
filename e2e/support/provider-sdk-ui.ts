@@ -71,7 +71,7 @@ export async function testProviderSdkConfig(page: Page, config: SdkSavedConfig, 
   if (rejected) {
     await expect(card.getByRole('alert')).toContainText('Failed:');
     await expect(card.getByRole('alert')).not.toContainText('PRIVATE_SDK_ERROR_CANARY');
-  } else await expect(card.getByText(/^[0-9]+ms$/, { exact: true })).toBeVisible();
+  } else await expect(card.getByText(/^\d+ms$/, { exact: true })).toBeVisible();
   await expect(card.getByRole('button', { name: 'Test Connection', exact: true })).toBeEnabled();
   return { requestId: response.headers()['x-request-id'], outcome: result.data };
 }

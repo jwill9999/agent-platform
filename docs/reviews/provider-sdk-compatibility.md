@@ -384,3 +384,11 @@ phase detailed artifacts were not uploaded by the existing CI rule; the actual j
 These final result/handoff updates do not alter runtime. Every latest exact-head workflow, Sonar
 finding, security alert and review thread still needs inspection before acceptance. No merge,
 protected staging, owner-app rebuild, live-provider compatibility or owner stress readiness is claimed.
+
+The subsequent Sonar analysis of2a cleared the earlier16 findings but reported one new minor
+S6353 notation issue in the anchored visible latency test selector. The final helper uses the
+concise digit class with the same start/end anchors, exact locator and visibility assertion.
+Independent review found no behavior difference in65,551 character/edge comparisons. Static
+formatting/lint checks passed; this test-helper notation change does not alter application runtime
+or invalidate the earlier connected outcomes. The final hosted run still must bind the pushed
+helper bytes; no earlier green gate or minor severity substitutes for that qualification.
