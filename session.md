@@ -10,7 +10,7 @@ model-connection-diagnostics Beads remain in_progress. See
 Security delivery is staging `ece78d8a`; eleven advisories remain tracked. SDK task
 `task/provider-sdk-refresh-plan` and feature `feature/provider-sdk-refresh` start from that actual base.
 The pinned maintained SDK cohort, eight adapters, encrypted private continuation, honest probes and
-safe durable diagnostics are implemented but uncommitted. Independent source reviews approved the
+safe durable diagnostics are implemented; follow-up qualification is in progress. Independent reviews approved the
 router135, DB236, contracts165 and focused20, configAPI8, harness819 and API90 qualification. Web431,
 full types/lint/format and builds passed, with affected packages rebuilt after the latest repair.
 Current rebuilt browser43/43 passed retry0/skip0, including all selected provider chat streams and
@@ -25,6 +25,10 @@ one approved effect, denial, restart fences, durable diagnostic identities/cover
 exclusion. The additive migration test retains every historical field and exact prior journal while
 explicitly checking the new default-zero column/table and three SQL hashes/timestamps. Normal push
 hooks, full affected suites/fresh benchmark and exact-head hosted gates remain open.
+First SDK commit `b533f0f4` passed its commit hook, but its push stopped at a shared metadata type
+cycle before package tests; nothing was pushed. The independently reviewed leaf-module repair
+preserves one Symbol and unchanged private behavior. Rebuilds, harness/API types, lint, 67 affected
+cases and the actual cycle check now pass; normal follow-up push checks remain required.
 No SDK PR, integration, owner-app rebuild or stress readiness is claimed yet. Preserve the owner
 app/profile/key, paused orchestration, main and disabled Docker gateway. Historical handoff below
 is retained verbatim; its superseded pending states do not override this current checkpoint.

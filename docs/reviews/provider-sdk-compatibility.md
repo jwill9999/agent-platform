@@ -178,3 +178,18 @@ coverage and zero pending/drop/conflict. Exactly one approved effect, denied no-
 one-to-three-row continuation growth, completed-history replay and interrupted-approval rejection409
 were verified. `unfinishedPriorProcess=true` honestly records the interrupted run. This confirms
 emulated application behavior, not live account access, model quality or owner-app readiness.
+
+## Normal hook finding: shared metadata cycle
+
+The first SDK commit is `b533f0f4`. Its normal push stopped before package tests because Madge found
+source and generated-declaration cycles between `types` and `providerContinuation`; nothing was
+pushed. The retained `first-sdk-push.log` is the actual failure evidence. A reviewed leaf module now
+owns the same single continuation Symbol and metadata type. Both consumers import that leaf, and
+the helper re-exports its previous type without exporting the Symbol from the package index.
+Guards, encrypted persistence, serialization, limits and public behavior are unchanged.
+
+Rebuilt declarations, harness/API typechecks, lint and all 67 affected private/node cases pass.
+The actual cycle check now passes with no circular dependencies (93 unresolved-module warnings
+remain disclosed in its log). Earlier broad connected evidence remains bound to its earlier source;
+this mechanical module move does not establish a new broad run. Normal hooks must still execute
+fully on the follow-up commit, with a fresh benchmark and hosted qualification.

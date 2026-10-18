@@ -1,5 +1,5 @@
 import type { ProviderContinuationBinding } from '@agent-platform/db';
-import type { PrivateChatMetadata } from './providerContinuation.js';
+import type { PrivateChatMetadata } from './privateChatMetadata.js';
 import type { RunExecutionControl } from './runControl.js';
 import type { McpApprovalBinding } from './security/mcpApproval.js';
 import type { Output, Tool as ContractTool } from '@agent-platform/contracts';

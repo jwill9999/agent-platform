@@ -2,14 +2,9 @@ import { isDeepStrictEqual } from 'node:util';
 import { modelMessageSchema, type ModelMessage } from 'ai';
 import type { ProviderContinuationBinding, ProviderContinuationRecord } from '@agent-platform/db';
 import type { ChatMessage, ToolCallIntent } from './types.js';
+import { continuation } from './privateChatMetadata.js';
 
-const continuation = Symbol('provider-continuation');
-export type PrivateChatMetadata = {
-  id?: string;
-  /** Survives graph checkpoints; opaque material must be rehydrated from encrypted storage. */
-  providerContinuationRequired?: boolean;
-  [continuation]?: ProviderContinuationRecord;
-};
+export type { PrivateChatMetadata } from './privateChatMetadata.js';
 
 export const PROVIDER_CONTINUATION_RECOVERY_MESSAGE =
   'Provider continuation is unavailable or invalid. Start a new chat. If this persists, check the existing model and private-storage settings.';
