@@ -239,6 +239,24 @@ continues to fail on unresolved high findings; the differential gate addresses n
 
 Migration repair is now separately delivered by protected PR347 at staging`5c2f6553`, all14executed
 checks successful and independently qualified, including genuine full analysis and actual native VM.
-This security worktree remains based on `d55f20ed`; combined-tree qualification must adopt the actual
-protected source rather than import unmerged changes. The earlier statements about unmerged PR345
-describe their historical checkpoints. No owner profile or SDK implementation changes are included.
+The security checkpoint was saved by a normal-hook local commit`6f622ac6`, then reconciled with
+actual protected staging`5c2f6553`. The merge retains reviewed Electron42.11.15/Vitest4/Vite7 and the
+entire security lockfile, while adding staging's native secure-storage script/check and unchanged
+migration/diagnostics source. The earlier statements about unmerged PR345 describe their historical
+checkpoints. No owner profile or SDK implementation changes are included.
+
+Both earlier complete sessions reconstruct exactly from their separately preserved unique prefixes
+and the common465732byte historical body stored once. Post-format verification proves both original
+hashes and the unchanged suffix (`security-staging-history-reconstruction.json`); neither full source
+is falsely claimed to occur contiguously twice. The imported push hook drops only Vitest4's unsupported
+`--minWorkers=1` option. A proposed permanent workspace-serialization flag passed55 hook controls
+but failed four isolation controls solely on their exact expected argument lists. Those controls
+live in a third paused test file, outside the owner's two-file exception, so the scheduling proposal
+was reverted and that file stayed unchanged. Normal-hook qualification instead uses supported
+command-scoped `npm_config_workspace_concurrency=1`, matching CI without a global configuration edit.
+Ordinary API followed by a fresh complete benchmark, Git/PATH defenses, assertions and failure
+propagation remain intact. Final54 hook controls passed without failures/skips in34.51seconds,
+and all four unchanged isolation cases passed in2.66seconds. The original55-pass/four-failure
+evidence is retained separately. A first isolation command targeted the wrong package and collected
+no tests; its log is retained and does not qualify anything. The corrected package command ran the
+real four cases. Combined workspace and connected/hosted checks remain pending.

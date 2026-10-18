@@ -7,7 +7,8 @@
 export type DbErrorCode =
   | 'FOREIGN_KEY_VIOLATION'
   | 'UNIQUE_CONSTRAINT_VIOLATION'
-  | 'DB_CONSTRAINT_ERROR';
+  | 'DB_CONSTRAINT_ERROR'
+  | 'DATABASE_MIGRATION_HISTORY_MISMATCH';
 
 export class DbError extends Error {
   readonly name = 'DbError';
@@ -23,6 +24,15 @@ export class DbError extends Error {
 export class ForeignKeyViolationError extends DbError {
   constructor(message: string, cause?: unknown) {
     super('FOREIGN_KEY_VIOLATION', message, cause);
+  }
+}
+
+export class MigrationHistoryError extends DbError {
+  constructor() {
+    super(
+      'DATABASE_MIGRATION_HISTORY_MISMATCH',
+      'DATABASE_MIGRATION_HISTORY_MISMATCH: Database upgrade could not be verified. Existing data was preserved. Back up the database and use supported migration recovery.',
+    );
   }
 }
 

@@ -11,9 +11,10 @@ Feature `feature/dependency-security` and task `task/dependency-security` start 
 `d55f20ed034ec79ebe60af3a2f734699fe7ba264`. Worktree:
 `/Users/letuscode/.codex/worktrees/openai-parameter-repair/agent-platform`.
 Migration PR345 and hook repair PR348 are now delivered through protected PR347 at staging
-`5c2f6553b1169abc0fa4fcd53432b2207f538313`. That independently qualified source is not yet imported
-into this security draft. Reconcile the task and feature with actual staging before combined-tree
-qualification, preserving the dependency repairs and complete source histories.
+`5c2f6553b1169abc0fa4fcd53432b2207f538313`. The task is reconciling that independently qualified
+source with reviewed local checkpoint`6f622ac6`; combined qualification and feature baseline refresh
+remain pending. Preserve dependency repairs and both complete session histories through exact
+unique-prefix/common-body reconstruction, rather than duplicating their shared historical body.
 
 ## Bounded stages
 
