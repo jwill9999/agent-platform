@@ -24,7 +24,7 @@ API cases, rebuilds/types/lint. Independent evidence review verified encrypted c
 one approved effect, denial, restart fences, durable diagnostic identities/coverage and private-data
 exclusion. The additive migration test retains every historical field and exact prior journal while
 explicitly checking the new default-zero column/table and three SQL hashes/timestamps. Normal push
-hooks, full affected suites/fresh benchmark and exact-head hosted gates remain open.
+hooks and full affected suites/fresh benchmark have now passed as recorded below; exact-head hosted gates remain open.
 First SDK commit `b533f0f4` passed its commit hook, but its push stopped at a shared metadata type
 cycle before package tests; nothing was pushed. The independently reviewed leaf-module repair
 preserves one Symbol and unchanged private behavior. Rebuilds, harness/API types, lint, 67 affected
@@ -41,7 +41,10 @@ The five Stop/resume fixture prerequisites were independently repaired and passe
 missing-master/private controls. Reviewed test-only module-cache boundaries and a dedicated real
 HTTP fixture then passed the forced mixed96-case slice (13.31seconds, no retries/skips); original
 failures remain retained. No production, paused-work, assertion or deadline changed. The next
-normal full push and fresh benchmark still must pass. SDK-CONTRACT01
+normal full push then passed at `5d157be9`:3,868 ordinary tests,77 existing optional skips and
+all nine benchmark vectors/900 measured requests/990 fixture calls. Raw p95 recomputation gives
+10.692751ms maximum positive overhead under the unchanged20ms limit. Source and remote refs were
+verified; only results/handoff change afterward. Hosted qualification is next. SDK-CONTRACT01
 clarifies visible errors versus header/report correlation, and the open owner stress review now
 explicitly depends on provider interoperability. No owner trial has happened.
 No SDK PR, integration, owner-app rebuild or stress readiness is claimed yet. Preserve the owner
