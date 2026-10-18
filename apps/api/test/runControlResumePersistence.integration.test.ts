@@ -17,7 +17,10 @@ import { SYSTEM_TOOLS } from '@agent-platform/harness';
 import type { ChatRouterOptions } from '../src/infrastructure/http/v1/chatRouter.js';
 import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
 
-const providerModule = '../../../e2e/support/project-chat-stop/provider.mjs';
+const providerModule = new URL(
+  '../../../e2e/support/project-chat-stop/provider.mjs',
+  import.meta.url,
+).href;
 const { startStopProvider } = await import(providerModule);
 const cleanups: Array<() => Promise<void>> = [];
 beforeEach(() => {

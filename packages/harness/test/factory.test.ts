@@ -22,14 +22,16 @@ const mockOpenSessions = vi.fn(async () => []);
 const mockGetSessions = vi.fn(() => new Map());
 
 vi.mock('@agent-platform/mcp-adapter', () => ({
-  McpSessionManager: vi.fn().mockImplementation(() => ({
-    openSessions: mockOpenSessions,
-    getSession: mockGetSession,
-    closeAll: mockCloseAll,
-    getSessions: mockGetSessions,
-    isHealthy: vi.fn(),
-    reconnect: vi.fn(),
-  })),
+  McpSessionManager: vi.fn().mockImplementation(function () {
+    return {
+      openSessions: mockOpenSessions,
+      getSession: mockGetSession,
+      closeAll: mockCloseAll,
+      getSessions: mockGetSessions,
+      isHealthy: vi.fn(),
+      reconnect: vi.fn(),
+    };
+  }),
 }));
 
 import {

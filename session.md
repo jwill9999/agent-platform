@@ -1,3 +1,57 @@
+# Dependency security — local qualification checkpoint, 18 October 2026
+
+Canonical Beads: `agent-platform-dependency-security` is IN_PROGRESS; activation remains open.
+The owner authorized GitHub-native dependency maintenance and security repairs while keeping the
+SDK upgrade separate. Default branch is staging; main promotion and automatic merges are excluded.
+This branch, `task/dependency-security`, contains an uncommitted setup/package/test draft, not a
+completed or deployed security feature. Repository documentation remains canonical; no external
+publication is requested.
+
+Setup guard18 controls and the43 parent-edge/four disclosed pin-exception review passed. The last
+saved lockfile audit has11 distinct GHSAs (0critical/3high/6moderate/2low), versus158 at the staged
+baseline; instance counts differ. Remaining SDK-owned and unpatched debt is still open. All eight
+AI package identities/integrities are frozen; one permitted Nanoid dependency edge changed.
+
+Local evidence includes191 database tests,229 desktop unit tests,773 harness tests and542 ordinary
+API tests passing. The first API attempt had fixture-import collection failures; its seven imports
+now resolve the same module-relative fixtures. A later long API attempt overlapped confirmed Mac
+sleep and failed; its awake repeat passed542/542 with unchanged deadlines. Failures remain retained.
+
+The initial eight owner-approved composite bootstrap budgets passed37 focused cases. A later awake
+full workflow run exposed five additional five-second budget failures and two storage fixture-lease
+failures:7failed/1134passed/77existing optional skips in527.56seconds. Those failures remain retained.
+The owner explicitly approved a follow-up limited to two test files: five more composite budgets
+at30seconds (final13at30s/24at5s), plus nine storage cases with60second fixture leases and safe cleanup.
+Independent source/AST review confirms all original assertions, short-expiry/takeover checks and
+the other20 storage cases are preserved. All66 focused cases passed without skips/retries in115.58s.
+The full workflow package then passed1141 cases with77 existing optional skips and zero failures
+in454.02seconds, on unchanged reviewed source. Product deadlines, runtime and PR283 are unchanged.
+
+The subsequent full recursive run lasted26614.79seconds and failed56 workflow cases, including
+stale-lease and timing failures, after the long host interruption. Its later power-log capture was
+unavailable: do not claim suspension explains every failure. Full workspace, fresh benchmark,
+build/types, connected journeys and hosted activation remain required. The two explicit test-only
+exceptions above do not authorize broader timeouts, lease changes, retries or runtime changes.
+
+Separately, protected migration PR347 merged at `5c2f6553b1169abc0fa4fcd53432b2207f538313`.
+All14 executed checks passed with clear reviews/security; independent critique verified genuine
+full analysis,70 retry-free Electron cases,214DB/547API tests, raw benchmark and20 actual packaged
+macOS VM cases. Only the VM reran after its original setup-only download failure. The migration task
+is closed and synced. Recovery tags protect all four delivered tips; the feature and hook branches
+were cleaned up, while the two in-use task branches remain. This security draft is still based on
+older staging `d55f20ed`; reconciliation with the qualified migration source has not happened yet.
+
+The owner's running app/profile/credentials remain untouched. Its old provider SDK still emits
+unsupported `max_tokens` for the configured model; rebuilding unchanged source cannot fix it.
+The separate SDK plan has an unresolved private continuation/persistence prerequisite and has not
+been approved for implementation. No additional paid request, key change, Docker gateway enabling,
+global edit, main promotion or paused orchestration resumption is included. Stress testing is not ready.
+
+Historical handoff follows unchanged; canonical Beads and this dated checkpoint supersede its
+older pending states. See the dependency-security plan, task, verification and results for evidence.
+
+<!-- markdownlint-disable MD025 -->
+
 # Stop and durable monitoring — protected integration checkpoint
 
 Protected [PR336](https://github.com/jwill9999/agent-platform/pull/336) delivered the opt-in
