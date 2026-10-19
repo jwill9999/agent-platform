@@ -3,6 +3,31 @@
 Beads: `agent-platform-native-workspace-listing` (P1 bug, in_progress).
 Owner authorized repair, regression tests, critic review and actual app preflight on19October2026.
 
+## Protected integration follow-up
+
+Owner subsequently authorized PR376, feature→staging delivery after all checks/comments clear,
+delivered-only cleanup and app preparation. PR376 merged at `c30f1c23`; protected PR377 at that head
+was blocked by a Personal/Project navigation reversal in one Electron case (74 clean, one retry pass).
+The original trace lacks browser snapshots/network, so its exact ordering remains unproven.
+Controlled source reproduction establishes the stale-URL/pending-Project mechanism separately.
+
+NAV1: A newer Personal selection must retain personal session/agent/model scope when an older
+Project navigation or lookup completes. A normal Personal reselect must preserve resumed/in-flight
+personal work. Preserve Project selection, cold reopen, back/forward, modified links and normal
+Settings navigation. Use the existing generation guards and acknowledged same-root navigation;
+no SDK, dependency, harness, approval, Stop or API changes.
+
+Independent plan critique required the pending-Project guard control (NAV-P01) and approved the
+corrected design. Source critique NAV-S01 also requires persistent Sidebar synchronization after
+Settings and same-root fallback navigation, tested through actual committed-location adoption.
+Follow-up branch `task/native-workspace-session-scope` starts from actual feature
+`c30f1c23` in an isolated checkout; the owner app stays untouched until qualified source is rebuilt.
+Fresh source review, feature checks, protected scan/VM/all live gates, and actual rebuilt owner
+preflight remain mandatory. Dependency upgrades are held until after stress testing; successful live
+model generation and the owner stress trial remain unperformed.
+Later delivery state and exact heads belong in canonical Beads and PR377; this section records the
+repair contract rather than predicting its eventual CI or merge result.
+
 ## Requirements and scope
 
 - NW1: With no workspace override, the managed desktop backend supplies `WORKSPACE_ROOT` as
@@ -30,8 +55,9 @@ linked from the existing desktop startup record; this task owns its scoped imple
 
 Manifest: this spec, [verification](../testing/native-workspace-listing.md),
 [results](../reviews/native-workspace-listing.md), existing [native workflow](../development/codex-development.md).
-Coordinator owns source/tests/docs/Beads; independent critic inspects plan, exact source and evidence.
-Read-only assignments are procedural, not technical tool isolation. No parallel source editors.
+Coordinator owns the native test/docs/Beads; the bounded worker owns page/Sidebar/unit navigation
+source. Independent critic inspects plan, exact source and evidence. File ownership does not overlap;
+read-only assignments are procedural, not technical tool isolation.
 
 ## Implementation and verification
 
@@ -48,8 +74,8 @@ Read-only assignments are procedural, not technical tool isolation. No parallel 
    original profile/key, no credential edits. Workspace must list without the warning; monitoring native
    export and clean restart retain samples/preferences. Source-bound readback and critic review required.
 
-Merge authority is separate: this request authorizes implementation/app preparation and a reviewable
-PR, not automatic merge of this new feature. No task closure before its declared hosted/integration
+The original request reserved merge authority; the later owner grant above authorizes the conditional
+task/feature/staging delivery. No task closure before its declared hosted/integration
 and preflight gates. Record exact source and passed/failed/blocked/unrun results, never infer completion.
 
 ## Gherkin E2E strategy
@@ -75,6 +101,13 @@ Feature: Native workspace files without container prerequisites
     When I open Workspace settings and refresh
     Then I see a safe unavailable message and execution policies remain available
     And logs identify a bounded phase and error category without paths or raw errors
+  Scenario: Personal selection wins over stale Project navigation
+    Given a restored Project with Project and Personal sessions
+    When I select Chat and open its session menu
+    Then only Personal sessions and Personal context remain visible
+    And an older Project lookup cannot restore Project context
+    When I navigate back and forward
+    Then the visible scope follows the selected history entry
 ```
 
 ## Definition of done

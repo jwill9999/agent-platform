@@ -1,3 +1,16 @@
+# Workspace integration repair checkpoint
+
+PR376 merged at c30f1c23; PR377 failed its flaky Electron gate at that head.
+This isolated follow-up preserves Personal scope against stale Project navigation:
+55 focused controls and18 selected native cases pass without retries. Fresh hosted
+qualification and rebuilt-owner preflight are required. Actual subsequent heads, gates
+and staging delivery belong in Beads agent-platform-native-workspace-listing and PR377.
+Dependency upgrades held until after stress testing; live model response/trial unverified.
+Owner profile/key, paused orchestration/main/disabled Docker gateway retained.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier handoff follows verbatim. -->
+
 # Native Workspace listing repair — 19 October 2026
 
 Source checkpoint for PR376, task/native-workspace-listing → feature/native-workspace-listing; staging remainsa17bc1db and Beads agent-platform-native-workspace-listing is in_progress. Runtimec08e3881 passes independent review, API610/900-request benchmark and four rebuilt connected journeys. Its actual owner listing/recording/native export/clean restart preserves2→5 samples/all30 tables/journal23/key. Hosted code issues are zero; duplicated fault-test setup is consolidated into two unchanged-coverage parameter cases. Fresh final gates/acceptance belong in Beads/PRs. No merge, live model or owner stress trial claimed; paused/global/gateway/main unchanged. Prior text below is verbatim history.

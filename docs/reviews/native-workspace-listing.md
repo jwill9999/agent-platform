@@ -3,6 +3,51 @@
 Spec: [requirements](../tasks/agent-platform-native-workspace-listing.md).
 Tests: [verification map](../testing/native-workspace-listing.md).
 
+## Protected-integration repair checkpoint
+
+PR376 passed all12 executed contexts and five workflows at reviewed `f526f4ef`, then merged normally
+at `c30f1c23`. The feature tree equals reviewed source. Protected PR377 at that head has two genuine
+full Promptfoo analyses without findings and clean scoped Sonar/CodeQL, but its actual Electron
+report is74 clean plus one flaky retry pass. GitHub later confirms its Electron job failed; that
+source is not merge-ready. Subsequent heads/gates/delivery are recorded in canonical Beads and PR377,
+not inferred from the local checkpoint below.
+The failure shows Personal sidebar/composer with Project main/session scope after Chat navigation.
+Its trace lacks DOM/network snapshots, so the exact hosted order and cause are not asserted.
+
+A controlled old-source regression reproduces delayed URL/Project completion overwriting the newer
+Personal choice. Independent critique NAV-P01 required a second control for a pending Project lookup
+while Personal is already displayed. Source critique NAV-S01 exposed persistent Sidebar state after
+Settings and same-root fallback; both red stages are retained. The corrected generation guards,
+acknowledged root navigation and committed-location synchronization pass55 focused controls with
+the original22 test-definition bodies unchanged. Independent source review approves the frozen page,
+Sidebar, unit and native test. Backend/renderer/desktop builds and affected types/lint/format pass.
+Fresh hosted qualification remains mandatory; the connected local result follows below.
+The Electron evidence follow-up explicitly traces manual contexts and retains private fixture logs
+on failure, preserving original assertions, deadlines and primary errors. No dependency upgrade or
+provider request is included. Earlier result sections below are historical checkpoints.
+
+The first follow-up native invocation collected no tests because its new callback signature was
+invalid for Playwright; the zero-argument callback now uses `test.info()`, without a lint suppression.
+The next run passed the responsive case, Settings→Personal, original scope transition and history-back,
+but failed the added history-forward menu assertion. Rich trace retains the prior menu in its closed
+exit state through the click; the stable trigger stays closed after that portal disappears. URL and
+surface remain Personal/global throughout, and the later session response is not the earlier close's
+cause. Exact pointer-dismiss ordering is unproven. Critic approved two stronger dismissal assertions:
+after each Escape the exact scope label must disappear before the next action. No repeat click,
+sleep, retry or timeout increase is added. Both failed invocations remain retained; changed-source
+native qualification was then repeated on changed test source; no production menu-lifecycle repair
+is claimed.
+
+The final selected native execution passes18/18, workers1/retries0, no flakes/skips: two stabilisation
+journeys, Workspace2, diagnostic export1, migration3, SDK2, Git3 and Stop5. The canonical navigation
+receipt confirms Settings→Personal, original Project→Personal, back→Project and forward→Personal
+URL/surface/scope/control states, plus completed traces/cleanup, closed owned ports and successful
+evidence persistence. Runtime/build hashes and the owner app's listeners remain unchanged. Provider
+responses are deterministic; this is not a live model or stress test. Reports remain bound to their
+pre-format source. Final Prettier wraps one assertion with an optional trailing comma; normalized
+AST/literal/child structure is identical, with a separate source equivalence receipt. Artifact/effect
+review, normal hooks and fresh exact-head hosted gates still qualify the delivered revision.
+
 ## Follow-up qualification checkpoint
 
 PR376 opened at `a843f5df`. Independent source/document review approved; normal serial hooks then
