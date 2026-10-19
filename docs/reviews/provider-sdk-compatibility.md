@@ -35,7 +35,13 @@ restart interruption rule remains unchanged. Header/environment credential chang
 fields, keyless undefined-master text and empty/malformed-present-master denial are covered. No
 external model service is called by this focused boundary test. API build, types and scoped lint pass.
 Logs are fallback-binding-api-build.log, fallback-binding-focused-first.log, fallback-binding-types.log
-and fallback-binding-lint.log in the evidence root. The frozen source/test/doc review, normal hooks
+and fallback-binding-lint.log in the evidence root. A final test-only strengthening requires readable
+success for every expected200 stream, exact private capture counts and all synthetic credential
+privacy checks. Its10 cases passed7.31seconds on testSHA59acda32, with independent critique; the
+prior combined52 receipt retains its earlier test bytes. This strengthening overlapped the first
+bd04 push-hook checkpoint, so that mixed-worktree run is retained historically and does not establish
+exact committed-test qualification. The final follow-up commit requires fresh normal full hooks and
+benchmark, with no published amendment. The frozen source/test/doc review, normal hooks
 and fresh exact-head hosted qualification remain pending at this local checkpoint. New actual
 unsuppressed CodeQL checks, both head/merge alerts and all protected gates are mandatory. No old7b
 scan or CI result qualifies the changed repair source; later status belongs in current Beads and PRs.

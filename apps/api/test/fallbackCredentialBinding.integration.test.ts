@@ -97,14 +97,21 @@ async function fixture() {
         .post('/v1/chat')
         .send({ sessionId: session.body.data.id, message: 'Inspect the local fallback' });
       if (headerKey !== undefined) req.set('x-openai-key', headerKey);
-      return req.expect(status);
+      const response = await req.expect(status);
+      if (status === 200) expect(response.text.includes('Local binding ready')).toBe(true);
+      return response;
     },
   };
 }
 
 function assertPrivate(response: string, bindings: ProviderContinuationBinding[]) {
   const publicAndLogs = response + JSON.stringify(log.mock.calls);
-  expect(publicAndLogs.includes(fixtureCredential)).toBe(false);
+  for (const credential of [
+    fixtureCredential,
+    'fixture-credential-B',
+    'unused-environment-credential',
+  ])
+    expect(publicAndLogs.includes(credential)).toBe(false);
   for (const binding of bindings) {
     // Compare booleans so a regression does not print a private credential identity.
     expect(publicAndLogs.includes(binding.credentialRevision)).toBe(false);
@@ -120,6 +127,7 @@ describe('private fallback credential binding through the actual API resolver', 
     vi.stubEnv('AGENT_OPENAI_API_KEY', 'unused-environment-credential');
     const same = await f.ask(fixtureCredential);
     const changed = await f.ask('fixture-credential-B');
+    expect(f.bindings.length).toBe(3);
     expect(isDeepStrictEqual(f.bindings[0], f.bindings[1])).toBe(true);
     expect(isDeepStrictEqual(f.bindings[0], f.bindings[2])).toBe(false);
     expect(first.text + same.text + changed.text).toContain('Local binding ready');
@@ -132,6 +140,7 @@ describe('private fallback credential binding through the actual API resolver', 
     await f.ask();
     vi.stubEnv('AGENT_OPENAI_API_KEY', 'fixture-credential-B');
     const changed = await f.ask();
+    expect(f.bindings.length).toBe(3);
     expect(isDeepStrictEqual(f.bindings[0], f.bindings[1])).toBe(true);
     expect(isDeepStrictEqual(f.bindings[0], f.bindings[2])).toBe(false);
     assertPrivate(changed.text, f.bindings);
@@ -149,6 +158,7 @@ describe('private fallback credential binding through the actual API resolver', 
       if (field === 'master')
         vi.stubEnv('SECRETS_MASTER_KEY', Buffer.alloc(32, 52).toString('base64'));
       const changed = await f.ask(fixtureCredential);
+      expect(f.bindings.length).toBe(2);
       expect(isDeepStrictEqual(f.bindings[0], f.bindings[1])).toBe(false);
       assertPrivate(changed.text, f.bindings);
     },
@@ -161,6 +171,7 @@ describe('private fallback credential binding through the actual API resolver', 
     const f = await fixture();
     const first = await f.ask();
     const second = await f.ask();
+    expect(f.bindings.length).toBe(2);
     expect(isDeepStrictEqual(f.bindings[0], f.bindings[1])).toBe(true);
     expect(first.text + second.text).toContain('Local binding ready');
     expect(f.sqlite.prepare('SELECT COUNT(*) AS count FROM provider_continuations').get()).toEqual({

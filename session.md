@@ -17,7 +17,10 @@ an HMAC key over explicit nonsecret fields, preserving credential-change fences,
 configuration and existing Stop/restart semantics. It adds no stored header credentials or replacement
 master key. Independent design critique approved. Focused actual-resolver52/52 passed18.58seconds,
 including three clean-process identity checks and legacy weak-binding replay denial; API build/types
-and scoped lint pass. Frozen source/test/doc critique and normal hooks remain pending at this dated
+and scoped lint pass. Final strengthened10 cases passed7.31seconds with independent approval; the
+prior52 receipt keeps its old test bytes. That assertion-only delta overlapped bd04 push hooks, so
+retain the mixed checkpoint and require fresh full normal hooks/benchmark on the final follow-up.
+No published commit is amended. Source/test/doc critique and normal hooks remain pending at this dated
 local checkpoint; later outcomes belong in current Beads/PRs. Then verify PR363 receives the fixed source,
 resolve only the fixed thread and require new exact-head full scan, actual packaged VM and all live
 gates. Old7b scan/CI results cannot qualify the changed source. Current status belongs in Beads.
