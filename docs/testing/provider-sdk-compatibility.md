@@ -50,3 +50,43 @@ outcomes before the next model request so a later provider error cannot erase or
 Plain nonthinking local text without a secrets master key must retain its existing behavior. Required
 private provider content or durable tool bindings must fail closed when they cannot be persisted;
 never create a default key or silently downgrade opaque continuation to legacy history.
+
+## Legacy-watermark upgrade regressions
+
+Owner: `agent-platform-sdk-legacy-migration`; requirements MIG-S1–6 in the
+[repair specification](../tasks/agent-platform-sdk-legacy-migration.md). Synthetic fixtures only.
+
+| Scenario                                 | Requirement | Input/action and independent expected evidence                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SDK-MIG01 eligible upgrade and reopen    | S1–4        | Real SQLite canonical0000–0020 plus valid opaque later journal entry, retained records and encrypted credential. Official open appends exactly original0021 hash/time; every original column value and full ordered journal prefix unchanged. Reopen is idempotent; no decryption/logged key.                                                                                                             |
+| SDK-MIG02 existing adopters              | S1/S3       | Complete canonical0021 with later opaque entry reopens unchanged; no repeated DDL or journal row.                                                                                                                                                                                                                                                                                                         |
+| SDK-MIG03 history denial                 | S2–4        | Missing/wrong-time/duplicate predecessors; malformed/duplicate journal; wrong SDK SQL/hash/time; any other below-water pending migration. Same safe error, unchanged schema/rows/journal and released lock.                                                                                                                                                                                               |
+| SDK-MIG04 schema denial and rollback     | S2–4        | Partial SDK columns/table, differing defaults/checks/index definitions, scoped or migration-journal trigger, legacy backfill-needed schema and controlled mid-transaction failure. Eligibility denies or real transaction rolls back; no partial SDK stamp/effect. Journal triggers cannot alter original rows; the postcondition requires the exact original ordered journal plus one canonical0021 row. |
+| SDK-MIG05 native managed startup/restart | S5/S6       | Real Electron/Node/SQLite/disposable native profile with owner-shaped history; visible retained model/Project data, health200, exact canonical SDK addition and unchanged original records/journal. Clean restart preserves state. Existing invalid-history native denial remains. Owned ports/processes released, no live generation.                                                                    |
+| SDK-MIG06 owner preflight                | S6          | After actual protected delivery/build, private stopped-profile backup with original key and20GiB free; official private-copy upgrade first. Then native recording/export/clean restart with retained configs and truthful coverage. Owner live model check is separately manual before stress-ready claim.                                                                                                |
+
+Use explicit Node24.14, normal hooks and single workers. Affected DB tests, native migration and SDK
+continuation cases run locally; ordinary CI/browser/Electron, unchanged raw900/990 performance,
+Sonar/CodeQL and actual protected scan/signed packagedVM qualify the exact delivered head. No budget,
+assertion, workload, durability or history condition is weakened. A backend-only repair does not add
+a dashboard or unrelated UI feature; native startup is required and public API/model regressions remain.
+
+Escape analysis: previous positive fixtures modeled an ordinary v18 upgrade; the complete-unknown
+fixture already had every known migration. The negative future-watermark case correctly checked
+rejection. None exercised the repaired pre0021 profile retaining a later opaque journal entry. Add
+that recurring scenario to ordinary DB and native CI, without treating the development transcript
+as product diagnostics or claiming unknown-entry provenance.
+
+Historical variant: SDK-MIG01/02/04/05 include the exact hash/time-bound nullable TEXT
+workspace_events_json addition, positioned before0021. Derive trusted references from canonical
+SQL plus the independently reconstructed legacy statement, never actual owner DDL. Preserve non-null
+opaque values on upgrade/reopen; wrong binding, missing row, duplicate identity, altered type/default/
+column order/extra definition and unrecognized schema fail closed. The historical ALTER is reference/
+fixture-only and never replayed on the owner. Source identity proof does not establish its old commit
+or execution provenance. Actual private-copy eligibility matched all34 derived definitions.
+
+SDK-MIG02/04 also exercise historical-adopter reopen after a successful bridge: missing legacy
+prerequisites or a journal trigger deny before incidental backfill, preserving schema/all rows/journal
+and releasing the connection lock. Exactly22 published migrations are recognized; future extension
+requires reviewed reference/identity coverage. Local81 controls and focused native/SDK results are
+recorded in the review. Full73-case collection is inventory; fresh hosted execution remains mandatory.

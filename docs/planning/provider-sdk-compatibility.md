@@ -147,3 +147,31 @@ native failure is retained. Same-process SQLite reopen evidence is labeled separ
 exactly-once interrupted-reply checkpoints after committed assistant prefixes while retaining later
 partial output and tool outcomes before subsequent requests. Plain nonthinking keyless local text
 remains compatible; opaque continuation and durable tool bindings never bypass their storage guard.
+
+## S12 legacy-watermark compatibility repair, 19 October
+
+PR363 delivered reviewed SDK source to staging at `be153c50`. Actual owner preflight then failed on
+a private copy: canonical pending0021 has timestamp1778000000000 below a preserved unknown journal
+watermark1785803000000. All22 original entries are retained; unknown provenance is not asserted.
+The current app was restored with the original profile/key. S12 remains incomplete.
+
+The bounded [repair task](../tasks/agent-platform-sdk-legacy-migration.md) owns MIG-S1–6: exact immutable
+SDK21 compatibility, full canonical predecessor and trusted touched pre-schema proof (including legacy backfill tables),
+bridge-only journal-trigger denial and exact original-journal-plus-one postcondition, atomic original
+SQL/stamp plus final guard, negative/reopen/rollback tests and real native startup. The provider parent
+depends on that child in Beads. It uses feature/provider-sdk-owner-upgrade and
+task/provider-sdk-legacy-migration from actual stagingbe153; no runtime credential or paused changes.
+
+Existing SDK alternatives and owner choices remain agreed. No generic migration relaxation, timestamp
+rewrite, journal surgery, fresh-profile import or paid test is part of the repair. The test mapping is
+[SDK-MIG](../testing/provider-sdk-compatibility.md#legacy-watermark-upgrade-regressions); results and
+independent findings remain in the existing review. Owner end-to-end delivery authority continues;
+final plan/source critique and every new current-head gate precede original-profile operation.
+
+The exact pre-schema feasibility check identified the preserved workspace-events column. Its complete
+legacy ALTER bytes independently match the retained journal SHA256; executing those proven bytes
+only in a canonical in-memory reference reproduces all34 owner touched definitions. The repair
+therefore includes one explicit hash/time-bound historical variant, before and after0021, with opaque
+values preserved. See the task's proven-variant requirements; no generic extra-column tolerance or
+new workspace-events capability is introduced. Refined contract and DB/native source review passed. Focused local migration/SDK journeys pass;
+fresh hosted delivery and the actual retained-profile S12 remain required.

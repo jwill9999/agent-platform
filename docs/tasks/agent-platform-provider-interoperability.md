@@ -67,3 +67,17 @@ Feature: Configurable models with honest connection evidence
 Playwright must exercise visible actions through the real UI and independently verify backend
 fixture requests, persisted records and denied/cancelled absence of effects. S08/S09 own browser and
 Electron runs; preserve failure traces before repair. No task close while required journeys fail.
+
+## S12 owner-profile upgrade follow-up
+
+SDK source was delivered to staging through PR363 atbe153c50. The actual owner preflight found a
+legacy journal watermark incompatibility on a private copy; original data/history/key were preserved
+and the prior app restored. [SDK legacy migration repair](agent-platform-sdk-legacy-migration.md)
+now blocks this parent's S12 completion in canonical Beads. No source delivery or fixture result
+substitutes for the actual preserved-profile recording/export/restart and owner live-model readiness.
+
+Refined repair contract and DB/native source passed independent review. Local81 migration controls,
+retained original2 native cases, the new upgrade/restart and unchanged SDK2 pass retry0. Full73 cases
+are collected only; new hosted feature/protected qualification and actual original-profile S12 remain
+open. The restored owner app still uses its previous SDK; no live model/stress success is claimed.
+The repair spec/results retain failures, exact source bindings and the22-migration maintenance limit.

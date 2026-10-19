@@ -902,3 +902,99 @@ path. All40 controls pass0fail/skip/cancel in26.95seconds, including10 real quer
 source-byte/no-effect/signal/receipt checks; previous assertions and budgets remain. Actual local
 execution is Darwin; policy simulation does not claim native Windows qualification. Fresh hosted
 source review/checks and protected CodeQL clearance remain required. No runtime or gate waiver.
+
+## 19 October — staged delivery and owner migration preflight blocker
+
+PR363 merged by protected exact-head guarded squash at `be153c50019b0dd28b6105cf2f48a961ac16ed8f`.
+Tree18a9bbe4 equals reviewed feature938a and task9c. Independent final critique verified all five
+artifact digests/CRCs and13,765 members:72 Electron cases each retry0, actual signed packagedVM20,
+3,898 ordinary cases plus77 existing optional skips, API604/DB236/focused63/Git33/40 observer controls.
+Fresh900 measured/990 calls maxoverhead3.578690ms/enqueue0.046122ms satisfy unchanged20/2 limits.
+Both genuine full analyses completed6 batches/SARIF0, all3 CodeQL languages0, alert13 fixed without
+dismissal and Sonar current-head0/all5OK. All18 executed rollup checks/eight workflows succeeded,
+13 same-app required contexts passed; five source-conditional skips include Sourcery diff>150000.
+Host auxiliary coverage remains partial. Source/history and paused/main preservation were verified.
+Model diagnostics closed/read back/synced after its own delivery; provider S12 remains in progress.
+
+The actual staged production build passed backend/renderer/desktop on Node24.14. Owner unlocked the
+Mac; the idle retained app was quit normally, all owned ports and database handles released. Whole
+stopped profile/logs were copied privately and byte-verified; original key copy verified internally
+without logging its value/hash. Free space after backup27.38GiB. Official openDatabase on the private
+copy failed safely before SDK SQL:22 existing journal entries include a later opaque watermark.
+Original three owner databases remained byte-identical to the stopped backup. The previous runtime
+was reopened with the same profile/key and returned API/renderer200; it still has the old SDK.
+No upgraded owner launch, live model test or stress readiness is claimed.
+
+Evidence: `/Users/letuscode/.codex/provider-sdk-20261018/` receipts
+pr363-qualified-staging-delivery.json, pr363-938a-final-independent-approval.json,
+owner-sdk-staged-production-build.json, owner-sdk-stopped-profile-backup.json,
+owner-sdk-private-copy-preflight-blocker.json and owner-sdk-retained-runtime-restored-readiness.json.
+Private backups must not be published.
+
+SDK-MIG01/02 independent preliminary critique confirms the guard intentionally rejects0021 below
+the watermark; unknown hash existed before17October repair and has no proven retained SQL origin.
+The approved bounded direction keeps0021 immutable and proves complete predecessor history/exact
+touched pre-schema before its atomic compatibility bridge. Generic high-water guards and all other
+rejections remain. See [repair task](../tasks/agent-platform-sdk-legacy-migration.md) and
+[verification mapping](../testing/provider-sdk-compatibility.md#legacy-watermark-upgrade-regressions).
+This paragraph records the initial diagnosis; later local results below supersede its planned state.
+
+Final contract critique found SDK-MIG-P01 journal-trigger preservation and SDK-MIG-P02 missing child
+Gherkin mapping. The contract now explicitly rejects journal triggers on the bridge, proves the full
+original ordered journal plus one canonical0021 append, includes legacy backfill tables in pre-schema
+proof and maps eligible/restart, denied and existing-adopter journeys to UI and independent DB state.
+The refined contract passed independent review; actual local results follow below.
+
+Further feasibility evidence found messages.workspace_events_json present in the owner schema. Exact
+64-byte legacy ALTER reconstruction hashes to the retained43b2b451 entry; the independent critic
+confirmed that identity. Original commit/execution provenance remains unproven. Canonical0000–0020
+plus the proven statement in an in-memory reference matches all34 owner touched/legacy definitions
+exactly; no journal triggers exist. Receipts owner-sdk-workspace-column-hash-reconstruction.json and
+owner-sdk-proven-variant-eligibility.json retain proof without owner records. The contract now includes
+this one strict hash/time-bound pre/post variant, opaque-value preservation and adopter/reopen/negative
+controls. The refined contract and DB/native source passed independent review; owner databases remain untouched
+by upgrade code, and normal recording continues on the retained old app.
+
+## 19 October — bounded migration repair, local qualification
+
+Frozen runtime migrationHistory e188346d, final DB tests e4f0f638, sdk-watermark fixture5a119aaf,
+fixture typeba078302 and native testb9e2ee4f passed independent source review. The canonical0021
+bridge proves predecessor SQL/hash/time, trusted canonical or proven historical pre/post DDL,
+legacy-backfill prerequisites, journal-trigger denial and the exact original ordered journal plus
+one canonical append. Published0021 and the original31 DB tests remain exact. Maintenance limit:
+this variant recognizes exactly22 migrations; future migrations require a reviewed extension.
+
+Final81 migration controls pass, including50 new cases. An earlier full36-file DB suite passed284
+cases in37.23s on identical runtime before two added adopter controls; no final286 full-suite claim.
+Build/types/lint/format/syntax pass. Initial missing contracts and compiled diagnostics/monitoring
+workers were build-prerequisite failures, retained and resolved without product/assertion changes.
+SDK-MIG-SRC01 requested negative historical-adopter coverage; missing legacy prerequisites and
+journal triggers now deny without incidental backfill/schema/record/journal effects. Critic approved.
+
+Coherent backend/renderer/desktop builds pass Node24.14/pnpm9.15.4 without installs/dotenv. Full
+Playwright73 cases/16 files were collected, not executed locally. Original2 MIG-R06 cases pass
+retry0 with byte-exact callback bodies and unchanged fixture modes. Final new SDK-MIG05 passes
+retry0 in6.627s: real managed Electron/backend/SQLite retains all28 original tables/seven records,
+non-null opaque legacy value and22 original journal rows, appends exactly0021 once, then restarts
+idempotently. Retained Project/model/key indicator are visible both phases. No generation/probe;
+both closes fulfilled and all4 application ports released.
+
+Three failed new-case attempts remain retained: invalid synthetic agent limits caused agents400;
+missing desktop Project metadata plus personal-Chat navigation hid recents; duplicated text made
+a generic locator ambiguous. Reviewed SDK-only fixture corrections satisfy existing Agent/Project
+contracts; the test stays on Home and uses the exact accessible Project-card label. No old mode/body,
+runtime source, assertion or five-second expectation was weakened. SQL evidence now precedes UI;
+the first failed attempt explicitly lacks independent postmigration SQL proof.
+
+Both unchanged SDK native cases pass retry0 in16.056s/21.082s. Error diagnostics4events survive real
+restart with durable/verified/ready storage and zero pending/drop/conflict. Private continuation
+rows1→3 remain encrypted; completed history survives restart, interrupted approvals return409 with
+no new provider/audit/file effects, exactly one approved file effect occurs, private log markers
+are absent. Providers are emulated and profiles disposable; no owner data/Keychain/live model claim.
+
+Evidence root `/Users/letuscode/.codex/provider-sdk-20261018/`: sdk-legacy-bridge-adopter-qualified.json,
+sdk-legacy-fixture-project-qualified.json and sdk-legacy-native-final-local-qualification.json
+SHAb101b908bee74e8e8ab805f07b135afa8c9a27e3d617dccf50998bec22ab8267 bind actual source/dist/logs,
+complete reports/trace members and retained failures. Combined final documentation/evidence review,
+normal hooks, fresh feature/protected full analysis/VM/all checks and original-profile private-copy
+then recording/export/restart remain open. No live-model/stress readiness is declared.
