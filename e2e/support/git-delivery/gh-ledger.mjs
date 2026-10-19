@@ -7,10 +7,13 @@ import {
   rename,
   rm,
   access,
+  readdir,
+  open,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { URL } from 'node:url';
+import { Buffer } from 'node:buffer';
 
 function checkedBranch(value) {
   if (
@@ -58,6 +61,8 @@ export async function createGhLedgerFixture({
   let closed = false;
   async function assertIdle() {
     if (closed) throw new Error('Fixture is closed');
+    if ((await readdir(directory)).some((name) => /^claim\.[0-9a-f-]{36}$/.test(name)))
+      throw new Error('Await owned child completion before configuring or closing fixture');
     try {
       await access(join(directory, 'active.lock'));
     } catch (error) {
@@ -95,6 +100,9 @@ export async function createGhLedgerFixture({
       if (closed) throw new Error('Fixture is closed');
       return JSON.parse(await readFile(join(directory, 'ledger.json'), 'utf8'));
     },
+    async readEvidence() {
+      return readInvocationEvidence(directory);
+    },
     async setFailureModes(values) {
       const next = { ...config, ...checkedFailures(values) };
       await updateConfig(next);
@@ -109,4 +117,98 @@ export async function createGhLedgerFixture({
       closed = true;
     },
   };
+}
+
+const stages = new Set([
+  'configuration',
+  'validation',
+  'claim',
+  'waiting',
+  'ledger_read',
+  'dispatch',
+  'persist',
+  'output',
+  'complete',
+  'cleanup',
+]);
+const outcomes = new Set([
+  'running',
+  'success',
+  'command_error',
+  'lock_timeout',
+  'fixture_error',
+  'cancelled',
+]);
+const kinds = new Set([
+  'unknown',
+  'version',
+  'auth',
+  'repository',
+  'commit-checks',
+  'panel-list',
+  'pr-checks',
+  'list',
+  'create',
+]);
+
+/** Safe bounded observations only: never expose argv, configuration, outputs or raw errors. */
+async function readInvocationEvidence(directory) {
+  const maximum = 512;
+  const result = {
+    version: 1,
+    maximum,
+    records: [],
+    activeClaims: null,
+    truncated: false,
+    errors: 0,
+  };
+  let files;
+  try {
+    files = await readdir(directory);
+  } catch {
+    result.errors++;
+    return result;
+  }
+  result.activeClaims = files.filter((name) => /^claim\.[0-9a-f-]{36}$/.test(name)).length;
+  const receipts = files.filter((name) => /^receipt\.[0-9a-f-]{36}\.json$/.test(name)).sort();
+  result.truncated = receipts.length > maximum;
+  for (const name of receipts.slice(0, maximum)) {
+    try {
+      const handle = await open(join(directory, name), 'r');
+      let value;
+      try {
+        const bytes = Buffer.alloc(2049);
+        const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
+        if (bytesRead > 2048) throw new Error('Invocation evidence exceeds bound');
+        value = JSON.parse(bytes.subarray(0, bytesRead).toString('utf8'));
+      } finally {
+        await handle.close();
+      }
+      if (
+        value.version !== 1 ||
+        !stages.has(value.stage) ||
+        !outcomes.has(value.outcome) ||
+        !kinds.has(value.kind) ||
+        !Number.isSafeInteger(value.startedAtMs) ||
+        value.startedAtMs < 0 ||
+        !Number.isSafeInteger(value.waitMs) ||
+        value.waitMs < 0 ||
+        value.waitMs > 60000 ||
+        value.lockBudgetMs !== 1000
+      )
+        throw new Error('Invalid safe invocation evidence');
+      result.records.push({
+        version: 1,
+        kind: value.kind,
+        stage: value.stage,
+        outcome: value.outcome,
+        startedAtMs: value.startedAtMs,
+        waitMs: value.waitMs,
+        lockBudgetMs: 1000,
+      });
+    } catch {
+      result.errors++;
+    }
+  }
+  return result;
 }

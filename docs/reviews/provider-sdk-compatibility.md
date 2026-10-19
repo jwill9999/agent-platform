@@ -1,6 +1,6 @@
 # Provider SDK compatibility review and results
 
-Status: 19 October 2026. PR362 merged at7b816c61 after qualifiedeca47820; protected PR363 remains blocked by CodeQL12 pending actual repaired-source delivery. Repair PR364 atb8cfddc1 passed normal API593 and fresh900/990 benchmark (maximum overhead2.534041ms), but its green Sonar check concealed nine actual open API findings. A semantics-preserving lazy-secret extraction and privacy-safe dedicated matcher follow-up is being qualified. No protected staging delivery, owner-app rebuild or stress readiness is claimed.
+Status: 19 October 2026. PR362 merged at7b816c61; protected PR363 remains blocked by CodeQL12 until actual repaired-source delivery. PR364 at8e998a8f cleared actual Sonar and review threads, API604/DB236/browser and a complete fresh benchmark, but Electron has71 passes plus one flaky Git publishing case. It is not merge-qualified. A bounded owned-fixture serialization and failure-evidence repair now passes local controls and the focused native journey; fresh complete hosted qualification remains required. No protected delivery, owner-app rebuild, live-model success or stress readiness is claimed.
 Earlier pending states below retain their named source/time bindings and do not override this checkpoint.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
@@ -9,6 +9,52 @@ Evidence root: `/Users/letuscode/.codex/provider-sdk-20261018`; source base stag
 Qualified provider protocol/generation checks below use researched owned HTTP fixtures and the actual pinned SDKs.
 It does not establish live model availability, account permissions or generation quality. The owner
 app/profile remains unchanged; paused orchestration, main and the disabled Docker gateway are preserved.
+
+## Git fixture concurrency and retained failures
+
+Actual8e hosted evidence is in pr364-8e99-hosted-connected-verification.json. Its complete benchmark
+passes900 measured requests/990 fixture calls across nine vectors, maximum added p95 3.823261ms
+under unchanged20ms. API604, DB236 and the correct focused63 cases pass; both SDK native journeys
+pass first attempt. Electron's full72-case report contains71 expected passes and one flaky Git-panel
+publishing case, so overall qualification remains false despite green CI checks.
+
+Retry0 received safe unavailable PR data from the owned gh read after successful startup; the PRs
+view correctly lacked its Title field. Eleven PR-list responses were HTTP200, with no pending reads.
+The old failure path omitted CLI stage/ledger evidence. Exact historical cause remains unproven.
+Source inspection found that the fixture rejects every overlapping exclusive ledger lock while
+production permits bounded concurrent reads. A controlled old-source reproduction through four
+actual API read operations confirms process_failed and zero ledger calls while an owned child holds
+the lock; gh-fixture-old-lock-reproduction.json/log retain that independent fixture defect.
+
+Critique approved at most one second of monotonic lock serialization inside the same CLI invocation,
+unique active claims so queued children prevent reconfiguration/cleanup, and strict owned lock/claim
+release. Safe bounded stage/outcome receipts plus unconditional before/after cleanup evidence avoid
+raw arguments, environment or errors. Existing invalid/foreign-command denial, busy timeout, atomic
+ledger and one-effect/lost-response checks remain; no product/API/UI retries, test-budget, assertion
+or deadline changes. Review caught final-receipt ownership and invalid pre-claim writes; both are
+corrected. A controlled queued SIGTERM/SIGINT probe reproduced stranded claims; cooperative
+cancellation now prevents dispatch, persists a safe cancelled receipt and releases only its own
+claim. Forced SIGKILL remains fail-closed, with no speculative filesystem recovery.
+
+Final local27 fixture controls pass in6.172seconds and all33 Git Node controls pass in6.016seconds,
+zero failures/skips/cancellations. Original16 cases and five-second invocation helper remain verbatim.
+The actual compiled API four-read proof succeeds after all four queued claims are observed and the
+held lock is released: four outputs/ledger rows, zero remaining claims/errors. Frozen evidence is
+gh-fixture-cancel-source-and-qualification.json; earlier controlled failures remain retained.
+The focused native publishing/lost-response case passes first attempt in12.931seconds, no retry/skip/
+flake. Before/after snapshots have78 terminal calls,71 successes, six expected pre-PR check errors
+and one intentional lost-create-response error. Every PR list succeeds; maximum lock wait13ms,
+claims/evidence errors/truncation all zero. Exactly one PR is created and reconciled, fresh push and
+remote identity retained, all owned processes/ports closed. git-fixture-native-first-qualification.json
+binds the four code sources and existing unchanged production/dist bytes; no owner profile or paid
+model call is involved. Final combined review, normal hooks and fresh clean full hosted qualification
+remain required at this dated local checkpoint. Current workflow outcomes belong in Beads/PRs.
+
+The supersededb8 run39182710133 failed its benchmark: actual artifact12156329045 contains only three
+vectors/300 measurements/330 calls, completedfalse. Healthy43.318715ms and locked46.076602ms exceed
+the20ms limit. pr364-b8-benchmark-failure-independent-review.json binds raw ZIP/member/log evidence.
+Timing, event-loop and GC observations do not establish cause; retain SDK-PERF01 without claiming
+unrelated key/fixture repairs fix performance. Current8e's full fresh pass is a separate qualification.
 
 ## Hosted review boundaries and follow-up
 

@@ -609,11 +609,17 @@ test.describe('Electron Project Git workflow panel', () => {
         contentType: 'application/json',
       }),
     );
+    await captureFailure(failures, () =>
+      attachGitHubBoundaryEvidence(testInfo, ghFixture, 'before-cleanup', pendingReads.size),
+    );
     try {
       await app?.close();
     } catch (error) {
       failures.push(error);
     }
+    await captureFailure(failures, () =>
+      attachGitHubBoundaryEvidence(testInfo, ghFixture, 'after-app-close', pendingReads.size),
+    );
     try {
       await ghFixture?.close();
     } catch (error) {
@@ -632,6 +638,60 @@ test.describe('Electron Project Git workflow panel', () => {
     throwFailures(failures);
   });
 });
+
+async function attachGitHubBoundaryEvidence(
+  testInfo: TestInfo,
+  fixture: Awaited<ReturnType<typeof createGhLedgerFixture>> | undefined,
+  phase: 'before-cleanup' | 'after-app-close',
+  pendingReadCount: number,
+): Promise<void> {
+  if (!fixture) return;
+  const [invocations, ledger] = await Promise.allSettled([
+    fixture.readEvidence(),
+    fixture.readLedger(),
+  ]);
+  const summary =
+    ledger.status === 'fulfilled'
+      ? {
+          available: true,
+          callCount: ledger.value.calls.length,
+          createCalls: ledger.value.calls.filter(
+            ({ args }: { args: string[] }) => args[0] === 'pr' && args[1] === 'create',
+          ).length,
+          successCalls: ledger.value.calls.filter(
+            ({ outcome }: { outcome: string }) => outcome === 'success',
+          ).length,
+          errorCalls: ledger.value.calls.filter(
+            ({ outcome }: { outcome: string }) => outcome === 'error',
+          ).length,
+          pullRequestCount: ledger.value.pullRequests.length,
+          lostResponseConsumed: ledger.value.lostResponseConsumed === true,
+        }
+      : { available: false };
+  await testInfo.attach(`github-boundary-${phase}`, {
+    body: Buffer.from(
+      JSON.stringify(
+        {
+          phase,
+          // Request listeners were removed before cleanup; this is their last observed count.
+          lastObservedPendingReadCount: pendingReadCount,
+          invocations:
+            invocations.status === 'fulfilled' ? invocations.value : { available: false },
+          ledger: summary,
+        },
+        null,
+        2,
+      ),
+    ),
+    contentType: 'application/json',
+  });
+  const incompleteInvocations =
+    invocations.status === 'fulfilled' &&
+    (invocations.value.errors !== 0 || invocations.value.truncated);
+  if (invocations.status === 'rejected' || ledger.status === 'rejected' || incompleteInvocations) {
+    throw new Error('GitHub fixture boundary evidence could not be collected completely.');
+  }
+}
 
 async function waitForOwnedRendererLoad(page: Page, rendererPort: number): Promise<void> {
   // firstWindow observes construction before main.ts finishes its initial loadURL.

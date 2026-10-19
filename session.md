@@ -1,3 +1,53 @@
+# Provider SDK — Git fixture follow-up, 19 October 2026
+
+Owner-authorized delivery remains in progress. PR362 merged into the feature at7b816c61;
+protected [PR363](https://github.com/jwill9999/agent-platform/pull/363) still has that old head and
+remains blocked by CodeQL12. Repair [PR364](https://github.com/jwill9999/agent-platform/pull/364)
+at8e998a8f has zero actual Sonar issues and all six review threads resolved. Its API604/DB236 and
+fresh full900-measurement/990-call benchmark passed, maximum added p95 3.823261ms below20ms.
+Browser42 plus one known context skip passed. Both SDK Electron journeys passed first attempt,
+but the complete Electron report has71 passes and one flaky Git-panel case. Green job badges do
+not satisfy the agreed clean72 gate; do not merge this source.
+
+The failed publishing case selected PRs but received safe unavailable PR data from the owned GitHub
+CLI read, so its Title field never appeared. Startup succeeded and11 PR-list responses were HTTP200
+with no pending reads. Failed-command evidence was omitted by success-only fixture attachments;
+its exact historical cause remains unproven. The fixture immediately rejects overlapping exclusive
+ledger locks despite legitimate concurrent reads. A controlled old-source reproduction makes four
+real API read operations fail with process_failed and no ledger entries while an owned child holds
+that lock. This establishes a fixture concurrency defect without claiming the old trace's cause.
+
+Independent critique approved a bounded fixture-only repair: one CLI invocation waits at most one
+second for its exclusive lock, with unique queued claims preventing configuration/cleanup races and
+strictly owned cleanup. Safe enum stage/outcome receipts and unconditional failure-path summaries
+preserve evidence. Review corrected final-receipt ownership and pre-claim invalid-input writes;
+controlled queued SIGTERM/SIGINT also exposed stranded claims. Cooperative cancellation now prevents
+dispatch, records cancellation and releases only its own claim; forced SIGKILL remains fail-closed.
+All27 fixture controls and all33 Git Node controls passed with zero failures/skips/cancellations;
+original16 test bodies and the five-second invocation helper remain unchanged. The focused actual
+Electron publishing/lost-response case passed first attempt in12.931seconds, no retries/skips/flakes.
+Both safe snapshots retained78 terminal invocations, all PR lists successful, max lock wait13ms,
+zero claims/evidence errors/truncation and exactly one intentional lost-response PR creation.
+Owned processes/ports closed. No application, API/UI retry, assertion, product deadline or test-budget
+change. Final combined review, normal hooks and fresh clean hosted qualification remain required at
+this local checkpoint; later results belong in Beads/PRs without rewriting frozen source.
+
+Retain the separate olderb8 benchmark failure: only three vectors/300 measurements/330 calls were
+captured before the first assertion; healthy43.318715ms and locked46.076602ms exceeded20ms.
+SDK-PERF01's cause is unproven, and unrelated key/fixture repairs are not performance fixes. The
+current complete8e benchmark is independently qualified; it does not erase that failure.
+
+Both SDK Beads tasks remain in_progress. After qualified repair delivery, verify PR363's actual fixed
+head and require fresh unsuppressed CodeQL, full analysis, signed packaged macOS VM and all live
+checks/comments before protected squash. Preserve the original key/profile for the later rebuild,
+recording/export/restart and owner-led live-model check. The Mac is currently locked; an unlock
+request is pending for native preflight. No owner-app change, paid call, staging/cleanup, live-model
+success or stress readiness is claimed. Main, paused PR283/orchestration and disabled Docker gateway
+remain separate. Later current status belongs in Beads/PRs; earlier checkpoints remain verbatim.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier checkpoint follows verbatim; its pending statements are historical. -->
+
 # Provider SDK — final quality follow-up, 19 October 2026
 
 Owner authorization continues through PR362/feature/staging merges only after every actual check
