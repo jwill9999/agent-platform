@@ -1,14 +1,11 @@
-# Monitoring preparation checkpoint
+# Monitoring readiness delivered
 
-Owner app50f6 is running. One authorized OpenAI chat returned Connection OK;1attempt/no tools/retries,
-4.672s,5579input/7output. Reports verify5samples/no loss/gaps. No stress trial/further paid calls.
-
-Both monitoring P1s remain in_progress. Log isolation:50controls/4native cases pass retry0.
-Failure provenance:70focused cases/build/types/critic and1native export/restart pass retry0.
-PR379 stageddee20500; local batch aligned. Related fixes/tests/docs use one PR direct protected
-staging after local review; no feature merge. Normal push/benchmark pass; hosted gates remain.
-See docs/planning/monitoring-stress-readiness.md. Owner app/key, paused/main/gateway preserved;
-upgrades held.
+PR380 merged to protected staging at f9fc009f; tree equals reviewed3970582e. All18 executed checks
+pass; no open review/Sonar/CodeQL findings. Independent QA:4047 ordinary,75 Electron,20 signed VM,
+browser42+1 known skip, genuine full scan and benchmark. Both readiness P1s are closed/synced.
+Owner app50f6/profile/key remain unchanged. Next: staged-app preflight, then frozen bounded owner
+trial and one saved-evidence review. Stress remains OPEN/unrun; no further paid calls.
+This factual handoff is queued for the next batch; paused/main/gateway remain unchanged.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Earlier handoff follows verbatim. -->

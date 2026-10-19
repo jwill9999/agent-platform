@@ -2,6 +2,39 @@
 
 19 October baseline50f6/treefc553. This record distinguishes actual evidence from planned repairs.
 
+## Delivered to protected staging — 19 October
+
+PR380 merged by the owner-authorized guarded squash at
+`f9fc009f93687c221a6929e7c97c7b712a2f6525`. Actual staging tree
+`0a4add919a9f9a286c83fefdbb050a94f1c7e6ef` equals reviewed head `3970582e`.
+All13 required app-bound contexts and18 executed checks passed; all seven latest workflows
+completed successfully. No unresolved threads, blocking reviews, Sonar issues/hotspots or scoped
+CodeQL alerts remained. Earlier pending statements below are historical checkpoints.
+
+Independent hosted review confirms4047 ordinary tests, including70 provenance and50 fixture
+controls, plus194 Node controls. All77 optional workflow-control skips match protected-base source;
+paused orchestration is not newly qualified. Electron75 pass retry0/no flakes/skips/failures;
+signed packaged macOS VM20 pass, including actual ready/Stop guest journeys. Browser42 pass plus
+one existing optional-context skip; Git5/Stop5 retry0 are verified, while main32 lacks a retained
+per-case retry report. VM compact artifacts likewise lack raw per-case retry reports.
+
+Full Promptfoo performs two genuine batches with zero SARIF findings. The fresh benchmark contains
+900 measured requests/990 calls: maximum p95 overhead2.583389ms below20ms and enqueue0.062578ms below2ms.
+Host core samples are complete; missing auxiliary memory-event data remains explicitly partial.
+Final independent receipt: `monitoring-readiness/pr380-qualification/qa-397-final-hosted-qualification.json`
+SHA `07247efdccc496858d289bc31dd1ca7ed47ea36e935891955e9134ff12211eab`.
+Merge/tree proof: `pr380-merged-tree-proof.json` in the same qualification directory.
+
+Both readiness Beads tasks are closed; their readbacks and terminal Dolt push bind the closeout.
+The owner app still uses50f6 with its original profile/key; staged-app preflight and the bounded
+manual trial have not run. Original storage failure cause remains unproven. Renderer/subprocess/I/O
+limits remain disclosed; no broader instrumentation or upgrades are added before the trial.
+Current CI took30m42s, including8m58s before first-job start; the final verify job took17m55s.
+Queue/scheduling and test execution are recorded separately without asserting a network cause.
+
+This two-file factual closeout is committed/pushed for the next coherent protected-staging batch,
+without a separate documentation-only PR/hosted cycle. No runtime changes are introduced here.
+
 ## Already observed
 
 PRE-T02 PASS for one explicitly owner-authorized paid native chat request: configured OpenAI
@@ -95,7 +128,7 @@ This healthy native journey does not claim a native terminal-fault reproduction;
 publication/status/restart behavior is covered by the separately reviewed real API/DB controls.
 Unchanged Git journeys were reused rather than repeated; the full hosted suite remains required.
 
-## Delivery and pending outcomes
+## Historical pre-delivery checkpoint
 
 PR379 is delivered directly to protected staging at `dee20500`; its reviewed tree matches the actual
 merge. The running owner app remains on source50f6. This monitoring batch will align with that actual
