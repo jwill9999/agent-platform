@@ -637,3 +637,36 @@ intended context case. Static lint/format/diff passed. The full50-case file pass
 error in28.98seconds. Normal hooks and fresh exact-head hosted gates remain pending at this
 checkpoint. No product or paused source changed,
 and no unchanged rerun, retry increase or deadline waiver is used.
+
+## Git startup ports and strict Electron CI outcome
+
+The three Git native journeys passed once without retry in30.204seconds, with all four ports
+allocated distinctly per launch, actual Node inspector equality, configured Chromium debugger
+port equality (actual endpoint unknown), renderer HTTP200 HTML and all12ports released.
+`git-startup-native-first-qualification.json` binds the unchanged source and runtime. A real owned
+Node inspector control reproduces HTTP400 and the literal WebSockets response; it does not identify
+the historical failed service. The broader fixture inventory and product readiness accepting400
+remain recorded in the existing startup P1, outside this bounded repair.
+
+The initial repair is pushed as d3160c6e. Its normal full-workspace hook passed3,898 ordinary
+cases plus77 existing optional skips and all builds/types. The separate fresh benchmark retained
+nine complete vectors,900 measured requests/990 fixture calls, max positive overhead2.739666ms
+under the unchanged20ms limit, enqueue p95 below2ms, queue at most256 and healthy zero loss.
+Raw windows were independently recomputed; benchmark source remains byte-identical to staging.
+These are local source-bound results, not protected-head qualification or owner stress evidence.
+
+A one-line follow-up sets `failOnFlakyTests: !!process.env.CI` in the real Electron config.
+CI retains one retry for diagnostics, workers1 and the60-second default; every existing test,
+assertion and explicit budget remains unchanged. External controls import this actual config without
+overriding its failure policy, retries, workers or timeout: the first-fail/second-pass case is flaky
+with two attempts and exit1; a clean first attempt exits0; CI unset retains false/retries0.
+No browser, app or provider is launched by these policy controls. ESLint/format/diff pass.
+The external control harness initially needed module-loading/report-field corrections; those
+failures are retained separately and did not expose a product defect. Final combined review and
+normal follow-up hooks are still required. Fresh hosted CI must pass all72 Electron cases without
+flakiness, plus every actual security/review/full-scan/packaged-VM/protected gate before merge.
+
+PR363's prior a9e71+1flaky result remains unqualified despite successful job badges. Prior scan,
+VM, SDK, API, browser and benchmark slices remain bound to their actual source. This change enforces
+the existing clean-run requirement rather than accepting retry success. No live-provider success,
+owner-profile upgrade, stress readiness, main promotion or paused orchestration delivery is claimed.

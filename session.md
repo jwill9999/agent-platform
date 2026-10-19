@@ -1,3 +1,22 @@
+# Provider SDK — enforce clean Electron CI, 19 October 2026
+
+The Git startup-port repair is pushed at d3160c6e. Normal hooks passed all builds/types,
+3,898 ordinary cases (77 existing optional skips) and a fresh complete benchmark:900 measured/
+990 fixture calls, max overhead2.739666ms below20ms. Its three native Git journeys passed retry0.
+Protected PR363 remains blocked at a9e by71 passes plus one flaky case despite a green job.
+
+CI now sets Playwright failOnFlakyTests from CI, preserving its existing one retry, single worker
+and60-second default. Controls import the actual repository config: a failed first attempt followed
+by success exits1 and remains flaky; a clean first attempt exits0. Local CI-unset policy is unchanged.
+These are no-browser policy controls, separate from the source-bound native journeys. Combined
+review, follow-up normal hooks and fresh feature/protected qualification remain required. No runtime,
+paused orchestration, owner profile/key or paid provider changes. Owner-app preflight still requires
+native access after Mac unlock; no staging/live-model or stress readiness is claimed. Earlier text
+below is retained verbatim history; current delivery state is tracked in Beads and PRs.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Previous handoff follows verbatim; its pending statements are historical. -->
+
 # Provider SDK — distinct Git-test startup ports, 19 October 2026
 
 PR362 and repair PR364 are merged into the feature at a9e8ac61. Protected

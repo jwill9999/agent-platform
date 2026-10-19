@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: '.',
   testMatch: '**/*.e2e.ts',
   forbidOnly: !!process.env.CI,
+  failOnFlakyTests: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
