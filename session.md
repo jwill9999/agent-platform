@@ -1,15 +1,17 @@
-# Workspace integration repair checkpoint
+# Current handoff — 19 October 2026
 
-PR376 merged at c30f1c23; PR377 failed its flaky Electron gate at that head.
-This isolated follow-up preserves Personal scope against stale Project navigation:
-55 focused controls and18 selected native cases pass without retries. Fresh hosted
-qualification and rebuilt-owner preflight are required. Actual subsequent heads, gates
-and staging delivery belong in Beads agent-platform-native-workspace-listing and PR377.
-Dependency upgrades held until after stress testing; live model response/trial unverified.
-Owner profile/key, paused orchestration/main/disabled Docker gateway retained.
+PR378/377 are merged into staging `50f6e1b5`: all19 executed checks passed;
+Workspace repair is closed/synced. Actual app listing/recording/export/clean restart
+passed with original data/key retained. Live model generation/stress trial unverified.
+
+Stress remains blocked by `agent-platform-desktop-fixture-log-isolation` and
+`agent-platform-monitoring-storage-failure-provenance`; restart is not a cause fix.
+Dependency upgrades held; paused orchestration/PR283, main and Docker gateway unchanged.
+Housekeeping: [audit/results](docs/reviews/post-merge-cleanup-20261019.md).
+Use [end-of-run cleanup](docs/development/post-merge-cleanup.md). This docs update awaits PR delivery.
 
 <!-- markdownlint-disable MD025 -->
-<!-- Earlier handoff follows verbatim. -->
+<!-- Earlier handoff follows verbatim; pending statements below are historical. -->
 
 # Native Workspace listing repair — 19 October 2026
 

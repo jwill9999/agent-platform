@@ -395,9 +395,14 @@ When ending a work session, you MUST complete ALL steps below. Work is **NOT** c
    selected prototype run uses its own journaled equivalent for operations it owns; that does not
    make the prototype a default developer dependency.
 
-5. **Clean up** — clear stashes, prune remote branches
-6. **Verify** — all changes committed AND pushed
-7. **Hand off** — provide context for next session via `session.md`
+5. **Hand off** — after verifying actual delivery, update and push `session.md` with the merged SHA,
+   checks, remaining blockers and next action through the normal branch/PR process.
+6. **Clean up** — follow [post-merge cleanup](development/post-merge-cleanup.md): audit worktrees and
+   test data, preserve dirty/paused/in-use work and required evidence, then retire only proven unused
+   delivered checkouts and disposable artifacts. Inspect ignored data, including local Beads stores;
+   never clear unrelated stashes or blanket-prune application data/caches.
+7. **Verify** — confirm committed/pushed records, exact removals, retained evidence and runtime/dirty
+   work preservation; record space recovered and read back/sync Beads. Apply this cleanup every run.
 
 **Critical rules:**
 
