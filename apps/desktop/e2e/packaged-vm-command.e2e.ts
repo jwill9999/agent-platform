@@ -1385,7 +1385,14 @@ for (const { policy, unavailableFiles, action } of [
           response.url().endsWith('/api/v1/workspace/files'),
         );
         await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-        expect((await refreshedListing).status()).toBe(500);
+        const unavailableListing = await refreshedListing;
+        expect(unavailableListing.status()).toBe(503);
+        expect(await unavailableListing.json()).toEqual({
+          error: {
+            code: 'WORKSPACE_FILES_UNAVAILABLE',
+            message: 'Workspace files are unavailable. Refresh to retry.',
+          },
+        });
         await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
         await expect(page.getByText('File listing unavailable. Refresh to retry.')).toBeVisible();
         await expect(selector).toHaveValue(policy);

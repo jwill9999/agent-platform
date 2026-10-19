@@ -31,6 +31,28 @@ must qualify the corrected source; earlier head checks cannot qualify this follo
 merge authority remain separate. The sections below retain earlier local checkpoints as history;
 their pending statements describe those checkpoints, not the latest delivery state.
 
+### Connected permission-contract correction
+
+The completed A843 hosted Electron job failed74passed/1failed: its existing "shell-write block with
+unavailable file listing" journey expected the old generic500 but received the intentional503.
+Both attempts failed identically before CI cancellation, so this is a contract expectation gap,
+not a cancellation result or a transient flake. The original job/log/report are retained. The minimal
+test-only correction now asserts503 and the exact safe `WORKSPACE_FILES_UNAVAILABLE` code/message;
+all existing policy persistence, denied audit, no-approval and unchanged-file checks remain intact.
+That complete existing native journey passes retry0 in11.8seconds with deterministic provider and
+fixed-command runner fixtures; it does not establish actual VM isolation or live model readiness.
+
+The corrected runtime at `28259b33` passed normal hooks (610 API cases) and a fresh raw900/990
+benchmark: maximum positive p95 overhead7.454959ms<20ms, enqueue0.0245ms<2ms, independently approved.
+Its actual owner preflight passed: both earlier samples retained exactly across normal restart,
+2→5 samples/two process identities/new positive interval, no pending/drop/conflict/resource gaps,
+ready seven-day recording, all30 original tables/journal23/key preserved and31.84GiB free.
+Native Workspace lists normally; saved model settings remain. Reports have zero idle V1 events and
+explicitly incomplete overall coverage. No provider request or owner stress trial occurred. This
+follow-up changes only the permission test and documentation; the running owner candidate's compiled
+runtime remains identical. Its preflight evidence stays bound to28259, not relabeled as a later launch.
+Fresh hosted tests/security/Sonar must qualify the new test revision before acceptance.
+
 ## Earlier local checkpoints (historical)
 
 19October baseline: actual owner app at staged `a17bc1db` shows generic error and unavailable file
