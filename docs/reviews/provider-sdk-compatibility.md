@@ -795,6 +795,27 @@ workflow objects and benchmark bytes remain unchanged; 13 trigger cases include 
 former bf37 continuation. Frozen combined review, normal hooks and actual hosted execution remain
 required before any merge qualification.
 
+### Hosted capability evidence and final membership correction
+
+At58a5bd9f, CI39201949314 attempt1 completed successfully. The declared diagnostic actually ran
+all9 vectors/900 measured requests/990 fixture calls, with process/core observations eligible and
+host coverage explicitly partial. All49 host samples report the unavailable auxiliary
+cgroupMemoryEvents field; this does not become full host coverage. The separate unchanged normal
+benchmark also completed9/900/990; independent raw-window recomputation gives maximum positive
+overhead2.269351ms below20ms and maximum enqueue0.053901ms below2ms. Actual artifact12165235559
+contains the distinct observed data and exact normal filename; API digest, CRC and every member
+are verified. These measurements do not establish the cause of the retained95d1 failure.
+
+Fresh58a Sonar has an OK gate but two open minor S7776 findings in the wrapper. The correction
+changes only two fixed membership collections to Set and their membership predicates to has,
+preserving rejection of unknown names/reasons and every coverage guard. All36 tiny controls pass
+with zero failures/skips/cancellations in26.563 seconds; syntax, lint, formatting and diff pass.
+No local full benchmark is repeated. The workflow remains identical: its next synchronize event
+has before58a rather than the declared ca2 predecessor, so the observed step is not selected again.
+Final source/evidence review, normal hooks and fresh exact-head checks remain required, including
+the original uninstrumented benchmark and actual Sonar issue clearance. Nothing here qualifies a
+future feature/staging head or the owner app without its own required evidence.
+
 At protected95d1, both full scans39195037863/39195062021 completed genuine five-batch analysis without findings;
 new CodeQL Actions/JavaScript/Swift analyses have zero results, alert12 is fixed without dismissal,
 and direct current-head Sonar is OK with zero open issues. Dependency comparison45 changes has

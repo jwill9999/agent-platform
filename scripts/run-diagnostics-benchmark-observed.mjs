@@ -233,7 +233,7 @@ const coreFields = [
   'memoryPressure',
   'ioPressure',
 ];
-const failureReasons = ['absent', 'unreadable', 'invalid', 'other'];
+const failureReasons = new Set(['absent', 'unreadable', 'invalid', 'other']);
 function counterSet(input, fields) {
   return !!input && fields.every((field) => numeric(input[field]));
 }
@@ -264,15 +264,15 @@ function coreCounters(sample) {
   );
 }
 function validGaps(sample) {
-  const fields = [...coreFields, 'cgroupMemoryEvents'];
+  const fields = new Set([...coreFields, 'cgroupMemoryEvents']);
   return (
     Array.isArray(sample.unavailable) &&
     sample.errors === sample.unavailable.length &&
     new Set(sample.unavailable).size === sample.unavailable.length &&
-    sample.unavailable.every((field) => fields.includes(field)) &&
+    sample.unavailable.every((field) => fields.has(field)) &&
     !!sample.unavailableReasons &&
     hasExactKeys(sample.unavailableReasons, sample.unavailable) &&
-    Object.values(sample.unavailableReasons).every((reason) => failureReasons.includes(reason))
+    Object.values(sample.unavailableReasons).every((reason) => failureReasons.has(reason))
   );
 }
 function hostCoverage(host) {

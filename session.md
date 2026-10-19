@@ -1,27 +1,24 @@
-# Provider SDK — capability-aware diagnostic, 19 October 2026
+# Provider SDK — diagnostic evidence and final membership repair, 19 October 2026
 
-PR362, PR364 and PR365 merged into the feature at95d1cdbf. Protected PR363 remains blocked by
-measured22.982728ms benchmark overhead against20ms. Its API604/DB236, browser, clean72 Electron,
-packaged VM20 and security slices do not waive that failure. Earlier handoffs remain verbatim history.
+PR362, PR364 and PR365 merged into the feature at95d1cdbf. Protected PR363 still awaits the
+repaired feature and fresh protected qualification; its original22.982728ms overhead failure is
+retained. No staging delivery or owner-app/live-model readiness is claimed.
 
-PR366 openingbf374458 failed its first Linux helper control before both benchmark commands; its
-cause was not uploaded. The ca2c319f follow-up retained evidence: actual child0 and valid process
-observations, but all seven host samples lacked only the auxiliary cgroupMemoryEvents counter.
-Again neither full benchmark ran. The fixed root metric is not universally available; its historical
-read-error reason remains unknown. Do not attribute these helper failures to application overhead.
+PR366 at58a5bd9f completed CI39201949314. The observed benchmark actually ran all900 measured/
+990 fixture calls across9 vectors with valid process/core evidence. Host coverage remains partial:
+all49 samples explicitly lack the auxiliary cgroupMemoryEvents counter. No hidden core gaps,
+zero imputation, causal claim or subtraction. The separate unchanged normal gate also completed
+900/990/9 with independently recomputed maximum positive overhead2.269351ms below20ms.
 
-Reviewed correction separates complete process/core evidence required for diagnostic eligibility
-from total host coverage. Any missing metric keeps host.complete=false and explicit partial or
-unavailable coverage; fixed failure reasons replace raw errors. No zero imputation or ignored core
-gap. All36 local tiny controls pass without failures/skips/cancellations, including stale flags,
-empty samples, optional-only gaps and actual worker identity. Mac controls explicitly do not qualify
-Linux coverage. No local full benchmark or product-deadline change is included.
+Two current-head minor Sonar findings are repaired by converting only fixed membership arrays to
+Set.has. All36 focused controls pass without failures/skips/cancellations in26.563 seconds; syntax,
+lint, format and diff pass. The workflow and original benchmark stay byte-identical. Its exact-prior-
+head condition rejects the next synchronization from58a, so no additional observed run is selected.
+Final combined review, normal hooks and fresh exact-head checks/Sonar clearance remain required.
 
-One continuation is restricted to PR366's task, synchronize fromca2c319f and attempt1. Controls
-still block both commands on failure; an eligible observed run cannot replace the unchanged fresh
-uninstrumented gate. Final combined review, normal hooks and new hosted checks remain required.
-Current delivery/checks belong in Beads and PR363. Owner-app preflight awaits Mac unlock; no staged,
-live-model/stress readiness, paid calls, profile/key changes, paused integration or cleanup claimed.
+Current delivery belongs in Beads and PR363. Preserve the original session below exactly once.
+Mac unlock still gates native owner-app preflight; no paid calls, profile/key changes, cleanup,
+main promotion or paused orchestration integration. Existing benchmark failures remain evidence.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Previous handoff follows verbatim; its pending statements are historical. -->
