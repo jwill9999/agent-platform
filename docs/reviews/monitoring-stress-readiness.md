@@ -79,6 +79,22 @@ OBS-S01/02/03 are resolved. Frozen source:
 `monitoring-readiness/provenance/provenance-worker-final-source.json` SHA
 `855e4ac6b2f613b618efb78ce40edf4d7fcc5e78559a88d39142f0011de680d5`.
 
+## Affected native provenance check
+
+The existing disposable diagnostic-export journey passed once in10.252s with one worker, retry0
+and no flaky/skipped/error cases. Current compiled schemas validate13-event native/browser/restarted
+reports, healthy capture, no new loss and exact native history retention. The backend-down report
+correctly remains0events/unverified/nondurable; browser export returns200 in28.715ms. All three
+canaries, host paths and credential patterns are absent. Both close promises complete before owned
+fixture cleanup;19 observed child processes exit and the owner app PIDs remain unchanged.
+
+Independent QA binds the20 frozen sources and16 runtime outputs, copies five safe attachments and
+records its limits in `monitoring-readiness/provenance/native-export-first-independent-review.json`
+SHA `2a94387ae1bceb27bd7d4730be7f2654516424ac64be5553065b2c31351cb34e`.
+This healthy native journey does not claim a native terminal-fault reproduction; safe terminal-fault
+publication/status/restart behavior is covered by the separately reviewed real API/DB controls.
+Unchanged Git journeys were reused rather than repeated; the full hosted suite remains required.
+
 ## Delivery and pending outcomes
 
 PR379 is delivered directly to protected staging at `dee20500`; its reviewed tree matches the actual
@@ -88,7 +104,9 @@ task-to-feature and feature-to-staging merges for bounded MVP work: group relate
 review and test locally, then use one protected-staging PR. Keep subsequent repairs in that PR;
 separate PRs are for urgent blockers. No current workflow/security gate is weakened.
 
-Combined critic/normal-hook qualification, affected native monitoring/export checks, the complete
-benchmark and all current protected hosted checks/reviews remain due. Both P1s stay in progress;
+Both source critiques and the combined20-document policy review pass; normal commit hooks pass.
+Local alignment incorporates actual staging `dee20500` and preserves every reviewed source byte.
+The cumulative normal push, complete benchmark and all current protected hosted checks/reviews
+remain due. Both P1s stay in progress;
 the owner stress trial remains OPEN/blocked. The owner app/data/key, held dependency work, paused
 orchestration, main and disabled Docker gateway remain preserved. No final delivery is claimed.
