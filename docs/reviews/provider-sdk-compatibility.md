@@ -863,3 +863,32 @@ once on retry0 with no flakes/skips. All API artifact digests and every member a
 `pr363-95d1-hosted-connected-verification.json` remains explicitly blocked by the benchmark.
 No source-independent result substitutes for the failed current benchmark. No owner-app upgrade,
 live-provider success, stress readiness, main promotion or paused orchestration delivery is claimed.
+
+### Protected CodeQL observer-fixture repair
+
+PR366 merged at687ec379 after all12 executed checks and independent artifact review cleared.
+The source-bound fresh benchmark completed900/990, maximum overhead1.897371ms below20ms and
+enqueue0.060132ms below2ms. All72 Electron cases passed on retry0; API604/DB236, browser42 plus
+one known skip and3898 ordinary cases passed. Host core counters are complete; auxiliary
+memory.events absence remains partial coverage. Retained earlier failures have no established cause.
+
+Actual protected687e CodeQL13 identifies JSON-serialized path data inserted into generated child
+JavaScript. Its open finding blocks staging despite genuine full scans and passing other slices.
+The bounded test-only correction uses static child source and separate argv data for the direct
+child handler family, validates fixed cases and preserves signal outcomes, assertions and budgets.
+Hostile-path/no-effect controls, source-independent critique and normal hooks are required, followed
+by new exact-head hosted feature and protected qualification. No custom sanitizer, suppression,
+product/benchmark/dependency/durability change or old-result substitution is introduced.
+
+The provider task retains S12 actual owner-profile recording/export/restart; model diagnostics has
+its separate protected-delivery acceptance, and owner stress remains open. Native access still
+requires manual Mac unlock. No paid call, credential/profile change or paused integration is claimed.
+
+All39 focused observer controls pass with zero failures/skips/cancellations in27.05seconds. The
+original36 remain, with AST evidence preserving all original parent assertions and timeout options.
+Three new controls cover10 real normal/hostile child executions with identical generated source
+and no marker effect, three invalid-enum denials, and owned-child abort/SIGKILL plus spawn-failure
+cleanup. The new controls execute sequentially, honor their unchanged10-second budgets and await
+child closure before removing owned fixtures. Syntax, ESLint, formatting and diff checks pass.
+Final combined source/results/session critique, normal hooks and all fresh hosted gates remain
+required. No local full application suite or benchmark is repeated for this test-only correction.

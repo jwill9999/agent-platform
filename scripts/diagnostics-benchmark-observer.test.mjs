@@ -253,6 +253,103 @@ function fixture() {
   return mkdtempSync(join(tmpdir(), 'diagnostic-observer-control-'));
 }
 
+/** Await actual close before an owned fixture may be removed, including abort/spawn failure. */
+async function settleDirectChild(child, signal) {
+  const closed = new Promise((resolveClosed) => child.once('close', resolveClosed));
+  const exited = once(child, 'exit');
+  const terminate = () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+  };
+  signal.addEventListener('abort', terminate, { once: true });
+  try {
+    if (signal.aborted) terminate();
+    const result = await exited;
+    signal.throwIfAborted();
+    return result;
+  } finally {
+    signal.removeEventListener('abort', terminate);
+    try {
+      terminate();
+    } finally {
+      await closed;
+    }
+  }
+}
+
+// Child programs are constant source. All owned paths and scenario selections
+// cross the process boundary only as argv data, never as JavaScript fragments.
+const identityChildSource = `
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+assert.equal(process.argv.length, 3);
+const [preloadURL] = process.argv.slice(2);
+const fs = createRequire(import.meta.url)('node:fs/promises');
+let resolve, reject;
+const first = new Promise(yes => resolve = yes);
+const second = new Promise((_yes, no) => reject = no);
+let calls = 0;
+fs.statfs = () => ++calls === 1 ? first : second;
+await import(preloadURL);
+const value = {bsize:4096};
+const failure = new Error('owned failure');
+assert.equal(fs.statfs('/not-used-by-owned-double'), first);
+resolve(value);
+assert.equal(await first, value);
+assert.equal(fs.statfs('/not-used-by-owned-double'), second);
+reject(failure);
+await assert.rejects(second, error => error === failure);
+`;
+const handledChildSource = `
+import assert from 'node:assert/strict';
+import {readdirSync} from 'node:fs';
+import {statfs} from 'node:fs/promises';
+assert.equal(process.argv.length, 6);
+const [preloadURL, directory, registration, timing] = process.argv.slice(2);
+assert.ok(['on', 'once', 'prependOnceListener'].includes(registration));
+assert.ok(['existing', 'later'].includes(timing));
+let handled = 0;
+const handler = () => {
+  handled++;
+  assert.equal(readdirSync(process.env.DIAGNOSTICS_OBSERVER_DIRECTORY).includes(String(process.pid)+'.json'), false);
+};
+function register() {
+  switch (registration) {
+    case 'on': process.on('SIGTERM', handler); break;
+    case 'once': process.once('SIGTERM', handler); break;
+    case 'prependOnceListener': process.prependOnceListener('SIGTERM', handler); break;
+  }
+}
+if (timing === 'existing') register();
+await import(preloadURL);
+if (timing === 'later') register();
+process.kill(process.pid, 'SIGTERM');
+await new Promise(setImmediate);
+assert.equal(handled, 1);
+await statfs(directory);
+`;
+const foreignChildSource = `
+import assert from 'node:assert/strict';
+import {statfs} from 'node:fs/promises';
+assert.equal(process.argv.length, 5);
+const [preloadURL, directory, disposition] = process.argv.slice(2);
+assert.ok(['removed', 'consumed'].includes(disposition));
+await import(preloadURL);
+let handled = 0;
+const handler = () => handled++;
+if (disposition === 'removed') {
+  process.on('SIGTERM', handler);
+  process.off('SIGTERM', handler);
+} else {
+  process.once('SIGTERM', handler);
+  process.kill(process.pid, 'SIGTERM');
+  await new Promise(setImmediate);
+  assert.equal(handled, 1);
+}
+await statfs(directory);
+process.kill(process.pid, 'SIGTERM');
+await new Promise(() => {});
+`;
+
 test(
   'real pnpm → default Vitest fork observes owned workers/statfs/raw writer only at fork exit',
   { timeout: 30000 },
@@ -392,21 +489,8 @@ test(
     mkdirSync(ledgers, { mode: 0o700 });
     try {
       const script = join(directory, 'identity.mjs');
-      writeFileSync(
-        script,
-        `
-import assert from 'node:assert/strict';
-import {createRequire} from 'node:module';
-const fs=createRequire(import.meta.url)('node:fs/promises');
-let resolve,reject;const first=new Promise(yes=>resolve=yes);const second=new Promise((_yes,no)=>reject=no);
-let calls=0;fs.statfs=()=>++calls===1?first:second;
-await import(${JSON.stringify(preload)});
-const value={bsize:4096};const failure=new Error('owned failure');
-assert.equal(fs.statfs('/not-used-by-owned-double'),first);resolve(value);assert.equal(await first,value);
-assert.equal(fs.statfs('/not-used-by-owned-double'),second);reject(failure);await assert.rejects(second,error=>error===failure);
-`,
-      );
-      const child = spawn(process.execPath, [script], {
+      writeFileSync(script, identityChildSource);
+      const child = spawn(process.execPath, [script, preload], {
         env: { ...process.env, DIAGNOSTICS_OBSERVER_DIRECTORY: ledgers },
         stdio: 'ignore',
       });
@@ -482,15 +566,15 @@ for (const registration of ['on', 'once', 'prependOnceListener']) {
         mkdirSync(ledgers, { mode: 0o700 });
         try {
           const script = join(directory, 'handled.mjs');
-          const register = `process.${registration}('SIGTERM',()=>{handled++;assert.equal(readdirSync(process.env.DIAGNOSTICS_OBSERVER_DIRECTORY).includes(String(process.pid)+'.json'),false);});`;
-          writeFileSync(
-            script,
-            `import assert from 'node:assert/strict';import {readdirSync} from 'node:fs';import {statfs} from 'node:fs/promises';let handled=0;${timing === 'existing' ? register : ''}await import(${JSON.stringify(preload)});${timing === 'later' ? register : ''}process.kill(process.pid,'SIGTERM');await new Promise(setImmediate);assert.equal(handled,1);await statfs(${JSON.stringify(directory)});`,
+          writeFileSync(script, handledChildSource);
+          const child = spawn(
+            process.execPath,
+            [script, preload, directory, registration, timing],
+            {
+              env: { ...process.env, DIAGNOSTICS_OBSERVER_DIRECTORY: ledgers },
+              stdio: 'ignore',
+            },
           );
-          const child = spawn(process.execPath, [script], {
-            env: { ...process.env, DIAGNOSTICS_OBSERVER_DIRECTORY: ledgers },
-            stdio: 'ignore',
-          });
           const [code, signal] = await once(child, 'exit');
           assert.equal(code, 0);
           assert.equal(signal, null);
@@ -524,15 +608,8 @@ for (const disposition of ['removed', 'consumed'])
       mkdirSync(ledgers, { mode: 0o700 });
       try {
         const script = join(directory, 'foreign-lifetime.mjs');
-        const change =
-          disposition === 'removed'
-            ? "process.on('SIGTERM',handler);process.off('SIGTERM',handler);"
-            : "process.once('SIGTERM',handler);process.kill(process.pid,'SIGTERM');await new Promise(setImmediate);assert.equal(handled,1);";
-        writeFileSync(
-          script,
-          `import assert from 'node:assert/strict';import {statfs} from 'node:fs/promises';await import(${JSON.stringify(preload)});let handled=0;const handler=()=>handled++;${change}await statfs(${JSON.stringify(directory)});process.kill(process.pid,'SIGTERM');await new Promise(()=>{});`,
-        );
-        const child = spawn(process.execPath, [script], {
+        writeFileSync(script, foreignChildSource);
+        const child = spawn(process.execPath, [script, preload, directory, disposition], {
           env: { ...process.env, DIAGNOSTICS_OBSERVER_DIRECTORY: ledgers },
           stdio: 'ignore',
         });
@@ -551,6 +628,175 @@ for (const disposition of ['removed', 'consumed'])
       }
     },
   );
+
+test(
+  'direct child source stays identical when owned argv paths contain hostile characters',
+  { timeout: 10000 },
+  async (context) => {
+    const owned = fixture();
+    const markerName = 'observer-injected-marker';
+    const hostile = `quotes '";process.getBuiltinModule('node:fs').writeFileSync('observer-injected-marker','unsafe');"\n\u2028`;
+    const sources = new Map();
+    try {
+      const scenarios = ['ordinary', hostile].flatMap((component) => {
+        const directory = join(owned, component);
+        mkdirSync(directory, { mode: 0o700 });
+        const ownedPreload = join(directory, 'observer.mjs');
+        writeFileSync(ownedPreload, readFileSync(fileURLToPath(preload)));
+        return [
+          { family: 'identity', source: identityChildSource, args: [], signal: null },
+          {
+            family: 'handled',
+            source: handledChildSource,
+            args: [directory, 'on', 'existing'],
+            signal: null,
+          },
+          {
+            family: 'handled',
+            source: handledChildSource,
+            args: [directory, 'prependOnceListener', 'later'],
+            signal: null,
+          },
+          {
+            family: 'foreign',
+            source: foreignChildSource,
+            args: [directory, 'removed'],
+            signal: 'SIGTERM',
+          },
+          {
+            family: 'foreign',
+            source: foreignChildSource,
+            args: [directory, 'consumed'],
+            signal: 'SIGTERM',
+          },
+        ].map((scenario) => ({ ...scenario, directory, ownedPreload }));
+      });
+      await scenarios.reduce(
+        (pending, scenario) =>
+          pending.then(async () => {
+            const { directory, ownedPreload } = scenario;
+            const run = mkdtempSync(join(directory, `${scenario.family}-`));
+            const script = join(run, 'child.mjs');
+            const ledgers = join(run, 'ledgers');
+            mkdirSync(ledgers, { mode: 0o700 });
+            writeFileSync(script, scenario.source);
+            const bytes = readFileSync(script);
+            const original = sources.get(scenario.family) ?? bytes;
+            assert.deepEqual(bytes, original);
+            sources.set(scenario.family, original);
+            const child = spawn(
+              process.execPath,
+              [script, pathToFileURL(ownedPreload).href, ...scenario.args],
+              {
+                cwd: owned,
+                env: { ...process.env, DIAGNOSTICS_OBSERVER_DIRECTORY: ledgers },
+                stdio: 'ignore',
+              },
+            );
+            const [code, signal] = await settleDirectChild(child, context.signal);
+            assert.equal(signal, scenario.signal);
+            assert.equal(code, scenario.signal ? null : 0);
+            const names = readdirSync(ledgers);
+            assert.equal(names.length, scenario.signal ? 0 : 1);
+            if (!scenario.signal) {
+              const receipt = JSON.parse(readFileSync(join(ledgers, names[0]), 'utf8'));
+              assert.equal(receipt.flushReason, 'exit');
+              assert.equal(receipt.exitCode, 0);
+              assert.equal(receipt.errors, 0);
+            }
+            assert.equal(readdirSync(owned).includes(markerName), false);
+            assert.equal(readdirSync(directory).includes(markerName), false);
+          }),
+        Promise.resolve(),
+      );
+      assert.equal(sources.size, 3);
+      proofs.push({
+        kind: 'static-child-hostile-argv',
+        sourceFamilies: sources.size,
+        executions: 10,
+        generatedSourceIdentical: true,
+        injectionMarkerAbsent: true,
+      });
+    } finally {
+      rmSync(owned, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'direct child scenario arguments reject unknown enums before importing the observer',
+  { timeout: 10000 },
+  async (context) => {
+    const owned = fixture();
+    try {
+      const scenarios = [
+        { source: handledChildSource, args: [owned, 'on;process.exit(0)', 'existing'] },
+        { source: handledChildSource, args: [owned, 'once', 'later;process.exit(0)'] },
+        { source: foreignChildSource, args: [owned, 'removed;process.exit(0)'] },
+      ];
+      await scenarios.reduce(
+        (pending, scenario) =>
+          pending.then(async () => {
+            const directory = mkdtempSync(join(owned, 'invalid-'));
+            const script = join(directory, 'child.mjs');
+            const ledgers = join(directory, 'ledgers');
+            mkdirSync(ledgers, { mode: 0o700 });
+            writeFileSync(script, scenario.source);
+            const child = spawn(process.execPath, [script, preload, ...scenario.args], {
+              env: { ...process.env, DIAGNOSTICS_OBSERVER_DIRECTORY: ledgers },
+              stdio: 'ignore',
+            });
+            const [code, signal] = await settleDirectChild(child, context.signal);
+            assert.equal(code, 1);
+            assert.equal(signal, null);
+            assert.deepEqual(readdirSync(ledgers), []);
+          }),
+        Promise.resolve(),
+      );
+      proofs.push({
+        kind: 'static-child-fixed-enums',
+        rejectedScenarios: 3,
+        exitCode: 1,
+        signal: null,
+        missingExitLedger: true,
+      });
+    } finally {
+      rmSync(owned, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'owned direct children close after abort and spawn failure before fixture cleanup',
+  { timeout: 10000 },
+  async (context) => {
+    const owned = fixture();
+    try {
+      const controller = new globalThis.AbortController();
+      const child = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], {
+        stdio: 'ignore',
+      });
+      const stopped = settleDirectChild(child, controller.signal);
+      controller.abort(new Error('Owned control abort'));
+      await assert.rejects(stopped, /Owned control abort/);
+      assert.equal(child.exitCode, null);
+      assert.equal(child.signalCode, 'SIGKILL');
+      assert.throws(() => process.kill(child.pid, 0), { code: 'ESRCH' });
+      const missing = spawn(join(owned, 'absent-node'), [], { stdio: 'ignore' });
+      await assert.rejects(settleDirectChild(missing, context.signal), { code: 'ENOENT' });
+      assert.equal(missing.pid, undefined);
+      proofs.push({
+        kind: 'static-child-owned-lifecycle',
+        abortSignal: 'SIGKILL',
+        abortExitCode: null,
+        missingExecutable: true,
+        closedBeforeCleanup: true,
+      });
+    } finally {
+      rmSync(owned, { recursive: true, force: true });
+    }
+  },
+);
 
 test(
   'a missing observation is visible and cannot turn a clean child into qualification',
