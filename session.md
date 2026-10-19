@@ -1,24 +1,27 @@
-# Provider SDK — diagnostic evidence and final membership repair, 19 October 2026
+# Provider SDK — fresh-runner performance isolation, 19 October 2026
 
-PR362, PR364 and PR365 merged into the feature at95d1cdbf. Protected PR363 still awaits the
-repaired feature and fresh protected qualification; its original22.982728ms overhead failure is
-retained. No staging delivery or owner-app/live-model readiness is claimed.
+PR362, PR364 and PR365 merged into feature95d1cdbf; protected PR363 remains open. PR3660852
+has Sonar0 open issues, clean72 Electron retry0 and passing connected/API/DB/browser slices, but
+its normal benchmark failed: healthy241.153030ms minus disabled115.119354ms =126.033676ms above20.
+Only300/330 calls completed. The earlier95 failure and all actual receipts remain retained.
 
-PR366 at58a5bd9f completed CI39201949314. The observed benchmark actually ran all900 measured/
-990 fixture calls across9 vectors with valid process/core evidence. Host coverage remains partial:
-all49 samples explicitly lack the auxiliary cgroupMemoryEvents counter. No hidden core gaps,
-zero imputation, causal claim or subtraction. The separate unchanged normal gate also completed
-900/990/9 with independently recomputed maximum positive overhead2.269351ms below20ms.
+Largest stalls have no recorded GC overlap; CPU/wall gaps do not prove host, scheduler or fsync
+cause. Passing58a normal followed76seconds of diagnostic work, unlike0852. Independent critique
+approved one fresh Linux isolation control with original physicalSQLite/default durability,
+benchmark bytes/3orders/900measured990calls/20ms2ms256/90-second limit unchanged.
 
-Two current-head minor Sonar findings are repaired by converting only fixed membership arrays to
-Set.has. All36 focused controls pass without failures/skips/cancellations in26.563 seconds; syntax,
-lint, format and diff pass. The workflow and original benchmark stay byte-identical. Its exact-prior-
-head condition rejects the next synchronization from58a, so no additional observed run is selected.
-Final combined review, normal hooks and fresh exact-head checks/Sonar clearance remain required.
+The required verify check now depends on the isolated benchmark and starts with a static exact-
+success guard before checkout; failure/skip/cancel cannot pass. Both jobs retain30-minute bounds.
+The external1Hz numeric host sampler has no preload, cooldown, raw-payload read or timing adjustment;
+core gaps block qualification and auxiliary gaps remain partial. Global/coarse phase data cannot
+establish per-request causality. Original ordinary steps and other jobs remain identical; optional
+old diagnostic execution is retired, with source/history retained. Old36 controls run after measurement.
 
-Current delivery belongs in Beads and PR363. Preserve the original session below exactly once.
-Mac unlock still gates native owner-app preflight; no paid calls, profile/key changes, cleanup,
-main promotion or paused orchestration integration. Existing benchmark failures remain evidence.
+All29 new tiny host/actual-guard/YAML controls pass; retained36 observer controls pass. No local
+full benchmark or paid call was run. Final combined source/evidence review, normal hooks and new
+hosted/protected qualification remain required. Current state is in Beads/comments and PR366/363.
+S12 owner-app recording/export/restart remains blocked by Mac unlock, so provider task stays open;
+no live-model/stress readiness, profile/key changes, cleanup, main or paused integration claimed.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Previous handoff follows verbatim; its pending statements are historical. -->

@@ -92,7 +92,7 @@ function numericLines(path, allowed) {
 function pressure(path) {
   return parsePressure(readFileSync(path, 'utf8'));
 }
-function linuxSample() {
+export function linuxSample() {
   const sample = {
     available: process.platform === 'linux',
     errors: 0,
@@ -275,7 +275,7 @@ function validGaps(sample) {
     Object.values(sample.unavailableReasons).every((reason) => failureReasons.has(reason))
   );
 }
-function hostCoverage(host) {
+export function hostCoverage(host) {
   const reliable =
     host.errors === 0 &&
     host.truncated === false &&

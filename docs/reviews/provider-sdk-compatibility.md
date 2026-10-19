@@ -816,6 +816,43 @@ Final source/evidence review, normal hooks and fresh exact-head checks remain re
 the original uninstrumented benchmark and actual Sonar issue clearance. Nothing here qualifies a
 future feature/staging head or the owner app without its own required evidence.
 
+### Normal0852 failure and fresh-runner isolation control
+
+The final Set correction at0852 cleared current Sonar to zero open issues, and CI39204045842 passed
+all ordinary/connected slices including72 Electron cases on retry0. Its required normal benchmark
+failed: healthy p95241.153030ms minus disabled115.119354ms =126.033676ms above20ms. The raw file
+is incomplete with3vectors/300measured/330calls. Artifact12165930061, API SHA256
+7f3ae31f7d58ae85d7501c3df8e2566679b0be4d228050965af9401414f3def2, and all connected artifacts were
+independently verified. Passing slices do not waive that failure.
+
+Phase CPU stays around3.1–3.2seconds while wall times are5.66/10.40/3.62seconds. Largest healthy and
+disabled stalls have no recorded GC overlap. Blocking I/O and descheduling are possibilities, not
+established causes. Source uses32-event DELETE/FULL transactions but no write-service evidence
+establishes fsync as the cause; no durability or batch change is made. The passing58a normal run
+followed76seconds of controls/observed execution;0852 did not. This sequencing confound motivates
+one independent fresh-runner control rather than an unchanged rerun or cooldown.
+
+The isolated Linux job keeps the exact original benchmark bytes, physical storage, three orders,
+900 measured/990 fixture calls and all20ms/2ms/256/90-second limits. Its preparation uses the same
+pinned actions/install/native/build. No ordinary application suite, preload, artificial baseline or
+warmup workload runs before measurement. Both jobs have30-minute bounds. The required verify job
+depends on benchmark success, uses always() and starts with a static environment-data guard before
+checkout; failure, skip, cancellation, missing or unknown result cannot become successful verify.
+All original ordinary steps and every other job remain unchanged. The old optional one-shot
+preload execution is retired; its source and historical evidence remain. Its36 controls run only
+after measurement in dependent verify.
+
+A separate host-only wrapper preserves the fixed original child argv/environment/cwd and failures,
+retaining bounded exclusive0600 numeric CPU/memory/cgroup/PSI evidence before/during/after the command.
+There is no preload, raw measurement read, delay or subtraction. Missing core counters block
+qualification; unavailable auxiliary memory events stay partial. Sampler CPU/wall overhead is
+recorded, never deducted. Global counters and phase clocks provide context, not per-request causality.
+The actual shell guard runs successfully only for exactsuccess from an empty checkout; all other
+statuses and malicious shell text fail without effects. All29 new tiny host/guard/YAML controls
+pass without failure/skip/cancellation, plus36 retained observer controls. No local full benchmark
+is repeated. Final combined source/control/docs critique, normal hooks and actual fresh hosted
+qualification remain required; a pass would qualify this environment, not diagnose earlier failures.
+
 At protected95d1, both full scans39195037863/39195062021 completed genuine five-batch analysis without findings;
 new CodeQL Actions/JavaScript/Swift analyses have zero results, alert12 is fixed without dismissal,
 and direct current-head Sonar is OK with zero open issues. Dependency comparison45 changes has
