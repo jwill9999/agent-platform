@@ -1,27 +1,24 @@
-# Provider SDK — fresh-runner performance isolation, 19 October 2026
+# Provider SDK — static observer fixtures, 19 October 2026
 
-PR362, PR364 and PR365 merged into feature95d1cdbf; protected PR363 remains open. PR3660852
-has Sonar0 open issues, clean72 Electron retry0 and passing connected/API/DB/browser slices, but
-its normal benchmark failed: healthy241.153030ms minus disabled115.119354ms =126.033676ms above20.
-Only300/330 calls completed. The earlier95 failure and all actual receipts remain retained.
+PR366 merged normally at687ec379; feature/PR363 tree118056c1 equals reviewed aabe7a61.
+All12 executed feature checks passed; independent review verified72 Electron eachretry0,
+3898 ordinary cases plus77 existing optional skips, API604/DB236/focused63/Git33 and browser42
+plus one known skip. The unchanged fresh benchmark completed900/990 with maximum overhead
+1.897371ms below20ms. All48 host samples have core counters; auxiliary memory.events is absent,
+so total coverage remains partial. No measured time is adjusted or earlier failure cause claimed.
 
-Largest stalls have no recorded GC overlap; CPU/wall gaps do not prove host, scheduler or fsync
-cause. Passing58a normal followed76seconds of diagnostic work, unlike0852. Independent critique
-approved one fresh Linux isolation control with original physicalSQLite/default durability,
-benchmark bytes/3orders/900measured990calls/20ms2ms256/90-second limit unchanged.
+Protected687e exposed CodeQL13 in generated observer-test child code. Staging remains blocked.
+The bounded repair replaces handler-family source interpolation with static child programs and
+separate argv data, validating fixed cases while preserving signal outcomes, assertions and budgets.
+All40 focused controls pass, including portable hostile-data, enum denial and owned-child cleanup.
+Original assertions and budgets are preserved. Final combined critique, normal hooks and fresh
+feature/protected qualification remain required. Runtime, benchmark, durability, CI policy and dependencies
+are unchanged. Passing687e scans or other slices cannot qualify the changed repair head.
 
-The required verify check now depends on the isolated benchmark and starts with a static exact-
-success guard before checkout; failure/skip/cancel cannot pass. Both jobs retain30-minute bounds.
-The external1Hz numeric host sampler has no preload, cooldown, raw-payload read or timing adjustment;
-core gaps block qualification and auxiliary gaps remain partial. Global/coarse phase data cannot
-establish per-request causality. Original ordinary steps and other jobs remain identical; optional
-old diagnostic execution is retired, with source/history retained. Old36 controls run after measurement.
-
-All29 new tiny host/actual-guard/YAML controls pass; retained36 observer controls pass. No local
-full benchmark or paid call was run. Final combined source/evidence review, normal hooks and new
-hosted/protected qualification remain required. Current state is in Beads/comments and PR366/363.
-S12 owner-app recording/export/restart remains blocked by Mac unlock, so provider task stays open;
-no live-model/stress readiness, profile/key changes, cleanup, main or paused integration claimed.
+ProviderS12 remains in_progress until actual owner-profile recording/export/restart; native access
+still awaits manual Mac unlock. Model diagnostics needs its own protected delivery; stress remains
+open. No owner-app upgrade, paid provider call, profile/key change, main or paused integration.
+Current delivery state belongs in Beads/comments and PRs. Earlier checkpoints remain in Git.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Previous handoff follows verbatim; its pending statements are historical. -->
