@@ -1,7 +1,7 @@
 # Provider SDK compatibility review and results
 
-Status: 19 October 2026. Hosted6ea passed clean Electron72, browser42 plus its existing context-fixture skip, Sonar and dependency review, but failed48 Git API cases. A controlled predecessor-order probe reproduced a cached test-mock defect; its reviewed fixture-only repair is being qualified. No merge-ready claim.
-No complete hosted qualification, integration, owner-app rebuild or stress readiness is claimed.
+Status: 19 October 2026. PR362 merged at7b816c61 after exacteca47820 passed all11 executed feature checks,3876 ordinary cases/77 existing optional skips,72 first-attempt Electron cases, browser42 plus its documented context-fixture skip and the900/990 benchmark with maximum overhead3.153359ms under20ms. Independent artifact/source review approved that revision. Protected PR363 has a new blocking high CodeQL credential-binding finding; its bounded repair is being prepared. No protected staging delivery, owner-app rebuild or stress readiness is claimed.
+Earlier pending states below retain their named source/time bindings and do not override this checkpoint.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
 
@@ -9,6 +9,36 @@ Evidence root: `/Users/letuscode/.codex/provider-sdk-20261018`; source base stag
 Qualified provider protocol/generation checks below use researched owned HTTP fixtures and the actual pinned SDKs.
 It does not establish live model availability, account permissions or generation quality. The owner
 app/profile remains unchanged; paused orchestration, main and the disabled Docker gateway are preserved.
+
+## Protected credential-binding correction
+
+CodeQL alert12 on protected PR363 at7b816c61 found an unkeyed SHA256 over the fallback resolved
+configuration, including a header/environment API credential. Saved-model configuration revisions
+already use their encrypted envelope and remain separate. The actual finding is on the pull-request
+head ref; an empty merge-ref alert query did not clear the failing check or unresolved thread.
+
+The independently approved bounded design uses the credential as an HMAC key, with a fixed domain,
+a private purpose secret and an explicit public provider/model/endpoint projection as message input.
+It never serializes the credential-containing configuration into a hash message. The purpose secret
+comes from a separately domain-separated existing validated master key, or a module-private random
+secret when no master key is configured. Keyless identity uses a distinct domain/presence marker.
+This is private credential identity, not password verification or a new credential store. A configured
+invalid master fails closed. Same patched source/configuration/master remains stable across restart;
+changing any binding material changes its identity. Existing prepatch pending fallback identities
+must fail closed with the normal new-request recovery; no weak backwards fallback is added.
+
+Focused resolver tests passed52/52 in18.58seconds:42 context-admission cases, including denial of
+legacy unkeyed private-binding replay, plus10 new fallback-identity controls. Three separate clean Node
+processes with reopened disposable SQLite prove same-master identity stability and changed-master
+separation through private IPC; this does not resume a pending approval after restart. The existing
+restart interruption rule remains unchanged. Header/environment credential changes, public binding
+fields, keyless undefined-master text and empty/malformed-present-master denial are covered. No
+external model service is called by this focused boundary test. API build, types and scoped lint pass.
+Logs are fallback-binding-api-build.log, fallback-binding-focused-first.log, fallback-binding-types.log
+and fallback-binding-lint.log in the evidence root. The frozen source/test/doc review, normal hooks
+and fresh exact-head hosted qualification remain pending at this local checkpoint. New actual
+unsuppressed CodeQL checks, both head/merge alerts and all protected gates are mandatory. No old7b
+scan or CI result qualifies the changed repair source; later status belongs in current Beads and PRs.
 
 ## Current qualification
 

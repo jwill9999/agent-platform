@@ -1,3 +1,36 @@
+# Provider SDK — protected credential-binding repair, 19 October 2026
+
+Owner authorized PR362 merge, protected feature-to-staging delivery after every check/comment clears,
+delivered-branch cleanup and app preparation for owner-led live model testing. PR362 merged normally
+at7b816c61 after all11 executed checks passed on independently reviewedeca47820. Fetched feature tree
+ce9273f8 matches that source and the refreshed conflict-free stagingece78d8a rehearsal.
+
+Protected [PR363](https://github.com/jwill9999/agent-platform/pull/363) is open7b→stagingece. Its full
+Promptfoo analysis and Dependency Review succeeded, but CodeQL raised high alert12 at the fallback
+chat credential revision: SHA256 of the resolved configuration includes the API key. Saved-model
+credential revisions already use the encrypted envelope and are separate. Do not merge this head.
+CodeQL findings must include actual head and merge refs plus check annotations; an empty merge-ref
+query does not clear the actual head-ref alert or its unresolved thread.
+
+The bounded repair uses a separately domain-separated private purpose secret and the credential as
+an HMAC key over explicit nonsecret fields, preserving credential-change fences, keyless text, saved
+configuration and existing Stop/restart semantics. It adds no stored header credentials or replacement
+master key. Independent design critique approved. Focused actual-resolver52/52 passed18.58seconds,
+including three clean-process identity checks and legacy weak-binding replay denial; API build/types
+and scoped lint pass. Frozen source/test/doc critique and normal hooks remain pending at this dated
+local checkpoint; later outcomes belong in current Beads/PRs. Then verify PR363 receives the fixed source,
+resolve only the fixed thread and require new exact-head full scan, actual packaged VM and all live
+gates. Old7b scan/CI results cannot qualify the changed source. Current status belongs in Beads.
+
+Both SDK tasks remain in_progress. Owner app/profile/key and paid model calls remain untouched;
+prepare the preserved-profile rebuild/recording/export/restart only after qualified staging delivery.
+No live-account success or stress readiness is claimed. Paused orchestration/PR283 remain separate,
+main unpromoted, Docker gateway disabled, and no Notion/global changes. Earlier checkpoints below
+are historical and retained verbatim; superseded pending/authority statements do not override this one.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier checkpoint follows verbatim. -->
+
 # Provider SDK and model choice — 19 October 2026
 
 Owner approved the bounded SDK/provider MVP with OpenAI, Claude, Gemini, DeepSeek and Grok,
