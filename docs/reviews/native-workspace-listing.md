@@ -53,6 +53,21 @@ follow-up changes only the permission test and documentation; the running owner 
 runtime remains identical. Its preflight evidence stays bound to28259, not relabeled as a later launch.
 Fresh hosted tests/security/Sonar must qualify the new test revision before acceptance.
 
+### Serial metadata extraction checkpoint
+
+Hosted analysis at `1a09555f` resolved S3776 but reported S9382 on the newly extracted async stat
+call inside the loop. The final refactor restores the original inline awaited stat/ENOENT-only catch
+and extracts only pure file metadata construction. Traversal remains serial, preserving validation,
+entry ordering, limits, benign disappearance and other-error rejection. No parallelization, timeout,
+assertion waiver or rule suppression is introduced. The existing exact503 permission correction remains.
+
+All10 affected API controls, API types/lint/format/build and rebuilt connected Workspace, permission
+and diagnostic-export journeys qualify this source locally; exact results/evidence accompany Beads
+and the PR. The actual28259 owner receipts remain historical source-bound evidence. Because runtime
+source changed again, the final rebuilt candidate needs its own compiled binding and owner recording/
+export/restart qualification; no old report is relabeled as a new launch. Normal hooks, fresh current-head
+hosted gates and independent final evidence review remain mandatory. Merge authority is separate.
+
 ## Earlier local checkpoints (historical)
 
 19October baseline: actual owner app at staged `a17bc1db` shows generic error and unavailable file

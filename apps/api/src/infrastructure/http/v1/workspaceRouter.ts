@@ -72,13 +72,22 @@ async function ensureWorkspaceAreas(root: string): Promise<void> {
   );
 }
 
-async function statExistingWorkspaceEntry(absolutePath: string): Promise<Stats | undefined> {
-  try {
-    return await stat(absolutePath);
-  } catch (error) {
-    if (filesystemCategory(error) === 'ENOENT') return undefined;
-    throw error;
-  }
+function toWorkspaceFile(
+  name: string,
+  area: WorkspaceArea,
+  root: string,
+  absolutePath: string,
+  entryStat: Stats,
+): WorkspaceFile {
+  const kind = entryStat.isDirectory() ? 'directory' : 'file';
+  return {
+    name,
+    path: toWorkspaceRelative(root, absolutePath),
+    area,
+    kind,
+    size: kind === 'file' ? entryStat.size : 0,
+    modifiedAt: entryStat.mtime.toISOString(),
+  };
 }
 
 async function listAreaFiles(options: {
@@ -100,23 +109,24 @@ async function listAreaFiles(options: {
       const validation = await options.jail.validate(absolutePath, 'read');
       if (!validation.allowed) continue;
 
-      const entryStat = await statExistingWorkspaceEntry(validation.resolvedPath);
-      if (entryStat === undefined) continue;
+      let entryStat: Stats;
+      try {
+        entryStat = await stat(validation.resolvedPath);
+      } catch (error) {
+        if (filesystemCategory(error) === 'ENOENT') continue;
+        throw error;
+      }
 
-      const kind = entryStat.isDirectory() ? 'directory' : 'file';
-      files.push({
-        name: entry.name,
-        path: toWorkspaceRelative(
-          validation.mount?.hostPath ?? options.root,
-          validation.resolvedPath,
-        ),
-        area: options.area,
-        kind,
-        size: kind === 'file' ? entryStat.size : 0,
-        modifiedAt: entryStat.mtime.toISOString(),
-      });
+      const file = toWorkspaceFile(
+        entry.name,
+        options.area,
+        validation.mount?.hostPath ?? options.root,
+        validation.resolvedPath,
+        entryStat,
+      );
+      files.push(file);
 
-      if (kind === 'directory') {
+      if (file.kind === 'directory') {
         await walk(validation.resolvedPath, depth + 1);
       }
     }
