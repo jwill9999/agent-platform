@@ -3,11 +3,11 @@ import {
   type ContextDecisionMetadata,
   type ContextWindow,
 } from '@agent-platform/contracts';
-import type { CoreMessage } from 'ai';
+import type { ModelMessage } from 'ai';
 import type { ChatMessage } from './types.js';
 
 /** Versioned character estimate of the complete mapped request, including JSON escaping. */
-export function estimateProviderInput(messages: CoreMessage[], tools: unknown): number {
+export function estimateProviderInput(messages: ModelMessage[], tools: unknown): number {
   return Math.ceil(JSON.stringify({ messages, tools: tools ?? [] }).length / 4);
 }
 
@@ -127,12 +127,12 @@ function groupHistory(
   return groups;
 }
 
-function selectedMessages(mapped: CoreMessage[], groups: Group[]): CoreMessage[] {
+function selectedMessages(mapped: ModelMessage[], groups: Group[]): ModelMessage[] {
   return groups.flatMap(({ indices }) => indices.map((index) => mapped[index]!));
 }
 
 export type ProviderAdmission = {
-  messages: CoreMessage[];
+  messages: ModelMessage[];
   decision: ContextDecisionMetadata;
   admitted: boolean;
 };
@@ -141,7 +141,7 @@ export type ProviderAdmission = {
 export function admitProviderContext(
   input: {
     messages: ChatMessage[];
-    mappedMessages: CoreMessage[];
+    mappedMessages: ModelMessage[];
     /** Final provider tool names/descriptions/JSON schemas, not AI SDK wrapper objects. */
     mappedTools: unknown;
     contextWindow?: ContextWindow;

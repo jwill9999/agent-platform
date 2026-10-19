@@ -7,6 +7,9 @@ export {
   type SubsystemCheck,
 } from './health.js';
 export {
+  ModelProviderSchema,
+  ModelBaseURLSchema,
+  type ModelProvider,
   ModelConfigSchema,
   ModelConfigCreateBodySchema,
   ModelConfigUpdateBodySchema,

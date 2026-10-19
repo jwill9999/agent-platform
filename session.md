@@ -1,3 +1,50 @@
+# Provider SDK and model choice — 19 October 2026
+
+Owner approved the bounded SDK/provider MVP with OpenAI, Claude, Gemini, DeepSeek and Grok,
+plus OpenRouter alternatives. Researched emulators are accepted; no additional paid calls.
+Beads provider-interoperability and model-connection-diagnostics remain in_progress. See the
+[plan](docs/planning/provider-sdk-compatibility.md),
+[verification](docs/testing/provider-sdk-compatibility.md) and
+[source-bound results](docs/reviews/provider-sdk-compatibility.md).
+
+[PR362](https://github.com/jwill9999/agent-platform/pull/362) integrates
+`task/provider-sdk-refresh-plan` into `feature/provider-sdk-refresh`, based on stagingece78d8a.
+Product runtime2a62817b passed normal affected builds/types and1,771 ordinary cases, plus the
+unchanged900/990 benchmark with maximum overhead3.491375ms below20ms. Its earlier20.732750ms
+failure remains retained with unknown cause. Later6ea changes were reviewed docs and an equivalent
+anchored test-selector shorthand; actual Sonar cleared all issues, with zero open findings.
+
+Hosted6ea CI39175948211 verified clean Electron72: every case passed retry0/no flaky/skip, including
+the SDK diagnostics, encrypted-history, restart and exactly-once/denied-effect journeys. Browser42
+passed plus the existing context-fixture skip with separate local passing evidence. All selected
+artifact/member hashes and source/tested-merge bindings were independently verified. The old946
+launch timeout remains unexplained; SDK-OBS01 safe pre-handle diagnostics is recorded separately.
+Current6ea Dependency Review verified45 changes/zero introduced advisories, not zero total audit.
+
+The required verify job nevertheless failed48 Git-chat API cases, with533 passing; it did not reach
+the fresh benchmark. Controlled predecessor-order probes proved a retained context SDK mock closure
+can produce those pre-transport errors with zero network traffic, while standalone cases pass.
+Hosted logs lack the marker, so their exact cause remains an evidence-based inference. A reviewed
+Git-test-only cache reset/unmock plus explicit owned configuration and transport guard preserves all
+49 original assertions/deadlines and adds one negative egress control. Both forced order slices
+passed5/5 and all50 Git cases passed without skip/retry/unhandled error in28.98seconds. Normal
+hooks and fresh exact-head hosted qualification remain pending here.
+No application or paused runtime source changed in that follow-up.
+
+Refresh all final-head workflows, reviews and actual Sonar/CodeQL findings. Sourcery skips the
+150,000-character diff limit; independent source-aware review is retained. Later status belongs in
+current Beads/PR checks without rewriting these historical checkpoints. Do not merge old6ea on the
+strength of its green desktop/security jobs; every executed/required final-head job must pass.
+
+Owner app/profile/key and original dirty/paused work remain untouched. No owner-app rebuild, live
+provider compatibility, stress trial/readiness, SDK integration or merge is claimed. Keep paused
+orchestration/PR283 separate, main unpromoted and Docker gateway disabled. No Notion publication,
+global change, credential replacement or additional paid request. Historical session below remains
+verbatim; superseded pending states there do not override this checkpoint.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Historical session follows; retain its original top-level headings verbatim. -->
+
 # Dependency security — protected staging review repair, 18 October 2026
 
 Beads `agent-platform-dependency-security` remains in progress; activation is open.

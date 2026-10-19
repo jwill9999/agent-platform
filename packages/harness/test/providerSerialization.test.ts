@@ -31,35 +31,60 @@ beforeEach(async () => {
     for await (const chunk of req) chunks.push(Buffer.from(chunk));
     requests.push(JSON.parse(Buffer.concat(chunks).toString()) as Record<string, unknown>);
     res.writeHead(200, { 'content-type': 'text/event-stream' });
-    const frame = (delta: unknown, finish_reason: string | null) =>
-      res.write(
-        'data: ' +
-          JSON.stringify({
-            id: 'fixture',
-            object: 'chat.completion.chunk',
-            created: 1,
-            model: 'gpt-4o',
-            choices: [{ index: 0, delta, finish_reason }],
-          }) +
-          '\n\n',
-      );
-    frame({ role: 'assistant', content: 'partial' }, null);
-    if (partialTool)
-      frame(
-        {
-          tool_calls: [
-            {
-              index: 0,
-              id: 'call1',
-              type: 'function',
-              function: { name: 'test_tool', arguments: '{"value":' },
-            },
-          ],
+    const frame = (value: unknown) => res.write(`data: ${JSON.stringify(value)}\n\n`);
+    frame({
+      type: 'response.created',
+      response: { id: 'response-fixture', created_at: 1, model: 'gpt-4o' },
+    });
+    frame({
+      type: 'response.output_item.added',
+      output_index: 0,
+      item: { type: 'message', id: 'message-one' },
+    });
+    frame({
+      type: 'response.output_text.delta',
+      item_id: 'message-one',
+      output_index: 0,
+      delta: 'partial',
+    });
+    frame({
+      type: 'response.output_item.done',
+      output_index: 0,
+      item: {
+        type: 'message',
+        id: 'message-one',
+        status: 'completed',
+        role: 'assistant',
+        content: [{ type: 'output_text', text: 'partial', annotations: [] }],
+      },
+    });
+    if (partialTool) {
+      frame({
+        type: 'response.output_item.added',
+        output_index: 1,
+        item: {
+          type: 'function_call',
+          id: 'function-one',
+          call_id: 'call1',
+          name: 'test_tool',
+          arguments: '',
         },
-        null,
-      );
-    frame({}, completion);
-    res.end('data: [DONE]\n\n');
+      });
+      frame({
+        type: 'response.function_call_arguments.delta',
+        item_id: 'function-one',
+        output_index: 1,
+        delta: '{"value":',
+      });
+    }
+    frame({
+      type: completion === 'length' ? 'response.incomplete' : 'response.completed',
+      response: {
+        incomplete_details: completion === 'length' ? { reason: 'max_output_tokens' } : null,
+        usage: { input_tokens: 2, output_tokens: 2 },
+      },
+    });
+    res.end();
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -110,15 +135,14 @@ describe('installed AI SDK provider serialization', () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({
       model: 'gpt-4o',
-      max_tokens: 123,
+      max_output_tokens: 123,
+      store: false,
       tools: [
         {
           type: 'function',
-          function: {
-            name: 'test__tool',
-            description: 'safe tool',
-            parameters: { additionalProperties: false, required: ['value'] },
-          },
+          name: 'test__tool',
+          description: 'safe tool',
+          parameters: { additionalProperties: false, required: ['value'] },
         },
       ],
     });

@@ -1,3 +1,13 @@
+import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
+import {
+  PROVIDER_CONTINUATION_RECOVERY_MESSAGE,
+  attachProviderContinuation,
+  getProviderContinuation,
+  projectProviderContinuation,
+  requiresProviderContinuation,
+  validateCapturedProviderText,
+} from '../providerContinuation.js';
 import {
   abortReason,
   assertRunActive,
@@ -8,8 +18,13 @@ import {
 } from '../runControl.js';
 import type { ContextDecisionMetadata } from '@agent-platform/contracts';
 import { admitProviderContext } from '../providerContext.js';
-import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
-import { streamText, jsonSchema, type StreamTextResult, type ToolSet, type CoreMessage } from 'ai';
+import {
+  createLanguageModel,
+  providerGenerationOptions,
+  toProviderRequestError,
+  type SupportedProvider,
+} from '@agent-platform/model-router';
+import { streamText, jsonSchema, isStepCount, type ModelMessage, type ToolSet } from 'ai';
 import type { RunnableConfig } from '@langchain/core/runnables';
 
 import type { HarnessStateType } from '../graphState.js';
@@ -29,9 +44,28 @@ import { checkDeadline } from '../deadline.js';
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Convert harness ChatMessage[] to Vercel AI SDK CoreMessage[]. */
-export function toCoreMessages(messages: ChatMessage[]): CoreMessage[] {
-  return messages.map((m): CoreMessage => {
+type ModelStream = {
+  fullStream?: AsyncIterable<{ type: string; text?: string; error?: unknown }>;
+  textStream: AsyncIterable<string>;
+  consumeStream?: () => PromiseLike<void>;
+  text: PromiseLike<string>;
+};
+
+/** Convert harness ChatMessage[] to Vercel AI SDK ModelMessage[]. */
+export function toCoreMessages(
+  messages: ChatMessage[],
+  binding?: import('@agent-platform/db').ProviderContinuationBinding,
+  pendingIds?: readonly string[],
+): ModelMessage[] {
+  const privateBytes = messages.reduce((total, message) => {
+    const record = getProviderContinuation(message);
+    return total + (record ? Buffer.byteLength(JSON.stringify(record)) : 0);
+  }, 0);
+  if (privateBytes > 4 * 1024 * 1024)
+    throw new Error('Provider continuation exceeds the session limit. Start a new chat.');
+  return messages.map((m): ModelMessage => {
+    const privateMessage = projectProviderContinuation(m, binding, pendingIds);
+    if (privateMessage) return privateMessage;
     if (m.role === 'tool') {
       return {
         role: 'tool',
@@ -40,7 +74,7 @@ export function toCoreMessages(messages: ChatMessage[]): CoreMessage[] {
             type: 'tool-result',
             toolCallId: m.toolCallId,
             toolName: sanitiseToolName(m.toolName),
-            result: m.content,
+            output: { type: 'text', value: m.content },
           },
         ],
       };
@@ -54,7 +88,7 @@ export function toCoreMessages(messages: ChatMessage[]): CoreMessage[] {
             type: 'tool-call' as const,
             toolCallId: tc.id,
             toolName: sanitiseToolName(tc.name),
-            args: tc.args,
+            input: tc.args,
           })),
         ],
       };
@@ -179,22 +213,33 @@ function makeStrictSchema(schema: unknown): unknown {
  * harness tool IDs so we can translate tool-call responses back.
  */
 export function buildToolNameMap(defs: ToolDefinition[]): {
-  tools: Record<string, { description: string; parameters: unknown }>;
+  tools: ToolSet;
   /** sanitised → original */
   toOriginal: Map<string, string>;
   mappedSchemas: Array<{ name: string; description: string; parameters: unknown }>;
 } {
-  const tools: Record<string, { description: string; parameters: unknown }> = {};
+  const tools: ToolSet = {};
   const toOriginal = new Map<string, string>();
   const mappedSchemas: Array<{ name: string; description: string; parameters: unknown }> = [];
+  const canonical = new Map<string, { name: string; description: string; parameters: unknown }>();
 
   for (const def of defs) {
     const safe = sanitiseToolName(def.name);
     const parameters = makeStrictSchema(def.parameters) as Record<string, unknown>;
+    const identity = { name: def.name, description: def.description, parameters };
+    const previous = canonical.get(safe);
+    if (previous) {
+      // Assigned native tools can also be present as their identical registry
+      // record. Coalesce that identity, never a different ID or conflicting schema.
+      if (!isDeepStrictEqual(previous, identity))
+        throw new Error('Configured tool names are ambiguous.');
+      continue;
+    }
+    canonical.set(safe, identity);
     mappedSchemas.push({ name: safe, description: def.description, parameters });
     tools[safe] = {
       description: def.description,
-      parameters: jsonSchema(parameters),
+      inputSchema: jsonSchema(parameters),
     };
     toOriginal.set(safe, def.name);
   }
@@ -235,6 +280,8 @@ export type LlmReasonNodeOptions = {
   dispatcher?: PluginDispatcher;
   onContextDecision?: (decision: ContextDecisionMetadata) => void;
   onModelAttempt?: () => void;
+  onAssistantMessage?: (message: ChatMessage, previousMessages: ChatMessage[]) => Promise<void>;
+  hydrateMessages?: (messages: ChatMessage[]) => Promise<ChatMessage[]>;
 };
 
 /** Safely fire the onPromptBuild plugin hook — swallows errors. */
@@ -263,7 +310,7 @@ function providerStreamError(error: unknown, signal?: AbortSignal): Error {
       abortReason(signal) === 'timeout' ? 'TimeoutError' : 'AbortError',
     );
   }
-  return error instanceof Error ? error : new Error(String(error));
+  return toProviderRequestError(error);
 }
 
 async function withProviderAbortIdentity<T>(
@@ -282,22 +329,17 @@ async function withProviderAbortIdentity<T>(
  * Returns the accumulated text-delta content.
  */
 async function consumeFullStream(
-  result: StreamTextResult<ToolSet, unknown>,
+  result: ModelStream,
   emitter: OutputEmitter | undefined,
   signal?: AbortSignal,
 ): Promise<string> {
   let fullText = '';
-  for await (const part of result.fullStream) {
+  for await (const part of result.fullStream ?? []) {
     if (part.type === 'text-delta') {
-      const chunk = part.textDelta;
+      const chunk = part.text ?? '';
       fullText += chunk;
       if (emitter && chunk) {
         await emitter.emit({ type: 'text', content: chunk });
-      }
-    } else if (part.type === 'reasoning') {
-      const chunk = part.textDelta;
-      if (emitter && chunk) {
-        await emitter.emit({ type: 'thinking', content: chunk });
       }
     } else if (part.type === 'error') {
       // Throw immediately so callers never reach `await result.text`, which
@@ -310,7 +352,7 @@ async function consumeFullStream(
 
 /** Fallback: consume `textStream` when `fullStream` is unavailable (e.g. test stubs). */
 async function consumeTextStream(
-  result: StreamTextResult<ToolSet, unknown>,
+  result: ModelStream,
   emitter: OutputEmitter | undefined,
 ): Promise<string> {
   let fullText = '';
@@ -326,11 +368,11 @@ async function consumeTextStream(
 
 /**
  * Reconcile the streamed text with the SDK-resolved `result.text`.
- * Emits any missing suffix or falls back to reasoning content.
+ * Emits any missing public-text suffix. Provider reasoning remains private.
  */
 async function reconcileText(
   streamedText: string,
-  result: StreamTextResult<ToolSet, unknown>,
+  result: ModelStream,
   emitter: OutputEmitter | undefined,
 ): Promise<string> {
   const resolvedText = (await result.text) ?? '';
@@ -350,25 +392,7 @@ async function reconcileText(
     }
   }
 
-  const merged = resolvedText || streamedText;
-  if (!merged.trim()) {
-    return (await tryReasoningFallback(result, emitter)) ?? merged;
-  }
-
-  return merged;
-}
-
-/** Return reasoning text if available, emitting it as a thinking chunk. */
-async function tryReasoningFallback(
-  result: StreamTextResult<ToolSet, unknown>,
-  emitter: OutputEmitter | undefined,
-): Promise<string | null> {
-  const reasoning = await result.reasoning;
-  if (!reasoning?.trim()) return null;
-  if (emitter) {
-    await emitter.emit({ type: 'thinking', content: reasoning });
-  }
-  return reasoning;
+  return resolvedText || streamedText;
 }
 
 /**
@@ -383,7 +407,7 @@ async function tryReasoningFallback(
  * are missing.
  */
 async function streamAndAccumulate(
-  result: StreamTextResult<ToolSet, unknown>,
+  result: ModelStream,
   emitter: OutputEmitter | undefined,
   signal?: AbortSignal,
 ): Promise<string> {
@@ -398,14 +422,31 @@ async function streamAndAccumulate(
  *  Reverses sanitised tool names back to original IDs via `nameMap`. */
 function buildLlmOutput(
   fullText: string,
-  finalToolCalls: Array<{ toolCallId: string; toolName: string; args: unknown }>,
+  finalToolCalls: Array<{
+    toolCallId: string;
+    toolName: string;
+    input: unknown;
+    providerExecuted?: boolean;
+    invalid?: boolean;
+  }>,
   nameMap: Map<string, string>,
 ): { output: LlmOutput; assistantMessage: ChatMessage } {
+  if (
+    finalToolCalls.some(
+      (call) =>
+        call.invalid ||
+        call.providerExecuted ||
+        !call.input ||
+        typeof call.input !== 'object' ||
+        Array.isArray(call.input),
+    )
+  )
+    throw new Error('The model returned an invalid tool request. No tool was executed.');
   if (finalToolCalls.length > 0) {
     const calls: ToolCallIntent[] = finalToolCalls.map((tc) => ({
       id: tc.toolCallId,
       name: nameMap.get(tc.toolName) ?? tc.toolName,
-      args: (tc.args as Record<string, unknown>) ?? {},
+      args: (tc.input as Record<string, unknown>) ?? {},
     }));
     return {
       output: { kind: 'tool_calls', calls },
@@ -420,11 +461,11 @@ function buildLlmOutput(
 
 /** Sum prompt + completion tokens; missing or invalid usage from the SDK → 0 (avoid NaN budgets). */
 function sumUsageTokens(
-  usage: { promptTokens?: number; completionTokens?: number } | undefined,
+  usage: { inputTokens?: number; outputTokens?: number } | undefined,
 ): number {
   if (!usage) return 0;
-  const p = Number(usage.promptTokens);
-  const c = Number(usage.completionTokens);
+  const p = Number(usage.inputTokens);
+  const c = Number(usage.outputTokens);
   const sum = (Number.isFinite(p) ? p : 0) + (Number.isFinite(c) ? c : 0);
   return Number.isFinite(sum) ? sum : 0;
 }
@@ -521,11 +562,11 @@ function normaliseOptions(options?: OutputEmitter | LlmReasonNodeOptions): LlmRe
 
 /** Normalise raw SDK usage into safe prompt/completion token counts. */
 function normaliseTokenUsage(
-  usage: { promptTokens?: number; completionTokens?: number } | undefined,
+  usage: { inputTokens?: number; outputTokens?: number } | undefined,
 ): { promptTokens: number; completionTokens: number } | undefined {
   if (!usage) return undefined;
-  const p = Number(usage.promptTokens);
-  const c = Number(usage.completionTokens);
+  const p = Number(usage.inputTokens);
+  const c = Number(usage.outputTokens);
   return {
     promptTokens: Number.isFinite(p) ? p : 0,
     completionTokens: Number.isFinite(c) ? c : 0,
@@ -613,15 +654,16 @@ async function emitContextHalt(
     CONTEXT_INVALID_HISTORY:
       'Required conversation history is incomplete or invalid. Earlier completed actions are retained; start a new request with the needed context.',
     MODEL_OUTPUT_INCOMPLETE:
-      'The model reached its output limit. Its response is incomplete; no tool calls from this response were executed.',
+      'The model did not complete a usable public response. No tool calls from this response were executed.',
   };
   await emitter?.emit({ type: 'error', code, message: messages[code] });
 }
 
 type ModelAttemptInput = {
   model: ReturnType<typeof createLanguageModel>;
-  messages: CoreMessage[];
+  messages: ModelMessage[];
   maxTokens: number;
+  generationOptions: ReturnType<typeof providerGenerationOptions>;
   tools: ReturnType<typeof buildToolNameMap>['tools'] | undefined;
   signal?: AbortSignal;
   runControl?: RunExecutionControl;
@@ -639,11 +681,13 @@ function invokeModelAttempt(input: ModelAttemptInput) {
       let streamError: Error | null = null;
       notifyObserver(() => input.onModelAttempt?.());
       const res = streamText({
+        allowSystemInMessages: true,
         model: input.model,
         messages: input.messages,
-        maxTokens: input.maxTokens,
+        maxOutputTokens: input.maxTokens,
+        ...input.generationOptions,
         tools: input.tools,
-        maxSteps: 1,
+        stopWhen: isStepCount(1),
         maxRetries: 0,
         abortSignal: input.signal,
         onError: ({ error }) => {
@@ -663,7 +707,14 @@ function invokeModelAttempt(input: ModelAttemptInput) {
           input.toolNameMap,
           input.emitter,
         );
-      return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo, finishReason };
+      const responseMessages = await res.responseMessages;
+      return {
+        fullText: text,
+        finalToolCalls: toolCalls,
+        usage: usageInfo,
+        finishReason,
+        responseMessages,
+      };
     }),
   );
 }
@@ -677,6 +728,7 @@ type CompletedModelOutputInput = {
   step: number;
   retryCount: number;
   emitter?: OutputEmitter;
+  onAssistantMessage?: (message: ChatMessage, previousMessages: ChatMessage[]) => Promise<void>;
 };
 
 /** Assemble completed output only after the tracked SDK attempt and final admission check. */
@@ -689,15 +741,43 @@ async function completeModelOutput({
   step,
   retryCount,
   emitter,
+  onAssistantMessage,
 }: CompletedModelOutputInput): Promise<Partial<HarnessStateType>> {
   const { fullText, finalToolCalls, usage, finishReason } = completed;
 
   const tokenUsage = normaliseTokenUsage(usage);
-  const { output, assistantMessage } = buildLlmOutput(
+  const { output, assistantMessage: publicMessage } = buildLlmOutput(
     fullText,
     finishReason === 'length' ? [] : finalToolCalls,
     toolNameMap,
   );
+
+  if (onAssistantMessage || state.modelConfig?.continuationBinding) publicMessage.id = randomUUID();
+  let assistantMessage = publicMessage;
+  const binding = state.modelConfig?.continuationBinding;
+  const required = requiresProviderContinuation(
+    completed.responseMessages,
+    state.modelConfig ?? undefined,
+  );
+  if (
+    finishReason !== 'length' &&
+    ((required && !binding) ||
+      ((required || (binding && finalToolCalls.length > 0)) && !onAssistantMessage))
+  )
+    throw new Error(PROVIDER_CONTINUATION_RECOVERY_MESSAGE);
+  // Durable tool turns also bind approval to the selected configuration, even
+  // when the provider has no opaque reasoning. Plain text needs no private row.
+  if (binding && finishReason !== 'length' && (required || finalToolCalls.length > 0)) {
+    const record = {
+      version: 1 as const,
+      binding,
+      responseMessages: completed.responseMessages,
+    };
+    validateCapturedProviderText(publicMessage, record);
+    assistantMessage = attachProviderContinuation(publicMessage, record);
+  }
+  // Persistence must finish before graph admission to approval/tool nodes.
+  await onAssistantMessage?.(assistantMessage, state.messages);
 
   const tokenDelta = sumUsageTokens(usage);
   const newTotalTokens = state.totalTokensUsed + tokenDelta;
@@ -711,7 +791,7 @@ async function completeModelOutput({
 
   const halted = await checkBudgetLimits(state, newTotalTokens, newTotalCost, traceEvents, emitter);
 
-  const incomplete = finishReason === 'length';
+  const incomplete = finishReason === 'length' || (!fullText.trim() && finalToolCalls.length === 0);
   if (incomplete) await emitContextHalt(emitter, 'MODEL_OUTPUT_INCOMPLETE');
   return {
     ...(incomplete ? { contextHalt: { code: 'MODEL_OUTPUT_INCOMPLETE' as const } } : {}),
@@ -737,7 +817,14 @@ async function completeModelOutput({
  * Supports AbortSignal via `config.configurable.signal` for cancellation.
  */
 export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptions) {
-  const { emitter, dispatcher, onContextDecision, onModelAttempt } = normaliseOptions(options);
+  const {
+    emitter,
+    dispatcher,
+    onContextDecision,
+    onModelAttempt,
+    onAssistantMessage,
+    hydrateMessages,
+  } = normaliseOptions(options);
 
   return async function llmReasonNode(
     state: HarnessStateType,
@@ -768,7 +855,8 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       };
     }
 
-    const { messages, toolDefinitions, modelConfig } = state;
+    const { toolDefinitions, modelConfig } = state;
+    const messages = hydrateMessages ? await hydrateMessages(state.messages) : state.messages;
 
     if (!modelConfig) {
       throw new Error('llm_reason: modelConfig is required in state');
@@ -782,7 +870,11 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     const tools = Object.keys(sdkTools).length > 0 ? sdkTools : undefined;
     const admission = admitProviderContext({
       messages,
-      mappedMessages: toCoreMessages(messages),
+      mappedMessages: toCoreMessages(
+        messages,
+        modelConfig.continuationBinding,
+        state.pendingApprovalToolCallIds,
+      ),
       mappedTools: mappedSchemas,
       contextWindow: state.contextWindow,
       currentTurnStartIndex: state.currentTurnStartIndex,
@@ -807,6 +899,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       provider: (modelConfig.provider ?? 'openai') as SupportedProvider,
       model: modelConfig.model,
       apiKey: modelConfig.apiKey,
+      baseURL: modelConfig.baseURL,
     });
     if (dispatcher) {
       await firePromptBuildHook(dispatcher, state);
@@ -832,6 +925,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
             model,
             messages: admission.messages,
             maxTokens: admission.decision.outputCap,
+            generationOptions: providerGenerationOptions(modelConfig),
             tools,
             signal,
             runControl,
@@ -869,6 +963,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       step,
       retryCount: retryCounter.count,
       emitter,
+      onAssistantMessage,
     });
   };
 }

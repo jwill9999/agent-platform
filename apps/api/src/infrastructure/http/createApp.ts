@@ -1,4 +1,6 @@
 import express, { type Application } from 'express';
+import { createLogger } from '@agent-platform/logger';
+import { installSafeProviderWarningLogger } from '@agent-platform/model-router';
 import type { DiagnosticStore, MonitoringStore } from '@agent-platform/contracts';
 import { diagnosticIngress } from '../diagnostics/observations.js';
 import type { DiagnosticAccess } from '../diagnostics/localAccess.js';
@@ -25,6 +27,8 @@ export function createApp(options: {
     monitoring?: { store: MonitoringStore; runtime: MonitoringRuntime };
   };
 }): Application {
+  const providerLog = createLogger('api:provider');
+  installSafeProviderWarningLogger((warning) => providerLog.warn('provider.sdk.warning', warning));
   const app = express();
 
   // Trust first proxy hop (Next.js BFF / Docker network) so express-rate-limit

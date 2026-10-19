@@ -69,6 +69,9 @@ jobs:
       - name: Shared Stop provider fixture controls
         run: node --test e2e/support/project-chat-stop/*.test.mjs
 
+      - name: Provider SDK protocol fixture controls
+        run: node --test e2e/support/provider-sdk.test.mjs
+
       - name: Test local diagnostic command boundaries
         run: node --test scripts/diagnostics.test.mjs scripts/monitoring.test.mjs scripts/pre-push.test.mjs
 

@@ -1,7 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { ModelConfig, ModelConfigCreateBody, ModelConfigUpdateBody } from '@agent-platform/contracts';
+import type {
+  ModelConfig,
+  ModelConfigCreateBody,
+  ModelConfigUpdateBody,
+  ModelProvider,
+} from '@agent-platform/contracts';
+import { ModelProviderSchema } from '@agent-platform/contracts';
 import { apiGet, apiPost, apiPut, apiDelete, apiPath, ApiRequestError } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,24 +34,27 @@ import {
   XCircle,
 } from 'lucide-react';
 
-const PROVIDERS = ['openai', 'anthropic', 'ollama'] as const;
-type SupportedProvider = (typeof PROVIDERS)[number];
+type ProviderOption = {
+  id: ModelProvider;
+  label: string;
+  requiresApiKey: boolean;
+  apiMode: string;
+};
 
-function providerLabel(provider: string): string {
-  switch (provider) {
-    case 'openai': return 'OpenAI';
-    case 'anthropic': return 'Anthropic';
-    case 'ollama': return 'Ollama';
-    default: return provider;
-  }
+function providerLabel(provider: string, providers: ProviderOption[]): string {
+  return providers.find((entry) => entry.id === provider)?.label ?? provider;
 }
 
 function providerBadgeColor(provider: string): string {
   switch (provider) {
-    case 'openai': return 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20';
-    case 'anthropic': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20';
-    case 'ollama': return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20';
-    default: return 'bg-muted text-muted-foreground';
+    case 'openai':
+      return 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20';
+    case 'anthropic':
+      return 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20';
+    case 'ollama':
+      return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20';
+    default:
+      return 'bg-muted text-muted-foreground';
   }
 }
 
@@ -53,6 +62,7 @@ function providerBadgeColor(provider: string): string {
 
 export function ModelConfigsDashboard() {
   const [configs, setConfigs] = useState<ModelConfig[]>([]);
+  const [providers, setProviders] = useState<ProviderOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<ModelConfig | 'new' | null>(null);
@@ -61,8 +71,13 @@ export function ModelConfigsDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiGet<ModelConfig[]>(apiPath('model-configs'));
+      const [data, catalogue] = await Promise.all([
+        apiGet<ModelConfig[]>(apiPath('model-configs')),
+        apiGet<ProviderOption[]>(apiPath('model-configs', 'providers')),
+      ]);
+      if (!catalogue?.length) throw new Error('Provider catalogue unavailable');
       setConfigs(data ?? []);
+      setProviders(catalogue);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -70,24 +85,36 @@ export function ModelConfigsDashboard() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-
-  const handleDelete = useCallback(async (id: string) => {
-    if (!confirm('Delete this model config? Agents using it will fall back to env-var resolution.')) return;
-    try {
-      await apiDelete(apiPath('model-configs', id));
-      await load();
-    } catch (e) {
-      setError(e instanceof ApiRequestError ? e.message : String(e));
-    }
+  useEffect(() => {
+    load();
   }, [load]);
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      if (
+        !confirm('Delete this model config? Agents using it will fall back to env-var resolution.')
+      )
+        return;
+      try {
+        await apiDelete(apiPath('model-configs', id));
+        await load();
+      } catch (e) {
+        setError(e instanceof ApiRequestError ? e.message : String(e));
+      }
+    },
+    [load],
+  );
 
   if (editing !== null) {
     return (
       <ModelConfigEditor
         config={editing === 'new' ? undefined : editing}
+        providers={providers}
         onCancel={() => setEditing(null)}
-        onSaved={() => { setEditing(null); load(); }}
+        onSaved={() => {
+          setEditing(null);
+          load();
+        }}
       />
     );
   }
@@ -101,14 +128,17 @@ export function ModelConfigsDashboard() {
             Save model configurations with encrypted API keys and assign them to agents
           </p>
         </div>
-        <Button onClick={() => setEditing('new')}>
+        <Button onClick={() => setEditing('new')} disabled={!providers.length}>
           <Plus className="h-4 w-4 mr-2" />
           Add Model
         </Button>
       </header>
 
       {error && (
-        <div className="px-6 py-3 bg-destructive/10 border-b border-destructive/20 text-destructive text-sm">
+        <div
+          role="alert"
+          className="px-6 py-3 bg-destructive/10 border-b border-destructive/20 text-destructive text-sm"
+        >
           {error}
         </div>
       )}
@@ -127,7 +157,11 @@ export function ModelConfigsDashboard() {
             <p className="text-sm text-muted-foreground mb-4">
               Add a model config to store provider credentials securely and assign them to agents
             </p>
-            <Button variant="outline" onClick={() => setEditing('new')}>
+            <Button
+              variant="outline"
+              onClick={() => setEditing('new')}
+              disabled={!providers.length}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Model
             </Button>
@@ -140,8 +174,11 @@ export function ModelConfigsDashboard() {
               <ModelConfigCard
                 key={cfg.id}
                 config={cfg}
+                providers={providers}
                 onEdit={() => setEditing(cfg)}
-                onDelete={() => { handleDelete(cfg.id); }}
+                onDelete={() => {
+                  handleDelete(cfg.id);
+                }}
               />
             ))}
           </div>
@@ -155,13 +192,14 @@ export function ModelConfigsDashboard() {
 
 interface ModelConfigCardProps {
   config: ModelConfig;
+  providers: ProviderOption[];
   onEdit: () => void;
   onDelete: () => void;
 }
 
 type TestState = 'idle' | 'testing' | { ok: boolean; latencyMs: number; error?: string };
 
-function ModelConfigCard({ config, onEdit, onDelete }: Readonly<ModelConfigCardProps>) {
+function ModelConfigCard({ config, providers, onEdit, onDelete }: Readonly<ModelConfigCardProps>) {
   const [testState, setTestState] = useState<TestState>('idle');
 
   const handleTest = useCallback(async () => {
@@ -172,8 +210,12 @@ function ModelConfigCard({ config, onEdit, onDelete }: Readonly<ModelConfigCardP
         {},
       );
       setTestState(result ?? { ok: false, latencyMs: 0, error: 'No response' });
-    } catch (e) {
-      setTestState({ ok: false, latencyMs: 0, error: e instanceof Error ? e.message : String(e) });
+    } catch {
+      setTestState({
+        ok: false,
+        latencyMs: 0,
+        error: 'Connection test could not complete. Check the application and try again.',
+      });
     }
   }, [config.id]);
 
@@ -185,7 +227,12 @@ function ModelConfigCard({ config, onEdit, onDelete }: Readonly<ModelConfigCardP
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+              aria-label={`Actions for ${config.name}`}
+            >
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -194,7 +241,10 @@ function ModelConfigCard({ config, onEdit, onDelete }: Readonly<ModelConfigCardP
               <Pencil className="h-4 w-4 mr-2" /> Edit
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              onClick={onDelete}
+              className="text-destructive focus:text-destructive"
+            >
               <Trash2 className="h-4 w-4 mr-2" /> Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -205,8 +255,10 @@ function ModelConfigCard({ config, onEdit, onDelete }: Readonly<ModelConfigCardP
       <p className="text-sm text-muted-foreground font-mono mb-3">{config.model}</p>
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${providerBadgeColor(config.provider)}`}>
-          {providerLabel(config.provider)}
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${providerBadgeColor(config.provider)}`}
+        >
+          {providerLabel(config.provider, providers)}
         </span>
         <Badge variant="outline" className="text-xs">
           {config.hasApiKey ? '🔑 Key stored' : 'No key'}
@@ -219,7 +271,9 @@ function ModelConfigCard({ config, onEdit, onDelete }: Readonly<ModelConfigCardP
           variant="outline"
           size="sm"
           className="flex-1"
-          onClick={() => { handleTest(); }}
+          onClick={() => {
+            handleTest();
+          }}
           disabled={testState === 'testing'}
         >
           {testState === 'testing' ? (
@@ -229,19 +283,18 @@ function ModelConfigCard({ config, onEdit, onDelete }: Readonly<ModelConfigCardP
           )}
           Test Connection
         </Button>
-        {typeof testState === 'object' && (
-          testState.ok ? (
+        {typeof testState === 'object' &&
+          (testState.ok ? (
             <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
               <CheckCircle className="h-3.5 w-3.5" />
               {testState.latencyMs}ms
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-xs text-destructive" title={testState.error}>
+            <span role="alert" className="flex items-start gap-1 text-xs text-destructive">
               <XCircle className="h-3.5 w-3.5" />
-              Failed
+              Failed: {testState.error ?? 'The provider rejected the connection.'}
             </span>
-          )
-        )}
+          ))}
       </div>
     </div>
   );
@@ -251,39 +304,60 @@ function ModelConfigCard({ config, onEdit, onDelete }: Readonly<ModelConfigCardP
 
 interface ModelConfigEditorProps {
   config?: ModelConfig;
+  providers: ProviderOption[];
   onCancel: () => void;
   onSaved: () => void;
 }
 
 interface EditorFormState {
   name: string;
-  provider: SupportedProvider;
+  provider: ModelProvider | '';
+  baseURL: string;
   model: string;
   apiKey: string;
 }
 
-function buildEditorState(config?: ModelConfig): EditorFormState {
+function buildEditorState(providers: ProviderOption[], config?: ModelConfig): EditorFormState {
   return {
     name: config?.name ?? '',
-    provider: (PROVIDERS.includes(config?.provider as SupportedProvider) ? config!.provider : 'openai') as SupportedProvider,
+    provider: config?.provider ?? providers[0]?.id ?? '',
+    baseURL: config?.baseURL ?? '',
     model: config?.model ?? '',
     apiKey: '',
   };
 }
 
-function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEditorProps>) {
-  const [form, setForm] = useState<EditorFormState>(() => buildEditorState(config));
+function ModelConfigEditor({
+  config,
+  providers,
+  onCancel,
+  onSaved,
+}: Readonly<ModelConfigEditorProps>) {
+  const [form, setForm] = useState<EditorFormState>(() => buildEditorState(providers, config));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const setField = useCallback(<K extends keyof EditorFormState>(key: K, value: EditorFormState[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  const setField = useCallback(
+    <K extends keyof EditorFormState>(key: K, value: EditorFormState[K]) => {
+      setForm((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
 
   const handleSave = useCallback(async () => {
     setError(null);
-    if (!form.name.trim()) { setError('Name is required'); return; }
-    if (!form.model.trim()) { setError('Model is required'); return; }
+    if (!form.name.trim()) {
+      setError('Name is required');
+      return;
+    }
+    if (!form.model.trim()) {
+      setError('Model is required');
+      return;
+    }
+    if (!form.provider) {
+      setError('Provider is required');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -292,6 +366,7 @@ function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEd
           name: form.name.trim(),
           provider: form.provider,
           model: form.model.trim(),
+          baseURL: form.baseURL.trim() || null,
           ...(form.apiKey ? { apiKey: form.apiKey } : {}),
         };
         await apiPut(apiPath('model-configs', config.id), body);
@@ -300,6 +375,7 @@ function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEd
           name: form.name.trim(),
           provider: form.provider,
           model: form.model.trim(),
+          ...(form.baseURL.trim() ? { baseURL: form.baseURL.trim() } : {}),
           ...(form.apiKey ? { apiKey: form.apiKey } : {}),
         };
         await apiPost(apiPath('model-configs'), body);
@@ -312,16 +388,12 @@ function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEd
     }
   }, [form, config, onSaved]);
 
-  const modelPlaceholder = {
-    openai: 'gpt-4o',
-    anthropic: 'claude-sonnet-4-20250514',
-    ollama: 'llama3.2',
-  }[form.provider] ?? 'llama3.2';
+  const selectedProvider = providers.find((entry) => entry.id === form.provider);
 
   return (
     <div className="flex flex-col h-full">
       <header className="flex items-center gap-3 px-6 py-4 border-b border-border bg-card/50">
-        <Button variant="ghost" size="icon" onClick={onCancel}>
+        <Button variant="ghost" size="icon" onClick={onCancel} aria-label="Back to models">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
@@ -332,14 +404,26 @@ function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEd
             API keys are encrypted at rest with AES-256-GCM
           </p>
         </div>
-        <Button onClick={() => { handleSave(); }} disabled={saving}>
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+        <Button
+          onClick={() => {
+            handleSave();
+          }}
+          disabled={saving}
+        >
+          {saving ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4 mr-2" />
+          )}
           {config ? 'Update' : 'Save'}
         </Button>
       </header>
 
       {error && (
-        <div className="px-6 py-3 bg-destructive/10 border-b border-destructive/20 text-destructive text-sm">
+        <div
+          role="alert"
+          className="px-6 py-3 bg-destructive/10 border-b border-destructive/20 text-destructive text-sm"
+        >
           {error}
         </div>
       )}
@@ -350,7 +434,7 @@ function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEd
             <Label htmlFor="mc-name">Name</Label>
             <Input
               id="mc-name"
-              placeholder="My GPT-4o Config"
+              placeholder="My model configuration"
               value={form.name}
               onChange={(e) => setField('name', e.target.value)}
             />
@@ -363,10 +447,20 @@ function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEd
                 id="mc-provider"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring"
                 value={form.provider}
-                onChange={(e) => setField('provider', e.target.value as SupportedProvider)}
+                onChange={(e) => {
+                  const value = ModelProviderSchema.parse(e.target.value);
+                  setForm((previous) => ({
+                    ...previous,
+                    provider: value,
+                    apiKey: '',
+                    baseURL: '',
+                  }));
+                }}
               >
-                {PROVIDERS.map((p) => (
-                  <option key={p} value={p}>{providerLabel(p)}</option>
+                {providers.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -375,7 +469,7 @@ function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEd
               <Label htmlFor="mc-model">Model</Label>
               <Input
                 id="mc-model"
-                placeholder={modelPlaceholder}
+                placeholder="Provider model ID"
                 value={form.model}
                 onChange={(e) => setField('model', e.target.value)}
               />
@@ -383,19 +477,42 @@ function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEd
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="mc-endpoint">API endpoint (optional)</Label>
+            <Input
+              id="mc-endpoint"
+              value={form.baseURL}
+              placeholder="Use provider default"
+              aria-describedby="mc-endpoint-help"
+              onChange={(e) => setField('baseURL', e.target.value)}
+            />
+            <p id="mc-endpoint-help" className="text-xs text-muted-foreground">
+              A custom endpoint receives this configuration's key. Use HTTPS, or loopback HTTP for a
+              local service. For OpenRouter, enter the full provider/model ID in Model.
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="mc-key">
               API Key
-              {form.provider === 'ollama' && (
-                <span className="ml-2 text-xs text-muted-foreground">(optional for Ollama)</span>
+              {selectedProvider && !selectedProvider.requiresApiKey && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  (optional for this provider)
+                </span>
               )}
-              {config?.hasApiKey && !form.apiKey && (
-                <span className="ml-2 text-xs text-muted-foreground">leave blank to keep existing key</span>
+              {config?.hasApiKey && config.provider === form.provider && !form.apiKey && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  leave blank to keep existing key
+                </span>
               )}
             </Label>
             <Input
               id="mc-key"
               type="password"
-              placeholder={config?.hasApiKey ? '••••••••••••••••' : 'sk-...'}
+              placeholder={
+                config?.hasApiKey && config.provider === form.provider
+                  ? '••••••••••••••••'
+                  : 'Provider API key'
+              }
               value={form.apiKey}
               onChange={(e) => setField('apiKey', e.target.value)}
               autoComplete="off"

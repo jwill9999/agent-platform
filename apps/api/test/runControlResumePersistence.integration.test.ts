@@ -1,5 +1,6 @@
 import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,6 +25,8 @@ const providerModule = new URL(
 const { startStopProvider } = await import(providerModule);
 const cleanups: Array<() => Promise<void>> = [];
 beforeEach(() => {
+  // Real SDK tool turns persist their bound continuation before approval/effects.
+  vi.stubEnv('SECRETS_MASTER_KEY', randomBytes(32).toString('base64'));
   for (const name of ['LANGCHAIN_TRACING_V2', 'LANGSMITH_TRACING', 'LANGSMITH_TRACING_V2'])
     vi.stubEnv(name, 'false');
   vi.spyOn(console, 'log').mockImplementation(() => {});

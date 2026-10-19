@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/cn';
 import { User, Paperclip } from 'lucide-react';
-import type { UIMessage } from 'ai';
+import type { HarnessUiMessage as UIMessage } from '@/lib/harness-ui-message';
 import { CriticBadges, CriticReviewBlock } from './critic-badges';
 import { ThinkingBlock } from './thinking-block';
 import { Markdown } from './markdown';

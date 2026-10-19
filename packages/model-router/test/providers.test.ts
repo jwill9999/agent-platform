@@ -4,7 +4,16 @@ import { SUPPORTED_PROVIDERS, isSupportedProvider, createLanguageModel } from '.
 describe('providers', () => {
   describe('SUPPORTED_PROVIDERS', () => {
     it('includes openai, anthropic, ollama', () => {
-      expect(SUPPORTED_PROVIDERS).toEqual(['openai', 'anthropic', 'ollama']);
+      expect(SUPPORTED_PROVIDERS).toEqual([
+        'openai',
+        'anthropic',
+        'google',
+        'deepseek',
+        'xai',
+        'openrouter',
+        'ollama',
+        'openai-compatible',
+      ]);
     });
   });
 
@@ -16,7 +25,7 @@ describe('providers', () => {
     });
 
     it('returns false for unsupported providers', () => {
-      expect(isSupportedProvider('google')).toBe(false);
+      expect(isSupportedProvider('unknown')).toBe(false);
       expect(isSupportedProvider('')).toBe(false);
       expect(isSupportedProvider('OPENAI')).toBe(false);
     });
@@ -56,15 +65,15 @@ describe('providers', () => {
       const model = createLanguageModel({
         provider: 'ollama',
         model: 'llama3.2',
-        baseURL: 'http://custom:11434/v1',
+        baseURL: 'http://127.0.0.1:11434/v1',
       });
       expect(model).toBeDefined();
     });
 
     it('throws for unsupported provider', () => {
       expect(() =>
-        createLanguageModel({ provider: 'google' as never, model: 'gemini', apiKey: 'key' }),
-      ).toThrow('Unsupported model provider "google"');
+        createLanguageModel({ provider: 'unknown' as never, model: 'gemini', apiKey: 'key' }),
+      ).toThrow('Unsupported model provider');
     });
   });
 });

@@ -22,7 +22,7 @@ import {
   ProjectInstructionUpdateCandidateSchema,
   ProjectInstructionUpdateProposalSchema,
 } from '@agent-platform/contracts';
-import type { UIMessage } from 'ai';
+import type { HarnessUiMessage as UIMessage } from '@/lib/harness-ui-message';
 import {
   FolderOpen,
   File,

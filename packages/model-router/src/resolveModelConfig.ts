@@ -1,11 +1,5 @@
 import { isSupportedProvider, type SupportedProvider } from './providers.js';
 import { resolveApiKeyForProvider, apiKeyResultToOutcome } from './resolveApiKey.js';
-import type { ApiOpenAiKeyOutcome, OpenAiKeyGateResult } from './resolveOpenAiApiKey.js';
-import {
-  openAiKeyGateToApiOutcome,
-  resolveGatedOpenAiKeyForRequest,
-} from './resolveOpenAiApiKey.js';
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -36,7 +30,7 @@ export type ResolveModelConfigOptions = {
 // Default models per provider
 // ---------------------------------------------------------------------------
 
-const DEFAULT_MODELS: Record<SupportedProvider, string> = {
+const DEFAULT_MODELS: Partial<Record<SupportedProvider, string>> = {
   openai: 'gpt-4o',
   anthropic: 'claude-sonnet-4-20250514',
   ollama: 'llama3.2',
@@ -64,33 +58,16 @@ export function resolveModelConfig(options: ResolveModelConfigOptions = {}): Mod
   // --- Provider + model ---
   const provider = agentOverride?.provider ?? process.env.DEFAULT_MODEL_PROVIDER ?? 'openai';
 
-  const defaultModel = isSupportedProvider(provider) ? DEFAULT_MODELS[provider] : 'gpt-4o';
+  if (!isSupportedProvider(provider))
+    return { kind: 'error', code: 'UNSUPPORTED_PROVIDER', message: 'Unsupported model provider' };
+  const defaultModel = DEFAULT_MODELS[provider];
   const model = agentOverride?.model ?? process.env.DEFAULT_MODEL ?? defaultModel;
+  if (!model)
+    return { kind: 'error', code: 'MISSING_MODEL', message: 'Choose a model for this provider' };
 
   // --- API key (provider-aware) ---
-  if (isSupportedProvider(provider)) {
-    const keyResult = resolveApiKeyForProvider({ provider, headerKey });
-    const outcome = apiKeyResultToOutcome(keyResult);
-    if (outcome.kind === 'error') {
-      return { kind: 'error', code: outcome.code, message: outcome.message };
-    }
-    return { kind: 'ok', config: { provider, model, apiKey: outcome.key } };
-  }
-
-  // Fallback: unknown provider — try OpenAI key resolution for backward compat
-  const gated: OpenAiKeyGateResult = resolveGatedOpenAiKeyForRequest({
-    preferredEnvVar: 'AGENT_OPENAI_API_KEY',
-    headerKey,
-  });
-
-  const keyOutcome: ApiOpenAiKeyOutcome = openAiKeyGateToApiOutcome(gated);
-
-  if (keyOutcome.kind === 'error') {
-    return { kind: 'error', code: keyOutcome.code, message: keyOutcome.message };
-  }
-
-  return {
-    kind: 'ok',
-    config: { provider, model, apiKey: keyOutcome.key },
-  };
+  const keyResult = resolveApiKeyForProvider({ provider, headerKey });
+  const outcome = apiKeyResultToOutcome(keyResult);
+  if (outcome.kind === 'error') return outcome;
+  return { kind: 'ok', config: { provider, model, apiKey: outcome.key } };
 }

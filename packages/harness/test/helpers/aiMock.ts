@@ -11,8 +11,10 @@ import { vi } from 'vitest';
 
 export const mockStreamText = vi.fn();
 
-export function setupAiMock() {
+export async function setupAiMock() {
+  const actual = await vi.importActual<typeof import('ai')>('ai');
   return {
+    ...actual,
     streamText: (...args: unknown[]) => mockStreamText(...args),
     jsonSchema: (schema: unknown) => ({ type: 'json-schema', jsonSchema: schema }),
   };
@@ -21,7 +23,8 @@ export function setupAiMock() {
 export function setupOpenAiProviderMock() {
   return {
     createOpenAI: ({ apiKey }: { apiKey: string }) => {
-      return (model: string) => ({ provider: 'openai', modelId: model, apiKey });
+      const makeModel = (model: string) => ({ provider: 'openai', modelId: model, apiKey });
+      return Object.assign(makeModel, { responses: makeModel });
     },
   };
 }
@@ -46,12 +49,31 @@ export function mockStreamResult(opts: {
     })(),
     fullStream: (async function* () {
       for (const chunk of chunks) {
-        yield { type: 'text-delta' as const, textDelta: chunk };
+        yield { type: 'text-delta' as const, text: chunk };
       }
     })(),
     text: Promise.resolve(joined),
-    reasoning: Promise.resolve(opts.reasoning ?? undefined),
-    toolCalls: Promise.resolve(opts.toolCalls ?? []),
-    usage: Promise.resolve(opts.usage),
+    reasoningText: Promise.resolve(opts.reasoning ?? undefined),
+    responseMessages: Promise.resolve([
+      {
+        role: 'assistant',
+        content: [
+          ...(joined ? [{ type: 'text', text: joined }] : []),
+          ...(opts.toolCalls ?? []).map(({ args, ...call }) => ({
+            type: 'tool-call',
+            ...call,
+            input: args,
+          })),
+        ],
+      },
+    ]),
+    toolCalls: Promise.resolve(
+      (opts.toolCalls ?? []).map(({ args, ...call }) => ({ ...call, input: args })),
+    ),
+    usage: Promise.resolve(
+      opts.usage
+        ? { inputTokens: opts.usage.promptTokens, outputTokens: opts.usage.completionTokens }
+        : undefined,
+    ),
   };
 }

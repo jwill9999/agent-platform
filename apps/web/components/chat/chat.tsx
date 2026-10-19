@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useCallback, type ReactNode } from 'react';
-import type { UIMessage } from 'ai';
+import type { HarnessUiMessage as UIMessage } from '@/lib/harness-ui-message';
 import { Sparkles } from 'lucide-react';
 import { Message, getMessageText } from './message';
 import { GitChatHistory } from './git-chat-history';

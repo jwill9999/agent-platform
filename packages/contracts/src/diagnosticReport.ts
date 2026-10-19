@@ -31,6 +31,9 @@ function durationSuffix(durationMs: number | undefined): string {
 export function renderDiagnosticObservation(sequence: number, event: DiagnosticEvent): string {
   const duration = durationSuffix(event.durationMs);
   const error = event.errorCode ? ` [${event.errorCode}]` : '';
+  const providerFailure = event.providerFailure
+    ? `; provider failure ${event.providerFailure}`
+    : '';
   const operation = event.operationId ? `; operation ${event.operationId}` : '';
   const attempt = event.attempt ? `; attempt ${event.attempt}` : '';
   const decision = event.contextDecision;
@@ -44,7 +47,7 @@ export function renderDiagnosticObservation(sequence: number, event: DiagnosticE
   const control = event.control
     ? `; logical run ${event.control.logicalRunId}; ${event.control.stage}; ${event.control.state}; reason ${event.control.reason}; ${event.control.inFlight} admitted unresolved`
     : '';
-  return `${sequence}. ${event.phase}: ${event.outcome}${duration}${error}; request ${event.requestId}${operation}${attempt}${context}${usage}${control}`;
+  return `${sequence}. ${event.phase}: ${event.outcome}${duration}${error}; request ${event.requestId}${operation}${attempt}${context}${usage}${control}${providerFailure}`;
 }
 
 function renderSummary(report: DiagnosticReport): string {
