@@ -394,7 +394,7 @@ describe('HomePage asynchronous selection ownership', () => {
 
     expectPersonalScope();
     expect(window.location.search).toBe('?mode=chat');
-    expect(window.history.length).toBe(historyBeforePersonal + 1);
+    expect(window.history).toHaveLength(historyBeforePersonal + 1);
     expect(mocks.bind).toHaveBeenCalledTimes(bindsBeforePersonal);
     expect(mocks.linkFallback).not.toHaveBeenCalled();
   });
@@ -407,7 +407,7 @@ describe('HomePage asynchronous selection ownership', () => {
     const length = window.history.length;
     await navigate(workspacePersonalChatRequestedEvent);
     expectPersonalScope();
-    expect(window.history.length).toBe(length);
+    expect(window.history).toHaveLength(length);
     expect(mocks.bind).toHaveBeenCalledOnce();
   });
 
@@ -467,7 +467,7 @@ describe('HomePage asynchronous selection ownership', () => {
       await clickSidebarLink('/?mode=chat', init);
       expect(current()).toBe('bound-alpha');
       expect(window.location.search).toBe('?projectId=alpha');
-      expect(window.history.length).toBe(length);
+      expect(window.history).toHaveLength(length);
       expect(mocks.linkFallback).toHaveBeenCalledOnce();
       expect(mocks.post).toHaveBeenCalledTimes(postsBeforeLink);
     },
@@ -498,7 +498,7 @@ describe('HomePage asynchronous selection ownership', () => {
       await clickSidebarLink('/?mode=chat');
       expect(window.location.pathname).toBe(pathname);
       expect(window.location.search).toBe('');
-      expect(window.history.length).toBe(length);
+      expect(window.history).toHaveLength(length);
       expect(mocks.linkFallback).toHaveBeenCalledExactlyOnceWith('/?mode=chat');
       expect(mocks.post).not.toHaveBeenCalled();
     },
@@ -510,7 +510,7 @@ describe('HomePage asynchronous selection ownership', () => {
     const length = window.history.length;
     await clickSidebarLink('/?mode=chat');
     expect(window.location.pathname).toBe('/settings/models');
-    expect(window.history.length).toBe(length);
+    expect(window.history).toHaveLength(length);
     expect(current()).toBeUndefined();
     expect(mocks.linkFallback).toHaveBeenCalledExactlyOnceWith('/?mode=chat');
     expect(mocks.post).not.toHaveBeenCalled();
@@ -579,7 +579,7 @@ describe('HomePage asynchronous selection ownership', () => {
         link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })),
       );
       expect(window.location.search).toBe('?projectId=alpha');
-      expect(window.history.length).toBe(length);
+      expect(window.history).toHaveLength(length);
       expect(current()).toBe('bound-alpha');
       expect(mocks.linkFallback).toHaveBeenCalledOnce();
       expect(mocks.post).toHaveBeenCalledTimes(postsBeforeLink);
@@ -609,7 +609,7 @@ describe('HomePage asynchronous selection ownership', () => {
       expect(window.location.search).toBe('');
       expect(container.textContent).toContain('Choose a workspace');
       expect(pushes).not.toHaveBeenCalled();
-      expect(window.history.length).toBe(length);
+      expect(window.history).toHaveLength(length);
     } finally {
       pushes.mockRestore();
     }
