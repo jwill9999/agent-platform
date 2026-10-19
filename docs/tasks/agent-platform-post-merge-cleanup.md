@@ -8,7 +8,9 @@ On 19 October the owner requested a current `session.md` after staging delivery,
 worktrees/test files to reclaim space, and routine end-of-run removal of no-longer-needed metadata
 and test data. PR378 and PR377 have delivered to staging `50f6e1b5`; this task changes documentation
 and performs bounded developer housekeeping. It does not repair the separately tracked monitoring
-issues or authorize another merge, dependency upgrade, live model call or owner stress trial.
+issues or authorize a dependency upgrade, live model call or owner stress trial. The owner's later
+correction removes the unnecessary feature merge: PR379 must target protected staging directly.
+The same live protection checks, resolved comments and applicable merge authority still apply.
 
 ## Requirements
 
@@ -31,7 +33,7 @@ issues or authorize another merge, dependency upgrade, live model call or owner 
    allowlisted retirement. Retain uncertain/unique/paused/in-use worktrees.
 5. Update the existing handoff/current shared closeout protocol and this task's result record.
 6. Validate/review the final documents and receipts, commit/push with normal hooks, and open the
-   task-to-feature PR. Hosted checks/reviews and actual merge authority remain separate.
+   task-to-staging PR. Hosted checks/reviews and actual merge authority remain separate.
 
 | Relationship            | Task                                                   | State                                    |
 | ----------------------- | ------------------------------------------------------ | ---------------------------------------- |
@@ -59,9 +61,10 @@ Independent review covers destructive selections and final documentation. Normal
 - Current handoff and recurring cleanup guidance validated, reviewed, committed and pushed.
 - Audit/results state actual removals, preserved data, uncertainty and measured space, with receipts.
 - Beads readback and terminal Dolt sync complete; do not close while its declared PR delivery is pending.
-- Task branch `task/post-merge-housekeeping` targets `feature/post-merge-housekeeping`, from staging50f6.
-  This documentation PR still needs hosted review/checks and owner merge authority; no staging merge
-  or runtime restart is implied by the housekeeping request.
+- Task branch `task/post-merge-housekeeping`, from staging50f6, uses existing PR379 directly into
+  protected `staging`. The earlier feature destination is superseded; do not create a second PR or
+  feature merge. Actual current-head staging checks/reviews and applicable merge authority remain
+  required; no protection bypass or runtime restart is implied.
 
 Owner authorization is the request in this chat. Independent plan/final review and actual results
 are recorded in [the cleanup results](../reviews/post-merge-cleanup-20261019.md).

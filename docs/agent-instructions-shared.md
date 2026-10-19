@@ -204,9 +204,16 @@ Branching rules (locked):
 - **`feature/<feature-name>`** — integration branch
 - **`task/<task-name>`** — individual work units, chained linearly (each branches from the previous task branch)
 - **Never commit directly to `main`**
-- One PR per segment tip → `feature/<feature-name>`; completed features → protected `staging`; human-approved `staging` → `main`
+- Implementation segments: one PR per segment tip → `feature/<feature-name>`; completed features → protected `staging`; human-approved `staging` → `main`
 
-Required branch lifecycle:
+Simple documentation-only maintenance uses one `task/<name>` branch from current `staging` and one
+PR directly into protected `staging`; no intermediate feature branch or merge is needed. This applies
+to prose/Markdown-only changes such as handoffs, task records and contributor guidance. Mixed changes
+to runtime code, executable assets, dependencies, workflows, configuration or schemas use the feature
+lifecycle below. The direct route preserves all live required checks, review/comment resolution,
+exact-head guards and applicable owner merge authority; it is not a protection bypass.
+
+Required branch lifecycle for implementation work:
 
 1. Create or use a **`feature/<feature-name>`** branch from current **`staging`** as the integration branch.
 2. Create the first **`task/<task-name>`** branch from that feature branch.

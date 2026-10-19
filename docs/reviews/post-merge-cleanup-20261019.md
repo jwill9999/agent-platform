@@ -95,10 +95,10 @@ its temporary dependency symlink points to the live checkout for documentation c
 read-only filesystem mount. Remove that link after normal hooks and push; generated Git hooks remain
 needed while the documentation task is active. No runtime/E2E test is needed for these documents.
 
-Markdown CLI checks cover three non-ignored files; the direct Markdown API explicitly validates all
-five authored documents, including the task/results excluded by CLI defaults. Formatting, local links,
+Original five-file checks passed. The direct-staging follow-up includes the task README too; the
+direct Markdown API explicitly validates all six authored documents, including CLI-ignored records. Formatting, local links,
 diff and historical-suffix checks also apply. Full earlier f526 session history (511,129 bytes) remains
-verbatim exactly once; only the current checkpoint is replaced, leaving session at 511,968 bytes.
+verbatim exactly once; only the current checkpoint is replaced, leaving session at 511,963 bytes.
 The replaced 50f6 checkpoint remains in Git. Normal hooks, final independent review, pushed revision
 and hosted PR status are tracked in Beads; this documentation has not been promoted to staging.
 
@@ -109,4 +109,7 @@ preservation checks. The source-bound PR377/app qualification remains under
 records; they are not external publications or a second task tracker.
 
 The [recurring closeout checklist](../development/post-merge-cleanup.md) is linked from shared
-instructions. The new documentation task targets its feature branch; it is not yet merged into staging.
+instructions. The owner corrected the unnecessary two-merge route: existing PR379 targets protected
+staging directly from its task branch, with the normal protection/review gates retained. The earlier
+feature route is superseded; no second PR or feature merge is needed. This documentation is not yet
+merged into staging.

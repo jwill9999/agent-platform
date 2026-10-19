@@ -6,7 +6,10 @@ change another task or remove useful evidence. Beads remains authoritative for s
 1. Verify the actual merged revision/tree and current checks/reviews. Update `session.md` with the
    delivered SHA, verification, remaining blockers and next action. Keep detailed results in the
    existing task/review record; label older pending statements as historical. Commit/push the handoff
-   through the normal branch/PR process. Updating a handoff grants no additional merge authority.
+   through one task-branch PR directly into protected staging for simple documentation-only
+   maintenance; no feature integration merge is needed. Keep the same required checks and reviews.
+   Mixed implementation changes use the normal feature route. Updating a handoff grants no
+   additional merge authority.
 2. Inventory worktrees, branches, staged/unstaged/untracked **and ignored** files, running processes,
    open handles and generated test artifacts. A clean Git status alone is insufficient. Record each
    worktree as retain, retire or uncertain, with a reason and an allocated-size estimate.

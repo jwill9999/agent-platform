@@ -8,7 +8,7 @@ Stress remains blocked by `agent-platform-desktop-fixture-log-isolation` and
 `agent-platform-monitoring-storage-failure-provenance`; restart is not a cause fix.
 Dependency upgrades held; paused orchestration/PR283, main and Docker gateway unchanged.
 Housekeeping: [audit/results](docs/reviews/post-merge-cleanup-20261019.md).
-Use [end-of-run cleanup](docs/development/post-merge-cleanup.md). This docs update awaits PR delivery.
+Use [end-of-run cleanup](docs/development/post-merge-cleanup.md). PR379 goes directly to staging.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Earlier handoff follows verbatim; pending statements below are historical. -->
