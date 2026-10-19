@@ -22,6 +22,12 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
 
 5. **Git (mandatory)** — **Never commit directly to `main`.**
    - **Naming:** **`feature/<feature-name>`** and **`task/<task-name>`** (e.g. `feature/agent-platform-persistence`, `task/agent-platform-mov.1`).
+   - **Simple documentation maintenance:** a prose/Markdown-only task branches from current `staging`
+     and opens one PR directly into protected `staging`, without a feature integration merge. Mixed
+     runtime, executable asset, dependency, workflow, configuration or schema changes use the chained
+     feature route. Required checks, resolved comments, review, exact-head guards and actual owner
+     merge authority still apply. The documentation task closes after its direct staging PR merges
+     and its declared gates pass.
    - **Chained segments (default):** tasks run **in order** on Git. The **first** task in a segment branches from **`feature/<feature-name>`**. **Each following** task branches from the **previous task’s branch** (after that task is complete and pushed). **Intermediate** tasks do **not** get their own PR to `feature`—only the **last task in the segment** opens **one PR** from **`task/<tip>` → `feature/<feature-name>`**, merging the whole chain. Then the **next** segment’s first task branches from the **updated** `feature` branch.
    - **Sign-off:** **Done means the task's declared gates are green.** Local gates pass before push/PR:
      build, format, lint, unit tests, and relevant integration/E2E/Playwright checks from the task
@@ -32,7 +38,7 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
      rule. If a required gate fails, the task is not done.
    - **Release:** run integration testing and ensure required CI/CD pipelines are green. Merge only
      with actual owner-granted merge/destination authority, reusing valid existing authorization;
-     passing gates alone grant none. Then merge
+     passing gates alone grant none. For implementation features, merge
      **`feature/<feature-name>` → protected `staging`** via PR. Merge **`staging` → `main`** only with
      explicit human approval.
 

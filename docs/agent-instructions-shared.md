@@ -204,9 +204,16 @@ Branching rules (locked):
 - **`feature/<feature-name>`** — integration branch
 - **`task/<task-name>`** — individual work units, chained linearly (each branches from the previous task branch)
 - **Never commit directly to `main`**
-- One PR per segment tip → `feature/<feature-name>`; completed features → protected `staging`; human-approved `staging` → `main`
+- Implementation segments: one PR per segment tip → `feature/<feature-name>`; completed features → protected `staging`; human-approved `staging` → `main`
 
-Required branch lifecycle:
+Simple documentation-only maintenance uses one `task/<name>` branch from current `staging` and one
+PR directly into protected `staging`; no intermediate feature branch or merge is needed. This applies
+to prose/Markdown-only changes such as handoffs, task records and contributor guidance. Mixed changes
+to runtime code, executable assets, dependencies, workflows, configuration or schemas use the feature
+lifecycle below. The direct route preserves all live required checks, review/comment resolution,
+exact-head guards and applicable owner merge authority; it is not a protection bypass.
+
+Required branch lifecycle for implementation work:
 
 1. Create or use a **`feature/<feature-name>`** branch from current **`staging`** as the integration branch.
 2. Create the first **`task/<task-name>`** branch from that feature branch.
@@ -395,9 +402,14 @@ When ending a work session, you MUST complete ALL steps below. Work is **NOT** c
    selected prototype run uses its own journaled equivalent for operations it owns; that does not
    make the prototype a default developer dependency.
 
-5. **Clean up** — clear stashes, prune remote branches
-6. **Verify** — all changes committed AND pushed
-7. **Hand off** — provide context for next session via `session.md`
+5. **Hand off** — after verifying actual delivery, update and push `session.md` with the merged SHA,
+   checks, remaining blockers and next action through the normal branch/PR process.
+6. **Clean up** — follow [post-merge cleanup](development/post-merge-cleanup.md): audit worktrees and
+   test data, preserve dirty/paused/in-use work and required evidence, then retire only proven unused
+   delivered checkouts and disposable artifacts. Inspect ignored data, including local Beads stores;
+   never clear unrelated stashes or blanket-prune application data/caches.
+7. **Verify** — confirm committed/pushed records, exact removals, retained evidence and runtime/dirty
+   work preservation; record space recovered and read back/sync Beads. Apply this cleanup every run.
 
 **Critical rules:**
 
