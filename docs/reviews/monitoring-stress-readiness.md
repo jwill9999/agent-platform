@@ -115,3 +115,19 @@ This subsequent prose-only outcome update preserves every tested source byte. Al
 hosted checks/reviews still need qualification; no protected merge or task closure is claimed. Both P1s stay in progress;
 the owner stress trial remains OPEN/blocked. The owner app/data/key, held dependency work, paused
 orchestration, main and disabled Docker gateway remain preserved. No final delivery is claimed.
+
+## Batched hosted quality follow-up and manual-trial boundaries
+
+The first PR380 Sonar check reports gateOK but five open minor duplicate-import findings; the
+findings are not treated as clear. One grouped repair consolidates only those contract imports in
+five DB/API files. AST verification preserves binding/type flags and all non-import statements;
+all five compiled JavaScript files remain byte-identical. Scoped builds/types/lint/format and
+independent review pass. Existing runtime/native results remain applicable, while the changed head
+still requires full fresh protected checks. Repairs stay in PR380 rather than separate branches/PRs.
+
+The updated owner trial spec separates finding ordinary bugs from repairing them: freeze the
+qualified build, complete one bounded manual block and review the saved evidence afterward.
+Independent critique approves the actual spec and resolves TRIAL-P01/P02: preserve immediate safety
+stops, distinguish new capture failure from historical/disclosed gaps, and record live-use caps
+before starting. Remaining renderer/subprocess/I/O visibility limits are explicit; a broader APM
+project is not added as a prerequisite. No owner trial or additional paid call has occurred.

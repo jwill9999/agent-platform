@@ -1,10 +1,10 @@
-import type { CaptureFailureArtifacts } from '@agent-platform/contracts';
 import {
   DiagnosticScopeSchema,
   DiagnosticReportSchema,
   DiagnosticHealthSchema,
   type DiagnosticStore,
   type MonitoringStore,
+  type CaptureFailureArtifacts,
 } from '@agent-platform/contracts';
 import { getSession, DiagnosticStoreError, type DrizzleDb } from '@agent-platform/db';
 import { buildDiagnosticReport } from '@agent-platform/plugin-observability';

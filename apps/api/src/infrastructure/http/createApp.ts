@@ -1,8 +1,11 @@
-import type { CaptureFailureArtifacts } from '@agent-platform/contracts';
+import type {
+  CaptureFailureArtifacts,
+  DiagnosticStore,
+  MonitoringStore,
+} from '@agent-platform/contracts';
 import express, { type Application } from 'express';
 import { createLogger } from '@agent-platform/logger';
 import { installSafeProviderWarningLogger } from '@agent-platform/model-router';
-import type { DiagnosticStore, MonitoringStore } from '@agent-platform/contracts';
 import { diagnosticIngress } from '../diagnostics/observations.js';
 import type { DiagnosticAccess } from '../diagnostics/localAccess.js';
 import { createDiagnosticsRouter } from './v1/diagnosticsRouter.js';

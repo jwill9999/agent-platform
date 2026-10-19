@@ -1,4 +1,3 @@
-import type { CaptureFailureArtifacts } from '@agent-platform/contracts';
 import {
   CaptureFailureArtifactsSchema,
   MonitoringPreferenceInputSchema,
@@ -9,6 +8,7 @@ import {
   projectMonitoringReport,
   type DiagnosticStore,
   type MonitoringStore,
+  type CaptureFailureArtifacts,
 } from '@agent-platform/contracts';
 import { Router } from 'express';
 import { z } from 'zod';

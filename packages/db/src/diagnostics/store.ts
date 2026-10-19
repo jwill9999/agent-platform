@@ -1,4 +1,3 @@
-import type { CaptureFailureObserver } from '@agent-platform/contracts';
 import { createCaptureStore } from './captureStore.js';
 import { randomUUID } from 'node:crypto';
 import {
@@ -13,6 +12,7 @@ import {
   type DiagnosticPage,
   type DiagnosticScope,
   type DiagnosticStoredEvent,
+  type CaptureFailureObserver,
 } from '@agent-platform/contracts';
 
 function diagnosticErrorCode(reason: string): 'invalid_cursor' | 'expired_history' | 'unavailable' {

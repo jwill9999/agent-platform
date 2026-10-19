@@ -1,4 +1,3 @@
-import type { CaptureFailureObserver } from '@agent-platform/contracts';
 import { createCaptureStore } from '../diagnostics/captureStore.js';
 import { randomUUID } from 'node:crypto';
 import {
@@ -11,6 +10,7 @@ import {
   type MonitoringWindow,
   MonitoringPreferenceInputSchema,
   type MonitoringPreference,
+  type CaptureFailureObserver,
 } from '@agent-platform/contracts';
 
 function monitoringErrorCode(reason: string): 'invalid_cursor' | 'expired_history' | 'unavailable' {
