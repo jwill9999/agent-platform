@@ -22,7 +22,7 @@ const { migrate } = requireFromDb('drizzle-orm/better-sqlite3/migrator');
 
 /** Synthetic retained profile, constructed independently of production openDatabase/seed. */
 export function createMigrationProfile(sqlitePath, mode) {
-  if (!['legacy', 'blocked', 'complete', 'complete-unknown'].includes(mode)) {
+  if (!['legacy', 'blocked', 'complete', 'complete-unknown', 'sdk-watermark'].includes(mode)) {
     throw new Error('Unknown synthetic migration profile');
   }
   mkdirSync(dirname(sqlitePath), { recursive: true });
@@ -36,6 +36,9 @@ export function createMigrationProfile(sqlitePath, mode) {
     const latest = Math.max(...journal.entries.map((entry) => entry.when));
     if (mode === 'legacy' || mode === 'blocked') {
       journal.entries = journal.entries.filter((entry) => entry.idx < 19);
+      writeFileSync(journalPath, JSON.stringify(journal));
+    } else if (mode === 'sdk-watermark') {
+      journal.entries = journal.entries.filter((entry) => entry.idx < 21);
       writeFileSync(journalPath, JSON.stringify(journal));
     }
     sqlite.pragma('foreign_keys = ON');
@@ -75,10 +78,64 @@ export function createMigrationProfile(sqlitePath, mode) {
     } finally {
       key.fill(0);
     }
-    if (mode === 'blocked' || mode === 'complete-unknown') {
+    if (mode === 'sdk-watermark') {
+      sqlite
+        .prepare('UPDATE agents SET execution_limits_json=? WHERE id=?')
+        .run(
+          JSON.stringify({ maxSteps: 5, maxParallelTasks: 1, timeoutMs: 30000 }),
+          'retained-agent',
+        );
+      // Synthetic reproduction of the cryptographically proven historical schema variant.
+      sqlite.exec('ALTER TABLE `messages` ADD COLUMN `workspace_events_json` text;\n');
+      sqlite
+        .prepare('UPDATE messages SET workspace_events_json=? WHERE id=?')
+        .run('{"syntheticOpaqueWorkspaceEvent":"retain-exactly"}', 'retained-message');
+      const workspace = join(dirname(sqlitePath), 'retained-workspace');
+      mkdirSync(workspace, { recursive: true });
+      sqlite
+        .prepare(
+          `INSERT INTO model_configs(
+        id,name,provider,model,secret_ref_id,created_at_ms,updated_at_ms
+      ) VALUES(?,?,?,?,?,?,?)`,
+        )
+        .run(
+          'retained-model-config',
+          'Retained synthetic model',
+          'openai',
+          'synthetic-retained-model',
+          'retained-secret',
+          1000,
+          1000,
+        );
+      sqlite
+        .prepare(
+          `INSERT INTO projects(
+        id,slug,name,workspace_path,workspace_key,metadata_json,created_at_ms,updated_at_ms
+      ) VALUES(?,?,?,?,?,?,?,?)`,
+        )
+        .run(
+          'retained-project',
+          'retained-synthetic-project',
+          'Retained synthetic Project',
+          workspace,
+          'synthetic-retained-workspace',
+          JSON.stringify({ source: 'desktop' }),
+          1000,
+          1000,
+        );
+      sqlite
+        .prepare('UPDATE sessions SET project_id=? WHERE id=?')
+        .run('retained-project', 'retained-session');
+    }
+    if (mode === 'blocked' || mode === 'complete-unknown' || mode === 'sdk-watermark') {
       sqlite
         .prepare('INSERT INTO __drizzle_migrations(hash,created_at) VALUES(?,?)')
-        .run('f'.repeat(64), latest + 86_400_000);
+        .run(
+          mode === 'sdk-watermark'
+            ? '43b2b45107a31db10880e2d0dd0ab95c976befcc4ec95e954cc3c7fefc8ce915'
+            : 'f'.repeat(64),
+          mode === 'sdk-watermark' ? 1785803000000 : latest + 86_400_000,
+        );
     }
   } finally {
     sqlite.close();

@@ -1,24 +1,17 @@
-# Provider SDK — static observer fixtures, 19 October 2026
+# Provider SDK — migration repair local qualification, 19 October 2026
 
-PR366 merged normally at687ec379; feature/PR363 tree118056c1 equals reviewed aabe7a61.
-All12 executed feature checks passed; independent review verified72 Electron eachretry0,
-3898 ordinary cases plus77 existing optional skips, API604/DB236/focused63/Git33 and browser42
-plus one known skip. The unchanged fresh benchmark completed900/990 with maximum overhead
-1.897371ms below20ms. All48 host samples have core counters; auxiliary memory.events is absent,
-so total coverage remains partial. No measured time is adjusted or earlier failure cause claimed.
+PR363 delivered SDK source to stagingbe153c50. Six SDK branches were recovery-protected/cleaned;
+paused orchestration/main remain separate. Model diagnostics is closed/synced. The owner app still
+uses its restored old SDK after a safe private-copy migration rejection.
 
-Protected687e exposed CodeQL13 in generated observer-test child code. Staging remains blocked.
-The bounded repair replaces handler-family source interpolation with static child programs and
-separate argv data, validating fixed cases while preserving signal outcomes, assertions and budgets.
-All40 focused controls pass, including portable hostile-data, enum denial and owned-child cleanup.
-Original assertions and budgets are preserved. Final combined critique, normal hooks and fresh
-feature/protected qualification remain required. Runtime, benchmark, durability, CI policy and dependencies
-are unchanged. Passing687e scans or other slices cannot qualify the changed repair head.
-
-ProviderS12 remains in_progress until actual owner-profile recording/export/restart; native access
-still awaits manual Mac unlock. Model diagnostics needs its own protected delivery; stress remains
-open. No owner-app upgrade, paid provider call, profile/key change, main or paused integration.
-Current delivery state belongs in Beads/comments and PRs. Earlier checkpoints remain in Git.
+P1 agent-platform-sdk-legacy-migration blocks provider S12. Its exact0021 canonical/proven-historical
+bridge preserves SQL, original journal/records and strict schema/trigger guards. Independent DB/native
+source review passed;81 DB controls pass. Original2 native cases, new upgrade/restart and unchanged
+SDK2 pass retry0. Full73 cases are collected, not locally run. Failures/evidence are in task/results.
+Combined final review, normal hooks, fresh feature/protected checks/security/VM, then private-copy/
+owner recording/export/restart remain. The variant recognizes22 migrations; future extension needs
+reviewed coverage. No owner data/key, paid test, main/global/gateway or paused integration change.
+Current state belongs in Beads/PRs. Previous checkpoints remain in Git; history below is verbatim.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Previous handoff follows verbatim; its pending statements are historical. -->
