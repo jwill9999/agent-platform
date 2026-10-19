@@ -1,13 +1,16 @@
 import { createInProcessSessionLock } from '../src/infrastructure/http/sessionLock.js';
 import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import {
   appendMessage,
   closeDatabase,
   createProject,
+  decryptUtf8,
+  encryptUtf8,
   createModelConfig,
   updateModelConfig,
   DEFAULT_AGENT_ID,
@@ -599,6 +602,56 @@ describe('context admission through API and SQLite', () => {
       ).toHaveLength(0);
     },
   );
+
+  it('rejects a retained pre-repair unkeyed fallback revision before claiming approval', async () => {
+    vi.stubEnv('DEFAULT_MODEL_PROVIDER', 'openai');
+    vi.stubEnv('DEFAULT_MODEL', 'gpt-4o');
+    const sessionId = await f.session();
+    const approvalRequestId = await pending(f, sessionId);
+    await request(f.app)
+      .post(`/v1/approval-requests/${approvalRequestId}/approve`)
+      .send({})
+      .expect(200);
+    const key = Buffer.from(process.env.SECRETS_MASTER_KEY!, 'base64');
+    const row = f.sqlite
+      .prepare(
+        'SELECT message_id AS messageId, ciphertext_b64 AS ciphertextB64, iv_b64 AS ivB64, auth_tag_b64 AS authTagB64, key_version AS keyVersion, algorithm FROM provider_continuations WHERE session_id = ?',
+      )
+      .get(sessionId) as {
+      messageId: string;
+      ciphertextB64: string;
+      ivB64: string;
+      authTagB64: string;
+      keyVersion: number;
+      algorithm: 'aes-256-gcm-v1';
+    };
+    const payload = JSON.parse(decryptUtf8(row, key));
+    // Synthetic historic fixture only: never hash a runtime credential this way.
+    const legacy = createHash('sha256')
+      .update('{"provider":"openai","model":"gpt-4o","apiKey":"sk-fixture-only"}')
+      .digest('hex');
+    expect(isDeepStrictEqual(payload.continuation.binding.credentialRevision, legacy)).toBe(false);
+    payload.continuation.binding.credentialRevision = legacy;
+    const plaintext = JSON.stringify(payload);
+    const envelope = encryptUtf8(plaintext, key, row.keyVersion);
+    f.sqlite
+      .prepare(
+        'UPDATE provider_continuations SET ciphertext_b64 = ?, iv_b64 = ?, auth_tag_b64 = ?, plaintext_bytes = ? WHERE message_id = ?',
+      )
+      .run(
+        envelope.ciphertextB64,
+        envelope.ivB64,
+        envelope.authTagB64,
+        Buffer.byteLength(plaintext),
+        row.messageId,
+      );
+    const resumed = await resume(f, sessionId, approvalRequestId);
+    expect(resumed.text).toContain('MODEL_CONTINUATION_CHANGED');
+    expect(resumed.text.includes(legacy)).toBe(false);
+    expect(f.effects).toBe(0);
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect(listApprovalRequests(f.db, { sessionId })[0]?.resumedAtMs).toBeUndefined();
+  });
 
   it.each(['apiKey', 'baseURL', 'provider'] as const)(
     'refreshes %s changed while waiting for the session lock before approval claim',

@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
-import { access, writeFile, unlink } from 'node:fs/promises';
+import { execFile, spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { access, writeFile, unlink, readdir, readFile, mkdir, rm } from 'node:fs/promises';
+import { watch } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { promisify } from 'node:util';
 import test from 'node:test';
 import process from 'node:process';
+import { setTimeout, clearTimeout } from 'node:timers';
 
 import { createGhLedgerFixture } from './gh-ledger.mjs';
 
@@ -338,3 +342,304 @@ test('explicit-branch PR reads reject altered argv before ledger effects', async
   assert.deepEqual((await fixture.readLedger()).calls, []);
   assert.deepEqual((await fixture.readLedger()).pullRequests, []);
 });
+
+async function waitForClaims(fixture, count) {
+  await new Promise((resolve, reject) => {
+    const watcher = watch(fixture.directory, () => inspect());
+    const timer = setTimeout(
+      () => finish(new Error('Owned children did not claim the fixture')),
+      2500,
+    );
+    let done = false;
+    function finish(error) {
+      if (done) return;
+      done = true;
+      watcher.close();
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve();
+    }
+    function inspect() {
+      readdir(fixture.directory).then((names) => {
+        if (names.filter((name) => /^claim\.[0-9a-f-]{36}$/.test(name)).length === count) finish();
+      }, finish);
+    }
+    inspect();
+  });
+}
+
+test('concurrent panel and check invocations serialize once each with a complete atomic ledger', async (context) => {
+  const fixture = await own(context);
+  const lock = join(fixture.directory, 'active.lock');
+  await writeFile(lock, 'test-owned-lock', { flag: 'wx' });
+  const pending = [panelList, commitChecks, panelList, commitChecks].map((args) =>
+    invoke(fixture, args),
+  );
+  const settled = Promise.allSettled(pending);
+  try {
+    await waitForClaims(fixture, 4);
+    assert.equal((await fixture.readEvidence()).activeClaims, 4);
+    await assert.rejects(fixture.setFailureModes({ authFailure: true }), /Await owned child/);
+    await assert.rejects(fixture.close(), /Await owned child/);
+    await unlink(lock);
+    for (const result of await settled) {
+      assert.equal(result.status, 'fulfilled');
+      assert.deepEqual(JSON.parse(result.value.stdout), []);
+    }
+    const ledger = await fixture.readLedger();
+    assert.equal(ledger.calls.length, 4);
+    assert.equal(ledger.calls.filter((call) => call.outcome === 'success').length, 4);
+    assert.deepEqual(ledger.pullRequests, []);
+    const evidence = await fixture.readEvidence();
+    assert.equal(evidence.activeClaims, 0);
+    assert.equal(evidence.errors, 0);
+    assert.equal(evidence.records.length, 4);
+    assert.ok(
+      evidence.records.every(
+        (record) => record.outcome === 'success' && record.stage === 'complete',
+      ),
+    );
+  } finally {
+    await unlink(lock).catch((error) => {
+      if (error.code !== 'ENOENT') throw error;
+    });
+    await settled;
+  }
+});
+
+test('a queued claim alone blocks reconfiguration and cleanup until its child exits', async (context) => {
+  const fixture = await own(context);
+  const lock = join(fixture.directory, 'active.lock');
+  await writeFile(lock, 'test-owned-lock', { flag: 'wx' });
+  const pending = invoke(fixture, panelList);
+  pending.catch(() => {}); // Observe setup-failure rejection; the original promise is still awaited.
+  try {
+    await waitForClaims(fixture, 1);
+    assert.equal(pending.child.kill('SIGSTOP'), true);
+    await unlink(lock);
+    await assert.rejects(fixture.setCurrentBranch('task/changed'), /Await owned child/);
+    await assert.rejects(fixture.close(), /Await owned child/);
+    assert.equal((await fixture.readEvidence()).activeClaims, 1);
+    assert.equal(pending.child.kill('SIGCONT'), true);
+    assert.deepEqual(JSON.parse((await pending).stdout), []);
+    await waitForClaims(fixture, 0);
+  } finally {
+    pending.child.kill('SIGCONT');
+    await unlink(lock).catch((error) => {
+      if (error.code !== 'ENOENT') throw error;
+    });
+    await pending.catch(() => {});
+  }
+});
+
+test('held locks reach the bounded deadline without releasing foreign ownership or claiming effects', async (context) => {
+  const fixture = await own(context);
+  const lock = join(fixture.directory, 'active.lock');
+  await writeFile(lock, 'test-owned-lock', { flag: 'wx' });
+  try {
+    await assert.rejects(invoke(fixture, create), { code: 2 });
+    assert.equal(await readFile(lock, 'utf8'), 'test-owned-lock');
+    assert.deepEqual((await fixture.readLedger()).calls, []);
+    const evidence = await fixture.readEvidence();
+    assert.equal(evidence.activeClaims, 0);
+    assert.equal(evidence.records.length, 1);
+    assert.equal(evidence.records[0].outcome, 'lock_timeout');
+    assert.equal(evidence.records[0].stage, 'waiting');
+    assert.ok(evidence.records[0].waitMs >= 1000);
+  } finally {
+    await unlink(lock);
+  }
+});
+
+test('concurrent duplicate creates preserve one effect and report the real second command rejection', async (context) => {
+  const fixture = await own(context);
+  const results = await Promise.allSettled([invoke(fixture, create), invoke(fixture, create)]);
+  assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1);
+  const rejected = results.find((result) => result.status === 'rejected');
+  assert.equal(rejected.reason.code, 1);
+  const ledger = await fixture.readLedger();
+  assert.equal(ledger.pullRequests.length, 1);
+  assert.equal(ledger.calls.length, 2);
+  const evidence = await fixture.readEvidence();
+  assert.deepEqual(evidence.records.map((record) => record.outcome).sort(), [
+    'command_error',
+    'success',
+  ]);
+});
+
+test('dispatch filesystem failures retain safe stage receipts without raw errors or leaked claims', async (context) => {
+  const fixture = await own(context);
+  const ledger = join(fixture.directory, 'ledger.json');
+  await unlink(ledger);
+  await mkdir(ledger);
+  try {
+    await assert.rejects(invoke(fixture, panelList), { code: 2 });
+    const evidence = await fixture.readEvidence();
+    assert.equal(evidence.activeClaims, 0);
+    assert.equal(evidence.records[0].stage, 'ledger_read');
+    assert.equal(evidence.records[0].outcome, 'fixture_error');
+    await assert.rejects(access(join(fixture.directory, 'active.lock')), { code: 'ENOENT' });
+    assert.equal(JSON.stringify(evidence).includes(fixture.directory), false);
+  } finally {
+    await rm(ledger, { recursive: true });
+  }
+});
+
+test('evidence reads allowlist fields, bound record count and expose malformed receipts honestly', async (context) => {
+  const fixture = await own(context);
+  const safe = {
+    version: 1,
+    kind: 'panel-list',
+    stage: 'complete',
+    outcome: 'success',
+    startedAtMs: 1,
+    waitMs: 0,
+    lockBudgetMs: 1000,
+    private: 'must-not-export',
+  };
+  await writeFile(join(fixture.directory, `receipt.${randomUUID()}.json`), JSON.stringify(safe));
+  let evidence = await fixture.readEvidence();
+  assert.equal(JSON.stringify(evidence).includes('must-not-export'), false);
+  await writeFile(join(fixture.directory, `receipt.${randomUUID()}.json`), 'not JSON');
+  await writeFile(join(fixture.directory, `receipt.${randomUUID()}.json`), 'x'.repeat(2049));
+  evidence = await fixture.readEvidence();
+  assert.equal(evidence.errors, 2);
+  await Promise.all(
+    Array.from({ length: 513 }, () =>
+      writeFile(join(fixture.directory, `receipt.${randomUUID()}.json`), JSON.stringify(safe)),
+    ),
+  );
+  evidence = await fixture.readEvidence();
+  assert.equal(evidence.truncated, true);
+  assert.ok(evidence.records.length <= 512);
+});
+
+test('the active claim protects final receipt persistence before parent cleanup is allowed', async (context) => {
+  const fixture = await own(context);
+  const release = join(fixture.directory, 'receipt-release');
+  const preload = join(fixture.directory, 'receipt-barrier.cjs');
+  await writeFile(
+    preload,
+    `
+const fs = require('node:fs');
+const { syncBuiltinESMExports } = require('node:module');
+const { performance } = require('node:perf_hooks');
+const rename = fs.renameSync;
+fs.renameSync = (from, to) => {
+  if (/receipt\\.[0-9a-f-]{36}\\.json$/.test(to) && JSON.parse(fs.readFileSync(from, 'utf8')).outcome !== 'running') {
+    process.send('final-receipt-waiting');
+    const deadline = performance.now() + 2500;
+    while (!fs.existsSync(process.env.RECEIPT_RELEASE)) {
+      if (performance.now() >= deadline) throw new Error('Owned receipt barrier expired');
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+    }
+    process.disconnect();
+  }
+  return rename(from, to);
+};
+syncBuiltinESMExports();
+`,
+  );
+  const child = spawn(process.execPath, ['--require', preload, fixture.executable, ...panelList], {
+    env: { PATH: dirname(process.execPath), ...fixture.env, RECEIPT_RELEASE: release },
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    timeout: 5000,
+  });
+  const exited = once(child, 'exit');
+  exited.catch(() => {});
+  try {
+    const [message] = await Promise.race([
+      once(child, 'message'),
+      exited.then(() => {
+        throw new Error('Owned child exited before receipt barrier');
+      }),
+    ]);
+    assert.equal(message, 'final-receipt-waiting');
+    assert.equal((await fixture.readEvidence()).activeClaims, 1);
+    await assert.rejects(fixture.close(), /Await owned child/);
+    await assert.rejects(fixture.setFailureModes({ authFailure: true }), /Await owned child/);
+    await writeFile(release, 'release');
+    const [code] = await exited;
+    assert.equal(code, 0);
+    const evidence = await fixture.readEvidence();
+    assert.equal(evidence.activeClaims, 0);
+    assert.equal(evidence.records.length, 1);
+    assert.equal(evidence.records[0].outcome, 'success');
+    assert.equal(evidence.records[0].stage, 'complete');
+    await fixture.close();
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      await writeFile(release, 'release');
+      child.kill('SIGTERM');
+    }
+    await exited;
+  }
+});
+
+async function snapshotFixtureFiles(fixture) {
+  const names = (await readdir(fixture.directory)).sort();
+  return {
+    names,
+    contents: await Promise.all(names.map((name) => readFile(join(fixture.directory, name)))),
+  };
+}
+
+async function assertUnchangedFixtureFiles(fixture, before) {
+  const after = await snapshotFixtureFiles(fixture);
+  assert.deepEqual(after.names, before.names);
+  assert.ok(after.contents.every((contents, index) => contents.equals(before.contents[index])));
+  assert.deepEqual((await fixture.readLedger()).calls, []);
+  const evidence = await fixture.readEvidence();
+  assert.equal(evidence.activeClaims, 0);
+  assert.equal(evidence.records.length, 0);
+  assert.equal(evidence.errors, 0);
+}
+
+test('invalid configuration fails before claims without any ledger, receipt or file effect', async (context) => {
+  const fixture = await own(context);
+  await writeFile(join(fixture.directory, 'config.json'), 'not valid fixture JSON');
+  const before = await snapshotFixtureFiles(fixture);
+  await assert.rejects(invoke(fixture, panelList), { code: 2 });
+  await assertUnchangedFixtureFiles(fixture, before);
+});
+
+test('invalid arguments fail before claims even while another owner holds the lock', async (context) => {
+  const fixture = await own(context);
+  const lock = join(fixture.directory, 'active.lock');
+  await writeFile(lock, 'test-owned-lock', { flag: 'wx' });
+  try {
+    const before = await snapshotFixtureFiles(fixture);
+    await assert.rejects(invoke(fixture, [...panelList, '--unexpected']), { code: 2 });
+    await assertUnchangedFixtureFiles(fixture, before);
+  } finally {
+    await unlink(lock);
+  }
+});
+
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  test(`queued ${signal} cancels before dispatch, cleans only its claim and preserves foreign ownership`, async (context) => {
+    const fixture = await own(context);
+    const lock = join(fixture.directory, 'active.lock');
+    await writeFile(lock, 'test-owned-lock', { flag: 'wx' });
+    const pending = invoke(fixture, create);
+    pending.catch(() => {});
+    try {
+      await waitForClaims(fixture, 1);
+      assert.equal(pending.child.kill(signal), true);
+      await assert.rejects(pending, { code: 2, signal: null });
+      assert.equal(await readFile(lock, 'utf8'), 'test-owned-lock');
+      const ledger = await fixture.readLedger();
+      assert.deepEqual(ledger.calls, []);
+      assert.deepEqual(ledger.pullRequests, []);
+      const evidence = await fixture.readEvidence();
+      assert.equal(evidence.activeClaims, 0);
+      assert.equal(evidence.errors, 0);
+      assert.equal(evidence.records.length, 1);
+      assert.equal(evidence.records[0].stage, 'waiting');
+      assert.equal(evidence.records[0].outcome, 'cancelled');
+    } finally {
+      await pending.catch(() => {});
+      await unlink(lock);
+    }
+  });
+}

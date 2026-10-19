@@ -1,7 +1,7 @@
 # Provider SDK compatibility review and results
 
-Status: 19 October 2026. Hosted6ea passed clean Electron72, browser42 plus its existing context-fixture skip, Sonar and dependency review, but failed48 Git API cases. A controlled predecessor-order probe reproduced a cached test-mock defect; its reviewed fixture-only repair is being qualified. No merge-ready claim.
-No complete hosted qualification, integration, owner-app rebuild or stress readiness is claimed.
+Status: 19 October 2026. PR362 merged at7b816c61; protected PR363 remains blocked by CodeQL12 until actual repaired-source delivery. PR364 at576ca2dc is pushed, but its green Sonar check/gate has four actual open S9382 findings. The bounded two-file notation repair passes independent source review,27 unchanged controls and the actual four-queued-API-read proof; current native verification passes first attempt; normal hooks and fresh complete hosted gates remain required. Earlier8e had a full benchmark pass but71 Electron passes plus one flaky case and is not merge-qualified. No protected delivery, owner-app rebuild, live-model success or stress readiness is claimed.
+Earlier pending states below retain their named source/time bindings and do not override this checkpoint.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
 
@@ -9,6 +9,167 @@ Evidence root: `/Users/letuscode/.codex/provider-sdk-20261018`; source base stag
 Qualified provider protocol/generation checks below use researched owned HTTP fixtures and the actual pinned SDKs.
 It does not establish live model availability, account permissions or generation quality. The owner
 app/profile remains unchanged; paused orchestration, main and the disabled Docker gateway are preserved.
+
+## Asynchronous fixture quality follow-up
+
+Actual576 analysis is source-bound in pr364-576-sonar-opening.json: commit576ca2dc, gateOK but
+four open minor S9382 findings. They concern lock-poll delay and sequential receipt open/read/close.
+The independently reviewed correction uses an asynchronous polling function with one original start
+and deadline, plus a strict sequential Promise chain calling an extracted single-receipt reader.
+One-second lock budget, abort checks, owned cleanup, sorted512-file bound, one descriptor at a time,
+2049-byte probe/2048-byte limit, safe enum/numeric projection, catch/error count and final close
+remain unchanged. No product behavior, retry/assertion/deadline or test-budget changes, exclusions
+or rule suppressions are introduced.
+
+The unchanged27 controls pass6.133seconds, zero failures/skips/cancellations; actual compiled-API
+four-queued-read proof passes with four outputs/ledger rows and zero remaining claims/errors.
+gh-fixture-awaitloop-source-and-qualification.json binds exact source and evidence; test bodies are
+unchanged from576. The focused native journey passes first attempt in14.156seconds, retry/flaky/skip0.
+Both safe snapshots retain71 terminal records:65 successes, five expected pre-PR-check failures and
+one intentional lost-create-response failure. All panel PR lists succeed, maximum wait17ms,
+claims/evidence errors/truncation0, exactly one create/PR and successful reconciliation without replay.
+All four code/runtime bindings remain unchanged; Electron and both owned ports close.
+git-fixture-native-second-qualification.json retains the actual result. Combined documentation review,
+normal hooks and fresh actual Sonar0/full hosted qualification remain required at this checkpoint. Historical
+576 native and8e full-suite/benchmark results keep their named source bindings below.
+
+## Git fixture concurrency and retained failures
+
+Actual8e hosted evidence is in pr364-8e99-hosted-connected-verification.json. Its complete benchmark
+passes900 measured requests/990 fixture calls across nine vectors, maximum added p95 3.823261ms
+under unchanged20ms. API604, DB236 and the correct focused63 cases pass; both SDK native journeys
+pass first attempt. Electron's full72-case report contains71 expected passes and one flaky Git-panel
+publishing case, so overall qualification remains false despite green CI checks.
+
+Retry0 received safe unavailable PR data from the owned gh read after successful startup; the PRs
+view correctly lacked its Title field. Eleven PR-list responses were HTTP200, with no pending reads.
+The old failure path omitted CLI stage/ledger evidence. Exact historical cause remains unproven.
+Source inspection found that the fixture rejects every overlapping exclusive ledger lock while
+production permits bounded concurrent reads. A controlled old-source reproduction through four
+actual API read operations confirms process_failed and zero ledger calls while an owned child holds
+the lock; gh-fixture-old-lock-reproduction.json/log retain that independent fixture defect.
+
+Critique approved at most one second of monotonic lock serialization inside the same CLI invocation,
+unique active claims so queued children prevent reconfiguration/cleanup, and strict owned lock/claim
+release. Safe bounded stage/outcome receipts plus unconditional before/after cleanup evidence avoid
+raw arguments, environment or errors. Existing invalid/foreign-command denial, busy timeout, atomic
+ledger and one-effect/lost-response checks remain; no product/API/UI retries, test-budget, assertion
+or deadline changes. Review caught final-receipt ownership and invalid pre-claim writes; both are
+corrected. A controlled queued SIGTERM/SIGINT probe reproduced stranded claims; cooperative
+cancellation now prevents dispatch, persists a safe cancelled receipt and releases only its own
+claim. Forced SIGKILL remains fail-closed, with no speculative filesystem recovery.
+
+Final local27 fixture controls pass in6.172seconds and all33 Git Node controls pass in6.016seconds,
+zero failures/skips/cancellations. Original16 cases and five-second invocation helper remain verbatim.
+The actual compiled API four-read proof succeeds after all four queued claims are observed and the
+held lock is released: four outputs/ledger rows, zero remaining claims/errors. Frozen evidence is
+gh-fixture-cancel-source-and-qualification.json; earlier controlled failures remain retained.
+The focused native publishing/lost-response case passes first attempt in12.931seconds, no retry/skip/
+flake. Before/after snapshots have78 terminal calls,71 successes, six expected pre-PR check errors
+and one intentional lost-create-response error. Every PR list succeeds; maximum lock wait13ms,
+claims/evidence errors/truncation all zero. Exactly one PR is created and reconciled, fresh push and
+remote identity retained, all owned processes/ports closed. git-fixture-native-first-qualification.json
+binds the four code sources and existing unchanged production/dist bytes; no owner profile or paid
+model call is involved. Final combined review, normal hooks and fresh clean full hosted qualification
+remain required at this dated local checkpoint. Current workflow outcomes belong in Beads/PRs.
+
+The supersededb8 run39182710133 failed its benchmark: actual artifact12156329045 contains only three
+vectors/300 measurements/330 calls, completedfalse. Healthy43.318715ms and locked46.076602ms exceed
+the20ms limit. pr364-b8-benchmark-failure-independent-review.json binds raw ZIP/member/log evidence.
+Timing, event-loop and GC observations do not establish cause; retain SDK-PERF01 without claiming
+unrelated key/fixture repairs fix performance. Current8e's full fresh pass is a separate qualification.
+
+## Hosted review boundaries and follow-up
+
+PR364 review found a real format-validation gap: Node's base64 decoder can ignore invalid characters
+and still yield32bytes. The new fallback path must require canonical base64 before decoding; focused
+adversarial controls include ignored characters, whitespace, padding aliases and invalid pad bits.
+Review also found incomplete test log capture. The privacy fixture must cover all used console
+channels, the configured structured-logger sink and owned-child output, with positive controls that
+prove simulated leaks are detected. No key/revision value may be printed when those assertions fail.
+Final local qualification passed63/63 across three files in16.48seconds, with no retries, skips or
+unhandled failures; API build/types/lint/format pass. This includes20 binding controls,42 prior/context
+cases and one actual fallback-approval process-restart case. The process case uses the real maintained
+SDK against an owned loopback provider, zero saved configurations and the same valid master/model/
+provider endpoint. It confirms an approved encrypted continuation, one pending/null-completion audit
+and no file effect before the crash; a new API process marks the run interrupted/process_interrupted.
+Resume returns409 RUN_NOT_RUNNING, with provider requests still exactly1 and encrypted history,
+approval/resumedAt/claim/execution/audit rows unchanged. No new generation runtime was needed.
+
+Retain initial fixture failures: expecting zero audit rows was incorrect because pending approval is
+itself audited; the corrected assertion requires exactly one pending row and unchanged postrestart
+state. A same-API-origin restart also hit ECONNRESET; each child now owns a fresh API port while the
+provider endpoint/master/model remain identical. Its historical socket cause is unproven; no retry,
+assertion or deadline was relaxed. Logs/compiled-source hashes bind the final63 case receipt
+pr364-review-repair-source-and-qualification.json. A final notation-only0-9 to\d character-class
+change retains that63-case receipt's original source binding;65,536 BMP memberships,262,144 pattern
+substitutions and1,285 canonical cases prove equivalence. No underscore or non-ASCII digit is added.
+Final normal hooks will compile and test the actual shorthand source. Actual hosted reviews/security
+and all protected gates remain future at this dated checkpoint; later status belongs in Beads/PRs.
+
+The restart warning is distinct from credential identity. The existing shared run-control service
+creates a process identity and marks older active executions interrupted/outcome_unknown on startup;
+resume checks that persisted authority before private-binding validation or approval claim. Stable
+credential identity cannot bypass that fence. The actual fallback-specific SDK/API child-process
+restart regression above proves409 with no new provider/audit/file or approval-claim effect.
+Same-process SQLite reopen tests are not represented as process-restart evidence. No new orchestration
+or execution-generation runtime is introduced unless a concrete regression requires it.
+
+This MVP has one local API instance. Shut down/drain the old owner app before opening the upgraded
+build. Prepatch weak fallback pending identities fail closed with new-request recovery; there is no
+rolling mixed-version approval compatibility promise. Cross-worker resumable continuation requires
+a valid configured master; masterless identity is process-local and supports the existing keyless
+plaintext route. Multi-worker/rolling deployment support belongs to later distribution architecture,
+not this repair. Existing Stop, secret/private persistence and tool-admission requirements still apply.
+
+## Actual Sonar follow-up
+
+Atb8cfddc1, Sonar reported gateOK/checkSUCCESS while its direct API returned nine open issues:
+S1121 on a lazy assignment expression and S5906 on eight assertions. These are not waived by green
+check status. The repair extracts purpose-secret selection into equivalent explicit statements,
+retaining the exact domain/HMAC bytes and strict undefined versus invalid-present master handling.
+Length matchers receive null projections of private bindings so failure output remains safe;
+private-revision comparison stays boolean, while nonsecret PID comparison uses a direct matcher.
+Focused tests, frozen source/document critique, normal hooks and new actual hosted zero-issue
+qualification remain required. No assertion, timeout, scan, product deadline or benchmark limit is
+weakened. Current outcomes belong in Beads/PRs rather than rewriting prior frozen evidence claims.
+
+## Protected credential-binding correction
+
+CodeQL alert12 on protected PR363 at7b816c61 found an unkeyed SHA256 over the fallback resolved
+configuration, including a header/environment API credential. Saved-model configuration revisions
+already use their encrypted envelope and remain separate. The actual finding is on the pull-request
+head ref; an empty merge-ref alert query did not clear the failing check or unresolved thread.
+
+The independently approved bounded design uses the credential as an HMAC key, with a fixed domain,
+a private purpose secret and an explicit public provider/model/endpoint projection as message input.
+It never serializes the credential-containing configuration into a hash message. The purpose secret
+comes from a separately domain-separated existing validated master key, or a module-private random
+secret when no master key is configured. Keyless identity uses a distinct domain/presence marker.
+This is private credential identity, not password verification or a new credential store. A configured
+invalid master fails closed. With a valid configured master, the same patched source/configuration
+remains stable across restart; masterless identities are process-local and are not cross-process
+continuation credentials. Changing any binding material changes its identity. Existing prepatch pending fallback identities
+must fail closed with the normal new-request recovery; no weak backwards fallback is added.
+
+Focused resolver tests passed52/52 in18.58seconds:42 context-admission cases, including denial of
+legacy unkeyed private-binding replay, plus10 new fallback-identity controls. Three separate clean Node
+processes with reopened disposable SQLite prove same-master identity stability and changed-master
+separation through private IPC; this does not resume a pending approval after restart. The existing
+restart interruption rule remains unchanged. Header/environment credential changes, public binding
+fields, keyless undefined-master text and empty/malformed-present-master denial are covered. No
+external model service is called by this focused boundary test. API build, types and scoped lint pass.
+Logs are fallback-binding-api-build.log, fallback-binding-focused-first.log, fallback-binding-types.log
+and fallback-binding-lint.log in the evidence root. A final test-only strengthening requires readable
+success for every expected200 stream, exact private capture counts and all synthetic credential
+privacy checks. Its10 cases passed7.31seconds on testSHA59acda32, with independent critique; the
+prior combined52 receipt retains its earlier test bytes. This strengthening overlapped the first
+bd04 push-hook checkpoint, so that mixed-worktree run is retained historically and does not establish
+exact committed-test qualification. The final follow-up commit requires fresh normal full hooks and
+benchmark, with no published amendment. The frozen source/test/doc review, normal hooks
+and fresh exact-head hosted qualification remain pending at this local checkpoint. New actual
+unsuppressed CodeQL checks, both head/merge alerts and all protected gates are mandatory. No old7b
+scan or CI result qualifies the changed repair source; later status belongs in current Beads and PRs.
 
 ## Current qualification
 

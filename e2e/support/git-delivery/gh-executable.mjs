@@ -11,6 +11,9 @@ import {
 } from 'node:fs';
 import { join, isAbsolute } from 'node:path';
 import process from 'node:process';
+import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const fields = 'number,url,headRefName,baseRefName,title,body,isDraft';
 const panelFields =
@@ -190,39 +193,150 @@ function dispatch(request, config, ledger) {
   return { code: 0, output: `${pr.url}\n` };
 }
 
-function run() {
+const LOCK_BUDGET_MS = 1000;
+
+async function lockDelay(milliseconds, signal) {
+  try {
+    await delay(milliseconds, undefined, { signal });
+  } catch (error) {
+    if (!signal.aborted) throw error;
+  }
+}
+
+async function acquireLock(lock, owner, signal) {
+  const start = performance.now();
+  async function attempt(first) {
+    if (signal.aborted || (!first && performance.now() - start >= LOCK_BUDGET_MS))
+      return { acquired: false, waitMs: Math.ceil(performance.now() - start) };
+    try {
+      const descriptor = openSync(lock, 'wx', 0o600);
+      try {
+        writeFileSync(descriptor, owner);
+      } finally {
+        closeSync(descriptor);
+      }
+      return { acquired: true, waitMs: Math.ceil(performance.now() - start) };
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+    }
+    const remaining = LOCK_BUDGET_MS - (performance.now() - start);
+    if (remaining > 0) await lockDelay(Math.min(10, remaining), signal);
+    return attempt(false);
+  }
+  return attempt(true);
+}
+
+function finishClaim(claimed, claim, record, cancel) {
+  try {
+    if (claimed) {
+      try {
+        record();
+      } finally {
+        // The claim protects every fixture write, including the final receipt.
+        unlinkSync(claim);
+      }
+    }
+  } finally {
+    process.off('SIGTERM', cancel);
+    process.off('SIGINT', cancel);
+  }
+}
+
+async function run() {
   const directory = process.env.GIT_DELIVERY_GH_FIXTURE_DIR;
   if (!directory || !isAbsolute(directory)) throw new Error('Owned fixture directory required');
-  const config = JSON.parse(readFileSync(join(directory, 'config.json'), 'utf8'));
-  if (config.version !== 1) throw new Error('Unsupported fixture version');
-  // Validate before locking or recording: unsupported commands never look successful.
-  const request = parse(process.argv.slice(2), config.repository);
+  const owner = randomUUID();
   const lock = join(directory, 'active.lock');
-  const descriptor = openSync(lock, 'wx', 0o600);
-  closeSync(descriptor);
-  const temporary = join(directory, `ledger.${process.pid}.tmp`);
+  const claim = join(directory, `claim.${owner}`);
+  const temporary = join(directory, `ledger.${owner}.tmp`);
+  const receiptPath = join(directory, `receipt.${owner}.json`);
+  const receiptTemporary = `${receiptPath}.tmp`;
+  const receipt = {
+    version: 1,
+    kind: 'unknown',
+    stage: 'configuration',
+    outcome: 'running',
+    startedAtMs: Date.now(),
+    waitMs: 0,
+    lockBudgetMs: LOCK_BUDGET_MS,
+  };
+  let claimed = false;
+  let acquired = false;
+  const cancellation = new globalThis.AbortController();
+  const cancel = () => cancellation.abort();
+  const record = () => {
+    writeFileSync(receiptTemporary, JSON.stringify(receipt), { mode: 0o600 });
+    renameSync(receiptTemporary, receiptPath);
+  };
   try {
+    const config = JSON.parse(readFileSync(join(directory, 'config.json'), 'utf8'));
+    if (config.version !== 1) throw new Error('Unsupported fixture version');
+    // Invalid commands never acquire claims, the lock or ledger effects.
+    receipt.stage = 'validation';
+    const request = parse(process.argv.slice(2), config.repository);
+    receipt.kind = request.kind;
+    process.on('SIGTERM', cancel);
+    process.on('SIGINT', cancel);
+    receipt.stage = 'claim';
+    closeSync(openSync(claim, 'wx', 0o600));
+    claimed = true;
+    receipt.stage = 'waiting';
+    record();
+    const ownership = await acquireLock(lock, owner, cancellation.signal);
+    receipt.waitMs = ownership.waitMs;
+    acquired = ownership.acquired;
+    if (cancellation.signal.aborted) {
+      receipt.outcome = 'cancelled';
+      process.exitCode = 2;
+      process.stderr.write('Owned GitHub fixture invocation cancelled\n');
+      return;
+    }
+    if (!acquired) {
+      receipt.outcome = 'lock_timeout';
+      process.exitCode = 2;
+      process.stderr.write('Owned GitHub fixture lock deadline exceeded\n');
+      return;
+    }
+    receipt.stage = 'ledger_read';
     const path = join(directory, 'ledger.json');
     const ledger = JSON.parse(readFileSync(path, 'utf8'));
+    receipt.stage = 'dispatch';
     const result = dispatch(request, config, ledger);
     ledger.calls.push({
       args: process.argv.slice(2),
       outcome: result.code === 0 ? 'success' : 'error',
     });
+    receipt.stage = 'persist';
     writeFileSync(temporary, `${JSON.stringify(ledger)}\n`, { mode: 0o600 });
     renameSync(temporary, path);
+    receipt.stage = 'output';
     if (result.output) process.stdout.write(result.output);
     if (result.error) process.stderr.write(`${result.error}\n`);
     process.exitCode = result.code;
+    receipt.outcome = result.code === 0 ? 'success' : 'command_error';
+    receipt.stage = 'complete';
+  } catch {
+    receipt.outcome = 'fixture_error';
+    process.stderr.write('Invalid or busy owned GitHub fixture invocation\n');
+    process.exitCode = 2;
   } finally {
-    if (existsSync(temporary)) unlinkSync(temporary);
-    unlinkSync(lock);
+    try {
+      if (existsSync(temporary)) unlinkSync(temporary);
+      // A queued or timed-out invocation must never release another invocation's lock.
+      if (acquired && readFileSync(lock, 'utf8') === owner) unlinkSync(lock);
+    } catch {
+      receipt.stage = 'cleanup';
+      receipt.outcome = 'fixture_error';
+      process.exitCode = 2;
+    } finally {
+      finishClaim(claimed, claim, record, cancel);
+    }
   }
 }
 
 try {
-  run();
+  await run();
 } catch {
-  process.stderr.write('Invalid or busy owned GitHub fixture invocation\n');
+  process.stderr.write('Owned GitHub fixture evidence or cleanup failed\n');
   process.exitCode = 2;
 }

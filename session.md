@@ -1,3 +1,172 @@
+# Provider SDK — bounded asynchronous fixture cleanup, 19 October 2026
+
+Owner-authorized delivery remains in progress. PR362 merged at7b816c61; protected
+[PR363](https://github.com/jwill9999/agent-platform/pull/363) remains at that older source and
+blocked by CodeQL12 until the actual repair reaches the feature. Repair
+[PR364](https://github.com/jwill9999/agent-platform/pull/364) is pushed at576ca2dc. Its green
+Sonar check/gate nevertheless has four actual open S9382 issues in the owned Git fixture's lock
+polling and sequential evidence reads; those findings are not waived. Current hosted checks are
+still running and do not qualify this subsequent changed source.
+
+The independently reviewed two-file correction replaces await-in-loop notation with a fixed-start
+asynchronous lock attempt and a sequential Promise chain with a single-receipt helper. The original
+one-second deadline, cancellation/ownership rules, sorted512-file bound, one open descriptor,
+2048-byte receipt limit, safe projection and per-file error handling remain unchanged. All27
+unchanged fixture controls pass in6.133seconds, zero failures/skips/cancellations. The actual compiled
+API four-queued-read proof passes with four outputs/ledger rows and zero remaining claims/errors.
+The current focused native publishing/lost-response journey passes first attempt in14.156seconds,
+zero retry/flaky/skip. Both safe snapshots retain71 terminal invocations, all panel PR lists successful,
+maximum lock wait17ms, zero claims/evidence errors/truncation and exactly one intentional lost-create
+response/one reconciled PR. Source/runtime hashes stay unchanged and owned processes/ports close.
+No product behavior, retries, assertions, test budget or security suppression changes. Final combined
+review, normal hooks and fresh full hosted qualification remain required at this checkpoint; later
+outcomes belong in Beads/PRs without rewriting frozen source.
+
+Retain both genuine historical failures: b8's incomplete benchmark exceeded20ms and8e's Electron
+suite has71 passes plus one flaky publishing case despite successful job badges. Their causes remain
+unproven; the controlled fixture concurrency defect does not establish the historical trace's cause.
+The earlier full8e benchmark and focused576 native pass remain bound to their exact source. Neither
+substitutes for a fresh complete benchmark and clean72 Electron cases on the final head.
+
+Both SDK Beads tasks remain in_progress. After feature delivery, require PR363's actual fixed head,
+fresh unsuppressed CodeQL, genuine full analysis, signed packaged macOS VM and all live checks and
+comments before protected squash. Preserve original key/profile for later staged app rebuild and
+recording/export/restart. Native owner-app preflight awaits the requested Mac unlock; no app change,
+paid request, live model success, stress readiness or delivered-branch cleanup is claimed. Main,
+paused PR283/orchestration and the disabled Docker gateway remain separate.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier checkpoint follows verbatim; its pending statements are historical. -->
+
+# Provider SDK — Git fixture follow-up, 19 October 2026
+
+Owner-authorized delivery remains in progress. PR362 merged into the feature at7b816c61;
+protected [PR363](https://github.com/jwill9999/agent-platform/pull/363) still has that old head and
+remains blocked by CodeQL12. Repair [PR364](https://github.com/jwill9999/agent-platform/pull/364)
+at8e998a8f has zero actual Sonar issues and all six review threads resolved. Its API604/DB236 and
+fresh full900-measurement/990-call benchmark passed, maximum added p95 3.823261ms below20ms.
+Browser42 plus one known context skip passed. Both SDK Electron journeys passed first attempt,
+but the complete Electron report has71 passes and one flaky Git-panel case. Green job badges do
+not satisfy the agreed clean72 gate; do not merge this source.
+
+The failed publishing case selected PRs but received safe unavailable PR data from the owned GitHub
+CLI read, so its Title field never appeared. Startup succeeded and11 PR-list responses were HTTP200
+with no pending reads. Failed-command evidence was omitted by success-only fixture attachments;
+its exact historical cause remains unproven. The fixture immediately rejects overlapping exclusive
+ledger locks despite legitimate concurrent reads. A controlled old-source reproduction makes four
+real API read operations fail with process_failed and no ledger entries while an owned child holds
+that lock. This establishes a fixture concurrency defect without claiming the old trace's cause.
+
+Independent critique approved a bounded fixture-only repair: one CLI invocation waits at most one
+second for its exclusive lock, with unique queued claims preventing configuration/cleanup races and
+strictly owned cleanup. Safe enum stage/outcome receipts and unconditional failure-path summaries
+preserve evidence. Review corrected final-receipt ownership and pre-claim invalid-input writes;
+controlled queued SIGTERM/SIGINT also exposed stranded claims. Cooperative cancellation now prevents
+dispatch, records cancellation and releases only its own claim; forced SIGKILL remains fail-closed.
+All27 fixture controls and all33 Git Node controls passed with zero failures/skips/cancellations;
+original16 test bodies and the five-second invocation helper remain unchanged. The focused actual
+Electron publishing/lost-response case passed first attempt in12.931seconds, no retries/skips/flakes.
+Both safe snapshots retained78 terminal invocations, all PR lists successful, max lock wait13ms,
+zero claims/evidence errors/truncation and exactly one intentional lost-response PR creation.
+Owned processes/ports closed. No application, API/UI retry, assertion, product deadline or test-budget
+change. Final combined review, normal hooks and fresh clean hosted qualification remain required at
+this local checkpoint; later results belong in Beads/PRs without rewriting frozen source.
+
+Retain the separate olderb8 benchmark failure: only three vectors/300 measurements/330 calls were
+captured before the first assertion; healthy43.318715ms and locked46.076602ms exceeded20ms.
+SDK-PERF01's cause is unproven, and unrelated key/fixture repairs are not performance fixes. The
+current complete8e benchmark is independently qualified; it does not erase that failure.
+
+Both SDK Beads tasks remain in_progress. After qualified repair delivery, verify PR363's actual fixed
+head and require fresh unsuppressed CodeQL, full analysis, signed packaged macOS VM and all live
+checks/comments before protected squash. Preserve the original key/profile for the later rebuild,
+recording/export/restart and owner-led live-model check. The Mac is currently locked; an unlock
+request is pending for native preflight. No owner-app change, paid call, staging/cleanup, live-model
+success or stress readiness is claimed. Main, paused PR283/orchestration and disabled Docker gateway
+remain separate. Later current status belongs in Beads/PRs; earlier checkpoints remain verbatim.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier checkpoint follows verbatim; its pending statements are historical. -->
+
+# Provider SDK — final quality follow-up, 19 October 2026
+
+Owner authorization continues through PR362/feature/staging merges only after every actual check
+and comment clears, delivered-only recovery cleanup and preserved-profile app preparation. PR362
+merged normally at7b816c61. Protected PR363 remains blocked on CodeQL alert12 until the actual
+credential-binding repair is delivered through the feature branch and freshly qualified.
+
+Repair [PR364](https://github.com/jwill9999/agent-platform/pull/364) is open atb8cfddc1. Independent
+review approved the bounded HMAC/private identity design and source. Final normal hooks passed all
+593 API cases and a fresh900/990 benchmark, maximum added p95 2.534041ms under unchanged20ms.
+Its Sonar check reported SUCCESS/gateOK, but the actual API found nine open issues: one lazy-assignment
+expression and eight assertion-style findings. Do not treat the green check as clearance.
+
+The bounded follow-up extracts the lazy-purpose-secret expression without changing derived bytes,
+invalid-master or keyless semantics. Dedicated cardinality matchers use a null projection, so failed
+tests cannot dump private binding identities; private equality stays a boolean comparison. Original
+assertions, product deadlines and benchmark limits remain. Hosted review also identified permissive
+base64 decoding and incomplete privacy-test log capture; canonical fallback-master validation and
+all-used-channel/sink/output controls are being qualified. The restart warning is already fenced by
+shared persisted run control before approval claim; an actual fallback-specific process-restart409/
+no-effects regression passed. Final local63/63 passed16.48seconds with no retry/skip/unhandled
+failure, plus API build/types/lint/format. The real SDK/owned-loopback fallback case verifies approved
+encrypted history, new process interruption and409 with unchanged provider1/audit/approval/claim/file
+effects. Retain its initial zero-audit fixture mistake and transient same-origin ECONNRESET; final
+children use fresh owned API ports without changing provider identity or relaxing deadlines.
+Final digit-class shorthand is notation-only with exhaustive membership/corpus equivalence; the63-case
+receipt keeps its earlier regex bytes, and final normal hooks must compile/test the current source. Valid configured-master identity can survive restart; masterless
+identity is process-local. The single local owner app must shut down before upgrade; no rolling or
+multi-worker approval compatibility is promised in this MVP. Actual focused evidence/source review,
+normal hooks and fresh current-head hosted quality/security checks remain required. Later status
+belongs in Beads/PRs; the dated checkpoints below are retained verbatim.
+
+Owner-app preparation research safely verified the original primary Make key matches its stored
+credential once in memory on a private read-only snapshot. No key value, fingerprint or plaintext
+was logged; source DB/key were not changed. Pin that existing key/profile on rebuild after stagedelivery.
+The actual app command runner is disabled and has no VM resources configured; preserve that state
+for owner-led live model testing, with no host/Docker fallback or VM/shell readiness claim. No new
+paid model call, app restart/build, owner stress trial, Notion/global change, main promotion or paused
+orchestration/PR283 integration is claimed. Both SDK Beads tasks remain in_progress.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier checkpoint follows verbatim; its later-state limits remain historical. -->
+
+# Provider SDK — protected credential-binding repair, 19 October 2026
+
+Owner authorized PR362 merge, protected feature-to-staging delivery after every check/comment clears,
+delivered-branch cleanup and app preparation for owner-led live model testing. PR362 merged normally
+at7b816c61 after all11 executed checks passed on independently reviewedeca47820. Fetched feature tree
+ce9273f8 matches that source and the refreshed conflict-free stagingece78d8a rehearsal.
+
+Protected [PR363](https://github.com/jwill9999/agent-platform/pull/363) is open7b→stagingece. Its full
+Promptfoo analysis and Dependency Review succeeded, but CodeQL raised high alert12 at the fallback
+chat credential revision: SHA256 of the resolved configuration includes the API key. Saved-model
+credential revisions already use the encrypted envelope and are separate. Do not merge this head.
+CodeQL findings must include actual head and merge refs plus check annotations; an empty merge-ref
+query does not clear the actual head-ref alert or its unresolved thread.
+
+The bounded repair uses a separately domain-separated private purpose secret and the credential as
+an HMAC key over explicit nonsecret fields, preserving credential-change fences, keyless text, saved
+configuration and existing Stop/restart semantics. It adds no stored header credentials or replacement
+master key. Independent design critique approved. Focused actual-resolver52/52 passed18.58seconds,
+including three clean-process identity checks and legacy weak-binding replay denial; API build/types
+and scoped lint pass. Final strengthened10 cases passed7.31seconds with independent approval; the
+prior52 receipt keeps its old test bytes. That assertion-only delta overlapped bd04 push hooks, so
+retain the mixed checkpoint and require fresh full normal hooks/benchmark on the final follow-up.
+No published commit is amended. Source/test/doc critique and normal hooks remain pending at this dated
+local checkpoint; later outcomes belong in current Beads/PRs. Then verify PR363 receives the fixed source,
+resolve only the fixed thread and require new exact-head full scan, actual packaged VM and all live
+gates. Old7b scan/CI results cannot qualify the changed source. Current status belongs in Beads.
+
+Both SDK tasks remain in_progress. Owner app/profile/key and paid model calls remain untouched;
+prepare the preserved-profile rebuild/recording/export/restart only after qualified staging delivery.
+No live-account success or stress readiness is claimed. Paused orchestration/PR283 remain separate,
+main unpromoted, Docker gateway disabled, and no Notion/global changes. Earlier checkpoints below
+are historical and retained verbatim; superseded pending/authority statements do not override this one.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier checkpoint follows verbatim. -->
+
 # Provider SDK and model choice — 19 October 2026
 
 Owner approved the bounded SDK/provider MVP with OpenAI, Claude, Gemini, DeepSeek and Grok,

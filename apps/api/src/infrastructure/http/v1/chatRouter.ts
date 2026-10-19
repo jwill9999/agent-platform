@@ -116,7 +116,7 @@ import type { ObservabilityStore } from '@agent-platform/plugin-observability';
 import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import type { Request, Response, Router } from 'express';
 import { Router as createRouter } from 'express';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID, randomBytes, createHmac } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { isAbsolute, relative, sep } from 'node:path';
 import { z } from 'zod';
@@ -442,6 +442,41 @@ function resolveDefaultModelConfig(db: DrizzleDb): ResolvedChatModel | undefined
   return defaultModelConfig ? resolvedConfiguredModel(db, defaultModelConfig) : undefined;
 }
 
+let processFallbackPurposeSecret: Buffer | undefined;
+
+function fallbackPurposeSecret(): Buffer {
+  const masterKey = process.env['SECRETS_MASTER_KEY'];
+  if (masterKey === undefined) {
+    if (processFallbackPurposeSecret === undefined) processFallbackPurposeSecret = randomBytes(32);
+    return processFallbackPurposeSecret;
+  }
+  if (!/^[A-Za-z\d+/]{43}=$/.test(masterKey))
+    throw new Error('Invalid fallback master key configuration');
+  const parsedMasterKey = parseMasterKeyFromBase64(masterKey);
+  if (parsedMasterKey.toString('base64') !== masterKey)
+    throw new Error('Invalid fallback master key configuration');
+  return createHmac('sha256', parsedMasterKey)
+    .update('agent-platform/fallback-revision-purpose/v1')
+    .digest();
+}
+
+/** Private signing identity, never a reusable unkeyed verifier of the API credential. */
+function fallbackCredentialRevision(config: ResolvedChatModel): string {
+  const purposeSecret = fallbackPurposeSecret();
+  const credential = config.apiKey;
+  return createHmac('sha256', credential ?? purposeSecret)
+    .update(
+      credential !== undefined
+        ? 'agent-platform/fallback-revision/credential/v1\0'
+        : 'agent-platform/fallback-revision/keyless/v1\0',
+    )
+    .update(purposeSecret)
+    .update(
+      JSON.stringify({ provider: config.provider, model: config.model, baseURL: config.baseURL }),
+    )
+    .digest('hex');
+}
+
 /** Resolve model config or throw an HttpError on failure.
  *
  * Precedence (highest → lowest):
@@ -481,10 +516,7 @@ function resolveModelOrThrow(
   if (resolution.kind === 'error') {
     throw new HttpError(400, resolution.code, resolution.message);
   }
-  return bindContinuation(
-    resolution.config,
-    createHash('sha256').update(JSON.stringify(resolution.config)).digest('hex'),
-  );
+  return bindContinuation(resolution.config, fallbackCredentialRevision(resolution.config));
 }
 
 function resolveStoredModelConfigKeyOrThrow(
