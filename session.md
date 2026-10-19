@@ -1,3 +1,33 @@
+# Provider SDK — distinct Git-test startup ports, 19 October 2026
+
+PR362 and repair PR364 are merged into the feature at a9e8ac61. Protected
+[PR363](https://github.com/jwill9999/agent-platform/pull/363) contains the reviewed fix; actual
+CodeQL Actions/JavaScript/Swift analyses pass with zero findings, alert12 is fixed without dismissal,
+and Sonar has zero open issues. Both full scans completed five genuine batches with no findings.
+API604/DB236, browser42 plus one known skip, fresh900/990 benchmark max4.119057ms and real packaged
+macOS VM20 pass. The full Electron job is green but contains71 passes plus one flaky case, so staging
+is still blocked. The two SDK journeys pass separately; no result waives the clean72 gate.
+
+This new failure precedes every Git operation: the first home screen displays “WebSockets request
+was expected” instead of Open folder. The old fixture allocates two app ports while Playwright's
+Node/Chromium debuggers choose ephemeral ports. Existing migration/VM fixtures already allocate
+four distinct ports explicitly. Critique approved reusing that helper for all three Git launches,
+retaining safe actual port/HTTP evidence and every assertion, deadline and retry policy. Exact failed
+debugger identity was not captured; the collision mechanism remains a source-backed lead. The
+renderer readiness predicate accepting400 is a separate follow-up in the existing startup P1.
+The current three native Git journeys pass once, workers1/retries0, no flakes/skips:30.2seconds total.
+Every renderer is owned HTTP200 HTML; actual Node inspector ports match their distinct allocations,
+while Chromium ports are verified configuration only (actual endpoint unknown). All12ports close,
+source/runtime hashes stay unchanged, and PR creation/lost-response reconciliation occurs once.
+A controlled real Node inspector reproduces the400 literal/predicate gap, not the old port identity.
+Final combined review, normal hooks and new feature/protected gates remain required. No product,
+paused, owner-profile/key or paid-call changes are included. Both SDK
+records remain in_progress; native owner preflight still awaits Mac unlock. Earlier checkpoints
+below are verbatim history; current workflow state belongs in Beads/PRs.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier checkpoint follows verbatim; its pending statements are historical. -->
+
 # Provider SDK — bounded asynchronous fixture cleanup, 19 October 2026
 
 Owner-authorized delivery remains in progress. PR362 merged at7b816c61; protected

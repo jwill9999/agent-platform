@@ -1,6 +1,6 @@
 # Provider SDK compatibility review and results
 
-Status: 19 October 2026. PR362 merged at7b816c61; protected PR363 remains blocked by CodeQL12 until actual repaired-source delivery. PR364 at576ca2dc is pushed, but its green Sonar check/gate has four actual open S9382 findings. The bounded two-file notation repair passes independent source review,27 unchanged controls and the actual four-queued-API-read proof; current native verification passes first attempt; normal hooks and fresh complete hosted gates remain required. Earlier8e had a full benchmark pass but71 Electron passes plus one flaky case and is not merge-qualified. No protected delivery, owner-app rebuild, live-model success or stress readiness is claimed.
+Status: 19 October 2026. PR362 and PR364 merged into feature a9e8ac61. Protected PR363 has actual CodeQL/alert12/Sonar clearance, both genuine full scans, API604/DB236/browser and benchmark pass, and real packaged macOS VM20 pass. Its green Electron job nevertheless has71 passes plus a new initial-screen flaky case, so staging remains blocked. The bounded three-launch distinct-port repair passes independent source review and all three actual native journeys once; final combined review, normal hooks and new hosted qualification remain required. No owner-app or live/stress readiness is claimed.
 Earlier pending states below retain their named source/time bindings and do not override this checkpoint.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
@@ -9,6 +9,52 @@ Evidence root: `/Users/letuscode/.codex/provider-sdk-20261018`; source base stag
 Qualified provider protocol/generation checks below use researched owned HTTP fixtures and the actual pinned SDKs.
 It does not establish live model availability, account permissions or generation quality. The owner
 app/profile remains unchanged; paused orchestration, main and the disabled Docker gateway are preserved.
+
+## Protected initial-screen failure and distinct-port fixture plan
+
+Actual a9e protected results are frozen in pr363-a9e-hosted-connected-verification.json. Electron is
+71pass+1flaky despite its successful job. The failed attempt never enters Git: Open folder is absent
+and the screenshot instead reads “WebSockets request was expected” at the selected renderer origin.
+Backend/document startup succeeded, model configuration POST succeeded and safe Git receipts are
+empty. Its retry passes; that is not the agreed clean72 qualification. Exact debugger endpoint and
+first HTTP response were not retained, so the historical port collision is not proven.
+
+Source exposes a concrete mechanism: this Git file reserves only two app ports, then Playwright
+allocates two ephemeral debug listeners before renderer startup. Existing getDesktopLaunchPorts
+reserves all four ports together and is already used by migration and packaged VM fixtures. The
+independently approved repair reuses it for this file's three launches with explicit debugger flags,
+adds safe startup port/HTTP observations and retains all assertions,5s UI expectation, product/test
+deadlines and retries. No runtime/shared helper changes or reload/retry workaround. New actual three
+native journeys with workers1/retries0, combined source/results review, normal hooks and complete
+fresh feature and protected qualification remain required. The linked existing startup P1 separately
+retains rendererServer readiness accepting any status below500, including an inspector400; this
+fixture patch does not fix that product predicate or claim all external port races are eliminated.
+
+Final source028ff6ab passes lint/format/strict E2E types/diff. AST comparison retains all71 original
+assertion/test-budget calls and20 explicit timeout properties unchanged. The controlled owned Node24
+inspector returns400 and the matching fixed WebSockets category; its response passes the current
+product status<500 predicate. That proves a present mechanism, not historical port ownership.
+All three actual native Git journeys pass first attempt with workers1/retries0, no flaky/skipped
+cases:8.298/9.847/11.622seconds,30.2seconds total. Frozen seven code files and production/dist hashes
+stay unchanged. Every allocated four-port set is distinct; actual Node inspector port matches,
+Chromium configured switch matches but its actual endpoint is explicitly unknown, and initial
+renderer is owned loopback/root/HTTP200 HTML. All12ports release, all three app closes fulfill and
+owned processes exit. Safe Git evidence retains78 terminal invocations, maxwait26ms, zero claims/
+evidence errors/truncation, one create/lost-response reconciliation and cancel/no-effect checks.
+git-startup-native-first-qualification.json binds the actual results. A synthetic fixture-only master
+avoids Keychain setup; no owner key/profile/provider or native secure-storage qualification is used.
+Final combined source/doc/evidence review, normal hooks and new exact-head complete feature/protected
+gates remain required; the successful local slice is not a rerun or waiver of a9e's flaky full suite.
+
+Current a9e's other slices are independently qualified: API604/DB236/new63, browser42+knownskip,
+900 measured/990 calls with max addedp954.119057ms<20 and enqueue.041562ms<2, actual packaged macOS
+VM20 with development signing/virtualization entitlement and tested no host/secret exposure. Both
+full scans complete five genuine provider batches, CLI0.124.1/no findings; dependency45changes and
+zero introduced advisories. All three actual CodeQL languages return0 findings and alert12 is fixed,
+not dismissed; Sonar0open/allconditionsOK. SDK native2 pass with private encrypted continuation,
+durable failures across restart and no-effects fences. Those slices do not waive the flaky case or
+qualify a future head. Remaining existing high audit debt, upstream scan omissions, older benchmark/
+flake causes unproven, owner-profile preservation, no paid calls and paused boundaries remain.
 
 ## Asynchronous fixture quality follow-up
 
