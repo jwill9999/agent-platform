@@ -1,17 +1,33 @@
 import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs';
+import * as filesystem from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import express from 'express';
 import request from 'supertest';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { correlationMiddleware } from '../src/infrastructure/http/correlationMiddleware.js';
 import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 import { createWorkspaceRouter } from '../src/infrastructure/http/v1/workspaceRouter.js';
 
+vi.hoisted(() => vi.resetModules());
+afterAll(() => {
+  vi.doUnmock('node:fs/promises');
+  vi.resetModules();
+});
+
+// Native ESM fs exports are non-configurable. Mock only the read boundary while keeping
+// all real initialization, HTTP, path-jail and filesystem operations in these tests.
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return { ...actual, readdir: vi.fn(actual.readdir), stat: vi.fn(actual.stat) };
+});
+
 async function buildTestApp(workspaceRoot: string) {
   const app = express();
+  app.use(correlationMiddleware);
   app.use('/v1/workspace', createWorkspaceRouter({ workspaceRoot }));
   app.use(errorMiddleware);
   return listenLoopback(app);
@@ -29,6 +45,7 @@ describe('workspaceRouter', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     try {
       await closeLoopback(app);
     } finally {
@@ -103,5 +120,109 @@ describe('workspaceRouter', () => {
         file.path.includes('secret-link'),
       ),
     ).toBe(false);
+  });
+
+  async function expectUnavailable(options: {
+    phase: 'initialize' | 'read';
+    category: string;
+    root?: string;
+  }) {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const target = options.root ? await buildTestApp(options.root) : app;
+    try {
+      const res = await request(target)
+        .get('/v1/workspace/files')
+        .set('x-correlation-id', 'caller-canary')
+        .expect(503);
+      expect(res.body).toEqual({
+        error: {
+          code: 'WORKSPACE_FILES_UNAVAILABLE',
+          message: 'Workspace files are unavailable. Refresh to retry.',
+        },
+      });
+      const lines = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({
+        service: 'workspace-files',
+        phase: options.phase,
+        category: options.category,
+        correlationId: res.headers['x-request-id'],
+      });
+      expect(lines[0].correlationId).not.toBe('caller-canary');
+      expect(Object.keys(lines[0]).sort()).toEqual([
+        'category',
+        'correlationId',
+        'level',
+        'msg',
+        'phase',
+        'service',
+        'ts',
+      ]);
+      const text = JSON.stringify(lines) + JSON.stringify(res.body);
+      for (const secret of [workspaceRoot, outsideRoot, 'PRIVATE_ERROR_CANARY', 'caller-canary'])
+        expect(text).not.toContain(secret);
+    } finally {
+      if (target !== app) await closeLoopback(target);
+    }
+  }
+
+  it('reports initialization failure safely with trusted request correlation', async () => {
+    const blocked = join(workspaceRoot, 'blocked');
+    writeFileSync(blocked, 'unchanged');
+    await expectUnavailable({ root: blocked, phase: 'initialize', category: 'EEXIST' });
+    expect(readFileSync(blocked, 'utf8')).toBe('unchanged');
+  });
+
+  it('reports an unavailable area after successful initialization rather than an empty success', async () => {
+    vi.spyOn(filesystem, 'readdir').mockRejectedValueOnce(
+      Object.assign(new Error('PRIVATE_ERROR_CANARY'), { code: 'EIO' }),
+    );
+    await expectUnavailable({ phase: 'read', category: 'EIO' });
+  });
+
+  it('reports non-disappearance stat failures rather than partial successful results', async () => {
+    mkdirSync(join(workspaceRoot, 'uploads'));
+    writeFileSync(join(workspaceRoot, 'uploads', 'report.txt'), 'safe');
+    vi.spyOn(filesystem, 'stat').mockRejectedValueOnce(
+      Object.assign(new Error('PRIVATE_ERROR_CANARY'), { code: 'EACCES' }),
+    );
+    await expectUnavailable({ phase: 'read', category: 'EACCES' });
+  });
+
+  it('omits a file that disappears during listing', async () => {
+    mkdirSync(join(workspaceRoot, 'uploads'));
+    writeFileSync(join(workspaceRoot, 'uploads', 'gone.txt'), 'safe');
+    vi.spyOn(filesystem, 'stat').mockRejectedValueOnce(
+      Object.assign(new Error('gone'), { code: 'ENOENT' }),
+    );
+    const response = await request(app).get('/v1/workspace/files').expect(200);
+    expect(response.body.data.totalFiles).toBe(0);
+  });
+
+  it('retains the safe response when failure logging itself throws', async () => {
+    const blocked = join(workspaceRoot, 'blocked');
+    writeFileSync(blocked, 'unchanged');
+    const target = await buildTestApp(blocked);
+    vi.spyOn(console, 'log').mockImplementation(() => {
+      throw new Error('PRIVATE_ERROR_CANARY');
+    });
+    try {
+      const response = await request(target).get('/v1/workspace/files').expect(503);
+      expect(response.body.error.code).toBe('WORKSPACE_FILES_UNAVAILABLE');
+      expect(JSON.stringify(response.body)).not.toContain('PRIVATE_ERROR_CANARY');
+      expect(readFileSync(blocked, 'utf8')).toBe('unchanged');
+    } finally {
+      await closeLoopback(target);
+    }
+  });
+
+  it('retains validation and symlink download denials without outside effects', async () => {
+    await request(app).get('/v1/workspace/files?area=unknown').expect(400);
+    mkdirSync(join(workspaceRoot, 'generated'), { recursive: true });
+    const canary = join(outsideRoot, 'private.txt');
+    writeFileSync(canary, 'unchanged');
+    symlinkSync(canary, join(workspaceRoot, 'generated', 'outside-link'));
+    await request(app).get('/v1/workspace/files/download?path=generated/outside-link').expect(403);
+    expect(readFileSync(canary, 'utf8')).toBe('unchanged');
   });
 });

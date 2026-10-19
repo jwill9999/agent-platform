@@ -186,6 +186,35 @@ describe('desktop backend supervisor helpers', () => {
     });
   });
 
+  it('uses an app-owned default workspace without inheriting the container default', () => {
+    const root = makeTempRepo();
+    const paths = getDesktopBackendPaths(root, makeRuntimePaths(join(root, 'runtime')));
+    const env = buildDesktopBackendEnvironment({ env: {}, paths, port: '4500' });
+    expect(env).toHaveProperty('WORKSPACE_ROOT', join(root, 'runtime/data/workspace'));
+  });
+
+  it('preserves explicit workspace and container-path overrides', () => {
+    const root = makeTempRepo();
+    const paths = getDesktopBackendPaths(root, makeRuntimePaths(join(root, 'runtime')));
+    expect(
+      buildDesktopBackendEnvironment({
+        env: {
+          WORKSPACE_ROOT: join(root, 'configured'),
+          AGENT_WORKSPACE_CONTAINER_PATH: '/workspace',
+        },
+        paths,
+        port: '4500',
+      }),
+    ).toHaveProperty('WORKSPACE_ROOT', join(root, 'configured'));
+    expect(
+      buildDesktopBackendEnvironment({
+        env: { AGENT_WORKSPACE_CONTAINER_PATH: join(root, 'container') },
+        paths,
+        port: '4500',
+      }),
+    ).toHaveProperty('WORKSPACE_ROOT', join(root, 'container'));
+  });
+
   it('uses the packaged macOS VM helper path when no developer override is set', () => {
     const repoRoot = makeTempRepo();
     const runtimeRoot = join(repoRoot, 'runtime');

@@ -1,3 +1,17 @@
+# Native Workspace listing repair — 19 October 2026
+
+SDK/migration delivery is complete at staginga17bc1db; original-profile recording/export/restart
+passed independent review, data/key preserved. Owner now authorizes the separate native Workspace
+listing repair with regressions/critic review. Beads agent-platform-native-workspace-listing is
+in_progress; task/native-workspace-listing → feature/native-workspace-listing from a17. Plan/tests/
+results linked in its spec; repair and focused native/browser regressions pass local review. Serial
+hooks, hosted qualification and owner repaired-app preflight remain pending; owner app runsA17.
+No paid calls, paused orchestration, global/gateway/main changes. Stress remains open; prior text
+below is verbatim historical handoff, not current status. Current delivery belongs in Beads/PRs.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier handoff follows verbatim. -->
+
 # Provider SDK — migration repair local qualification, 19 October 2026
 
 PR363 delivered SDK source to stagingbe153c50. Six SDK branches were recovery-protected/cleaned;
