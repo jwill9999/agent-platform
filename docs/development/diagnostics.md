@@ -29,6 +29,27 @@ A browser connected to the supported local web/API topology offers a manual file
 normal Docker split-network deployment does not currently meet this topology and therefore cannot
 read diagnostic history. This restriction does not block normal chat operation.
 
+## Model connection probes
+
+The [provider compatibility work](../tasks/agent-platform-model-connection-diagnostics.md) adds
+request-scoped settings-probe events to the same durable local history. **Models → Test Connection**
+performs one bounded SDK generation request, with no retries. A real external service may charge for
+that user-initiated request. A successful authentication check alone is not a successful generation.
+A valid response with no visible reply within the fixed output budget reports `output_limited`;
+it does not establish an invalid key or an unusable model for normal chat.
+
+Probe events contain fixed provider family, configuration UUID, request/operation identity, duration
+and safe outcome/failure category. They exclude credentials, endpoint, prompt, raw provider response
+and private reasoning. A rejected parameter response remains failed; an accessible message is shown
+in Models rather than relying on a tooltip. Storage/logging failure cannot turn a failed probe into
+success or change the provider outcome.
+
+Settings probes have no chat-session scope. A current-chat export therefore does not automatically
+include them. Export an application-wide historical window without a session filter through Local
+monitoring, or use the developer-operated `list` and `report --request` commands below with their
+existing local capability requirements. Check coverage/loss before interpreting missing events.
+Reports remain local until the owner chooses to share them; no automatic transmission is added.
+
 ## Context decisions
 
 The context/token MVP branch adds optional V1 context-decision metadata; it remains under

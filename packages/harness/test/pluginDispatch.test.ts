@@ -63,19 +63,26 @@ const testTools: ContractTool[] = [
 // Mock streamText for llmReason tests
 // ---------------------------------------------------------------------------
 
-vi.mock('ai', () => ({
+vi.mock('ai', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('ai')>()),
   streamText: vi.fn(() => ({
     textStream: (async function* () {
       yield 'Hello';
     })(),
+    responseMessages: Promise.resolve([
+      { role: 'assistant', content: [{ type: 'text', text: 'Hello' }] },
+    ]),
     toolCalls: Promise.resolve([]),
-    usage: Promise.resolve({ promptTokens: 10, completionTokens: 5 }),
+    usage: Promise.resolve({ inputTokens: 10, outputTokens: 5 }),
   })),
   jsonSchema: vi.fn((s: unknown) => s),
 }));
 
 vi.mock('@ai-sdk/openai', () => ({
-  createOpenAI: vi.fn(() => vi.fn()),
+  createOpenAI: vi.fn(() => {
+    const model = vi.fn();
+    return Object.assign(model, { responses: model });
+  }),
 }));
 
 // ---------------------------------------------------------------------------

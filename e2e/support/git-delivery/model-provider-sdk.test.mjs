@@ -30,7 +30,7 @@ test('installed SDK reconstructs fragmented tool arguments and sends result on c
   const tools = {
     sys_git_stage: {
       description: 'Synthetic Git action for transport verification only.',
-      parameters: jsonSchema({
+      inputSchema: jsonSchema({
         type: 'object',
         properties: {
           mode: { type: 'string' },
@@ -44,7 +44,15 @@ test('installed SDK reconstructs fragmented tool arguments and sends result on c
   const first = streamText({ model: languageModel, messages, tools, maxRetries: 0 });
   await first.consumeStream();
   assert.deepEqual(await first.toolCalls, [
-    { type: 'tool-call', toolCallId: 'stage-sdk-1', toolName: 'sys_git_stage', args },
+    {
+      type: 'tool-call',
+      toolCallId: 'stage-sdk-1',
+      toolName: 'sys_git_stage',
+      input: args,
+      providerExecuted: undefined,
+      providerMetadata: undefined,
+      title: undefined,
+    },
   ]);
   assert.equal(await first.finishReason, 'tool-calls');
   const resumed = streamText({
@@ -53,7 +61,7 @@ test('installed SDK reconstructs fragmented tool arguments and sends result on c
     maxRetries: 0,
     messages: [
       ...messages,
-      { role: 'assistant', content: await first.toolCalls },
+      ...(await first.responseMessages),
       {
         role: 'tool',
         content: [
@@ -61,7 +69,7 @@ test('installed SDK reconstructs fragmented tool arguments and sends result on c
             type: 'tool-result',
             toolCallId: 'stage-sdk-1',
             toolName: 'sys_git_stage',
-            result: { state: 'succeeded' },
+            output: { type: 'json', value: { state: 'succeeded' } },
           },
         ],
       },
@@ -72,4 +80,9 @@ test('installed SDK reconstructs fragmented tool arguments and sends result on c
   assert.equal(await resumed.finishReason, 'stop');
   assert.deepEqual(fixture.errors, []);
   assert.equal(fixture.requests.length, 2);
+  const sentResult = fixture.requests[1].messages.find(
+    (message) => message.role === 'tool' && message.tool_call_id === 'stage-sdk-1',
+  );
+  assert.ok(sentResult);
+  assert.deepEqual(JSON.parse(sentResult.content), { state: 'succeeded' });
 });

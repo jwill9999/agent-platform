@@ -1,43 +1,74 @@
 import { generateText } from 'ai';
-import { createLanguageModel, isSupportedProvider } from './providers.js';
-
+import {
+  createLanguageModel,
+  isSupportedProvider,
+  providerGenerationOptions,
+} from './providers.js';
+import {
+  ProviderRequestError,
+  toProviderRequestError,
+  type ProviderErrorCategory,
+} from './providerErrors.js';
 export type TestConnectionOptions = {
   provider: string;
   model: string;
   apiKey?: string;
+  baseURL?: string;
+  timeoutMs?: number;
 };
-
 export type TestConnectionResult =
   | { ok: true; latencyMs: number }
-  | { ok: false; latencyMs: number; error: string };
-
-/**
- * Fire a minimal chat completion to verify the provider/model/key combination is working.
- * Uses maxTokens: 5 — low enough to minimise cost, high enough for models that require
- * more than 1 token to produce any output (maxTokens: 1 causes a false-negative for those).
- */
+  | {
+      ok: false;
+      latencyMs: number;
+      error: string;
+      category: ProviderErrorCategory;
+      statusCode?: number;
+      retryable: boolean;
+    };
+function connectionFailure(error: unknown): ProviderRequestError {
+  const safe = toProviderRequestError(error);
+  if (safe instanceof ProviderRequestError) return safe;
+  if (safe.name === 'AbortError') return new ProviderRequestError('timeout');
+  return new ProviderRequestError('unknown');
+}
+/** Exactly one bounded SDK generation, never reinterpret a rejected request as success. */
 export async function testModelConnection(
   options: TestConnectionOptions,
 ): Promise<TestConnectionResult> {
-  if (!isSupportedProvider(options.provider)) {
-    return { ok: false, latencyMs: 0, error: `Unsupported provider: ${options.provider}` };
-  }
-
-  const start = Date.now();
+  const start = performance.now();
+  const timeoutMs = options.timeoutMs ?? 10000;
   try {
-    const model = createLanguageModel({
-      provider: options.provider,
-      model: options.model,
-      apiKey: options.apiKey,
+    if (
+      !isSupportedProvider(options.provider) ||
+      !Number.isInteger(timeoutMs) ||
+      timeoutMs < 1 ||
+      timeoutMs > 30000
+    )
+      throw new ProviderRequestError('request');
+    const config = { ...options, provider: options.provider };
+    const result = await generateText({
+      model: createLanguageModel(config),
+      messages: [{ role: 'user', content: 'Reply OK.' }],
+      maxOutputTokens: 32,
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(timeoutMs),
+      ...providerGenerationOptions(config),
     });
-    await generateText({ model, messages: [{ role: 'user', content: 'Hi' }], maxTokens: 5 });
-    return { ok: true, latencyMs: Date.now() - start };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    // A "max tokens reached" finish reason means the model responded — treat as success.
-    if (message.includes('max_tokens') || message.includes('output limit')) {
-      return { ok: true, latencyMs: Date.now() - start };
-    }
-    return { ok: false, latencyMs: Date.now() - start, error: message };
+    if (!result.text.trim() && result.finishReason === 'length')
+      throw new ProviderRequestError('output_limited');
+    if (!result.text.trim() || result.finishReason === 'error')
+      throw new ProviderRequestError('invalid_response');
+    return { ok: true, latencyMs: Math.round(performance.now() - start) };
+  } catch (error: unknown) {
+    const failure = connectionFailure(error);
+    return {
+      ok: false,
+      latencyMs: Math.round(performance.now() - start),
+      error: failure.message,
+      category: failure.category,
+      retryable: failure.retryable,
+      ...(failure.statusCode ? { statusCode: failure.statusCode } : {}),
+    };
   }
 }

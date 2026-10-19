@@ -23,7 +23,11 @@ import {
   loadAgentById,
   getSkill,
   appendMessage,
-  listMessagesBySession,
+  listMessagesWithContinuation,
+  appendMessageWithContinuation,
+  ProviderContinuationError,
+  modelConfigCredentialRevision,
+  type ProviderContinuationBinding,
   updateSessionTitle,
   withTransaction,
   insertToolExecution,
@@ -52,7 +56,6 @@ import {
 import type {
   ApprovalRequest,
   MessageRecord,
-  ModelConfig,
   Output,
   PromptMemoryBundle,
   ProjectRecord,
@@ -71,12 +74,17 @@ import {
   SessionResumeBodySchema,
 } from '@agent-platform/contracts';
 import {
+  PROVIDER_CONTINUATION_RECOVERY_MESSAGE,
   type AgentContext,
   buildAgentContext,
   destroyAgentContext,
   AgentNotFoundError,
   buildHarnessGraph,
   createLlmReasonNode,
+  attachProviderContinuation,
+  getProviderContinuation,
+  continuationBindingMatches,
+  validateProviderContinuation,
   createToolDispatchNode,
   createSensorCheckNode,
   createNdjsonEmitter,
@@ -101,12 +109,14 @@ import {
   openAiKeyGateToApiOutcome,
   resolveGatedOpenAiKeyForRequest,
   streamChat,
+  PROVIDER_CATALOGUE,
+  providerEndpointIdentity,
 } from '@agent-platform/model-router';
 import type { ObservabilityStore } from '@agent-platform/plugin-observability';
 import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import type { Request, Response, Router } from 'express';
 import { Router as createRouter } from 'express';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes, createHmac } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { isAbsolute, relative, sep } from 'node:path';
 import { z } from 'zod';
@@ -196,6 +206,7 @@ type RuntimeGraphInput = {
   options: ChatRouterOptions;
   approvedToolCallIds?: ReadonlySet<string>;
   nativeToolExecutor?: NativeToolExecutor;
+  onMessagesPersisted?: () => void;
 };
 
 function resolveSlashCommandOptions(options?: RunSlashCommandOptions): RunSlashCommandOptions {
@@ -230,7 +241,31 @@ async function loadAgentContext(
   }
 }
 
-type ResolvedChatModel = { provider: string; model: string; apiKey?: string };
+type ResolvedChatModel = {
+  provider: string;
+  model: string;
+  apiKey?: string;
+  baseURL?: string;
+  continuationBinding?: ProviderContinuationBinding;
+};
+
+function bindContinuation(
+  config: ResolvedChatModel,
+  credentialRevision: string,
+): ResolvedChatModel {
+  const mode = PROVIDER_CATALOGUE.find((provider) => provider.id === config.provider)?.apiMode;
+  if (!mode) throw new HttpError(400, 'MODEL_PROVIDER_UNSUPPORTED', 'Choose a supported provider.');
+  return {
+    ...config,
+    continuationBinding: {
+      provider: config.provider,
+      model: config.model,
+      apiMode: mode,
+      endpoint: providerEndpointIdentity(config),
+      credentialRevision,
+    },
+  };
+}
 
 async function acquireRuntimeContext(
   db: DrizzleDb,
@@ -244,21 +279,21 @@ async function acquireRuntimeContext(
     globalPlugins: options.globalPlugins,
     signal,
   });
+  let release: (() => void) | undefined;
   try {
+    const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
+    release = await sessionLock.acquire(session.id, timeoutMs);
+    if (signal.aborted) throw new HttpError(499, 'REQUEST_CANCELLED', 'Request was cancelled.');
+    // Settings may change while this request waits for the session mutex.
     const modelCfg = resolveModelOrThrow(
       db,
       agentCtx,
       req.header('x-openai-key'),
       req.header('x-model-config-id') || undefined,
     );
-    const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
-    const release = await sessionLock.acquire(session.id, timeoutMs);
-    if (signal.aborted) {
-      release();
-      throw new HttpError(499, 'REQUEST_CANCELLED', 'Request was cancelled.');
-    }
     return { agentCtx, modelCfg, timeoutMs, release };
   } catch (error) {
+    release?.();
     await destroyAgentContext(agentCtx);
     throw error;
   }
@@ -351,17 +386,27 @@ function requiredSecretsMasterKey(): Buffer {
   return parseMasterKeyFromBase64(masterKeyB64);
 }
 
-function apiKeyForModelConfig(db: DrizzleDb, config: ModelConfig): string | undefined {
+function apiKeyForModelConfig(
+  db: DrizzleDb,
+  config: NonNullable<ReturnType<typeof getModelConfig>>,
+): string | undefined {
   if (!config.hasApiKey) return undefined;
   return resolveStoredModelConfigKeyOrThrow(db, config.id, requiredSecretsMasterKey());
 }
 
-function resolvedConfiguredModel(db: DrizzleDb, config: ModelConfig): ResolvedChatModel {
-  return {
-    provider: config.provider,
-    model: config.model,
-    apiKey: apiKeyForModelConfig(db, config),
-  };
+function resolvedConfiguredModel(
+  db: DrizzleDb,
+  config: NonNullable<ReturnType<typeof getModelConfig>>,
+): ResolvedChatModel {
+  return bindContinuation(
+    {
+      provider: config.provider,
+      model: config.model,
+      apiKey: apiKeyForModelConfig(db, config),
+      baseURL: config.baseURL ?? undefined,
+    },
+    modelConfigCredentialRevision(db, config.id),
+  );
 }
 
 function resolveExplicitModelConfig(
@@ -375,9 +420,11 @@ function resolveExplicitModelConfig(
   if (!cfg) {
     throw new HttpError(404, 'NOT_FOUND', `Model config '${effectiveModelConfigId}' not found`);
   }
-  // A per-request UI override must reference a config that has a stored API key.
-  // Configs without a key cannot be meaningfully used as an explicit override.
-  if (requestModelConfigId && !cfg.hasApiKey) {
+  // Credential requirements belong to the shared provider catalogue, including local keyless adapters.
+  const provider = PROVIDER_CATALOGUE.find((entry) => entry.id === cfg.provider);
+  if (!provider)
+    throw new HttpError(400, 'MODEL_PROVIDER_UNSUPPORTED', 'Choose a supported provider.');
+  if (requestModelConfigId && provider.requiresApiKey && !cfg.hasApiKey) {
     throw new HttpError(
       400,
       'VALIDATION_ERROR',
@@ -388,10 +435,46 @@ function resolveExplicitModelConfig(
 }
 
 function resolveDefaultModelConfig(db: DrizzleDb): ResolvedChatModel | undefined {
-  const defaultModelConfig = listModelConfigs(db).find(
-    (config) => config.hasApiKey || config.provider === 'ollama',
-  );
+  const defaultModelConfig = listModelConfigs(db).find((config) => {
+    const provider = PROVIDER_CATALOGUE.find((entry) => entry.id === config.provider);
+    return provider && (config.hasApiKey || !provider.requiresApiKey);
+  });
   return defaultModelConfig ? resolvedConfiguredModel(db, defaultModelConfig) : undefined;
+}
+
+let processFallbackPurposeSecret: Buffer | undefined;
+
+function fallbackPurposeSecret(): Buffer {
+  const masterKey = process.env['SECRETS_MASTER_KEY'];
+  if (masterKey === undefined) {
+    if (processFallbackPurposeSecret === undefined) processFallbackPurposeSecret = randomBytes(32);
+    return processFallbackPurposeSecret;
+  }
+  if (!/^[A-Za-z\d+/]{43}=$/.test(masterKey))
+    throw new Error('Invalid fallback master key configuration');
+  const parsedMasterKey = parseMasterKeyFromBase64(masterKey);
+  if (parsedMasterKey.toString('base64') !== masterKey)
+    throw new Error('Invalid fallback master key configuration');
+  return createHmac('sha256', parsedMasterKey)
+    .update('agent-platform/fallback-revision-purpose/v1')
+    .digest();
+}
+
+/** Private signing identity, never a reusable unkeyed verifier of the API credential. */
+function fallbackCredentialRevision(config: ResolvedChatModel): string {
+  const purposeSecret = fallbackPurposeSecret();
+  const credential = config.apiKey;
+  return createHmac('sha256', credential ?? purposeSecret)
+    .update(
+      credential !== undefined
+        ? 'agent-platform/fallback-revision/credential/v1\0'
+        : 'agent-platform/fallback-revision/keyless/v1\0',
+    )
+    .update(purposeSecret)
+    .update(
+      JSON.stringify({ provider: config.provider, model: config.model, baseURL: config.baseURL }),
+    )
+    .digest('hex');
 }
 
 /** Resolve model config or throw an HttpError on failure.
@@ -433,7 +516,7 @@ function resolveModelOrThrow(
   if (resolution.kind === 'error') {
     throw new HttpError(400, resolution.code, resolution.message);
   }
-  return resolution.config;
+  return bindContinuation(resolution.config, fallbackCredentialRevision(resolution.config));
 }
 
 function resolveStoredModelConfigKeyOrThrow(
@@ -458,16 +541,17 @@ function resolveStoredModelConfigKeyOrThrow(
 /** Map persisted MessageRecord rows to ChatMessage objects. */
 export function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
   if (m.role === 'tool' && m.toolCallId) {
-    return { role: 'tool', content: m.content, toolCallId: m.toolCallId, toolName: '' };
+    return { id: m.id, role: 'tool', content: m.content, toolCallId: m.toolCallId, toolName: '' };
   }
   if (m.role === 'assistant') {
     return {
+      id: m.id,
       role: 'assistant',
       content: m.content,
       toolCalls: m.toolCalls,
     };
   }
-  return { role: m.role as 'user' | 'assistant' | 'system', content: m.content };
+  return { id: m.id, role: m.role as 'user' | 'assistant' | 'system', content: m.content };
 }
 
 /** Restore tool names absent from the DB row without dropping or rearranging history. */
@@ -485,6 +569,50 @@ function persistedHistory(records: MessageRecord[]): ChatMessage[] {
   });
 }
 
+function loadPrivateHistory(db: DrizzleDb, sessionId: string): ChatMessage[] {
+  const stored = listMessagesWithContinuation(db, sessionId, optionalContinuationKey());
+  const publicMessages = persistedHistory(stored.map((entry) => entry.message));
+  return publicMessages.map((message, index) => {
+    const record = stored[index]!.continuation;
+    if (!record) return message;
+    validateProviderContinuation(message, record);
+    return attachProviderContinuation(message, record);
+  });
+}
+
+function optionalContinuationKey(): Buffer | undefined {
+  return process.env['SECRETS_MASTER_KEY'] ? requiredSecretsMasterKey() : undefined;
+}
+
+function rehydrateContinuation(
+  db: DrizzleDb,
+  sessionId: string,
+  messages: ChatMessage[],
+): ChatMessage[] {
+  const stored = new Map(loadPrivateHistory(db, sessionId).map((message) => [message.id, message]));
+  return messages.map((message) => {
+    const saved = message.id ? stored.get(message.id) : undefined;
+    const record = saved ? getProviderContinuation(saved) : getProviderContinuation(message);
+    return record ? attachProviderContinuation(message, record) : message;
+  });
+}
+
+function assertPendingContinuationBinding(
+  messages: ChatMessage[],
+  binding: ProviderContinuationBinding | undefined,
+  toolCallId: string,
+): void {
+  for (const message of messages) {
+    if (message.role !== 'assistant' || !message.toolCalls?.some((call) => call.id === toolCallId))
+      continue;
+    const record = getProviderContinuation(message);
+    if (record && (!binding || !continuationBindingMatches(record.binding, binding)))
+      throw new Error(
+        'MODEL_CONTINUATION_CHANGED: The model configuration changed while approval was pending. Start a new request.',
+      );
+  }
+}
+
 /** Persist only the new assistant/tool messages the graph appended. */
 function persistNewMessages(
   db: DrizzleDb,
@@ -494,15 +622,23 @@ function persistNewMessages(
 ): void {
   if (!allMessages) return;
   withTransaction(db, (tx) => {
-    for (const msg of allMessages.slice(initialCount)) {
+    for (const msg of rehydrateContinuation(tx, sessionId, allMessages.slice(initialCount))) {
       if (msg.role !== 'assistant' && msg.role !== 'tool') continue;
-      appendMessage(tx, {
-        sessionId,
-        role: msg.role,
-        content: msg.content,
-        toolCallId: msg.role === 'tool' ? msg.toolCallId : undefined,
-        toolCalls: msg.role === 'assistant' ? msg.toolCalls : undefined,
-      });
+      msg.id ??= randomUUID();
+      appendMessageWithContinuation(
+        tx,
+        {
+          id: msg.id,
+          sessionId,
+          role: msg.role,
+          content: msg.content,
+          toolCallId: msg.role === 'tool' ? msg.toolCallId : undefined,
+          toolCalls: msg.role === 'assistant' ? msg.toolCalls : undefined,
+          continuation: getProviderContinuation(msg),
+        },
+        optionalContinuationKey(),
+        1,
+      );
     }
   });
 }
@@ -551,6 +687,26 @@ function emitStreamError(res: Response, err: unknown, signal?: AbortSignal): voi
   }
 
   const rawMessage = err instanceof Error ? err.message : 'Graph execution failed';
+  // Only typed storage failures and exact local guard messages receive this recovery projection.
+  const continuationFailure =
+    err instanceof ProviderContinuationError ||
+    [
+      PROVIDER_CONTINUATION_RECOVERY_MESSAGE,
+      'PROVIDER_CONTINUATION_UNAVAILABLE',
+      'Provider continuation is unavailable or invalid. Start a new request.',
+      'Provider continuation exceeds the session limit.',
+      'Provider continuation exceeds the session limit. Start a new chat.',
+    ].includes(rawMessage);
+  if (continuationFailure) {
+    res.write(
+      JSON.stringify({
+        type: 'error',
+        code: 'PROVIDER_CONTINUATION_UNAVAILABLE',
+        message: PROVIDER_CONTINUATION_RECOVERY_MESSAGE,
+      }) + '\n',
+    );
+    return;
+  }
   const authError = isProviderAuthError(rawMessage);
   const message = authError
     ? 'The model provider rejected the configured API key. Check the selected model config or server environment key.'
@@ -783,7 +939,7 @@ function buildResumeMessages(
   reconstructedToolCallContext: boolean;
   currentTurnStartIndex: number;
 } {
-  const history = persistedHistory(listMessagesBySession(db, sessionId));
+  const history = loadPrivateHistory(db, sessionId);
   const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }, ...history];
   const assistantIndex = messages.findIndex(
     (message) =>
@@ -799,7 +955,7 @@ function buildResumeMessages(
     }
   }
   if (reconstructedToolCallContext) {
-    messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
+    messages.push({ id: randomUUID(), role: 'assistant', content: '', toolCalls: [toolCall] });
   }
   return { messages, reconstructedToolCallContext, currentTurnStartIndex };
 }
@@ -1256,7 +1412,7 @@ function createRuntimeToolDispatchNode({
     ? { projectId: workspaceResolution.projectId }
     : undefined;
 
-  return observeDiagnosticNode(
+  const node = observeDiagnosticNode(
     'tool',
     createToolDispatchNode({
       agent: agentCtx.agent,
@@ -1287,6 +1443,13 @@ function createRuntimeToolDispatchNode({
       executionPolicy: loadSettings(db).executionPolicy,
     }),
   );
+  return async (...args: Parameters<typeof node>) => {
+    const result = await node(...args);
+    return {
+      ...result,
+      messages: result.messages?.map((message) => ({ ...message, id: message.id ?? randomUUID() })),
+    };
+  };
 }
 
 function projectAccessPolicyForSession(
@@ -1320,6 +1483,7 @@ function buildRuntimeGraph({
   options,
   approvedToolCallIds,
   nativeToolExecutor,
+  onMessagesPersisted,
 }: RuntimeGraphInput) {
   const dispatcher = agentCtx.pluginDispatcher;
   return buildHarnessGraph({
@@ -1332,6 +1496,31 @@ function buildRuntimeGraph({
           dispatcher,
           onContextDecision: observeDiagnosticContextDecision,
           onModelAttempt: observeDiagnosticModelAttempt,
+          hydrateMessages: (messages) =>
+            new Promise<ChatMessage[]>((resolve) => {
+              // Preserve settled tool outcomes before the next model can fail or be stopped.
+              const context = resolveSessionProjectContext(db, getSession(db, sessionId)!);
+              persistNewMessages(
+                db,
+                sessionId,
+                sanitizeProjectAssistantMessages(messages, context),
+                0,
+              );
+              onMessagesPersisted?.();
+              resolve(rehydrateContinuation(db, sessionId, messages));
+            }),
+          onAssistantMessage: (message, previousMessages) =>
+            new Promise<void>((resolve) => {
+              const context = resolveSessionProjectContext(db, getSession(db, sessionId)!);
+              persistNewMessages(
+                db,
+                sessionId,
+                sanitizeProjectAssistantMessages([...previousMessages, message], context),
+                0,
+              );
+              onMessagesPersisted?.();
+              resolve();
+            }),
         }),
       { deferModelStart: !options.llmReasonNode },
     ),
@@ -1763,6 +1952,11 @@ export async function handleSessionResume(
   let heartbeatId: ReturnType<typeof setInterval> | undefined;
 
   try {
+    assertPendingContinuationBinding(
+      loadPrivateHistory(db, sessionId),
+      modelCfg.continuationBinding,
+      toolCall.id,
+    );
     const claimed = claimResumedApproval(db, approvalRequestId, toolCall, agentCtx.agent.id, res);
     if (!claimed) {
       execution.finish('failed', 'execution_failed');
@@ -1799,6 +1993,22 @@ export async function handleSessionResume(
       execution.invoke('setup', () => emitTaskStart(agentCtx, sessionId, runId)),
     );
 
+    // Recheck after awaited setup hooks, immediately before dispatch admission.
+    const currentModel = resolveModelOrThrow(
+      db,
+      agentCtx,
+      req.header('x-openai-key'),
+      req.header('x-model-config-id') || undefined,
+    );
+    assertPendingContinuationBinding(
+      loadPrivateHistory(db, sessionId),
+      currentModel.continuationBinding,
+      toolCall.id,
+    );
+    if (!isDeepStrictEqual(currentModel.continuationBinding, modelCfg.continuationBinding))
+      throw new Error(
+        'MODEL_CONTINUATION_CHANGED: The model configuration changed while approval was pending. Start a new request.',
+      );
     dispatchStarted = true;
     const { resumeMessages, stopAfterDispatch, mcpHalt, nativeToolExecutor } =
       await dispatchResumedApproval({
@@ -1838,6 +2048,7 @@ export async function handleSessionResume(
       options,
       approvedToolCallIds: isGitDeliveryTool(toolCall.name) ? undefined : new Set([toolCall.id]),
       nativeToolExecutor,
+      onMessagesPersisted: captured.checkpoint,
     });
     const resumeState = buildInitialState(
       runId,
@@ -1980,7 +2191,15 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           execution.invoke('setup', () => emitTaskStart(agentCtx, sessionId, runId)),
         );
 
-        const graph = buildRuntimeGraph({ db, agentCtx, runId, sessionId, emitter, options });
+        const graph = buildRuntimeGraph({
+          db,
+          agentCtx,
+          runId,
+          sessionId,
+          emitter,
+          options,
+          onMessagesPersisted: captured.checkpoint,
+        });
 
         const { messages, currentTurnStartIndex, memoryBundle, approvalHistory } =
           buildConversationMessages(db, session, message, agentCtx.systemPrompt);
@@ -2172,7 +2391,7 @@ function buildConversationMessages(
 } {
   return withTransaction(db, (tx) => {
     const sessionId = session.id;
-    const priorMessages = listMessagesBySession(tx, sessionId);
+    const history = loadPrivateHistory(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
     const projectContext = resolveSessionProjectContext(tx, session);
     const memoryBundle = retrievePromptMemories(tx, {
@@ -2184,7 +2403,6 @@ function buildConversationMessages(
       query: newMessage,
     });
 
-    const history = persistedHistory(priorMessages);
     const userMsg: ChatMessage = { role: 'user' as const, content: newMessage };
     const effectiveSystemPrompt = withPromptMemoryBundle(
       withProjectInstructionPrompt(
@@ -2238,7 +2456,7 @@ function buildInitialState(
   sessionId: string,
   messages: ChatMessage[],
   agentCtx: AgentContext,
-  modelConfig: { provider: string; model: string; apiKey?: string },
+  modelConfig: ResolvedChatModel,
   contextInfo: {
     currentTurnStartIndex: number;
     pendingApprovalToolCallIds?: string[];

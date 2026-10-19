@@ -12,9 +12,10 @@ import {
   parseMasterKeyFromBase64,
 } from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
-import { testModelConnection } from '@agent-platform/model-router';
+import { PROVIDER_CATALOGUE, testModelConnection } from '@agent-platform/model-router';
 import { Router } from 'express';
 
+import { beginDiagnosticProbe } from '../../diagnostics/observations.js';
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
 import { parseBody, requireParam } from './routerUtils.js';
@@ -43,6 +44,10 @@ export function createModelConfigsRouter(db: DrizzleDb): Router {
     }),
   );
 
+  router.get('/providers', (_req, res) => {
+    res.json({ data: PROVIDER_CATALOGUE });
+  });
+
   router.get(
     '/:id',
     asyncHandler(async (req, res) => {
@@ -56,7 +61,7 @@ export function createModelConfigsRouter(db: DrizzleDb): Router {
     '/',
     asyncHandler(async (req, res) => {
       const body = parseBody(ModelConfigCreateBodySchema, req.body);
-      const normalized = { ...body, model: body.model.trim().toLowerCase() };
+      const normalized = { ...body, model: body.model.trim() };
       const masterKey = normalized.apiKey ? getMasterKey() : undefined;
       const cfg = createModelConfig(db, normalized, masterKey, KEY_VERSION);
       res.status(201).json({ data: cfg });
@@ -71,7 +76,7 @@ export function createModelConfigsRouter(db: DrizzleDb): Router {
       const body = parseBody(ModelConfigUpdateBodySchema, req.body);
       const normalized = {
         ...body,
-        ...(body.model !== undefined ? { model: body.model.trim().toLowerCase() } : {}),
+        ...(body.model !== undefined ? { model: body.model.trim() } : {}),
       };
       // masterKey is only needed for encryption (non-empty apiKey).
       // apiKey === '' triggers the clear-key path in updateModelConfig which deletes the
@@ -100,18 +105,33 @@ export function createModelConfigsRouter(db: DrizzleDb): Router {
       const cfg = getModelConfig(db, id);
       if (!cfg) throw new HttpError(404, 'NOT_FOUND', 'Model config not found');
 
-      let apiKey: string | undefined;
-      if (cfg.hasApiKey) {
-        const masterKey = getMasterKey();
-        apiKey = resolveModelConfigKey(db, id, masterKey);
+      const finish = beginDiagnosticProbe(id, cfg.provider);
+      let credentialReady = !cfg.hasApiKey;
+      try {
+        let apiKey: string | undefined;
+        if (cfg.hasApiKey) {
+          apiKey = resolveModelConfigKey(db, id, getMasterKey());
+          credentialReady = true;
+        }
+        const result = await testModelConnection({
+          provider: cfg.provider,
+          model: cfg.model,
+          apiKey,
+          baseURL: cfg.baseURL ?? undefined,
+        });
+        finish(result);
+        res.json({ data: result });
+      } catch {
+        const category = credentialReady ? 'unknown' : 'authentication';
+        finish({ ok: false, category });
+        throw new HttpError(
+          503,
+          'MODEL_CONNECTION_UNAVAILABLE',
+          credentialReady
+            ? 'Model connection could not be tested'
+            : 'Stored model credential is unavailable',
+        );
       }
-
-      const result = await testModelConnection({
-        provider: cfg.provider,
-        model: cfg.model,
-        apiKey,
-      });
-      res.json({ data: result });
     }),
   );
 

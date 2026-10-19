@@ -1,4 +1,9 @@
-import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
+import {
+  createLanguageModel,
+  providerGenerationOptions,
+  toProviderRequestError,
+  type SupportedProvider,
+} from '@agent-platform/model-router';
 import { generateText } from 'ai';
 import type { Agent } from '@agent-platform/contracts';
 import { runPlannerRepairLoop, type PlannerResult } from '@agent-platform/planner';
@@ -100,12 +105,19 @@ export function createPlanGenerateNode(options: PlanGenerateNodeOptions) {
       provider: (modelConfig.provider ?? 'openai') as SupportedProvider,
       model: modelConfig.model,
       apiKey: modelConfig.apiKey,
+      baseURL: modelConfig.baseURL,
     });
 
+    const generationOptions = providerGenerationOptions(modelConfig);
     async function generatePlan(): Promise<string> {
       const result = await generateText({
+        allowSystemInMessages: true,
         model,
+        ...generationOptions,
+        maxRetries: 0,
         messages: [{ role: 'user', content: planningPrompt }],
+      }).catch((error: unknown) => {
+        throw toProviderRequestError(error);
       });
       return result.text;
     }

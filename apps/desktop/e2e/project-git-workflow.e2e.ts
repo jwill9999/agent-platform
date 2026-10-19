@@ -5,7 +5,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { getDesktopPorts, seedDesktopDatabase } from './support/runtime.js';
+import { getDesktopLaunchPorts, seedDesktopDatabase } from './support/runtime.js';
 import {
   attemptStartupEvidenceAttachment,
   createStartupEvidence,
@@ -26,7 +26,9 @@ test.describe('Electron Project Git workflow panel', () => {
     const runtimeDir = join(tempRoot, 'runtime');
     const projectDir = join(tempRoot, 'client', 'workflow-project');
     const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
-    const { backendPort, rendererPort } = await getDesktopPorts();
+    const launchPorts = await getDesktopLaunchPorts();
+    const { backendPort, rendererPort, nodeInspectorPort, chromiumDebuggerPort } = launchPorts;
+    let launchEvidence: Awaited<ReturnType<typeof readLaunchEvidence>> = { allocated: launchPorts };
     const startup = createStartupEvidence(backendPort, rendererPort);
     const failures: unknown[] = [];
     let app: ElectronApplication | undefined;
@@ -53,7 +55,12 @@ test.describe('Electron Project Git workflow panel', () => {
     try {
       app = await playwright._electron.launch({
         cwd: desktopDir,
-        args: ['.', `--user-data-dir=${join(tempRoot, 'user-data')}`],
+        args: [
+          '.',
+          `--user-data-dir=${join(tempRoot, 'user-data')}`,
+          `--inspect=127.0.0.1:${nodeInspectorPort}`,
+          `--remote-debugging-port=${chromiumDebuggerPort}`,
+        ],
         env: {
           ...process.env,
           OLLAMA_BASE_URL: 'http://127.0.0.1:9/v1',
@@ -73,6 +80,7 @@ test.describe('Electron Project Git workflow panel', () => {
       const page = await app.firstWindow();
       observedPage = page;
       await waitForOwnedRendererLoad(page, rendererPort);
+      launchEvidence = await readLaunchEvidence(app, page, launchPorts);
       // /init is handled locally, but the composer requires a selected model configuration.
       // An unreachable loopback Ollama target prevents accidental external provider calls.
       const configured = await page.request.post(
@@ -219,7 +227,7 @@ test.describe('Electron Project Git workflow panel', () => {
     } catch (error) {
       failures.push(error);
     }
-    if (!(await attachStartupBeforeCleanup(testInfo, startup, observedPage))) {
+    if (!(await attachStartupBeforeCleanup(testInfo, startup, observedPage, launchEvidence))) {
       failures.push(new Error('Git panel startup evidence could not be attached.'));
     }
     await captureFailure(failures, async () => {
@@ -239,7 +247,9 @@ test.describe('Electron Project Git workflow panel', () => {
     const projectDir = join(tempRoot, 'client', 'conflict-project');
     const collaboratorDir = join(tempRoot, 'collaborator');
     const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
-    const { backendPort, rendererPort } = await getDesktopPorts();
+    const launchPorts = await getDesktopLaunchPorts();
+    const { backendPort, rendererPort, nodeInspectorPort, chromiumDebuggerPort } = launchPorts;
+    let launchEvidence: Awaited<ReturnType<typeof readLaunchEvidence>> = { allocated: launchPorts };
     const startup = createStartupEvidence(backendPort, rendererPort);
     const failures: unknown[] = [];
     let app: ElectronApplication | undefined;
@@ -296,7 +306,11 @@ test.describe('Electron Project Git workflow panel', () => {
     try {
       app = await playwright._electron.launch({
         cwd: desktopDir,
-        args: ['.'],
+        args: [
+          '.',
+          `--inspect=127.0.0.1:${nodeInspectorPort}`,
+          `--remote-debugging-port=${chromiumDebuggerPort}`,
+        ],
         env: {
           ...process.env,
           AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
@@ -315,6 +329,7 @@ test.describe('Electron Project Git workflow panel', () => {
       const page = await app.firstWindow();
       observedPage = page;
       await waitForOwnedRendererLoad(page, rendererPort);
+      launchEvidence = await readLaunchEvidence(app, page, launchPorts);
       await page.route(`http://127.0.0.1:${rendererPort}/api/v1/sessions/project`, (route) => {
         const binding = (async () => {
           if (route.request().method() !== 'POST' || bindingIntercepted) {
@@ -403,7 +418,7 @@ test.describe('Electron Project Git workflow panel', () => {
     await captureFailure(failures, async () => {
       await Promise.all(bindingRoutes);
     });
-    if (!(await attachStartupBeforeCleanup(testInfo, startup, observedPage))) {
+    if (!(await attachStartupBeforeCleanup(testInfo, startup, observedPage, launchEvidence))) {
       failures.push(new Error('Git panel startup evidence could not be attached.'));
     }
     await captureFailure(failures, async () => {
@@ -423,7 +438,9 @@ test.describe('Electron Project Git workflow panel', () => {
     const projectDir = join(tempRoot, 'client', 'pr-project');
     const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
     const branch = 'feature/reviewed-remote';
-    const { backendPort, rendererPort } = await getDesktopPorts();
+    const launchPorts = await getDesktopLaunchPorts();
+    const { backendPort, rendererPort, nodeInspectorPort, chromiumDebuggerPort } = launchPorts;
+    let launchEvidence: Awaited<ReturnType<typeof readLaunchEvidence>> = { allocated: launchPorts };
     const startup = createStartupEvidence(backendPort, rendererPort);
     let app: ElectronApplication | undefined;
     let observedPage: Page | undefined;
@@ -496,7 +513,12 @@ test.describe('Electron Project Git workflow panel', () => {
       seedDesktopDatabase(sqlitePath);
       app = await playwright._electron.launch({
         cwd: desktopDir,
-        args: ['.', `--user-data-dir=${join(tempRoot, 'user-data')}`],
+        args: [
+          '.',
+          `--user-data-dir=${join(tempRoot, 'user-data')}`,
+          `--inspect=127.0.0.1:${nodeInspectorPort}`,
+          `--remote-debugging-port=${chromiumDebuggerPort}`,
+        ],
         env: {
           ...process.env,
           ...ghFixture.env,
@@ -518,6 +540,7 @@ test.describe('Electron Project Git workflow panel', () => {
       const page = await app.firstWindow();
       observedPage = page;
       await waitForOwnedRendererLoad(page, rendererPort);
+      launchEvidence = await readLaunchEvidence(app, page, launchPorts);
       page.on('request', onRequest);
       page.on('response', onResponse);
       page.on('requestfinished', onFinished);
@@ -580,7 +603,7 @@ test.describe('Electron Project Git workflow panel', () => {
     observedPage?.off('response', onResponse);
     observedPage?.off('requestfinished', onFinished);
     observedPage?.off('requestfailed', onFailed);
-    if (!(await attachStartupBeforeCleanup(testInfo, startup, observedPage))) {
+    if (!(await attachStartupBeforeCleanup(testInfo, startup, observedPage, launchEvidence))) {
       failures.push(new Error('Git panel startup evidence could not be attached.'));
     }
     await captureFailure(failures, () =>
@@ -609,11 +632,17 @@ test.describe('Electron Project Git workflow panel', () => {
         contentType: 'application/json',
       }),
     );
+    await captureFailure(failures, () =>
+      attachGitHubBoundaryEvidence(testInfo, ghFixture, 'before-cleanup', pendingReads.size),
+    );
     try {
       await app?.close();
     } catch (error) {
       failures.push(error);
     }
+    await captureFailure(failures, () =>
+      attachGitHubBoundaryEvidence(testInfo, ghFixture, 'after-app-close', pendingReads.size),
+    );
     try {
       await ghFixture?.close();
     } catch (error) {
@@ -632,6 +661,127 @@ test.describe('Electron Project Git workflow panel', () => {
     throwFailures(failures);
   });
 });
+
+async function attachGitHubBoundaryEvidence(
+  testInfo: TestInfo,
+  fixture: Awaited<ReturnType<typeof createGhLedgerFixture>> | undefined,
+  phase: 'before-cleanup' | 'after-app-close',
+  pendingReadCount: number,
+): Promise<void> {
+  if (!fixture) return;
+  const [invocations, ledger] = await Promise.allSettled([
+    fixture.readEvidence(),
+    fixture.readLedger(),
+  ]);
+  const summary =
+    ledger.status === 'fulfilled'
+      ? {
+          available: true,
+          callCount: ledger.value.calls.length,
+          createCalls: ledger.value.calls.filter(
+            ({ args }: { args: string[] }) => args[0] === 'pr' && args[1] === 'create',
+          ).length,
+          successCalls: ledger.value.calls.filter(
+            ({ outcome }: { outcome: string }) => outcome === 'success',
+          ).length,
+          errorCalls: ledger.value.calls.filter(
+            ({ outcome }: { outcome: string }) => outcome === 'error',
+          ).length,
+          pullRequestCount: ledger.value.pullRequests.length,
+          lostResponseConsumed: ledger.value.lostResponseConsumed === true,
+        }
+      : { available: false };
+  await testInfo.attach(`github-boundary-${phase}`, {
+    body: Buffer.from(
+      JSON.stringify(
+        {
+          phase,
+          // Request listeners were removed before cleanup; this is their last observed count.
+          lastObservedPendingReadCount: pendingReadCount,
+          invocations:
+            invocations.status === 'fulfilled' ? invocations.value : { available: false },
+          ledger: summary,
+        },
+        null,
+        2,
+      ),
+    ),
+    contentType: 'application/json',
+  });
+  const incompleteInvocations =
+    invocations.status === 'fulfilled' &&
+    (invocations.value.errors !== 0 || invocations.value.truncated);
+  if (invocations.status === 'rejected' || ledger.status === 'rejected' || incompleteInvocations) {
+    throw new Error('GitHub fixture boundary evidence could not be collected completely.');
+  }
+}
+
+type LaunchPorts = Awaited<ReturnType<typeof getDesktopLaunchPorts>>;
+type DebuggerEvidence = {
+  actualNodeInspectorPort: number | null;
+  configuredChromiumDebuggerPort: number | null;
+  actualChromiumDebuggerPort: null;
+};
+type RendererEvidence = {
+  loopback: boolean;
+  port: number | null;
+  rootPath: boolean;
+  contentType: 'html' | 'plain' | 'other';
+  responseStatus: number | null;
+};
+
+async function readLaunchEvidence(
+  app: ElectronApplication,
+  page: Page,
+  allocated: LaunchPorts,
+): Promise<{
+  allocated: LaunchPorts;
+  debugger?: DebuggerEvidence | null;
+  initialRenderer?: RendererEvidence | null;
+}> {
+  // Observe the already loaded document: no extra HTTP probe, navigation or retry.
+  const [debuggerResult, rendererResult] = await Promise.allSettled([
+    app.evaluate(({ app }) => {
+      const configured = app.commandLine.getSwitchValue('remote-debugging-port');
+      const port = /^\d{1,5}$/.test(configured) ? Number(configured) : 0;
+      return {
+        actualNodeInspectorPort:
+          Number.isInteger(process.debugPort) && process.debugPort > 0 && process.debugPort <= 65535
+            ? process.debugPort
+            : null,
+        configuredChromiumDebuggerPort: port > 0 && port <= 65535 ? port : null,
+        // The configured switch is not proof of the Chromium listener's bound endpoint.
+        actualChromiumDebuggerPort: null,
+      };
+    }),
+    page.evaluate(() => {
+      const navigation = performance.getEntriesByType('navigation')[0] as
+        | (PerformanceNavigationTiming & { responseStatus?: number })
+        | undefined;
+      const status = navigation?.responseStatus;
+      const port = /^\d{1,5}$/.test(location.port) ? Number(location.port) : 0;
+      let contentType: RendererEvidence['contentType'] = 'other';
+      if (document.contentType === 'text/html') contentType = 'html';
+      else if (document.contentType === 'text/plain') contentType = 'plain';
+      return {
+        loopback: location.hostname === '127.0.0.1',
+        port: port > 0 && port <= 65535 ? port : null,
+        rootPath: location.pathname === '/',
+        contentType,
+        responseStatus:
+          typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599
+            ? status
+            : null,
+      };
+    }),
+  ]);
+  // Missing optional evidence remains explicit; preserve the original test outcome.
+  return {
+    allocated,
+    debugger: debuggerResult.status === 'fulfilled' ? debuggerResult.value : null,
+    initialRenderer: rendererResult.status === 'fulfilled' ? rendererResult.value : null,
+  };
+}
 
 async function waitForOwnedRendererLoad(page: Page, rendererPort: number): Promise<void> {
   // firstWindow observes construction before main.ts finishes its initial loadURL.
@@ -666,6 +816,7 @@ async function attachStartupBeforeCleanup(
   testInfo: TestInfo,
   startup: ReturnType<typeof createStartupEvidence>,
   page: Page | undefined,
+  launchEvidence: Awaited<ReturnType<typeof readLaunchEvidence>>,
 ): Promise<boolean> {
   return await attemptStartupEvidenceAttachment(async () => {
     await testInfo.attach('fixture-startup-before-cleanup', {
@@ -673,6 +824,7 @@ async function attachStartupBeforeCleanup(
         JSON.stringify(
           {
             ...startup.snapshot(),
+            launchEvidence,
             pageOrigin: page ? new URL(page.url()).origin : null,
             pageClosed: page?.isClosed() ?? null,
           },

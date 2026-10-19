@@ -1,6 +1,11 @@
 import { generateText } from 'ai';
 import { CriticVerdictSchema, type CriticVerdict } from '@agent-platform/contracts';
-import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
+import {
+  createLanguageModel,
+  providerGenerationOptions,
+  toProviderRequestError,
+  type SupportedProvider,
+} from '@agent-platform/model-router';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { createLogger } from '@agent-platform/logger';
 
@@ -75,6 +80,7 @@ async function defaultEvaluate(state: HarnessStateType): Promise<CriticVerdict> 
     provider: (modelConfig.provider ?? 'openai') as SupportedProvider,
     model: modelConfig.model,
     apiKey: modelConfig.apiKey,
+    baseURL: modelConfig.baseURL,
   });
   const evalMessages = buildEvaluatorMessages(state);
   // Evaluator only emits system + user messages — narrow the type so the SDK
@@ -86,8 +92,13 @@ async function defaultEvaluate(state: HarnessStateType): Promise<CriticVerdict> 
     )
     .map((m) => ({ role: m.role, content: m.content }));
   const result = await generateText({
+    allowSystemInMessages: true,
     model,
+    ...providerGenerationOptions(modelConfig),
+    maxRetries: 0,
     messages: sdkMessages,
+  }).catch((error: unknown) => {
+    throw toProviderRequestError(error);
   });
   const json = extractFirstJsonObject(result.text);
   if (!json) {

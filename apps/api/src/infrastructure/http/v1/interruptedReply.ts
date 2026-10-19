@@ -19,6 +19,10 @@ export function captureInterruptedReply(
       },
       end: () => destination.end(),
     } satisfies OutputEmitter,
+    // The SDK barrier has committed this prefix. Keep capturing later model text.
+    checkpoint: () => {
+      text.length = 0;
+    },
     markSaved: () => {
       saved = true;
     },

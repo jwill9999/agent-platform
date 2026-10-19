@@ -90,6 +90,7 @@ export const modelConfigs = sqliteTable('model_configs', {
   name: text('name').notNull(),
   provider: text('provider').notNull(),
   model: text('model').notNull(),
+  baseURL: text('base_url'),
   /** FK to secret_refs; null when no key is stored (e.g. Ollama). */
   secretRefId: text('secret_ref_id').references(() => secretRefs.id, { onDelete: 'set null' }),
   createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
@@ -342,7 +343,24 @@ export const messages = sqliteTable('messages', {
   content: text('content').notNull(),
   toolCallId: text('tool_call_id'),
   toolCallsJson: text('tool_calls_json'),
+  providerContinuationFormat: integer('provider_continuation_format').notNull().default(0),
   createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+});
+
+/** Internal encrypted SDK parts. Never exposed in public message DTOs. */
+export const providerContinuations = sqliteTable('provider_continuations', {
+  messageId: text('message_id')
+    .primaryKey()
+    .references(() => messages.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => sessions.id, { onDelete: 'cascade' }),
+  ciphertextB64: text('ciphertext_b64').notNull(),
+  ivB64: text('iv_b64').notNull(),
+  authTagB64: text('auth_tag_b64').notNull(),
+  keyVersion: integer('key_version').notNull(),
+  algorithm: text('algorithm').notNull(),
+  plaintextBytes: integer('plaintext_bytes').notNull(),
 });
 
 /** Key-value platform settings (rate limits, cost budgets, etc.). */

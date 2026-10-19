@@ -583,12 +583,13 @@ export function assertContextTokenWire(
             type: 'tool-call',
             toolCallId: call.id,
             toolName: call.function.name,
-            args: JSON.parse(call.function.arguments),
+            input: JSON.parse(call.function.arguments),
           });
         }
         return { role: 'assistant', content };
       }
       if (message.role === 'tool') {
+        expect(typeof message.content).toBe('string');
         expect(pending.delete(message.tool_call_id!)).toBe(true);
         return {
           role: 'tool',
@@ -597,7 +598,9 @@ export function assertContextTokenWire(
               type: 'tool-result',
               toolCallId: message.tool_call_id,
               toolName: toolNames.get(message.tool_call_id!),
-              result: JSON.parse(String(message.content)),
+              // SDK7 text output is already literal: count the complete security
+              // wrapper/note as well as JSON-looking denial text without unwrapping.
+              output: { type: 'text', value: message.content as string },
             },
           ],
         };

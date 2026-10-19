@@ -14,7 +14,12 @@ import {
   type SensorSelectionState,
   type SensorTrigger,
 } from '@agent-platform/contracts';
-import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
+import {
+  createLanguageModel,
+  providerGenerationOptions,
+  toProviderRequestError,
+  type SupportedProvider,
+} from '@agent-platform/model-router';
 
 import type { ChatMessage, LlmModelConfig, LlmOutput } from '../types.js';
 import {
@@ -357,9 +362,13 @@ async function defaultModelEvaluate(
     provider: (modelConfig.provider ?? 'openai') as SupportedProvider,
     model: modelConfig.model,
     apiKey: modelConfig.apiKey,
+    baseURL: modelConfig.baseURL,
   });
   const response = await generateText({
+    allowSystemInMessages: true,
     model,
+    ...providerGenerationOptions(modelConfig),
+    maxRetries: 0,
     messages: [
       {
         role: 'system',
@@ -371,6 +380,8 @@ async function defaultModelEvaluate(
         content: buildPrompt(input),
       },
     ],
+  }).catch((error: unknown) => {
+    throw toProviderRequestError(error);
   });
   const json = extractFirstJsonObject(response.text);
   return json ? JSON.parse(json) : response.text;

@@ -3,12 +3,20 @@ export {
   createLanguageModel,
   isSupportedProvider,
   SUPPORTED_PROVIDERS,
+  PROVIDER_CATALOGUE,
+  providerGenerationOptions,
+  providerEndpointIdentity,
   type SupportedProvider,
   type ProviderConfig,
 } from './providers.js';
 
 // Provider-agnostic streaming
-export { streamChat, type ChatMessage, type StreamChatOptions } from './streamChat.js';
+export {
+  streamChat,
+  type ChatMessage,
+  type StreamChatOptions,
+  type StreamChatResult,
+} from './streamChat.js';
 
 // Provider-aware API key resolution
 export {
@@ -47,3 +55,12 @@ export {
   type OpenAiKeyGateResult,
   type PreferredOpenAiEnvVar,
 } from './resolveOpenAiApiKey.js';
+
+export { normalizeProviderEndpoint, providerFetch } from './providerEndpoint.js';
+export {
+  ProviderRequestError,
+  toProviderRequestError,
+  type ProviderErrorCategory,
+} from './providerErrors.js';
+
+export { installSafeProviderWarningLogger, type SafeProviderWarning } from './providerWarnings.js';

@@ -16,10 +16,64 @@ concurrency:
   cancel-in-progress: ${{ github.base_ref == 'main' }}
 
 jobs:
-  verify:
+  diagnostic-performance:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Rebuild native dependencies
+        run: pnpm run rebuild:native
+      - name: Build
+        run: pnpm run build
+
+      - name: Test isolated diagnostic CI boundaries
+        run: node --test scripts/diagnostics-benchmark-gate.test.mjs scripts/diagnostics-benchmark-host.test.mjs
+
+      - name: Diagnostic performance in a fresh process
+        env:
+          DIAGNOSTICS_BENCHMARK_RESULT: ${{ runner.temp }}/diagnostics-benchmark.json
+          DIAGNOSTICS_BENCHMARK_HOST_RESULT: ${{ runner.temp }}/diagnostics-benchmark.json.host-context.json
+        # The original workload runs once before ordinary suites, without a preload or cooldown.
+        # External numeric host evidence never changes measured durations or pass criteria.
+        run: node scripts/run-diagnostics-benchmark-host.mjs
+
+      - name: Upload diagnostic benchmark measurements
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: diagnostics-benchmark
+          path: ${{ runner.temp }}/diagnostics-benchmark.json*
+          retention-days: 7
+
+  verify:
+    needs: diagnostic-performance
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Require successful isolated diagnostic performance
+        env:
+          DIAGNOSTIC_PERFORMANCE_RESULT: ${{ needs.diagnostic-performance.result }}
+        # This guard runs before checkout, so it is static and depends only on the job result.
+        run: |
+          node --input-type=module - <<'JS'
+          import process from 'node:process';
+          if (process.env.DIAGNOSTIC_PERFORMANCE_RESULT !== 'success') {
+            process.stderr.write('Required isolated diagnostic performance did not succeed.\n');
+            process.exitCode = 1;
+          }
+          JS
+
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -69,6 +123,9 @@ jobs:
       - name: Shared Stop provider fixture controls
         run: node --test e2e/support/project-chat-stop/*.test.mjs
 
+      - name: Provider SDK protocol fixture controls
+        run: node --test e2e/support/provider-sdk.test.mjs
+
       - name: Test local diagnostic command boundaries
         run: node --test scripts/diagnostics.test.mjs scripts/monitoring.test.mjs scripts/pre-push.test.mjs
 
@@ -84,22 +141,11 @@ jobs:
       - name: Test
         # Includes default packages/db MIG-R01–05 migration/preservation/rollback regressions.
         # Keep timing and physical-storage measurements free of competing test suites.
-        # The one excluded test runs in the required fresh-process step immediately below.
+        # The one excluded test is required in the separate fresh-runner job above.
         run: pnpm -r --workspace-concurrency=1 run test --maxWorkers=1 --no-file-parallelism --exclude '**/diagnostics.performance.test.ts'
 
-      - name: Diagnostic performance in a fresh process
-        env:
-          DIAGNOSTICS_BENCHMARK_RESULT: ${{ runner.temp }}/diagnostics-benchmark.json
-        # Preserve the full benchmark workload, deadlines and assertions, without the API suite's reused fork.
-        run: pnpm --filter @agent-platform/api exec vitest run test/diagnostics.performance.test.ts --maxWorkers=1 --no-file-parallelism
-
-      - name: Upload diagnostic benchmark measurements
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: diagnostics-benchmark
-          path: ${{ runner.temp }}/diagnostics-benchmark.json*
-          retention-days: 7
+      - name: Test retained diagnostic observer controls after measurement
+        run: node --test scripts/diagnostics-benchmark-observer.test.mjs
 
       - name: Seed (idempotent)
         run: |

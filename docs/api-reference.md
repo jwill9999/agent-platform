@@ -121,6 +121,7 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `GET /v1/scheduler/runs/:runId`            |    ✅    |       ✅        | Get one run attempt                          |
 | `POST /v1/scheduler/runs/:runId/cancel`    |    ✅    |       ✅        | Request cancellation for a running attempt   |
 | `GET /v1/scheduler/runs/:runId/logs`       |    ✅    |       ✅        | Inspect bounded run logs and notifications   |
+| `GET /v1/model-configs/providers`          |    ✅    |       ✅        | Backend-owned provider catalogue             |
 | `GET /v1/model-configs`                    |    ✅    |       ✅        | Model configs dashboard                      |
 | `POST /v1/model-configs`                   |    ✅    |       ✅        | Model configs dashboard — create             |
 | `PUT /v1/model-configs/:id`                |    ✅    |       ✅        | Model configs dashboard — edit               |
@@ -359,14 +360,15 @@ Body schema: `AgentSchema` — requires `name`, `executionLimits`. Optional: `sy
 
 Saved LLM provider configurations with securely stored API keys. Assigned to agents to pin them to a specific model + key.
 
-| Method   | Path                         | Description                                         |
-| -------- | ---------------------------- | --------------------------------------------------- |
-| `GET`    | `/v1/model-configs`          | List all model configs                              |
-| `GET`    | `/v1/model-configs/:id`      | Get model config by ID                              |
-| `POST`   | `/v1/model-configs`          | Create a model config                               |
-| `PUT`    | `/v1/model-configs/:id`      | Update a model config                               |
-| `DELETE` | `/v1/model-configs/:id`      | Delete a model config (unlinks agents via SET NULL) |
-| `POST`   | `/v1/model-configs/:id/test` | Test connection — fires a minimal LLM ping          |
+| Method   | Path                          | Description                                                |
+| -------- | ----------------------------- | ---------------------------------------------------------- |
+| `GET`    | `/v1/model-configs/providers` | Supported IDs, labels, credential requirement and API mode |
+| `GET`    | `/v1/model-configs`           | List all model configs                                     |
+| `GET`    | `/v1/model-configs/:id`       | Get model config by ID                                     |
+| `POST`   | `/v1/model-configs`           | Create a model config                                      |
+| `PUT`    | `/v1/model-configs/:id`       | Update a model config                                      |
+| `DELETE` | `/v1/model-configs/:id`       | Delete a model config (unlinks agents via SET NULL)        |
+| `POST`   | `/v1/model-configs/:id/test`  | Test connection — fires a minimal LLM ping                 |
 
 **Create / Update body:**
 
@@ -379,12 +381,17 @@ Saved LLM provider configurations with securely stored API keys. Assigned to age
 }
 ```
 
-| Field      | Required on create | Notes                                                                                     |
-| ---------- | :----------------: | ----------------------------------------------------------------------------------------- |
-| `name`     |      **Yes**       | Display name                                                                              |
-| `provider` |      **Yes**       | `openai` / `anthropic` / `ollama` / any string                                            |
-| `model`    |      **Yes**       | Model identifier (e.g. `gpt-4o`, `claude-3-5-sonnet`)                                     |
-| `apiKey`   |         No         | API key — encrypted at rest (AES-256-GCM). Omit to keep existing key. Pass `""` to clear. |
+| Field      | Required on create | Notes                                                                                                                                  |
+| ---------- | :----------------: | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`     |      **Yes**       | Display name                                                                                                                           |
+| `provider` |      **Yes**       | `openai`, `anthropic`, `google`, `deepseek`, `xai`, `openrouter`, `ollama`, `openai-compatible`                                        |
+| `model`    |      **Yes**       | Exact case-sensitive provider model ID; OpenRouter uses provider/model                                                                 |
+| `apiKey`   |         No         | API key — encrypted at rest (AES-256-GCM). Omit to keep existing key; changing provider clears it unless replaced. Pass `""` to clear. |
+
+Optional `baseURL` is persisted and returned (null uses the adapter default). It requires HTTPS or
+loopback HTTP, without credentials/query/fragment; redirects are denied. On update, null clears the
+override; changing provider also clears it unless explicitly replaced. Stored secrets stay encrypted.
+The same backend controls apply to all clients, not only the settings UI.
 
 **Response shape** — API key is **never** returned:
 
@@ -410,7 +417,18 @@ Saved LLM provider configurations with securely stored API keys. Assigned to age
 }
 ```
 
-On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
+On failure: `{ "data": { "ok": false, "latencyMs": 120, "category": "request", "retryable": false, "error": "The provider rejected the model request." } }`.
+
+A probe makes one request with32output tokens, a10-second deadline and no retries. Native adapters
+own request parameters; HTTP400 mentioning max_tokens is failed. Safe categories are authentication,
+access, quota, rate_limit, request, transport, timeout, invalid_response, output_limited and unknown.
+output_limited means a valid response exhausted the test cap without visible text, not malformed
+response or proven usable chat. Provider HTTP status may be returned as statusCode; no raw error/body.
+Tests may incur provider charges when an owner triggers them with a real configuration.
+
+Durable local diagnostics record probe start/outcome/provider/configuration ID/duration and fixed
+failure category, linked by x-request-id; exports omit credentials/prompts/private continuation.
+A successful probe is not owner stress-test completion or a promise all model capabilities work.
 
 > **Security:** `SECRETS_MASTER_KEY` must be set to store or use API keys in model configs. Keys are encrypted with AES-256-GCM and never appear in API responses or logs.
 

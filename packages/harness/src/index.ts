@@ -188,3 +188,12 @@ export {
 } from './security/mcpApproval.js';
 
 export { RunStoppedError, type RunExecutionControl } from './runControl.js';
+
+export {
+  PROVIDER_CONTINUATION_RECOVERY_MESSAGE,
+  getProviderContinuation,
+  attachProviderContinuation,
+  withoutProviderContinuation,
+  continuationBindingMatches,
+  validateProviderContinuation,
+} from './providerContinuation.js';

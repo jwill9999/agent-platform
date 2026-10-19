@@ -8,6 +8,9 @@ const scopedTables = new Set([
   'controlled_runs',
   'run_executions',
   'run_attempts',
+  'provider_continuations',
+  'messages',
+  'model_configs',
 ]);
 const approvalColumns = new Set(['run_id', 'execution_payload_json', 'resumed_at_ms']);
 

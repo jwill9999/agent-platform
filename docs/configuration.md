@@ -6,18 +6,18 @@ All configuration ultimately flows through environment variables and the Setting
 
 ### API Server (`apps/api`)
 
-| Variable                 | Required | Default                     | Description                                                                                                          |
-| ------------------------ | -------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `SQLITE_PATH`            | **Yes**  | —                           | Absolute path to the SQLite database file                                                                            |
-| `SECRETS_MASTER_KEY`     | No \*    | —                           | Base64-encoded 32-byte key for AES-256-GCM secret encryption. **Required** to store or use API keys in model configs |
-| `PORT`                   | No       | `3000`                      | API listen port                                                                                                      |
-| `HOST`                   | No       | `0.0.0.0`                   | API bind address                                                                                                     |
-| `RATE_LIMIT_WINDOW_MS`   | No       | `60000`                     | Rate-limiter sliding window (ms)                                                                                     |
-| `RATE_LIMIT_MAX`         | No       | `100`                       | Maximum requests per window                                                                                          |
-| `DEFAULT_MODEL_PROVIDER` | No       | `openai`                    | Default LLM provider when no agent override is set                                                                   |
-| `DEFAULT_MODEL`          | No       | Provider default            | Default model name when no agent override is set                                                                     |
-| `OLLAMA_BASE_URL`        | No       | `http://localhost:11434/v1` | Base URL for the Ollama provider                                                                                     |
-| `NODE_ENV`               | No       | —                           | Set to `production` to disable OpenAPI response validation                                                           |
+| Variable                 | Required | Default                     | Description                                                                                                                            |
+| ------------------------ | -------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `SQLITE_PATH`            | **Yes**  | —                           | Absolute path to the SQLite database file                                                                                              |
+| `SECRETS_MASTER_KEY`     | No \*    | —                           | Base64-encoded 32-byte key for AES-256-GCM secret encryption. **Required** for saved credentials and durable private/tool continuation |
+| `PORT`                   | No       | `3000`                      | API listen port                                                                                                                        |
+| `HOST`                   | No       | `0.0.0.0`                   | API bind address                                                                                                                       |
+| `RATE_LIMIT_WINDOW_MS`   | No       | `60000`                     | Rate-limiter sliding window (ms)                                                                                                       |
+| `RATE_LIMIT_MAX`         | No       | `100`                       | Maximum requests per window                                                                                                            |
+| `DEFAULT_MODEL_PROVIDER` | No       | `openai`                    | Default LLM provider when no agent override is set                                                                                     |
+| `DEFAULT_MODEL`          | No       | Provider default            | Default model name when no agent override is set                                                                                       |
+| `OLLAMA_BASE_URL`        | No       | `http://localhost:11434/v1` | Base URL for the Ollama provider                                                                                                       |
+| `NODE_ENV`               | No       | —                           | Set to `production` to disable OpenAPI response validation                                                                             |
 
 ### Workspace Storage
 
@@ -94,11 +94,16 @@ Keys are resolved in order of precedence:
 2. Provider-specific env var (see table below)
 3. Legacy env var — blocked unless opt-in is enabled
 
-| Provider    | Preferred Env Var         | Legacy Env Var      | Legacy Opt-In Gate                                  |
-| ----------- | ------------------------- | ------------------- | --------------------------------------------------- |
-| `openai`    | `AGENT_OPENAI_API_KEY`    | `OPENAI_API_KEY`    | `OPENAI_ALLOW_LEGACY_ENV=1` or `ALLOW_LEGACY_ENV=1` |
-| `anthropic` | `AGENT_ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY` | `ALLOW_LEGACY_ENV=1`                                |
-| `ollama`    | — (no key needed)         | —                   | —                                                   |
+| Provider            | Preferred Env Var          | Legacy Env Var                 | Legacy Opt-In Gate                                  |
+| ------------------- | -------------------------- | ------------------------------ | --------------------------------------------------- |
+| `openai`            | `AGENT_OPENAI_API_KEY`     | `OPENAI_API_KEY`               | `OPENAI_ALLOW_LEGACY_ENV=1` or `ALLOW_LEGACY_ENV=1` |
+| `anthropic`         | `AGENT_ANTHROPIC_API_KEY`  | `ANTHROPIC_API_KEY`            | `ALLOW_LEGACY_ENV=1`                                |
+| `google`            | `AGENT_GOOGLE_API_KEY`     | `GOOGLE_GENERATIVE_AI_API_KEY` | `ALLOW_LEGACY_ENV=1`                                |
+| `deepseek`          | `AGENT_DEEPSEEK_API_KEY`   | `DEEPSEEK_API_KEY`             | `ALLOW_LEGACY_ENV=1`                                |
+| `xai`               | `AGENT_XAI_API_KEY`        | `XAI_API_KEY`                  | `ALLOW_LEGACY_ENV=1`                                |
+| `openrouter`        | `AGENT_OPENROUTER_API_KEY` | `OPENROUTER_API_KEY`           | `ALLOW_LEGACY_ENV=1`                                |
+| `openai-compatible` | — (optional saved key)     | —                              | —                                                   |
+| `ollama`            | — (no key needed)          | —                              | —                                                   |
 
 ### Web BFF (`apps/web`)
 
@@ -131,14 +136,33 @@ Model configuration is fully user-controlled — no hardcoded model IDs. The `mo
 
 For each chat request the API resolves the model + API key in this precedence order:
 
-1. **Saved model config** — agent has a `modelConfigId` referencing a `model_configs` row; provider, model, and encrypted API key are loaded from the DB. Requires `SECRETS_MASTER_KEY`.
-2. **Agent `modelOverride`** — free-form `{ provider, model }` stored on the agent; key resolved via env-var chain below.
-3. **Env-var defaults** — `DEFAULT_MODEL_PROVIDER` / `DEFAULT_MODEL`; key resolved via env-var chain below.
-4. **System fallback** — `openai` / `gpt-4o`.
+1. **Per-request modelConfigId** — explicit saved configuration selected by the caller.
+2. **Agent saved modelConfigId** — shared configuration assigned to that agent.
+3. **Saved platform default** — first usable saved configuration (credentials, or a keyless local adapter).
+4. **Agent modelOverride / environment** — provider/model with its provider-specific key resolution.
+5. **Legacy system fallback** — OpenAI/gpt-4o when no provider/model is supplied; new provider families require an explicit model ID.
+
+Saved configurations share the same backend for UI, agent/chat and future voice/CLI clients. Unsupported
+providers fail explicitly; they never silently borrow an OpenAI credential. Per-request picker state is
+currently transient; the configuration and agent assignment are durable. Re-select an override after
+reopening the app when needed. A pending approval stays bound to its original provider configuration.
 
 ### Saved Model Configs (recommended)
 
-Model configs store a provider, model, and encrypted API key that can be reused across agents:
+Model configs store provider, exact case-sensitive model ID, optional endpoint and encrypted API key.
+The supported catalogue is available at GET /v1/model-configs/providers: OpenAI, Anthropic, Google,
+DeepSeek, xAI, OpenRouter, Ollama and generic OpenAI-compatible services.
+
+OpenRouter uses its own saved credential and the full provider/model ID (for example
+openai/gpt-6.1-sol). Native examples and researched protocol coverage are in the
+[SDK plan](planning/provider-sdk-compatibility.md); model availability remains account-dependent.
+
+An endpoint override must use HTTPS, or explicit loopback HTTP for a local service, without URL
+credentials/query/fragment. Redirects are rejected before forwarding a key. The configured endpoint
+receives that configuration's credential. Changing provider clears the old key/endpoint unless
+explicitly replaced; keep a separate saved configuration for each provider/account.
+
+Example saved configuration:
 
 ```bash
 # Create a saved config
@@ -162,6 +186,27 @@ curl -X PUT http://localhost:3000/v1/agents/<id> \
 ```
 
 See the [API Reference — Model Configs](./api-reference.md#model-configs) for the full endpoint spec.
+
+### Private provider continuation
+
+Stateless OpenAI/xAI Responses calls disable provider storage. Reasoning/signature/tool continuation
+is retained separately from public messages, encrypted with the existing secrets master key. Internal
+stable message identities/required-format markers detect missing/corrupt continuation; writes finish
+before approval/tool effects. Private bytes are excluded from public message APIs, plugins, logs and
+diagnostic reports. Raw provider reasoning is not an assistant reply; application status/tool activity
+remains visible. Model switching after a completed turn keeps public history and omits foreign private
+data. Changing configuration during a pending approval fails closed.
+
+Developer-operated APIs need `SECRETS_MASTER_KEY` for durable tool/approval turns, including keyless
+local providers: the tool history still needs a bound private record. Plain nonthinking local text
+can run without it. Missing required private storage fails before tool effects. Make/native desktop
+startup creates or propagates its existing key; preserve that same key with the profile and database.
+This is separate from a provider API credential, and no default replacement key is introduced.
+
+Limits are256KiB per serialized private message and4MiB per session. Data follows conversation
+lifecycle and cascades on deletion; it is not controlled by diagnostic retention. Oversized or invalid
+required state is rejected without truncation/effects. Keep the existing profile/master key when
+upgrading. Startup migration checks and disposable upgrade/restart regressions apply.
 
 ### Agent-Level Model Override
 
@@ -258,11 +303,11 @@ The context/token MVP branch applies admission before each conversational reason
 tool-loop iterations and approval resume. It is under verification; see the
 [task and delivery status](tasks/agent-platform-context-optimisation.md).
 
-| Field             | Default    | Description                                                                                                  |
-| ----------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
-| `maxInputTokens`  | `16000`    | Approximate input allowance for complete mapped messages and tool schemas; admission uses 90% of this value. |
-| `maxOutputTokens` | `2048`     | Separate positive-integer completion allowance sent as the installed SDK's `maxTokens` option.               |
-| `strategy`        | `truncate` | Both `truncate` and legacy `summarize` use atomic history groups plus existing working memory.               |
+| Field             | Default    | Description                                                                                                                  |
+| ----------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `maxInputTokens`  | `16000`    | Approximate input allowance for complete mapped messages and tool schemas; admission uses 90% of this value.                 |
+| `maxOutputTokens` | `2048`     | Separate positive-integer completion allowance sent as SDK7 `maxOutputTokens`; native adapters serialize their own protocol. |
+| `strategy`        | `truncate` | Both `truncate` and legacy `summarize` use atomic history groups plus existing working memory.                               |
 
 The owner-approved16,000 default applies to absent/new settings. Explicitly saved budgets remain
 unchanged, including the previous8,000 value; no automatic migration increases existing limits.

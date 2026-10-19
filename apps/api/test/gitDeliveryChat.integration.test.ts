@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, writeFileSync, rmSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import {
   insertGitDeliveryOperation,
@@ -22,6 +22,15 @@ import {
 import type { ApprovalRequest } from '@agent-platform/contracts';
 import { createApp } from '../src/infrastructure/http/createApp.js';
 import { listenLoopback, closeLoopback } from './support/loopbackServer.js';
+
+// This actual SDK fixture shares an isolate:false fork with mocked reasoning tests.
+// Discard their cached graph closures before loading this app, then leave a clean cache.
+vi.hoisted(() => vi.resetModules());
+vi.unmock('@agent-platform/harness');
+vi.unmock('@agent-platform/model-router');
+vi.unmock('../../../packages/harness/node_modules/ai');
+vi.unmock('../../../packages/model-router/node_modules/@ai-sdk/openai-compatible');
+afterAll(() => vi.resetModules());
 
 const providerModule = new URL(
   '../../../e2e/support/git-delivery/model-provider.mjs',
@@ -48,29 +57,41 @@ async function setup(replies: unknown[], allowed = true) {
   writeFileSync(join(repo, 'file.txt'), 'changed');
   const opened = openDatabase(join(directory, 'test.sqlite'));
   const provider = await startGitDeliveryProvider({ model: 'git-delivery-chat', replies });
-  const oldTracing = {
+  const oldEnvironment = {
+    SECRETS_MASTER_KEY: process.env.SECRETS_MASTER_KEY,
     LANGSMITH_TRACING: process.env.LANGSMITH_TRACING,
     LANGCHAIN_TRACING_V2: process.env.LANGCHAIN_TRACING_V2,
     LANGSMITH_TRACING_V2: process.env.LANGSMITH_TRACING_V2,
   };
+  // Durable tool/approval bindings use only this fixture's disposable encryption key.
+  process.env.SECRETS_MASTER_KEY = randomBytes(32).toString('base64');
   process.env.LANGSMITH_TRACING = 'false';
   process.env.LANGSMITH_TRACING_V2 = 'false';
   process.env.LANGCHAIN_TRACING_V2 = 'false';
-  const oldBase = process.env.OLLAMA_BASE_URL;
-  process.env.OLLAMA_BASE_URL = provider.baseURL;
+  const originalFetch = globalThis.fetch;
+  const providerOrigin = new URL(provider.baseURL).origin;
+  const fetchCounts = { provider: 0, api: 0, rejected: 0 };
   const listener: { server?: Server } = {};
   let beforeStart: (() => Promise<void>) | undefined;
   cleanups.push(async () => {
-    if (listener.server) await closeLoopback(listener.server);
-    await provider.close();
-    for (const [key, value] of Object.entries(oldTracing)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+    try {
+      try {
+        if (listener.server) await closeLoopback(listener.server);
+      } finally {
+        await provider.close();
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+      for (const [key, value] of Object.entries(oldEnvironment)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      try {
+        closeDatabase(opened.sqlite);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
-    closeDatabase(opened.sqlite);
-    rmSync(directory, { recursive: true, force: true });
-    if (oldBase === undefined) delete process.env.OLLAMA_BASE_URL;
-    else process.env.OLLAMA_BASE_URL = oldBase;
   });
   const server = await listenLoopback(
     createApp({
@@ -93,6 +114,19 @@ async function setup(replies: unknown[], allowed = true) {
     }),
   );
   listener.server = server;
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Missing Git fixture address');
+  const apiOrigin = `http://127.0.0.1:${address.port}`;
+  globalThis.fetch = (input, init) => {
+    const target = new URL(input instanceof Request ? input.url : String(input));
+    if (target.origin === providerOrigin) fetchCounts.provider++;
+    else if (target.origin === apiOrigin) fetchCounts.api++;
+    else {
+      fetchCounts.rejected++;
+      return Promise.reject(new Error('Unowned request blocked by Git fixture'));
+    }
+    return originalFetch(input, init);
+  };
   const agent = (
     await request(server)
       .post('/v1/agents')
@@ -127,17 +161,28 @@ async function setup(replies: unknown[], allowed = true) {
       .send({ agentId: agent.id, mode: 'project', projectId: project.id })
       .expect(201)
   ).body.data.id as string;
-  await (
+  const modelConfig = (
     await request(server)
       .post('/v1/model-configs')
-      .send({ name: 'Local inert SDK fixture', provider: 'ollama', model: 'git-delivery-chat' })
+      .send({
+        name: 'Local inert SDK fixture',
+        provider: 'ollama',
+        model: 'git-delivery-chat',
+        baseURL: provider.baseURL,
+      })
       .expect((r) => {
         if (r.status !== 201) throw new Error(JSON.stringify(r.body));
       })
   ).body.data;
+  expect(modelConfig).toMatchObject({
+    provider: 'ollama',
+    model: 'git-delivery-chat',
+    baseURL: provider.baseURL,
+  });
   async function ask() {
     return request(server!)
       .post('/v1/chat')
+      .set('x-model-config-id', modelConfig.id)
       .send({ sessionId, message: 'Perform the requested Git action' })
       .expect((r) => {
         if (r.status !== 200) throw new Error(JSON.stringify(r.body));
@@ -162,6 +207,7 @@ async function setup(replies: unknown[], allowed = true) {
   async function resume(a: ApprovalRequest) {
     return request(server!)
       .post(`/v1/sessions/${sessionId}/resume`)
+      .set('x-model-config-id', modelConfig.id)
       .send({ approvalRequestId: a.id })
       .expect(200);
   }
@@ -178,6 +224,7 @@ async function setup(replies: unknown[], allowed = true) {
     repo,
     server,
     provider,
+    fetchCounts,
     ...opened,
     sessionId,
     ask,
@@ -195,6 +242,16 @@ const done = (id = 'stage-1') => ({
 });
 
 describe('Git delivery through real SDK, HTTP approvals, SQLite and Git', () => {
+  it('blocks unowned transport before dispatch without calling the provider', async () => {
+    const f = await setup([]);
+    await expect(fetch('https://unowned-provider.invalid/v1/chat/completions')).rejects.toThrow(
+      'Unowned request blocked by Git fixture',
+    );
+    expect(f.fetchCounts).toEqual({ provider: 0, api: 0, rejected: 1 });
+    expect(f.provider.requests).toEqual([]);
+    expect(f.provider.errors).toEqual([]);
+  });
+
   it.each([true, false])(
     'prepares before review, executes once and continues safely (allowlisted=%s)',
     async (allowed) => {
@@ -215,6 +272,7 @@ describe('Git delivery through real SDK, HTTP approvals, SQLite and Git', () => 
       expect(f.operation(a).receipt.state).toBe('succeeded');
       expect(f.provider.requests, resumed.text + JSON.stringify(f.provider.errors)).toHaveLength(2);
       expect(f.provider.errors).toEqual([]);
+      expect(f.fetchCounts).toMatchObject({ provider: 2, rejected: 0 });
       await f.resume(a);
       expect(f.provider.requests).toHaveLength(2);
       expect(f.operation(a).receipt.state).toBe('succeeded');

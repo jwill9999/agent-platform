@@ -146,3 +146,32 @@ describe('resolveModelConfig', () => {
     });
   });
 });
+
+describe('new provider resolution boundaries', () => {
+  it('rejects an unknown provider before looking up an OpenAI credential', () => {
+    expect(
+      resolveModelConfig({
+        agentOverride: { provider: 'unknown', model: 'ExactCase' },
+        headerKey: 'private-key',
+      }),
+    ).toEqual({
+      kind: 'error',
+      code: 'UNSUPPORTED_PROVIDER',
+      message: 'Unsupported model provider',
+    });
+  });
+  it.each(['google', 'deepseek', 'xai', 'openrouter'])(
+    'keeps the supplied %s model case and explicit key',
+    (provider) => {
+      expect(
+        resolveModelConfig({
+          agentOverride: { provider, model: 'ExactCase/Model' },
+          headerKey: 'fixture-key',
+        }),
+      ).toEqual({
+        kind: 'ok',
+        config: { provider, model: 'ExactCase/Model', apiKey: 'fixture-key' },
+      });
+    },
+  );
+});

@@ -98,6 +98,8 @@ const RETRYABLE_NODE_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT',
 export function isRetryableLlmError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
 
+  if ('retryable' in error && typeof error.retryable === 'boolean') return error.retryable;
+
   // Vercel AI SDK / OpenAI errors expose a status property
   const status = extractHttpStatus(error);
   if (status !== undefined) {
