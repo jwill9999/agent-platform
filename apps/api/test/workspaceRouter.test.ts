@@ -173,21 +173,20 @@ describe('workspaceRouter', () => {
     expect(readFileSync(blocked, 'utf8')).toBe('unchanged');
   });
 
-  it('reports an unavailable area after successful initialization rather than an empty success', async () => {
-    vi.spyOn(filesystem, 'readdir').mockRejectedValueOnce(
-      Object.assign(new Error('PRIVATE_ERROR_CANARY'), { code: 'EIO' }),
-    );
-    await expectUnavailable({ phase: 'read', category: 'EIO' });
-  });
-
-  it('reports non-disappearance stat failures rather than partial successful results', async () => {
-    mkdirSync(join(workspaceRoot, 'uploads'));
-    writeFileSync(join(workspaceRoot, 'uploads', 'report.txt'), 'safe');
-    vi.spyOn(filesystem, 'stat').mockRejectedValueOnce(
-      Object.assign(new Error('PRIVATE_ERROR_CANARY'), { code: 'EACCES' }),
-    );
-    await expectUnavailable({ phase: 'read', category: 'EACCES' });
-  });
+  it.each([
+    { method: 'readdir' as const, category: 'EIO' },
+    { method: 'stat' as const, category: 'EACCES' },
+  ])(
+    'reports read-phase $method failure rather than a partial or empty success',
+    async ({ method, category }) => {
+      mkdirSync(join(workspaceRoot, 'uploads'));
+      writeFileSync(join(workspaceRoot, 'uploads', 'report.txt'), 'safe');
+      vi.spyOn(filesystem, method).mockRejectedValueOnce(
+        Object.assign(new Error('PRIVATE_ERROR_CANARY'), { code: category }),
+      );
+      await expectUnavailable({ phase: 'read', category });
+    },
+  );
 
   it('omits a file that disappears during listing', async () => {
     mkdirSync(join(workspaceRoot, 'uploads'));

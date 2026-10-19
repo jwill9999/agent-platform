@@ -68,6 +68,27 @@ source changed again, the final rebuilt candidate needs its own compiled binding
 export/restart qualification; no old report is relabeled as a new launch. Normal hooks, fresh current-head
 hosted gates and independent final evidence review remain mandatory. Merge authority is separate.
 
+### Fault-test duplication correction checkpoint
+
+Actual hosted Sonar at `c08e3881` reports zero open issues, but its duplication gate is3.9% against
+3%:21 new duplicated lines in the two API fault-test bodies (readdir/EIO and stat/EACCES). The final
+test-only correction uses two parameterized cases with shared nonempty fixture setup; both retain the
+same exact503 response, safe error, trusted correlation, bounded logger keys/category and privacy
+assertions through `expectUnavailable`. No scenario, assertion, deadline or Sonar condition/exclusion
+is removed or weakened. All10 cases remain and pass; controlled preload orders are checked separately.
+
+The actual rebuilt owner preflight at `c08e3881` now also passes independent review: new native reports
+retain2→5 samples across clean restart, exact earlier samples/two process identities/new positive
+interval, ready seven-day recording and no pending/drop/conflict/resource gaps. All30 original tables,
+23 migration rows and original key remain; model settings/policies are retained,31.54GiB free.
+Zero idle diagnostic events leave overall coverage incomplete; no live model or owner stress trial is
+claimed. The normal runtime push passes610 API cases and fresh900/990 benchmark, maximum positive
+p95 overhead17.638918ms≤20ms and enqueue0.034292ms<2ms, independently recomputed and reviewed.
+This follow-up changes only fault-test arrangement and documentation; runtime/compiled bytes remain
+identical, so the actual preflight remains honestly bound to c08e rather than relabeled as a later launch.
+Fresh final hosted jobs/Sonar and normal hooks still qualify the test revision; merge authority remains
+separate. All earlier failures/checkpoints below are retained as history, not current readiness claims.
+
 ## Earlier local checkpoints (historical)
 
 19October baseline: actual owner app at staged `a17bc1db` shows generic error and unavailable file
