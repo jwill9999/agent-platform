@@ -1,13 +1,6 @@
 # Native Workspace listing repair — 19 October 2026
 
-SDK/migration delivery is complete at staginga17bc1db; original-profile recording/export/restart
-passed independent review, data/key preserved. Owner now authorizes the separate native Workspace
-listing repair with regressions/critic review. Beads agent-platform-native-workspace-listing is
-in_progress; task/native-workspace-listing → feature/native-workspace-listing from a17. Plan/tests/
-results linked in its spec; repair and focused native/browser regressions pass local review. Serial
-hooks, hosted qualification and owner repaired-app preflight remain pending; owner app runsA17.
-No paid calls, paused orchestration, global/gateway/main changes. Stress remains open; prior text
-below is verbatim historical handoff, not current status. Current delivery belongs in Beads/PRs.
+Staging remainsa17bc1db. Workspace repair PR376 (task/native-workspace-listing → feature/native-workspace-listing) is open; Beads agent-platform-native-workspace-listing remains in_progress. Independent review and3,956 ordinary tests passed;77 existing optional skips. Fresh900-request benchmark max p95 overhead2.83ms<20ms. First repaired-owner launch lists normally; native export saves6 samples with no loss/gaps, all30 application tables/journal23/key preserved. Hosted Sonar found one complexity issue; reviewed helper extraction needs fresh gates and final rebuilt-owner restart/export. No merge or owner stress trial claimed. No paid calls, paused/global/gateway/main changes. Current state belongs in Beads/PRs; prior text below is verbatim history.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Earlier handoff follows verbatim. -->

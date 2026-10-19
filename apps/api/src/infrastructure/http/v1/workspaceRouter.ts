@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import type { Dirent } from 'node:fs';
+import type { Dirent, Stats } from 'node:fs';
 import { mkdir, readdir, stat } from 'node:fs/promises';
 import { basename, join, posix, relative, resolve, sep } from 'node:path';
 
@@ -72,6 +72,15 @@ async function ensureWorkspaceAreas(root: string): Promise<void> {
   );
 }
 
+async function statExistingWorkspaceEntry(absolutePath: string): Promise<Stats | undefined> {
+  try {
+    return await stat(absolutePath);
+  } catch (error) {
+    if (filesystemCategory(error) === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
 async function listAreaFiles(options: {
   root: string;
   area: WorkspaceArea;
@@ -91,13 +100,8 @@ async function listAreaFiles(options: {
       const validation = await options.jail.validate(absolutePath, 'read');
       if (!validation.allowed) continue;
 
-      let entryStat: Awaited<ReturnType<typeof stat>>;
-      try {
-        entryStat = await stat(validation.resolvedPath);
-      } catch (error) {
-        if (filesystemCategory(error) === 'ENOENT') continue;
-        throw error;
-      }
+      const entryStat = await statExistingWorkspaceEntry(validation.resolvedPath);
+      if (entryStat === undefined) continue;
 
       const kind = entryStat.isDirectory() ? 'directory' : 'file';
       files.push({

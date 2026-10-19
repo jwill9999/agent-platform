@@ -3,6 +3,36 @@
 Spec: [requirements](../tasks/agent-platform-native-workspace-listing.md).
 Tests: [verification map](../testing/native-workspace-listing.md).
 
+## Follow-up qualification checkpoint
+
+PR376 opened at `a843f5df`. Independent source/document review approved; normal serial hooks then
+passed3,956 ordinary tests with77 existing optional skips, builds/types and cycles. The earlier Git
+disconnect timeout remains retained and unproven; the complete serial API suite passed610 cases.
+A separate fresh raw benchmark records900 measured/990 fixture calls, maximum positive p95 overhead
+2.825458ms below the unchanged20ms gate, enqueue0.018625ms below2ms, and no healthy capture loss.
+The installed Vitest4 uses `VITEST_MAX_WORKERS=1`; legacy fork variables did not bound its workers.
+The first push's unchanged paused-suite timing failures are retained; no paused code, assertions or
+budgets changed. The actual unchanged normal serial push passed all1,141 workflow cases.
+
+The actual owner app first launched the repair using its existing profile and original key. Native
+Workspace lists five empty areas without the warning; actual API listing returns200. Monitoring
+native SaveAs export retains six samples (five positive intervals), ready storage, seven-day retention
+and zero pending/drop/conflict/resource gaps. Idle diagnostic events are zero and overall coverage is
+explicitly incomplete. All30 original application tables preserve their rows, migration journal stays23
+rows, and the original key is internally byte-equal to the private stopped-profile backup. The app quit
+normally with both service ports released. No model request or owner stress trial occurred.
+
+Hosted Sonar at `a843f5df` identified S3776: nested listing walk complexity17 exceeds15. A reviewed
+extraction moves the existing stat/ENOENT-only handling to a helper, preserving validation order,
+benign disappearance, other-error503 and safe logging semantics. An initial inferred stat return type
+included bigint; the explicit default `Stats` type corrects that compile-only issue. Fresh affected
+API/connected validation, normal hooks, hosted qualification and final rebuilt-owner restart/export
+must qualify the corrected source; earlier head checks cannot qualify this follow-up. Integration and
+merge authority remain separate. The sections below retain earlier local checkpoints as history;
+their pending statements describe those checkpoints, not the latest delivery state.
+
+## Earlier local checkpoints (historical)
+
 19October baseline: actual owner app at staged `a17bc1db` shows generic error and unavailable file
 listing while Models/monitoring work. Prior safe receipt `owner-sdk-a17-workspace-warning-triage.json`
 and S12 review retain the observation. Source defaults to `/workspace`; exact original errno was not
