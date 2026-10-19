@@ -629,52 +629,92 @@ for (const disposition of ['removed', 'consumed'])
     },
   );
 
+const hostileArgvPayload = `quotes '";process.getBuiltinModule('node:fs').writeFileSync('observer-injected-marker','unsafe');"\n\u2028`;
+function hostileDirectoryComponent(platform, hostile) {
+  return platform === 'win32' ? 'hostile-argv-control' : hostile;
+}
+function preloadWithHostileQuery(path, hostile) {
+  const url = pathToFileURL(path);
+  url.searchParams.set('owned-argv-payload', hostile);
+  return url;
+}
+
+test('hostile argv directory policy is Windows-valid and preserves the full file URL query', () => {
+  const windows = hostileDirectoryComponent('win32', hostileArgvPayload);
+  assert.ok(!/[<>:"/\\|?*]/.test(windows));
+  assert.ok(
+    [...windows].every((character) => {
+      const code = character.charCodeAt(0);
+      return code > 31 && (code < 127 || code > 159);
+    }),
+  );
+  assert.ok(!/[. ]$/.test(windows));
+  assert.ok(!/^(?:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\..*)?$/i.test(windows));
+  assert.equal(hostileDirectoryComponent('darwin', hostileArgvPayload), hostileArgvPayload);
+  assert.equal(hostileDirectoryComponent('linux', hostileArgvPayload), hostileArgvPayload);
+  const owned = fixture();
+  try {
+    const copiedPreload = join(owned, 'observer.mjs');
+    writeFileSync(copiedPreload, readFileSync(fileURLToPath(preload)));
+    const url = preloadWithHostileQuery(copiedPreload, hostileArgvPayload);
+    assert.equal(url.searchParams.get('owned-argv-payload'), hostileArgvPayload);
+    assert.equal(fileURLToPath(url), copiedPreload);
+  } finally {
+    rmSync(owned, { recursive: true, force: true });
+  }
+});
+
 test(
   'direct child source stays identical when owned argv paths contain hostile characters',
   { timeout: 10000 },
   async (context) => {
     const owned = fixture();
     const markerName = 'observer-injected-marker';
-    const hostile = `quotes '";process.getBuiltinModule('node:fs').writeFileSync('observer-injected-marker','unsafe');"\n\u2028`;
+    const hostile = hostileArgvPayload;
     const sources = new Map();
     try {
-      const scenarios = ['ordinary', hostile].flatMap((component) => {
-        const directory = join(owned, component);
-        mkdirSync(directory, { mode: 0o700 });
-        const ownedPreload = join(directory, 'observer.mjs');
-        writeFileSync(ownedPreload, readFileSync(fileURLToPath(preload)));
-        return [
-          { family: 'identity', source: identityChildSource, args: [], signal: null },
-          {
-            family: 'handled',
-            source: handledChildSource,
-            args: [directory, 'on', 'existing'],
-            signal: null,
-          },
-          {
-            family: 'handled',
-            source: handledChildSource,
-            args: [directory, 'prependOnceListener', 'later'],
-            signal: null,
-          },
-          {
-            family: 'foreign',
-            source: foreignChildSource,
-            args: [directory, 'removed'],
-            signal: 'SIGTERM',
-          },
-          {
-            family: 'foreign',
-            source: foreignChildSource,
-            args: [directory, 'consumed'],
-            signal: 'SIGTERM',
-          },
-        ].map((scenario) => ({ ...scenario, directory, ownedPreload }));
-      });
+      const scenarios = ['ordinary', hostileDirectoryComponent(process.platform, hostile)].flatMap(
+        (component) => {
+          const directory = join(owned, component);
+          mkdirSync(directory, { mode: 0o700 });
+          const ownedPreload = join(directory, 'observer.mjs');
+          writeFileSync(ownedPreload, readFileSync(fileURLToPath(preload)));
+          const ownedPreloadURL = preloadWithHostileQuery(ownedPreload, hostile);
+          assert.equal(ownedPreloadURL.searchParams.get('owned-argv-payload'), hostile);
+          assert.equal(fileURLToPath(ownedPreloadURL), ownedPreload);
+          return [
+            { family: 'identity', source: identityChildSource, args: [], signal: null },
+            {
+              family: 'handled',
+              source: handledChildSource,
+              args: [directory, 'on', 'existing'],
+              signal: null,
+            },
+            {
+              family: 'handled',
+              source: handledChildSource,
+              args: [directory, 'prependOnceListener', 'later'],
+              signal: null,
+            },
+            {
+              family: 'foreign',
+              source: foreignChildSource,
+              args: [directory, 'removed'],
+              signal: 'SIGTERM',
+            },
+            {
+              family: 'foreign',
+              source: foreignChildSource,
+              args: [directory, 'consumed'],
+              signal: 'SIGTERM',
+            },
+          ].map((scenario) => ({ ...scenario, directory, ownedPreloadURL: ownedPreloadURL.href }));
+        },
+      );
       await scenarios.reduce(
         (pending, scenario) =>
           pending.then(async () => {
-            const { directory, ownedPreload } = scenario;
+            const { directory, ownedPreloadURL } = scenario;
             const run = mkdtempSync(join(directory, `${scenario.family}-`));
             const script = join(run, 'child.mjs');
             const ledgers = join(run, 'ledgers');
@@ -684,15 +724,11 @@ test(
             const original = sources.get(scenario.family) ?? bytes;
             assert.deepEqual(bytes, original);
             sources.set(scenario.family, original);
-            const child = spawn(
-              process.execPath,
-              [script, pathToFileURL(ownedPreload).href, ...scenario.args],
-              {
-                cwd: owned,
-                env: { ...process.env, DIAGNOSTICS_OBSERVER_DIRECTORY: ledgers },
-                stdio: 'ignore',
-              },
-            );
+            const child = spawn(process.execPath, [script, ownedPreloadURL, ...scenario.args], {
+              cwd: owned,
+              env: { ...process.env, DIAGNOSTICS_OBSERVER_DIRECTORY: ledgers },
+              stdio: 'ignore',
+            });
             const [code, signal] = await settleDirectChild(child, context.signal);
             assert.equal(signal, scenario.signal);
             assert.equal(code, scenario.signal ? null : 0);

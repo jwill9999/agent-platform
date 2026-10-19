@@ -892,3 +892,13 @@ cleanup. The new controls execute sequentially, honor their unchanged10-second b
 child closure before removing owned fixtures. Syntax, ESLint, formatting and diff checks pass.
 Final combined source/results/session critique, normal hooks and all fresh hosted gates remain
 required. No local full application suite or benchmark is repeated for this test-only correction.
+
+Sourcery then identified that the new hostile filesystem component is invalid on Windows. The
+follow-up keeps the exact hostile Unix path, chooses a fixed Windows-safe component and carries
+the full payload through URL.searchParams in the copied trusted preload URL on both platforms.
+Static child source and argv contracts stay unchanged. The added policy control validates Windows
+filename rules, exact Unix payload preservation, full query round-trip and unchanged imported file
+path. All40 controls pass0fail/skip/cancel in26.95seconds, including10 real queried imports with
+source-byte/no-effect/signal/receipt checks; previous assertions and budgets remain. Actual local
+execution is Darwin; policy simulation does not claim native Windows qualification. Fresh hosted
+source review/checks and protected CodeQL clearance remain required. No runtime or gate waiver.

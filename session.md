@@ -10,7 +10,7 @@ so total coverage remains partial. No measured time is adjusted or earlier failu
 Protected687e exposed CodeQL13 in generated observer-test child code. Staging remains blocked.
 The bounded repair replaces handler-family source interpolation with static child programs and
 separate argv data, validating fixed cases while preserving signal outcomes, assertions and budgets.
-All39 focused controls pass, including hostile-path/no-effect, enum denial and owned-child cleanup.
+All40 focused controls pass, including portable hostile-data, enum denial and owned-child cleanup.
 Original assertions and budgets are preserved. Final combined critique, normal hooks and fresh
 feature/protected qualification remain required. Runtime, benchmark, durability, CI policy and dependencies
 are unchanged. Passing687e scans or other slices cannot qualify the changed repair head.
