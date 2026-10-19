@@ -3,6 +3,22 @@
 Spec: [native workspace repair](../tasks/agent-platform-native-workspace-listing.md).
 Results: [review and evidence](../reviews/native-workspace-listing.md).
 
+## Navigation follow-up
+
+NAV-T01 uses the actual Sidebar/HomePage selection logic with deferred external navigation/Project
+lookup boundaries: Project→Personal→late Project must stay personal, including selected session,
+agent and model context. NAV-T02 covers resumed personal work→pending Project→newer Personal→late
+Project, while plain Personal reselect preserves resumed/pending work. NAV-T03 covers current Project
+completion, latest intent, back/forward, Settings route navigation, missing listeners and modified links.
+These component/application controls establish controlled ordering, not the old hosted trace ordering.
+
+NAV-T04 retains the real Electron restart/scoping journey, BFF/API/SQLite and existing assertions/
+deadlines. Explicitly trace each manually launched context, attach bounded route/status and scope
+metadata, and retain disposable profile/logs on failure. This journey does not call a model. Existing
+connected SDK/Stop/Git and Workspace/diagnostic/migration journeys remain required regressions;
+their deterministic provider doubles do not establish live model readiness. Fresh full hosted gates
+and actual rebuilt owner preflight qualify changed source; retry success does not clear a flaky case.
+
 | Scenario                                        | Requirements | Real boundary / checks                                                                                                                                                                                                                                          |
 | ----------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | NW-T01 managed default and configured overrides | NW1,NW2      | Supervisor unit env plus actual managed Electron without injected workspace root; root under isolated data, Docker defaults unchanged                                                                                                                           |

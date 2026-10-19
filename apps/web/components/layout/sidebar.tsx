@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import type {
   ProjectDesktopRecentProjectsResult,
   ProjectDesktopRecord,
@@ -55,6 +55,26 @@ import {
 } from '@/lib/project-navigation';
 
 const COLLAPSED_RECENT_PROJECT_COUNT = 4;
+
+function requestWorkspaceNavigation(
+  event: MouseEvent<HTMLAnchorElement>,
+  type: string,
+  detail?: { projectId: string },
+): void {
+  if (event.defaultPrevented || event.button !== 0) return;
+  if ([event.metaKey, event.ctrlKey, event.shiftKey, event.altKey].some(Boolean)) return;
+  const link = event.currentTarget;
+  if (link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+  const destination = new URL(link.href, globalThis.window.location.href);
+  if (globalThis.window.location.pathname !== '/') return;
+  if (destination.origin !== globalThis.window.location.origin || destination.pathname !== '/')
+    return;
+
+  // HomePage commits the URL before taking selection ownership. Without its
+  // synchronous acknowledgment, let Next Link perform normal route navigation.
+  const request = new CustomEvent(type, { cancelable: true, detail });
+  if (!globalThis.window.dispatchEvent(request)) event.preventDefault();
+}
 
 const settingsNavigation = [
   {
@@ -254,13 +274,11 @@ export function RecentProjectsNavSection({
                   href={buildProjectChatHref(project.id)}
                   className="flex min-w-0 flex-1 flex-col rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                   title={`Open ${project.name}`}
-                  onClick={() => {
-                    globalThis.window.dispatchEvent(
-                      new CustomEvent(projectReopenRequestedEvent, {
-                        detail: { projectId: project.id },
-                      }),
-                    );
-                  }}
+                  onClick={(event) =>
+                    requestWorkspaceNavigation(event, projectReopenRequestedEvent, {
+                      projectId: project.id,
+                    })
+                  }
                 >
                   {content}
                 </Link>
@@ -379,7 +397,7 @@ export function Sidebar() {
       globalThis.window.removeEventListener('popstate', syncSearchString);
       globalThis.window.removeEventListener(workspaceNavigationChangedEvent, syncSearchString);
     };
-  }, []);
+  }, [pathname]);
 
   const searchParams = new URLSearchParams(searchString);
   const currentMode = searchParams.get(workspaceModeSearchParam);
@@ -432,17 +450,14 @@ export function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
-              onClick={() => {
-                const url = new URL(item.href, globalThis.window.location.href);
-                setSearchString(url.search);
-                if (item.surface === 'home') {
-                  globalThis.window.dispatchEvent(new CustomEvent(workspaceHomeRequestedEvent));
-                } else if (item.surface === 'chat') {
-                  globalThis.window.dispatchEvent(
-                    new CustomEvent(workspacePersonalChatRequestedEvent),
-                  );
-                }
-              }}
+              onClick={(event) =>
+                requestWorkspaceNavigation(
+                  event,
+                  item.surface === 'home'
+                    ? workspaceHomeRequestedEvent
+                    : workspacePersonalChatRequestedEvent,
+                )
+              }
               aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group',
