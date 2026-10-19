@@ -85,6 +85,7 @@ before final decisions. Bounded planning stops at the reviewed decision brief, n
 | Plan             | This document                                                                                      |
 | Task             | [agent-platform-dependency-upgrade-preview](../tasks/agent-platform-dependency-upgrade-preview.md) |
 | Verification     | [Evidence checks](../testing/dependency-upgrade-preview.md)                                        |
+| Session handoff  | `session.md`, preserving the complete prior staging handoff                                        |
 | Critique/results | [Review record](../reviews/dependency-upgrade-preview.md)                                          |
 
 This separate clean worktree starts stagingbe153: feature/dependency-upgrade-preview →
