@@ -1,6 +1,6 @@
 # Provider SDK compatibility review and results
 
-Status: 19 October 2026. PR362 and PR364 merged into feature a9e8ac61. Protected PR363 has actual CodeQL/alert12/Sonar clearance, both genuine full scans, API604/DB236/browser and benchmark pass, and real packaged macOS VM20 pass. Its green Electron job nevertheless has71 passes plus a new initial-screen flaky case, so staging remains blocked. The bounded three-launch distinct-port repair passes independent source review and all three actual native journeys once; final combined review, normal hooks and new hosted qualification remain required. No owner-app or live/stress readiness is claimed.
+Status: 19 October 2026. PR362, PR364 and PR365 merged into the feature at `95d1cdbf`. Protected PR363 remains blocked by measured 22.982728 ms benchmark overhead against the 20 ms limit. PR366's ca2 follow-up passed ordinary and browser checks; its retained helper proof identifies an unavailable auxiliary Linux cgroup memory counter despite a successful child and complete core observations. Neither full benchmark has run. Independent critique approved explicit partial coverage with separate process/core eligibility and one narrowly guarded continuation. Fresh checks and review remain required; no staging, owner-app or live/stress readiness is claimed.
 Earlier pending states below retain their named source/time bindings and do not override this checkpoint.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
@@ -670,3 +670,196 @@ PR363's prior a9e71+1flaky result remains unqualified despite successful job bad
 VM, SDK, API, browser and benchmark slices remain bound to their actual source. This change enforces
 the existing clean-run requirement rather than accepting retry success. No live-provider success,
 owner-profile upgrade, stress readiness, main promotion or paused orchestration delivery is claimed.
+
+## Protected95d1 performance failure and bounded evidence plan
+
+PR365 merged normally at95d1cdbf; its tree equals reviewed5c48. The new protected PR363 run
+39195037818 preserves a genuine verify failure: first-repetition locked request p9560.943431ms
+minus disabled37.960703ms equals22.982728ms, above the unchanged20ms limit. Healthy overhead is
+0.887964ms. The retained raw report is completed=false, three vectors/300 measurements/330 fixture
+calls only. API604/DB236/new63 controls and Git fixture33 passed before the separate benchmark.
+No benchmark pass, complete900/990 qualification or staging readiness is inferred from those results.
+
+Artifact12162027412 has verified API digest248dc0e54faf2e385de194b02931b98613975eac1e4fe7c1e687ef2c1e3608e9,
+CRC and every member. Raw SHA2563319a202bb6839f4441b368085f77ea72ebfbfa5b061c314479815634b31a91f is
+retained alongside the job log. The failing percentile window overlaps one observed19.437716ms GC
+pause; observed GC can be incomplete. CPU/ELU and MessagePort counts establish neither external
+contention nor an active prior worker. No durations are excluded, adjusted or subtracted.
+
+Source review confirms bounded logical capture-store close requests termination without awaiting
+native exit. Cooperative close acknowledges after DB closure; monitoring stop invalidates future
+records but does not join a pending filesystem probe. Neither behavior proves the historical timing
+cause. Product shutdown deadlines, initial probe placement and all assertions remain unchanged.
+Independent critique requires actual identity/timestamp evidence before choosing a repair.
+
+The approved next step is one predeclared hosted diagnostic on a frozen reviewed task head, with
+bounded in-memory Worker/close-ack/exit, filesystem-probe and GC observations plus external one-hertz
+Linux numeric resource sampling. Tiny owned controls validate observation and cleanup before the
+sampler-only baseline. No payloads, credentials, paths, argv or environment values may be retained.
+Raw partial measurements and explicit observation gaps/truncation must survive failure under distinct
+filenames. No automatic retry or continue-on-error is permitted. The existing fresh uninstrumented
+benchmark remains a separate required gate with all three orders,900/990 calls,20ms overhead,2ms
+enqueue, queue256 and original deadlines unchanged. A diagnostic pass is not a cause finding or a
+replacement qualification. The implemented four-file observer/workflow refinement passes14 tiny controls, including an actual
+pnpm-to-Vitest default fork, real owned Worker close/ACK/exit, filesystem probe and exact raw-writer
+identity. Promise/result/error identity, active SIGTERM/SIGINT outcomes, failure7, existing/later
+regular/once/prependOnce handlers, no resurrection after consumption/removal and fail-closed missing
+evidence are covered. Static lint passes. No local complete benchmark has been run for this refinement.
+Final source review and normal hooks precede the one predeclared hosted diagnostic.
+
+The controls first exposed two observer defects, retained in their original logs: exit-only hooks
+miss Vitest’s SIGTERM teardown, and synchronous removal inside Node’s newListener registration can
+close the native signal handle before a foreign listener is installed. The corrected observer is
+permanently disowned immediately, with only its own listener removed in a microtask after registration.
+Foreign handlers remain untouched. Active-command signal identity is verified; an arbitrary bare Node
+self-signal with no live handles is explicitly unsupported and cannot qualify missing diagnostics.
+There is no process.kill/native patch, GC setting change, measurement adjustment or phase fence.
+
+Records remain bounded in memory until the owning process exit/termination boundary; diagnostic
+Worker exit alone does not flush during a measured phase. Per-PID exclusive0600 exit ledgers use a
+wrapper-owned0700 directory and are collected after child close, avoiding Vitest IPC descriptors.
+Observed raw data, observer records and host samples have distinct diagnostics-benchmark.json\*
+filenames from the later original gate. The conditional step is limited to the repair PR opening
+on attempt1, with no continue-on-error/retry; protected promotion skips it by source condition.
+The unchanged fresh uninstrumented gate remains mandatory even if the diagnostic passes.
+
+### Opening helper failure and bounded evidence recovery
+
+PR366 opening head `bf374458` ran CI39197870734, attempt 1. Ordinary tests passed, but the diagnostic
+step's first real pnpm/Vitest-fork control received wrapper exit 1; 13 other tiny controls passed.
+The shell stopped before the full instrumented benchmark command. The separate original benchmark
+correctly skipped, so no new performance measurement or gate pass exists. Artifact 12163356483 is
+592 bytes, API SHA256 475b617915a4e7bb6ff98ae52bf4d470988b898d0d10e1f20cce96ba061a8c68;
+its only member contains 13 successful control proofs. The failed control appended its receipt
+after the success assertion, so its child/observer/host evidence was lost from the upload. This is
+an instrumentation evidence gap, not a diagnosed application or Linux resource failure.
+
+Independent critique identified delimiter-joined schema-key validation as insufficient. Hosted
+review also found that missing expected host counters could appear complete, and the fork control
+did not establish a successful close acknowledgement from the actual fixture worker. The bounded
+correction requires exact key counts/membership, complete finite declared counters and ten CPU
+fields, a complete pressure some row and any present full row, and correlated worker identity,
+successful acknowledgement and exit status. It preserves numeric-only observations, resource paths,
+sampling bounds and every benchmark workload/assertion/deadline. These independently justified
+corrections do not establish the opening control's missing cause.
+
+The failed-control evidence is saved before success assertions, with fixed missing/invalid
+indicators and safe statuses rather than raw errors, output, paths or environment. The reviewed
+ca2 continuation selected only PR366's exact task branch, synchronize event from `bf374458` and
+attempt 1. Its records remain bound to that source; no full benchmark is inferred from the attempt.
+
+The corrected local suite passes all 29 tiny controls in 26.502 seconds, with zero failures,
+skips or cancellations. The real pnpm/Vitest-fork proof is persisted before assertions and records
+the actual worker's successful close and exit. Missing/invalid receipt and failed-wrapper controls
+verify safe failure evidence without child output, raw errors or paths. Pure parser controls reject
+joined, missing and extra keys, incomplete/nonfinite counters and incomplete pressure rows. Syntax,
+ESLint, formatting and diff checks pass. These macOS controls do not establish Linux counter
+availability. The original benchmark file and every pre-existing workflow object remain unchanged;
+12 trigger cases verify that only the opening and exact-prior-head continuation select the helper.
+Final combined source/evidence review, normal hooks and new hosted checks remained required at
+that local checkpoint.
+
+### Auxiliary cgroup capability correction
+
+The ca2 continuation CI39199762479 retained the missing evidence: 28 of 29 tiny controls passed,
+and the actual pnpm/Vitest child succeeded. Its wrapper exited1 solely because all seven Linux
+host samples lacked cgroupMemoryEvents. The three ledgers, matching raw owner/clock and successful
+worker close/exit are valid; CPU10, memory5, cgroupCPU6 and all three pressure counter sets are
+complete. Artifact12163534321 contains only the control report, so again no full observed benchmark
+ran and the original normal gate correctly skipped. The unavailable metric's precise read-error
+category was not retained; no historical ENOENT assertion is made.
+
+The sampler requests memory.events at the cgroup root, while the
+[Linux cgroup documentation](https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files)
+specifies that interface for non-root cgroups. Requiring this auxiliary counter universally is an
+incorrect capability assumption. Independent critique approved a bounded correction without a new
+cgroup-discovery collector: retain host.complete=false and explicit partial coverage for any gap,
+separately require complete process Worker/probe/raw and core-host observations for diagnostic
+eligibility, and preserve fixed absent/unreadable/invalid/other reasons. Missing or malformed core
+data cannot become eligible; no zeros or complete-coverage claims are substituted for unavailable
+data. Non-Linux local controls remain explicitly scoped rather than qualifying Linux coverage.
+
+One further continuation is restricted to PR366's task branch, synchronize from `ca2c319f` and
+attempt1. It follows this specific source-backed correction, not an unchanged rerun. Controls still
+block both benchmark commands on failure; the separate original fresh uninstrumented gate remains
+unchanged and mandatory. New focused controls, frozen independent review and normal hooks precede
+that continuation. No local full benchmark, product change or performance threshold/deadline waiver.
+
+The capability-aware implementation passes all 36 tiny controls in 26.504 seconds, with zero
+failures, skips or cancellations. Optional-only gaps remain eligible but partial/incomplete; missing
+or malformed core fields, stale error flags, empty samples and malformed ledgers cannot qualify.
+The actual Mac pnpm/Vitest fork succeeds with explicit non-linux-control-only scope and host/core/
+complete=false, so it makes no Linux coverage claim. Safe read-failure reason projections pass
+privacy controls. Syntax, lint, formatting, direct Markdown and diff checks pass. All original
+workflow objects and benchmark bytes remain unchanged; 13 trigger cases include rejection of the
+former bf37 continuation. Frozen combined review, normal hooks and actual hosted execution remain
+required before any merge qualification.
+
+### Hosted capability evidence and final membership correction
+
+At58a5bd9f, CI39201949314 attempt1 completed successfully. The declared diagnostic actually ran
+all9 vectors/900 measured requests/990 fixture calls, with process/core observations eligible and
+host coverage explicitly partial. All49 host samples report the unavailable auxiliary
+cgroupMemoryEvents field; this does not become full host coverage. The separate unchanged normal
+benchmark also completed9/900/990; independent raw-window recomputation gives maximum positive
+overhead2.269351ms below20ms and maximum enqueue0.053901ms below2ms. Actual artifact12165235559
+contains the distinct observed data and exact normal filename; API digest, CRC and every member
+are verified. These measurements do not establish the cause of the retained95d1 failure.
+
+Fresh58a Sonar has an OK gate but two open minor S7776 findings in the wrapper. The correction
+changes only two fixed membership collections to Set and their membership predicates to has,
+preserving rejection of unknown names/reasons and every coverage guard. All36 tiny controls pass
+with zero failures/skips/cancellations in26.563 seconds; syntax, lint, formatting and diff pass.
+No local full benchmark is repeated. The workflow remains identical: its next synchronize event
+has before58a rather than the declared ca2 predecessor, so the observed step is not selected again.
+Final source/evidence review, normal hooks and fresh exact-head checks remain required, including
+the original uninstrumented benchmark and actual Sonar issue clearance. Nothing here qualifies a
+future feature/staging head or the owner app without its own required evidence.
+
+### Normal0852 failure and fresh-runner isolation control
+
+The final Set correction at0852 cleared current Sonar to zero open issues, and CI39204045842 passed
+all ordinary/connected slices including72 Electron cases on retry0. Its required normal benchmark
+failed: healthy p95241.153030ms minus disabled115.119354ms =126.033676ms above20ms. The raw file
+is incomplete with3vectors/300measured/330calls. Artifact12165930061, API SHA256
+7f3ae31f7d58ae85d7501c3df8e2566679b0be4d228050965af9401414f3def2, and all connected artifacts were
+independently verified. Passing slices do not waive that failure.
+
+Phase CPU stays around3.1–3.2seconds while wall times are5.66/10.40/3.62seconds. Largest healthy and
+disabled stalls have no recorded GC overlap. Blocking I/O and descheduling are possibilities, not
+established causes. Source uses32-event DELETE/FULL transactions but no write-service evidence
+establishes fsync as the cause; no durability or batch change is made. The passing58a normal run
+followed76seconds of controls/observed execution;0852 did not. This sequencing confound motivates
+one independent fresh-runner control rather than an unchanged rerun or cooldown.
+
+The isolated Linux job keeps the exact original benchmark bytes, physical storage, three orders,
+900 measured/990 fixture calls and all20ms/2ms/256/90-second limits. Its preparation uses the same
+pinned actions/install/native/build. No ordinary application suite, preload, artificial baseline or
+warmup workload runs before measurement. Both jobs have30-minute bounds. The required verify job
+depends on benchmark success, uses always() and starts with a static environment-data guard before
+checkout; failure, skip, cancellation, missing or unknown result cannot become successful verify.
+All original ordinary steps and every other job remain unchanged. The old optional one-shot
+preload execution is retired; its source and historical evidence remain. Its36 controls run only
+after measurement in dependent verify.
+
+A separate host-only wrapper preserves the fixed original child argv/environment/cwd and failures,
+retaining bounded exclusive0600 numeric CPU/memory/cgroup/PSI evidence before/during/after the command.
+There is no preload, raw measurement read, delay or subtraction. Missing core counters block
+qualification; unavailable auxiliary memory events stay partial. Sampler CPU/wall overhead is
+recorded, never deducted. Global counters and phase clocks provide context, not per-request causality.
+The actual shell guard runs successfully only for exactsuccess from an empty checkout; all other
+statuses and malicious shell text fail without effects. All29 new tiny host/guard/YAML controls
+pass without failure/skip/cancellation, plus36 retained observer controls. No local full benchmark
+is repeated. Final combined source/control/docs critique, normal hooks and actual fresh hosted
+qualification remain required; a pass would qualify this environment, not diagnose earlier failures.
+
+At protected95d1, both full scans39195037863/39195062021 completed genuine five-batch analysis without findings;
+new CodeQL Actions/JavaScript/Swift analyses have zero results, alert12 is fixed without dismissal,
+and direct current-head Sonar is OK with zero open issues. Dependency comparison45 changes has
+zero introduced advisories, separate from existing audit debt. The protected Sourcery skip is due
+to exceeding150,000 diff characters, not a completed review; independent source review is retained.
+Actual VM20 and browser42 plus known skip passed; the full Electron report confirms72 each passed
+once on retry0 with no flakes/skips. All API artifact digests and every member are verified;
+`pr363-95d1-hosted-connected-verification.json` remains explicitly blocked by the benchmark.
+No source-independent result substitutes for the failed current benchmark. No owner-app upgrade,
+live-provider success, stress readiness, main promotion or paused orchestration delivery is claimed.

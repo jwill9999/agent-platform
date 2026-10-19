@@ -1,3 +1,31 @@
+# Provider SDK — fresh-runner performance isolation, 19 October 2026
+
+PR362, PR364 and PR365 merged into feature95d1cdbf; protected PR363 remains open. PR3660852
+has Sonar0 open issues, clean72 Electron retry0 and passing connected/API/DB/browser slices, but
+its normal benchmark failed: healthy241.153030ms minus disabled115.119354ms =126.033676ms above20.
+Only300/330 calls completed. The earlier95 failure and all actual receipts remain retained.
+
+Largest stalls have no recorded GC overlap; CPU/wall gaps do not prove host, scheduler or fsync
+cause. Passing58a normal followed76seconds of diagnostic work, unlike0852. Independent critique
+approved one fresh Linux isolation control with original physicalSQLite/default durability,
+benchmark bytes/3orders/900measured990calls/20ms2ms256/90-second limit unchanged.
+
+The required verify check now depends on the isolated benchmark and starts with a static exact-
+success guard before checkout; failure/skip/cancel cannot pass. Both jobs retain30-minute bounds.
+The external1Hz numeric host sampler has no preload, cooldown, raw-payload read or timing adjustment;
+core gaps block qualification and auxiliary gaps remain partial. Global/coarse phase data cannot
+establish per-request causality. Original ordinary steps and other jobs remain identical; optional
+old diagnostic execution is retired, with source/history retained. Old36 controls run after measurement.
+
+All29 new tiny host/actual-guard/YAML controls pass; retained36 observer controls pass. No local
+full benchmark or paid call was run. Final combined source/evidence review, normal hooks and new
+hosted/protected qualification remain required. Current state is in Beads/comments and PR366/363.
+S12 owner-app recording/export/restart remains blocked by Mac unlock, so provider task stays open;
+no live-model/stress readiness, profile/key changes, cleanup, main or paused integration claimed.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Previous handoff follows verbatim; its pending statements are historical. -->
+
 # Provider SDK — enforce clean Electron CI, 19 October 2026
 
 The Git startup-port repair is pushed at d3160c6e. Normal hooks passed all builds/types,
