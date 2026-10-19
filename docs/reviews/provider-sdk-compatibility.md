@@ -1,6 +1,6 @@
 # Provider SDK compatibility review and results
 
-Status: 19 October 2026. PR362 merged at7b816c61; protected PR363 remains blocked by CodeQL12 until actual repaired-source delivery. PR364 at8e998a8f cleared actual Sonar and review threads, API604/DB236/browser and a complete fresh benchmark, but Electron has71 passes plus one flaky Git publishing case. It is not merge-qualified. A bounded owned-fixture serialization and failure-evidence repair now passes local controls and the focused native journey; fresh complete hosted qualification remains required. No protected delivery, owner-app rebuild, live-model success or stress readiness is claimed.
+Status: 19 October 2026. PR362 merged at7b816c61; protected PR363 remains blocked by CodeQL12 until actual repaired-source delivery. PR364 at576ca2dc is pushed, but its green Sonar check/gate has four actual open S9382 findings. The bounded two-file notation repair passes independent source review,27 unchanged controls and the actual four-queued-API-read proof; current native verification passes first attempt; normal hooks and fresh complete hosted gates remain required. Earlier8e had a full benchmark pass but71 Electron passes plus one flaky case and is not merge-qualified. No protected delivery, owner-app rebuild, live-model success or stress readiness is claimed.
 Earlier pending states below retain their named source/time bindings and do not override this checkpoint.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
@@ -9,6 +9,29 @@ Evidence root: `/Users/letuscode/.codex/provider-sdk-20261018`; source base stag
 Qualified provider protocol/generation checks below use researched owned HTTP fixtures and the actual pinned SDKs.
 It does not establish live model availability, account permissions or generation quality. The owner
 app/profile remains unchanged; paused orchestration, main and the disabled Docker gateway are preserved.
+
+## Asynchronous fixture quality follow-up
+
+Actual576 analysis is source-bound in pr364-576-sonar-opening.json: commit576ca2dc, gateOK but
+four open minor S9382 findings. They concern lock-poll delay and sequential receipt open/read/close.
+The independently reviewed correction uses an asynchronous polling function with one original start
+and deadline, plus a strict sequential Promise chain calling an extracted single-receipt reader.
+One-second lock budget, abort checks, owned cleanup, sorted512-file bound, one descriptor at a time,
+2049-byte probe/2048-byte limit, safe enum/numeric projection, catch/error count and final close
+remain unchanged. No product behavior, retry/assertion/deadline or test-budget changes, exclusions
+or rule suppressions are introduced.
+
+The unchanged27 controls pass6.133seconds, zero failures/skips/cancellations; actual compiled-API
+four-queued-read proof passes with four outputs/ledger rows and zero remaining claims/errors.
+gh-fixture-awaitloop-source-and-qualification.json binds exact source and evidence; test bodies are
+unchanged from576. The focused native journey passes first attempt in14.156seconds, retry/flaky/skip0.
+Both safe snapshots retain71 terminal records:65 successes, five expected pre-PR-check failures and
+one intentional lost-create-response failure. All panel PR lists succeed, maximum wait17ms,
+claims/evidence errors/truncation0, exactly one create/PR and successful reconciliation without replay.
+All four code/runtime bindings remain unchanged; Electron and both owned ports close.
+git-fixture-native-second-qualification.json retains the actual result. Combined documentation review,
+normal hooks and fresh actual Sonar0/full hosted qualification remain required at this checkpoint. Historical
+576 native and8e full-suite/benchmark results keep their named source bindings below.
 
 ## Git fixture concurrency and retained failures
 

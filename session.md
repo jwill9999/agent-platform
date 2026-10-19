@@ -1,3 +1,43 @@
+# Provider SDK — bounded asynchronous fixture cleanup, 19 October 2026
+
+Owner-authorized delivery remains in progress. PR362 merged at7b816c61; protected
+[PR363](https://github.com/jwill9999/agent-platform/pull/363) remains at that older source and
+blocked by CodeQL12 until the actual repair reaches the feature. Repair
+[PR364](https://github.com/jwill9999/agent-platform/pull/364) is pushed at576ca2dc. Its green
+Sonar check/gate nevertheless has four actual open S9382 issues in the owned Git fixture's lock
+polling and sequential evidence reads; those findings are not waived. Current hosted checks are
+still running and do not qualify this subsequent changed source.
+
+The independently reviewed two-file correction replaces await-in-loop notation with a fixed-start
+asynchronous lock attempt and a sequential Promise chain with a single-receipt helper. The original
+one-second deadline, cancellation/ownership rules, sorted512-file bound, one open descriptor,
+2048-byte receipt limit, safe projection and per-file error handling remain unchanged. All27
+unchanged fixture controls pass in6.133seconds, zero failures/skips/cancellations. The actual compiled
+API four-queued-read proof passes with four outputs/ledger rows and zero remaining claims/errors.
+The current focused native publishing/lost-response journey passes first attempt in14.156seconds,
+zero retry/flaky/skip. Both safe snapshots retain71 terminal invocations, all panel PR lists successful,
+maximum lock wait17ms, zero claims/evidence errors/truncation and exactly one intentional lost-create
+response/one reconciled PR. Source/runtime hashes stay unchanged and owned processes/ports close.
+No product behavior, retries, assertions, test budget or security suppression changes. Final combined
+review, normal hooks and fresh full hosted qualification remain required at this checkpoint; later
+outcomes belong in Beads/PRs without rewriting frozen source.
+
+Retain both genuine historical failures: b8's incomplete benchmark exceeded20ms and8e's Electron
+suite has71 passes plus one flaky publishing case despite successful job badges. Their causes remain
+unproven; the controlled fixture concurrency defect does not establish the historical trace's cause.
+The earlier full8e benchmark and focused576 native pass remain bound to their exact source. Neither
+substitutes for a fresh complete benchmark and clean72 Electron cases on the final head.
+
+Both SDK Beads tasks remain in_progress. After feature delivery, require PR363's actual fixed head,
+fresh unsuppressed CodeQL, genuine full analysis, signed packaged macOS VM and all live checks and
+comments before protected squash. Preserve original key/profile for later staged app rebuild and
+recording/export/restart. Native owner-app preflight awaits the requested Mac unlock; no app change,
+paid request, live model success, stress readiness or delivered-branch cleanup is claimed. Main,
+paused PR283/orchestration and the disabled Docker gateway remain separate.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier checkpoint follows verbatim; its pending statements are historical. -->
+
 # Provider SDK — Git fixture follow-up, 19 October 2026
 
 Owner-authorized delivery remains in progress. PR362 merged into the feature at7b816c61;

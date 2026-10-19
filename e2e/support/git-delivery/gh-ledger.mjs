@@ -172,43 +172,50 @@ async function readInvocationEvidence(directory) {
   result.activeClaims = files.filter((name) => /^claim\.[0-9a-f-]{36}$/.test(name)).length;
   const receipts = files.filter((name) => /^receipt\.[0-9a-f-]{36}\.json$/.test(name)).sort();
   result.truncated = receipts.length > maximum;
-  for (const name of receipts.slice(0, maximum)) {
-    try {
-      const handle = await open(join(directory, name), 'r');
-      let value;
-      try {
-        const bytes = Buffer.alloc(2049);
-        const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
-        if (bytesRead > 2048) throw new Error('Invocation evidence exceeds bound');
-        value = JSON.parse(bytes.subarray(0, bytesRead).toString('utf8'));
-      } finally {
-        await handle.close();
-      }
-      if (
-        value.version !== 1 ||
-        !stages.has(value.stage) ||
-        !outcomes.has(value.outcome) ||
-        !kinds.has(value.kind) ||
-        !Number.isSafeInteger(value.startedAtMs) ||
-        value.startedAtMs < 0 ||
-        !Number.isSafeInteger(value.waitMs) ||
-        value.waitMs < 0 ||
-        value.waitMs > 60000 ||
-        value.lockBudgetMs !== 1000
-      )
-        throw new Error('Invalid safe invocation evidence');
-      result.records.push({
-        version: 1,
-        kind: value.kind,
-        stage: value.stage,
-        outcome: value.outcome,
-        startedAtMs: value.startedAtMs,
-        waitMs: value.waitMs,
-        lockBudgetMs: 1000,
-      });
-    } catch {
-      result.errors++;
-    }
-  }
+  await receipts
+    .slice(0, maximum)
+    .reduce(
+      (previous, name) => previous.then(() => readOneReceipt(directory, name, result)),
+      Promise.resolve(),
+    );
   return result;
+}
+
+async function readOneReceipt(directory, name, result) {
+  try {
+    const handle = await open(join(directory, name), 'r');
+    let value;
+    try {
+      const bytes = Buffer.alloc(2049);
+      const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
+      if (bytesRead > 2048) throw new Error('Invocation evidence exceeds bound');
+      value = JSON.parse(bytes.subarray(0, bytesRead).toString('utf8'));
+    } finally {
+      await handle.close();
+    }
+    if (
+      value.version !== 1 ||
+      !stages.has(value.stage) ||
+      !outcomes.has(value.outcome) ||
+      !kinds.has(value.kind) ||
+      !Number.isSafeInteger(value.startedAtMs) ||
+      value.startedAtMs < 0 ||
+      !Number.isSafeInteger(value.waitMs) ||
+      value.waitMs < 0 ||
+      value.waitMs > 60000 ||
+      value.lockBudgetMs !== 1000
+    )
+      throw new Error('Invalid safe invocation evidence');
+    result.records.push({
+      version: 1,
+      kind: value.kind,
+      stage: value.stage,
+      outcome: value.outcome,
+      startedAtMs: value.startedAtMs,
+      waitMs: value.waitMs,
+      lockBudgetMs: 1000,
+    });
+  } catch {
+    result.errors++;
+  }
 }

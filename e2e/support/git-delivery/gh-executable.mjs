@@ -205,9 +205,9 @@ async function lockDelay(milliseconds, signal) {
 
 async function acquireLock(lock, owner, signal) {
   const start = performance.now();
-  let first = true;
-  while (!signal.aborted && (first || performance.now() - start < LOCK_BUDGET_MS)) {
-    first = false;
+  async function attempt(first) {
+    if (signal.aborted || (!first && performance.now() - start >= LOCK_BUDGET_MS))
+      return { acquired: false, waitMs: Math.ceil(performance.now() - start) };
     try {
       const descriptor = openSync(lock, 'wx', 0o600);
       try {
@@ -221,8 +221,9 @@ async function acquireLock(lock, owner, signal) {
     }
     const remaining = LOCK_BUDGET_MS - (performance.now() - start);
     if (remaining > 0) await lockDelay(Math.min(10, remaining), signal);
+    return attempt(false);
   }
-  return { acquired: false, waitMs: Math.ceil(performance.now() - start) };
+  return attempt(true);
 }
 
 function finishClaim(claimed, claim, record, cancel) {
