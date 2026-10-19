@@ -1,3 +1,18 @@
+# Dependency upgrade preview — 19 October 2026
+
+P1 agent-platform-dependency-upgrade-preview records the owner-requested major-upgrade impact
+briefing. Its four planning documents passed distinct critique after the Next bundler correction;
+no package upgrade or merge is authorized. Electron/Next support choices come before implementation.
+Actual stagingbe153 already has AI SDK7; its owner-profile migration repair remains first delivery
+priority on a separate branch. No owner live-model/stress readiness is claimed here.
+
+Owner restored Dependabot security updates: GitHub confirms enabled/unpaused, defaultstaging and
+all13 required merge checks/no bypass. Current scheduling/status belongs in canonical Beads.
+The prior source handoff below is retained verbatim as historical, not current pending work.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier handoff follows verbatim. -->
+
 # Runner Keychain preflight — 26 October 2026
 
 PR381's only failing check was `staging-packaged-macos-vm-e2e`: the native secure-storage step hit
