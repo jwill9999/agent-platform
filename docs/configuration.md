@@ -4,6 +4,15 @@
 
 All configuration ultimately flows through environment variables and the Settings API.
 
+### Native managed Workspace root
+
+The managed desktop backend defaults `WORKSPACE_ROOT` to `workspace` under the existing desktop
+data directory. Listing and harness file tools use the same PathJail root. Existing explicit
+`WORKSPACE_ROOT`, then `AGENT_WORKSPACE_CONTAINER_PATH`, overrides take precedence; Docker/API-only
+launches retain the existing `/workspace` fallback. A native launch needs no host `/workspace`
+directory or extra filesystem permissions. Workspace listing failures return safe
+`WORKSPACE_FILES_UNAVAILABLE` responses with bounded phase/category logs and trusted request IDs.
+
 ### API Server (`apps/api`)
 
 | Variable                 | Required | Default                     | Description                                                                                                                            |

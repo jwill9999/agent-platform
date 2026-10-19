@@ -63,6 +63,7 @@ export interface DesktopBackendEnvironment {
   readonly SCHEDULER_ENABLED: string;
   readonly SECRETS_MASTER_KEY?: string;
   readonly SQLITE_PATH: string;
+  readonly WORKSPACE_ROOT: string;
   readonly AGENT_PLATFORM_DESKTOP_CONFIG_PATH: string;
   readonly AGENT_PLATFORM_DESKTOP_CONFIG_DIR: string;
   readonly AGENT_PLATFORM_DESKTOP_DATA_DIR: string;
@@ -184,6 +185,10 @@ export function buildDesktopBackendEnvironment({
     SCHEDULER_ENABLED: env.SCHEDULER_ENABLED ?? 'false',
     ...(secretsMasterKey ? { SECRETS_MASTER_KEY: secretsMasterKey } : {}),
     SQLITE_PATH: paths.sqlitePath,
+    WORKSPACE_ROOT:
+      env.WORKSPACE_ROOT ??
+      env.AGENT_WORKSPACE_CONTAINER_PATH ??
+      join(dirname(paths.sqlitePath), 'workspace'),
     AGENT_PLATFORM_DESKTOP_CONFIG_PATH: paths.configPath,
     AGENT_PLATFORM_DESKTOP_CONFIG_DIR: dirname(paths.configPath),
     AGENT_PLATFORM_DESKTOP_DATA_DIR: dirname(paths.sqlitePath),
