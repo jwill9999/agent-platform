@@ -106,7 +106,12 @@ separate PRs are for urgent blockers. No current workflow/security gate is weake
 
 Both source critiques and the combined20-document policy review pass; normal commit hooks pass.
 Local alignment incorporates actual staging `dee20500` and preserves every reviewed source byte.
-The cumulative normal push, complete benchmark and all current protected hosted checks/reviews
-remain due. Both P1s stay in progress;
+The cumulative normal push at `e9028562` passes all four affected packages' builds/types and
+183 contracts,244 desktop,301 DB and634 ordinary API cases. The unchanged full benchmark passes all
+nine vectors:900 measured requests/990 fixture calls, maximum positive request-p95 overhead3.30925ms
+below20ms, maximum enqueue-p950.021334ms below2ms. Raw measurements and the normal hook log remain
+under `monitoring-readiness/combined-push-benchmark.json` and `combined-normal-push.log`.
+This subsequent prose-only outcome update preserves every tested source byte. All current protected
+hosted checks/reviews still need qualification; no protected merge or task closure is claimed. Both P1s stay in progress;
 the owner stress trial remains OPEN/blocked. The owner app/data/key, held dependency work, paused
 orchestration, main and disabled Docker gateway remain preserved. No final delivery is claimed.

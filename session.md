@@ -6,7 +6,7 @@ Owner app50f6 is running. One authorized OpenAI chat returned Connection OK;1att
 Both monitoring P1s remain in_progress. Log isolation:50controls/4native cases pass retry0.
 Failure provenance:70focused cases/build/types/critic and1native export/restart pass retry0.
 PR379 stageddee20500; local batch aligned. Related fixes/tests/docs use one PR direct protected
-staging after local review; no mandatory feature merge. Full push/benchmark/hosted gates remain.
+staging after local review; no feature merge. Normal push/benchmark pass; hosted gates remain.
 See docs/planning/monitoring-stress-readiness.md. Owner app/key, paused/main/gateway preserved;
 upgrades held.
 
