@@ -1,12 +1,13 @@
-# Workspace integration repair checkpoint
+# Monitoring preparation checkpoint
 
-PR376 merged at c30f1c23; PR377 failed its flaky Electron gate at that head.
-This isolated follow-up preserves Personal scope against stale Project navigation:
-55 focused controls and18 selected native cases pass without retries. Fresh hosted
-qualification and rebuilt-owner preflight are required. Actual subsequent heads, gates
-and staging delivery belong in Beads agent-platform-native-workspace-listing and PR377.
-Dependency upgrades held until after stress testing; live model response/trial unverified.
-Owner profile/key, paused orchestration/main/disabled Docker gateway retained.
+Staging50f6e1b is running. One owner-authorized paid OpenAI chat returned Connection OK;
+1attempt/no tools/retries,4.672s,5579input/7output. Independent saved-report review verifies
+that window,5samples/no loss/gaps. No owner stress trial or further paid calls.
+
+Fixture-log isolation and failure-provenance P1s remain in_progress. First task fixes7fixture
+log roots;50focused controls/source review and4native cases pass retry0.
+Two-file safe snapshot plan reviewed, runtime not started. See docs/planning/monitoring-stress-readiness.md.
+PR379docs remain separate. Owner app/key, paused work/main/gateway preserved; upgrades held.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Earlier handoff follows verbatim. -->

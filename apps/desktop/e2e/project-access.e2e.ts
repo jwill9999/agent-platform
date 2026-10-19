@@ -126,6 +126,7 @@ test.describe('Electron Project access', () => {
           AGENT_PLATFORM_DESKTOP_RENDERER: 'standalone',
           AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(rendererPort),
           AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
+          AGENT_PLATFORM_DESKTOP_LOG_DIR: join(runtimeDir, 'logs'),
           AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
           AGENT_PLATFORM_DESKTOP_TEST_PROJECT_PARENT_DIR: newProjectParentDir,
           AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([
@@ -546,6 +547,7 @@ test.describe('Electron Project access', () => {
           AGENT_PLATFORM_DESKTOP_RENDERER: 'standalone',
           AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(rendererPort),
           AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
+          AGENT_PLATFORM_DESKTOP_LOG_DIR: join(runtimeDir, 'logs'),
           AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
           AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
           SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
