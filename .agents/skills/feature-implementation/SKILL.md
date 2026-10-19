@@ -28,7 +28,7 @@ Use [documentation](../documentation/SKILL.md) and
    Apply the diagnostic review checkpoints below to changes that exercise Agent Platform runs.
    Fix actionable findings within authorized scope; re-review changed semantics as needed.
 6. Update/read back Beads, session and required repository documentation. Commit/push only scoped work,
-   open the appropriate segment-tip PR and inspect all latest exact-head hosted checks/review findings.
+   open one cumulative task-tip PR directly to protected staging for a bounded MVP batch, following the current shared Git rules, and inspect all latest exact-head hosted checks/review findings.
    Continue normal repairs through green required tests/pipelines without another routine grant.
 7. Return concrete tested revision/diff/checks/limitations for final owner acceptance. Passing CI or
    implementation authorization does not grant merge/deploy/release authority. Ask only when owner

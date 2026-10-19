@@ -2,8 +2,8 @@
 
 **Beads:** `agent-platform-monitoring-storage-failure-provenance`, P1 bug, in progress.
 **Plan:** [Monitoring preparation](../planning/monitoring-stress-readiness.md).
-**Git:** following task from the accepted fixture-isolation tip; final segment PR to
-`feature/monitoring-stress-readiness`, then protected staging after all actual gates and authority.
+**Git:** `task/monitoring-failure-provenance` follows the accepted local fixture-isolation tip;
+one cumulative PR goes directly into protected staging after all actual gates and authority.
 
 ## Requirements and original observation
 
@@ -56,7 +56,7 @@ Fixture isolation is required before local native connected tests. Both existing
 
 After the accepted isolation tip and frozen contract review: implement narrow provenance,
 run the mapped tests, inspect real success/failure reports/logs, repair findings, update results and
-session, run normal hooks and final segment PR checks. Fresh protected full scan/real packaged VM,
+session, run normal hooks and single protected-staging PR checks. Fresh protected full scan/real packaged VM,
 reviews/security and actual tree/app verification are required before stress readiness. No merge
 authority is inferred from this plan or passing CI.
 

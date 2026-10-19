@@ -20,21 +20,22 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
    deliberately owned by an explicit managed prototype run use that run's journaled broker;
    unrelated developer tickets do not need managed discovery/readiness first.
 
-5. **Git (mandatory)** — **Never commit directly to `main`.**
-   - **Naming:** **`feature/<feature-name>`** and **`task/<task-name>`** (e.g. `feature/agent-platform-persistence`, `task/agent-platform-mov.1`).
-   - **Chained segments (default):** tasks run **in order** on Git. The **first** task in a segment branches from **`feature/<feature-name>`**. **Each following** task branches from the **previous task’s branch** (after that task is complete and pushed). **Intermediate** tasks do **not** get their own PR to `feature`—only the **last task in the segment** opens **one PR** from **`task/<tip>` → `feature/<feature-name>`**, merging the whole chain. Then the **next** segment’s first task branches from the **updated** `feature` branch.
-   - **Sign-off:** **Done means the task's declared gates are green.** Local gates pass before push/PR:
-     build, format, lint, unit tests, and relevant integration/E2E/Playwright checks from the task
-     strategy. An **intermediate** chained task closes after its exact-head acceptance, required
-     review/tests, pushed branch, checklist, and declared segment integration gate pass; it does not
-     wait for the segment-tip PR. A **segment-tip** task closes only after its PR to `feature` merges
-     and all required hosted checks pass. When a spec requires a PR per ticket, use the segment-tip
-     rule. If a required gate fails, the task is not done.
-   - **Release:** run integration testing and ensure required CI/CD pipelines are green. Merge only
-     with actual owner-granted merge/destination authority, reusing valid existing authorization;
-     passing gates alone grant none. Then merge
-     **`feature/<feature-name>` → protected `staging`** via PR. Merge **`staging` → `main`** only with
-     explicit human approval.
+5. **Git (mandatory)** — **Never commit directly to `main` or `staging`.**
+   - **Default bounded MVP batch:** create `task/<batch-name>` from actual `staging`, group related
+     fixes/tests/documentation, run local gates and critic review, and open one PR directly into
+     protected `staging`. Use one cumulative hosted qualification cycle rather than an intermediate
+     feature PR. Urgent blockers can be expedited separately; unrelated upgrades/paused work stay apart.
+   - **Local task boundaries:** scoped commits and chained local task tips are allowed. The final tip
+     contains the accepted cumulative work; no intermediate PR or duplicated push cycle is required.
+     Beads remains authoritative, and task closure still requires its declared checks/delivery.
+   - **Optional feature integration:** use `feature/<name>` only for owner-agreed larger or parallel
+     work that actually needs it. Older mandatory feature-route wording is superseded for new MVP batches.
+   - **Sign-off:** required local build/types/lint/format/unit and affected connected tests plus
+     independent review precede the batch PR. All actual required/executed exact-head hosted checks,
+     security findings and comments must clear before a guarded merge with owner destination authority.
+     A pushed branch, open PR or green badge alone is not completion or merge authorization.
+   - **Release:** protected staging remains the local development baseline. `staging` → `main`
+     requires separate explicit human approval; no production promotion is implied.
 
 6. **Template** — Copy [`_template.md`](./_template.md) when creating a new task spec; then wire the Beads issue.
 
@@ -78,9 +79,10 @@ Spec: docs/tasks/<issue-id>.md
 - Dependencies in Beads match upstream/downstream sections in the spec.
 - Testing strategy identifies local gates, Playwright UI actions/assertions when applicable, and
   GitHub Actions checks/artifacts to monitor.
-- Done distinguishes intermediate and segment-tip tasks: intermediate tasks require exact-head local,
-  review, push, and declared integration gates; segment tips additionally require the PR and hosted
-  CI/CD gates. A pushed branch or open PR alone is not done.
+- Done requires each task’s exact-head local acceptance/review and declared delivery gates.
+  Intermediate tips are published through the cumulative batch ancestry, without separate pushes
+  or PRs. Protected-staging delivery requires the actual merge and hosted gates; a pushed branch
+  or open PR alone is not done.
 
 ## Epic index (task spec files)
 

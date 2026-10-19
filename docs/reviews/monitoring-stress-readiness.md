@@ -29,8 +29,8 @@ The critic approved the narrower dedicated snapshot contract: at most2048 encode
 two retained files total, fixed metadata only, best-effort asynchronous exclusive atomic publication,
 cached historical status and no recovery/deadline/cross-store changes. Normal restart retention is
 claimed only for a completed publication; immediate exit/crash/filesystem failure can prevent it.
-The revised documents and eventual implementation require frozen review. Runtime implementation
-has not begun. Fixture isolation implementation is underway after its scope/test-direction approval.
+The first contract was approved before runtime work. The implementation and its final test-only
+review corrections now have frozen source receipts; see local outcomes below.
 
 ## Fixture isolation local results
 
@@ -55,10 +55,40 @@ Evidence: `monitoring-readiness/log-isolation/{owned-source-final,independent-so
 under the same Codex evidence root. No product runtime, owner app/profile/key or live model call
 changed during these tests.
 
-## Pending outcomes
+Normal commit hook passed at local `7cfb0ea8`, with all seven source hashes unchanged afterward.
+The offline install initially omitted generated Husky launchers; its unpublished draft was not
+hook-qualified and was recreated after normal hook setup. Both receipts remain retained.
+Per the owner's batching instruction, there is no intermediate push/PR: the accepted local tip
+feeds `task/monitoring-failure-provenance`, then one combined push/review/qualification cycle directly into protected staging.
 
-OBS-T01–05 remain planned, not run. Fixture isolation still needs normal hooks/push and final hosted
-segment integration; both P1s remain in progress and the owner stress trial remains OPEN/blocked.
-Current app data/key, running checkout,
-held dependency work, paused orchestration, main and disabled Docker gateway remain preserved.
-Full normal-hook/hosted qualification and actual delivery are not claimed.
+## Failure provenance local results
+
+OBS-T01–05 have focused local coverage:70 distinct passing cases, including17 contracts,25 DB,
+24 final artifact/process/status cases and four existing monitoring cases. The56 new cases exercise
+strict privacy/schema bounds, first-failure latching, unchanged terminal/startup behavior, invalid
+identity, independent private publication, stale claims, FIFO rejection, interruption, cached status,
+unavailable windows and actual API failure-to-healthy-restart retention. Completed publication is
+retained; an interrupted or failed publication remains explicitly best effort.
+
+Scoped contracts/DB/API builds, strict types, lint and format pass. First source critique resolved
+OBS-S01 using nonblocking regular-file reads; OBS-S02/03 led to test-only bounded cancellation/close
+cleanup and literal child source with module URLs passed as argv data. The final affected24 API
+cases pass in2.93s; production and previously compiled bytes remain unchanged. Final independent critique
+approves the20 frozen source files, four compiled bindings and20 logs with no remaining findings;
+OBS-S01/02/03 are resolved. Frozen source:
+`monitoring-readiness/provenance/provenance-worker-final-source.json` SHA
+`855e4ac6b2f613b618efb78ce40edf4d7fcc5e78559a88d39142f0011de680d5`.
+
+## Delivery and pending outcomes
+
+PR379 is delivered directly to protected staging at `dee20500`; its reviewed tree matches the actual
+merge. The running owner app remains on source50f6. This monitoring batch will align with that actual
+staging baseline before its one cumulative PR. The owner's19October direction replaces mandatory
+task-to-feature and feature-to-staging merges for bounded MVP work: group related fixes/tests/docs,
+review and test locally, then use one protected-staging PR. Keep subsequent repairs in that PR;
+separate PRs are for urgent blockers. No current workflow/security gate is weakened.
+
+Combined critic/normal-hook qualification, affected native monitoring/export checks, the complete
+benchmark and all current protected hosted checks/reviews remain due. Both P1s stay in progress;
+the owner stress trial remains OPEN/blocked. The owner app/data/key, held dependency work, paused
+orchestration, main and disabled Docker gateway remain preserved. No final delivery is claimed.

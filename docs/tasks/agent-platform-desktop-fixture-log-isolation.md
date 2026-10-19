@@ -2,7 +2,7 @@
 
 **Beads:** `agent-platform-desktop-fixture-log-isolation`, P1 bug, in progress.
 **Plan:** [Monitoring preparation](../planning/monitoring-stress-readiness.md).
-**Branch:** `task/desktop-fixture-log-isolation` from `feature/monitoring-stress-readiness`.
+**Branch:** accepted local tip `task/desktop-fixture-log-isolation` at staging50f6; final cumulative task targets protected staging directly.
 
 ## Requirements and evidence
 
@@ -28,8 +28,10 @@ owner trial depend on this isolation. Beads remains authoritative for scheduling
    unrelated sentinel stdout/stderr bytes must survive success, failure, restart and owned cleanup.
 4. Retain owned launch/failure log evidence before cleanup. Run affected native Git journeys and an
    adjacent export journey only after non-native isolation controls pass.
-5. Update results/session/Beads, use normal hooks and push the intermediate task. The following task
-   branches from this accepted tip. Its final segment PR carries both repairs into the feature.
+5. Update results/session/Beads and use the normal commit hook. Under the owner's subsequent batching
+   instruction, the following task branches from this accepted local tip; publish the cumulative
+   final tip once with normal push hooks and one PR carrying both repairs directly into protected staging.
+   No intermediate PR or task closure is inferred from a local commit.
 
 ## Tests and Gherkin strategy
 
@@ -59,6 +61,7 @@ profile, live provider or real remote mutation is used.
 
 All managed launch sites audited, regression guard and sentinel/failure controls pass, affected native
 journeys pass without retry, applicable desktop build/type/lint/format/normal hooks pass, source and
-evidence independently reviewed, intermediate tip pushed and segment integration gate recorded.
+evidence independently reviewed, accepted tip published through final cumulative ancestry and the
+declared segment integration gate recorded.
 Do not close merely for adding an environment line. No product log policy, deadlines or recovery
 behavior change belongs to this task. Results/review/sign-off are pending; no tests claimed here.

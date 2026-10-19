@@ -1,3 +1,4 @@
+import type { CaptureFailureArtifacts } from '@agent-platform/contracts';
 import {
   DiagnosticScopeSchema,
   DiagnosticReportSchema,
@@ -27,7 +28,11 @@ export function createDiagnosticsRouter(
   store: DiagnosticStore,
   access: DiagnosticAccess,
   configuredAppVersion = '0.0.0',
-  monitoring?: { store: MonitoringStore; runtime: MonitoringRuntime },
+  monitoring?: {
+    store: MonitoringStore;
+    runtime: MonitoringRuntime;
+    failureArtifacts?: () => CaptureFailureArtifacts;
+  },
 ): Router {
   const router = Router();
   const version = DiagnosticReportSchema.shape.appVersion.safeParse(configuredAppVersion);

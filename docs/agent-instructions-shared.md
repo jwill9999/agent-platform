@@ -199,21 +199,29 @@ control responsibilities.
 
 ## Git Workflow
 
-Branching rules (locked):
+The owner-authorized local MVP delivery route is one coherent batch directly to protected staging.
+Group related runtime fixes, meaningful regression tests and documentation before opening the PR.
+Do not create a separate PR or complete hosted pipeline cycle for each small repair. Expedite an
+urgent blocker separately when needed; keep unrelated upgrades and paused work separate.
 
-- **`feature/<feature-name>`** — integration branch
-- **`task/<task-name>`** — individual work units, chained linearly (each branches from the previous task branch)
-- **Never commit directly to `main`**
-- One PR per segment tip → `feature/<feature-name>`; completed features → protected `staging`; human-approved `staging` → `main`
+1. Create a **`task/<batch-name>`** branch from actual current **`staging`**. Local scoped commits or
+   chained task tips can preserve work boundaries; publish the cumulative final tip together.
+2. Complete the agreed local regression/connected checks and source-aware independent critique.
+   Open **one PR from the final task tip directly into protected `staging`**.
+3. Keep review and CI repairs in that PR. Every required/executed current-head check, security
+   finding and actionable review comment must qualify before an exact-head guarded merge. A changed
+   source still requires fresh applicable checks; batching does not waive protections.
+4. Merge only with actual owner-granted destination authority; reuse an existing valid grant.
+   Green checks alone do not authorize merge. Update session/Beads and clean proven delivered refs
+   and disposable artifacts after verified delivery, preserving recovery and active/dirty work.
+5. A **`feature/<name>`** integration branch is optional for owner-agreed larger/parallel work that
+   needs it. Do not impose an extra feature PR/merge on ordinary bounded MVP batches.
+6. Never commit directly to **`staging`** or **`main`**. Promotion **`staging` → `main`** requires
+   explicit human approval and is never implied by local MVP delivery.
 
-Required branch lifecycle:
-
-1. Create or use a **`feature/<feature-name>`** branch from current **`staging`** as the integration branch.
-2. Create the first **`task/<task-name>`** branch from that feature branch.
-3. Each subsequent task branch must be created from the previous task branch.
-4. The final task branch in the chain contains the cumulative task changes and opens the integration PR into **`feature/<feature-name>`**.
-5. After integration gates pass, merge **`feature/<feature-name>`** into protected **`staging`** via PR only with actual owner-granted merge/destination authority; reuse an existing valid grant. Green gates alone do not authorize merging.
-6. Merge **`staging`** into **`main`** only with explicit human approval; production promotion is never implied by feature approval.
+This current owner decision supersedes the former mandatory task-to-feature-to-staging route in
+older specifications, templates and historical handoffs. Existing paused orchestration remains
+separate and retains its own unchanged runtime controls.
 
 ---
 
@@ -395,9 +403,14 @@ When ending a work session, you MUST complete ALL steps below. Work is **NOT** c
    selected prototype run uses its own journaled equivalent for operations it owns; that does not
    make the prototype a default developer dependency.
 
-5. **Clean up** — clear stashes, prune remote branches
-6. **Verify** — all changes committed AND pushed
-7. **Hand off** — provide context for next session via `session.md`
+5. **Hand off** — after verifying actual delivery, update and push `session.md` with the merged SHA,
+   checks, remaining blockers and next action through the normal branch/PR process.
+6. **Clean up** — follow [post-merge cleanup](development/post-merge-cleanup.md): audit worktrees and
+   test data, preserve dirty/paused/in-use work and required evidence, then retire only proven unused
+   delivered checkouts and disposable artifacts. Inspect ignored data, including local Beads stores;
+   never clear unrelated stashes or blanket-prune application data/caches.
+7. **Verify** — confirm committed/pushed records, exact removals, retained evidence and runtime/dirty
+   work preservation; record space recovered and read back/sync Beads. Apply this cleanup every run.
 
 **Critical rules:**
 

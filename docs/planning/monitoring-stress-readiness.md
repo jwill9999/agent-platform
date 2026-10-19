@@ -15,18 +15,24 @@ there is no permission for more agent-paid calls, new credentials or dependency 
 The original recording failure remains unexplained. A clean restart/current window is evidence of
 recovery, not proof of a cause or permanent fix. Two existing P1 records block the owner trial.
 
+The owner subsequently requested batching related changes to avoid a separate PR/review/pipeline
+cycle for every small repair. Keep these two related fixes and their documentation in one cumulative
+PR directly into protected staging; a separate focused PR is reserved for an urgent blocker that requires it. Use local
+scoped commits/task tips, then normal combined push hooks and hosted qualification. This does not
+combine held upgrades, paused orchestration or unrelated work, or weaken any completion gate.
+
 ## Task and document manifest
 
-| Task                                                   | Specification                                                                          | Order and destination                                                                                  |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `agent-platform-desktop-fixture-log-isolation`         | [Owned test logs](../tasks/agent-platform-desktop-fixture-log-isolation.md)            | First task, `task/desktop-fixture-log-isolation` from `feature/monitoring-stress-readiness`            |
-| `agent-platform-monitoring-storage-failure-provenance` | [Failure provenance](../tasks/agent-platform-monitoring-storage-failure-provenance.md) | Following task branches from the qualified first tip; final task-to-feature PR, then protected staging |
-| `agent-platform-local-mvp-stress-review`               | [Owner trial](../tasks/agent-platform-local-mvp-stress-review.md)                      | Remains OPEN behind both P1 repairs and actual app readiness                                           |
+| Task                                                   | Specification                                                                          | Order and destination                                                                                                   |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `agent-platform-desktop-fixture-log-isolation`         | [Owned test logs](../tasks/agent-platform-desktop-fixture-log-isolation.md)            | Accepted local first tip `task/desktop-fixture-log-isolation` at staging50f6                                            |
+| `agent-platform-monitoring-storage-failure-provenance` | [Failure provenance](../tasks/agent-platform-monitoring-storage-failure-provenance.md) | `task/monitoring-failure-provenance` follows the accepted local first tip; one final PR directly into protected staging |
+| `agent-platform-local-mvp-stress-review`               | [Owner trial](../tasks/agent-platform-local-mvp-stress-review.md)                      | Remains OPEN behind both P1 repairs and actual app readiness                                                            |
 
 [Verification](../testing/monitoring-stress-readiness.md) separates planned checks from
 [results and critique](../reviews/monitoring-stress-readiness.md). The worktree is
 `~/.codex/worktrees/monitoring-stress-readiness/agent-platform`. The running owner checkout,
-active documentation PR379, held dependency work, main and paused orchestration remain separate.
+documentation PR379 delivered at stagingdee20500, held dependency work, main and paused orchestration remain separate.
 
 ## Bounded requirements
 
@@ -61,7 +67,7 @@ service, dashboard, account, global setting, Docker gateway or paused orchestrat
 
 ## Delivery and stopping point
 
-Use the ordinary chained implementation route, normal hooks, source-aware independent review and
+Use the owner-directed single batched task-to-staging route, normal hooks, independent review and
 all current-head hosted gates/comments. Green gates do not independently grant merge authority.
 The repairs are not complete until their declared delivery and evidence checks pass. Only then
 recheck the actual owner app and invite the bounded owner trial. The trial itself remains separate;

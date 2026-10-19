@@ -1,3 +1,4 @@
+import type { CaptureFailureArtifacts } from '@agent-platform/contracts';
 import express, { type Application } from 'express';
 import { createLogger } from '@agent-platform/logger';
 import { installSafeProviderWarningLogger } from '@agent-platform/model-router';
@@ -24,7 +25,11 @@ export function createApp(options: {
     store: DiagnosticStore;
     access: DiagnosticAccess;
     appVersion?: string;
-    monitoring?: { store: MonitoringStore; runtime: MonitoringRuntime };
+    monitoring?: {
+      store: MonitoringStore;
+      runtime: MonitoringRuntime;
+      failureArtifacts?: () => CaptureFailureArtifacts;
+    };
   };
 }): Application {
   const providerLog = createLogger('api:provider');

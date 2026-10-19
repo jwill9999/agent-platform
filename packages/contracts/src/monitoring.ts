@@ -1,3 +1,4 @@
+import { CaptureFailureArtifactsSchema } from './captureFailure.js';
 import { z } from 'zod';
 import {
   DiagnosticHealthSchema,
@@ -123,7 +124,11 @@ export const MonitoringPageSchema = z
   .strict();
 export type MonitoringPage = z.infer<typeof MonitoringPageSchema>;
 export const MonitoringStatusSchema = z
-  .object({ monitoring: MonitoringHealthSchema, diagnostics: DiagnosticHealthSchema })
+  .object({
+    monitoring: MonitoringHealthSchema,
+    diagnostics: DiagnosticHealthSchema,
+    failureArtifacts: CaptureFailureArtifactsSchema.optional(),
+  })
   .strict();
 export type MonitoringStatus = z.infer<typeof MonitoringStatusSchema>;
 export const MonitoringPreferenceResultSchema = z

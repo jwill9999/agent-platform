@@ -1,3 +1,4 @@
+import type { CaptureFailureObserver } from '@agent-platform/contracts';
 import { createCaptureStore } from './captureStore.js';
 import { randomUUID } from 'node:crypto';
 import {
@@ -37,6 +38,7 @@ export type DiagnosticStoreOptions = {
   retentionDays?: number;
   maxEvents?: number;
   processInstanceId?: string;
+  onFirstFailure?: CaptureFailureObserver;
 };
 type Stats = Pick<
   DiagnosticHealth,
@@ -79,6 +81,8 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
     DiagnosticHealth
   >({
     health,
+    storeKind: 'diagnostics',
+    onFirstFailure: options.onFirstFailure,
     configurationValid,
     unavailableError: 'diagnostics_unavailable',
     workerUrl: new URL(

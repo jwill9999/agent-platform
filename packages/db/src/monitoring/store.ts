@@ -1,3 +1,4 @@
+import type { CaptureFailureObserver } from '@agent-platform/contracts';
 import { createCaptureStore } from '../diagnostics/captureStore.js';
 import { randomUUID } from 'node:crypto';
 import {
@@ -30,7 +31,11 @@ export class MonitoringStoreError extends Error {
   }
 }
 
-export type MonitoringStoreOptions = { path: string; processInstanceId?: string };
+export type MonitoringStoreOptions = {
+  path: string;
+  processInstanceId?: string;
+  onFirstFailure?: CaptureFailureObserver;
+};
 type Stats = Pick<
   MonitoringHealth,
   | 'pruned'
@@ -66,6 +71,8 @@ export function createMonitoringStore(options: MonitoringStoreOptions): Monitori
     MonitoringHealth
   >({
     health,
+    storeKind: 'monitoring',
+    onFirstFailure: options.onFirstFailure,
     configurationValid,
     unavailableError: 'monitoring_unavailable',
     workerUrl: new URL(

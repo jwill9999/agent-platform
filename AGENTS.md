@@ -13,7 +13,7 @@ Read that file first. The sections it covers:
 - Conventions (TypeScript, error shape, secrets, model IDs, security modules)
 - Environment variables
 - Task tracking with **beads** (`bd ready` / `bd show` / `bd close`)
-- Git workflow (`feature/<name>` integration; `task/<name>` chained tips; never to `main`)
+- Git workflow (bounded `task/<name>` batches directly to protected `staging`; optional feature integration; never directly to `main`)
 - Non-interactive shell flags
 - Key locked decisions
 - Reference documentation index
