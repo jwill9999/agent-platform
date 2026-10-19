@@ -1,3 +1,4 @@
+import { createCaptureFailureRecorder } from './infrastructure/diagnostics/captureFailureArtifacts.js';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
@@ -39,11 +40,19 @@ if (sqlitePath) {
 const diagnosticsRequested = Boolean(process.env.DIAGNOSTICS_LOCAL_CAPABILITY);
 const diagnosticAccess = consumeDiagnosticAccess(process.env);
 const diagnosticProcessInstanceId = randomUUID();
+const captureFailureArtifacts =
+  sqlitePath && diagnosticAccess
+    ? createCaptureFailureRecorder({
+        appDataPath: dirname(sqlitePath),
+        processInstanceId: diagnosticProcessInstanceId,
+      })
+    : undefined;
 const diagnosticStore =
   sqlitePath && diagnosticAccess
     ? createDiagnosticStore({
         path: join(dirname(sqlitePath), 'diagnostics.sqlite'),
         processInstanceId: diagnosticProcessInstanceId,
+        onFirstFailure: (failure) => captureFailureArtifacts?.observe('diagnostics', failure),
         retentionDays:
           process.env.DIAGNOSTICS_RETENTION_DAYS === undefined
             ? undefined
@@ -61,6 +70,7 @@ const monitoringStore =
     ? createMonitoringStore({
         path: join(dirname(sqlitePath), 'monitoring.sqlite'),
         processInstanceId: diagnosticProcessInstanceId,
+        onFirstFailure: (failure) => captureFailureArtifacts?.observe('monitoring', failure),
       })
     : undefined;
 const monitoringRuntime =
@@ -100,7 +110,13 @@ const app = createApp({
           appVersion: process.env.DIAGNOSTICS_APP_VERSION,
           ...(monitoringStore && monitoringRuntime
             ? {
-                monitoring: { store: monitoringStore, runtime: monitoringRuntime },
+                monitoring: {
+                  store: monitoringStore,
+                  runtime: monitoringRuntime,
+                  ...(captureFailureArtifacts
+                    ? { failureArtifacts: () => captureFailureArtifacts.status() }
+                    : {}),
+                },
               }
             : {}),
         },

@@ -10,6 +10,7 @@ import {
   type MonitoringWindow,
   MonitoringPreferenceInputSchema,
   type MonitoringPreference,
+  type CaptureFailureObserver,
 } from '@agent-platform/contracts';
 
 function monitoringErrorCode(reason: string): 'invalid_cursor' | 'expired_history' | 'unavailable' {
@@ -30,7 +31,11 @@ export class MonitoringStoreError extends Error {
   }
 }
 
-export type MonitoringStoreOptions = { path: string; processInstanceId?: string };
+export type MonitoringStoreOptions = {
+  path: string;
+  processInstanceId?: string;
+  onFirstFailure?: CaptureFailureObserver;
+};
 type Stats = Pick<
   MonitoringHealth,
   | 'pruned'
@@ -66,6 +71,8 @@ export function createMonitoringStore(options: MonitoringStoreOptions): Monitori
     MonitoringHealth
   >({
     health,
+    storeKind: 'monitoring',
+    onFirstFailure: options.onFirstFailure,
     configurationValid,
     unavailableError: 'monitoring_unavailable',
     workerUrl: new URL(

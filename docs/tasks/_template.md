@@ -33,24 +33,24 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 ## Implementation plan
 
 1. Read Beads acceptance criteria and this spec.
-2. Follow **Git workflow (mandatory)** below: branch from the **parent branch** listed there (**`feature/<feature-name>`** for the first task in a segment, or **`task/<previous-task-name>`** when chaining).
+2. Follow **Git workflow (mandatory)** below: branch from the **parent branch** listed there (**`staging`** for the first bounded MVP task, or an accepted local task tip when chaining).
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list <issue-id>` shows expected upstream Beads issues **closed** before you finish (unless this spec says otherwise for parallel planning).
-5. If this is the **last task in a segment**, open **one PR** **`task/<tip> → feature/<feature-name>`**. If **not** the last, hand off: the **next** task branches from **`task/<this-task-name>`**.
+5. If this is the **last task in a segment**, open **one cumulative PR** **`task/<tip> → protected staging`**. If **not** the last, hand off: the **next** task branches from **`task/<this-task-name>`**.
 
 ## Git workflow (mandatory)
 
-**Chained tasks:** **`feature/<feature-name>`** → **`task/<task-1>`** → **`task/<task-2>`** → … → **one PR** from **`task/<last>`** → **`feature/<feature-name>`**.
+Default bounded MVP route: **`staging` → local task commits/tips → one PR into protected `staging`**.
+Group related fixes, tests and documentation. A separate focused PR is reserved for an urgent blocker.
 
-| Rule                       | Detail                                                                                                                                                                                                                                 |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **No `main`**              | Never push commits directly to **`main`**.                                                                                                                                                                                             |
-| **First task in segment**  | Branch **`task/<task-name>`** from **`feature/<feature-name>`** (e.g. `feature/agent-platform-persistence`).                                                                                                                           |
-| **Later tasks in segment** | Branch **`task/<task-name>`** from **`task/<previous-task-name>`** after the previous task’s work is pushed.                                                                                                                           |
-| **Intermediate tasks**     | **No** separate PR to `feature`. Push your branch; complete sign-off; next developer checks out from your **`task/...`** branch.                                                                                                       |
-| **Last task in segment**   | Open **one** PR **`task/<tip> → feature/<feature-name>`** to land the whole segment.                                                                                                                                                   |
-| **Next segment**           | First task branches from **updated** **`feature/<feature-name>`** after the segment PR is merged.                                                                                                                                      |
-| **Release**                | After gates pass with actual owner-granted merge/destination authority, merge **`feature/<feature-name>` → protected `staging`** via PR; green gates alone grant none. Merge **`staging` → `main`** only with explicit human approval. |
+| Rule                 | Detail                                                                                                                                          |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Base                 | First task starts from actual current staging. Following local task tips can branch from an accepted prior local tip.                           |
+| Batch                | Publish the cumulative final tip after combined local gates and critic review. No intermediate feature PR or duplicated push cycle is required. |
+| Qualification        | Keep repairs in the same PR. All required/executed exact-head hosted checks, security findings and actionable comments must clear.              |
+| Authority            | Merge only with actual owner-granted protected-staging authority; passing checks alone grants none.                                             |
+| Optional integration | Use a feature branch only for owner-agreed larger or parallel work that needs one.                                                              |
+| Release              | Never commit directly to staging/main. Staging-to-main promotion requires separate explicit human approval.                                     |
 
 ## Tests (required before sign-off)
 
@@ -63,16 +63,16 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 - [ ] Every **pre-close** checkbox below is complete before the Beads close transition.
 - [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **Git:** branch pushed; **if this is the segment tip**, **PR** merged **`task/<tip> → feature/<feature-name>`**; if **not** tip, next task can branch from **`task/<this-task-name>`**.
-- [ ] **Intermediate task:** exact-head acceptance, required review/tests, push, and declared segment integration gate pass; no nonexistent PR is required.
+- [ ] **Git:** accepted changes published through the cumulative pushed tip; the declared protected-staging delivery is merged and verified. An intermediate local tip needs no separate push or PR.
+- [ ] **Intermediate task:** exact-head acceptance, required review/tests, publication through cumulative ancestry, and declared batch delivery gate pass; no nonexistent PR is required.
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Pre-close sign-off
 
-- [ ] **Task branch** created from the correct **parent** (`feature/...` or previous **`task/...`**) **before** implementation work
+- [ ] **Task branch** created from the correct **parent** (`staging` or accepted previous **`task/...`**) **before** implementation work
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Definition of done and pre-close checklists** are complete
-- [ ] If **segment tip:** **PR** merged **`task/<tip> → feature/<feature-name>`** (link: **\*\*\*\***\_**\*\*\*\***) — _if not tip, write “N/A — merge at segment end”_
+- [ ] If **segment tip:** **PR** merged **`task/<tip> → protected staging`** (link: **\*\*\*\***\_**\*\*\*\***) — _if not tip, write “N/A — merge at segment end”_
 - [ ] If **intermediate:** exact accepted head and segment integration evidence recorded — _if tip, write “N/A — tip PR gate applies”_
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed

@@ -1,17 +1,17 @@
-# Current handoff — 19 October 2026
+# Monitoring preparation checkpoint
 
-PR378/377 are merged into staging `50f6e1b5`: all19 executed checks passed;
-Workspace repair is closed/synced. Actual app listing/recording/export/clean restart
-passed with original data/key retained. Live model generation/stress trial unverified.
+Owner app50f6 is running. One authorized OpenAI chat returned Connection OK;1attempt/no tools/retries,
+4.672s,5579input/7output. Reports verify5samples/no loss/gaps. No stress trial/further paid calls.
 
-Stress remains blocked by `agent-platform-desktop-fixture-log-isolation` and
-`agent-platform-monitoring-storage-failure-provenance`; restart is not a cause fix.
-Dependency upgrades held; paused orchestration/PR283, main and Docker gateway unchanged.
-Housekeeping: [audit/results](docs/reviews/post-merge-cleanup-20261019.md).
-Use [end-of-run cleanup](docs/development/post-merge-cleanup.md). PR379 goes directly to staging.
+Both monitoring P1s remain in_progress. Log isolation:50controls/4native cases pass retry0.
+Failure provenance:70focused cases/build/types/critic and1native export/restart pass retry0.
+PR379 stageddee20500; local batch aligned. Related fixes/tests/docs use one PR direct protected
+staging after local review; no feature merge. Normal push/benchmark pass; hosted gates remain.
+See docs/planning/monitoring-stress-readiness.md. Owner app/key, paused/main/gateway preserved;
+upgrades held.
 
 <!-- markdownlint-disable MD025 -->
-<!-- Earlier handoff follows verbatim; pending statements below are historical. -->
+<!-- Earlier handoff follows verbatim. -->
 
 # Native Workspace listing repair — 19 October 2026
 

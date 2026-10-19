@@ -39,4 +39,4 @@ project knowledge belongs. This skill supplies locations and consistency checks,
 
 For documentation-only changes validate the artifacts; do not invent application test results.
 When application work is involved, preserve the defined connected frontend/backend verification and
-feature integration gates. Record actual outcomes in the linked result report before sign-off.
+protected staging gates under the current shared Git route. Record actual outcomes in the linked result report before sign-off.

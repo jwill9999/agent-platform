@@ -79,6 +79,7 @@ test.describe('Electron workspace WebView runtime', () => {
           AGENT_PLATFORM_DESKTOP_RENDERER: 'standalone',
           AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(rendererPort),
           AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
+          AGENT_PLATFORM_DESKTOP_LOG_DIR: join(runtimeDir, 'logs'),
           AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
           AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
           CI: process.env.CI,

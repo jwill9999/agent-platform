@@ -4,6 +4,7 @@ import {
   DiagnosticHealthSchema,
   type DiagnosticStore,
   type MonitoringStore,
+  type CaptureFailureArtifacts,
 } from '@agent-platform/contracts';
 import { getSession, DiagnosticStoreError, type DrizzleDb } from '@agent-platform/db';
 import { buildDiagnosticReport } from '@agent-platform/plugin-observability';
@@ -27,7 +28,11 @@ export function createDiagnosticsRouter(
   store: DiagnosticStore,
   access: DiagnosticAccess,
   configuredAppVersion = '0.0.0',
-  monitoring?: { store: MonitoringStore; runtime: MonitoringRuntime },
+  monitoring?: {
+    store: MonitoringStore;
+    runtime: MonitoringRuntime;
+    failureArtifacts?: () => CaptureFailureArtifacts;
+  },
 ): Router {
   const router = Router();
   const version = DiagnosticReportSchema.shape.appVersion.safeParse(configuredAppVersion);

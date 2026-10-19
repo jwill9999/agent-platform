@@ -1,5 +1,11 @@
 import { Worker } from 'node:worker_threads';
-import type { DiagnosticHealth } from '@agent-platform/contracts';
+import {
+  CaptureFailureSchema,
+  type CaptureFailure,
+  type CaptureFailureObserver,
+  type CaptureStoreKind,
+  type DiagnosticHealth,
+} from '@agent-platform/contracts';
 
 type CaptureHealth = Omit<DiagnosticHealth, 'reason'> & {
   reason: DiagnosticHealth['reason'] | 'invalid_sample';
@@ -23,6 +29,8 @@ type Reply = {
 };
 type CaptureOptions<T, H extends CaptureHealth> = {
   health: H;
+  storeKind: CaptureStoreKind;
+  onFirstFailure?: CaptureFailureObserver;
   unavailableError: 'diagnostics_unavailable' | 'monitoring_unavailable';
   workerUrl: URL;
   workerData: unknown;
@@ -35,6 +43,14 @@ type CaptureOptions<T, H extends CaptureHealth> = {
   closeDeadlineMs: 1000 | 2000;
   onDisable?: () => void;
 };
+type FailureContext = {
+  operation: CaptureFailure['operation'];
+  cause: CaptureFailure['cause'];
+  startedAt: number;
+  deadlineMs: CaptureFailure['deadlineMs'];
+  exitCode?: number;
+};
+
 /** Internal mechanics shared by the two observational stores, with their domain policies explicit. */
 export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureOptions<T, H>) {
   const health = options.health;
@@ -45,8 +61,48 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
       resolve: (result: unknown) => void;
       reject: (error: Error) => void;
       timer: ReturnType<typeof setTimeout>;
+      failure: FailureContext;
     }
   >();
+  const workerStartedAt = performance.now();
+  const rpcFailures = new WeakMap<Error, FailureContext>();
+  let firstFailureObserved = false;
+  let awaitingReady = true;
+  function observeFailure(failure: FailureContext): void {
+    if (firstFailureObserved) return;
+    firstFailureObserved = true;
+    const parsed = CaptureFailureSchema.safeParse({
+      schemaVersion: 1,
+      processInstanceId: health.processInstanceId,
+      store: options.storeKind,
+      operation: failure.operation,
+      cause: failure.cause,
+      observedAtMs: Math.max(0, Date.now()),
+      elapsedMs: Math.min(
+        Number.MAX_SAFE_INTEGER,
+        Math.max(0, performance.now() - failure.startedAt),
+      ),
+      deadlineMs: failure.deadlineMs,
+      ...(failure.exitCode === undefined ? {} : { exitCode: failure.exitCode }),
+    });
+    if (parsed.success) health.firstFailure = Object.freeze(parsed.data);
+    try {
+      // Publication must schedule its own I/O; callback failures cannot affect capture or shutdown.
+      const result = options.onFirstFailure?.(parsed.success ? { ...parsed.data } : undefined);
+      void Promise.resolve(result).catch(() => {});
+    } catch {
+      /* Observation is best effort and must never replace the initiating failure. */
+    }
+  }
+  function operation(type: string): CaptureFailure['operation'] {
+    if (type === 'append') return 'append';
+    if (type === 'close') return 'close';
+    if (options.readCommands.includes(type)) return 'read';
+    return type === 'setPreference' ? 'preference' : 'maintenance';
+  }
+  function replyFailure(error: unknown, fallback: FailureContext): FailureContext {
+    return error instanceof Error ? (rpcFailures.get(error) ?? fallback) : fallback;
+  }
   let worker: Worker | undefined;
   let serial = 0;
   let inflight: Promise<void> | undefined;
@@ -63,7 +119,7 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
     urgentFlushScheduled = false;
   }
   const update = (stats: CaptureStats) => {
-    if (health.state === 'closed') return;
+    if (health.state === 'closed' || health.state === 'disabled') return;
     const dropped = Math.max(stats.dropped, health.dropped);
     Object.assign(health, stats, { dropped });
     if (health.conflicts) {
@@ -71,8 +127,9 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
       health.reason = 'conflict';
     }
   };
-  function disable(reason: CaptureHealth['reason']): void {
-    if (health.state === 'closed') return;
+  function disable(reason: CaptureHealth['reason'], failure: FailureContext): void {
+    if (health.state === 'closed' || health.state === 'disabled') return;
+    observeFailure(failure);
     options.onDisable?.();
     health.state = 'disabled';
     health.reason = reason;
@@ -87,20 +144,39 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
     calls.clear();
     resolveReady();
   }
-  function rpc(type: string, input: unknown, deadline = 200): Promise<unknown> {
-    if (!worker || health.state === 'disabled' || health.state === 'closed' || calls.size >= 16)
-      return Promise.reject(new Error(options.unavailableError));
+  function rpc(type: string, input: unknown, deadline: 200 | 1000 | 2000 = 200): Promise<unknown> {
+    if (!worker || health.state === 'disabled' || health.state === 'closed' || calls.size >= 16) {
+      const error = new Error(options.unavailableError);
+      rpcFailures.set(error, {
+        operation: operation(type),
+        cause: 'rpc_unavailable',
+        startedAt: performance.now(),
+        deadlineMs: deadline,
+      });
+      return Promise.reject(error);
+    }
     const id = ++serial;
+    const failure: FailureContext = {
+      operation: operation(type),
+      cause: 'worker_reply',
+      startedAt: performance.now(),
+      deadlineMs: deadline,
+    };
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         calls.delete(id);
         const reason = options.readCommands.includes(type) ? 'read_timeout' : 'storage_unavailable';
         reject(new Error(reason));
-        disable(reason);
+        disable(reason, { ...failure, cause: 'timeout' });
         void worker?.terminate();
       }, deadline);
-      calls.set(id, { resolve, reject, timer });
-      worker!.postMessage({ id, type, input });
+      calls.set(id, { resolve, reject, timer, failure });
+      try {
+        worker!.postMessage({ id, type, input });
+      } catch (error) {
+        if (error instanceof Error) rpcFailures.set(error, { ...failure, cause: 'post_message' });
+        reject(error);
+      }
     });
   }
   function schedule(): void {
@@ -132,6 +208,7 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
     if (!queue.length || health.state === 'disabled' || health.state === 'closed') return;
     clearScheduledFlush();
     const batch = queue.splice(0, 32);
+    const appendStartedAt = performance.now();
     inflight = (async () => {
       try {
         let result: unknown;
@@ -145,7 +222,7 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
         update(result as CaptureStats);
       } catch (error) {
         health.dropped += batch.length;
-        if (health.state === 'closed') return;
+        if (health.state === 'closed' || health.state === 'disabled') return;
         health.state = 'degraded';
         health.reason = 'storage_unavailable';
         if (!(error instanceof Error) || error.message !== 'busy')
@@ -153,6 +230,12 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
             error instanceof Error && error.message === 'storage_limited'
               ? 'storage_limited'
               : 'storage_unavailable',
+            replyFailure(error, {
+              operation: 'append',
+              cause: 'unknown',
+              startedAt: appendStartedAt,
+              deadlineMs: 1000,
+            }),
           );
       } finally {
         health.pending = queue.length;
@@ -162,18 +245,30 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
     await inflight;
     if (queue.length) await flush();
   }
-  if (!options.configurationValid) disable('invalid_configuration');
+  if (!options.configurationValid)
+    disable('invalid_configuration', {
+      operation: 'configuration',
+      cause: 'invalid_configuration',
+      startedAt: workerStartedAt,
+      deadlineMs: null,
+    });
   else {
     try {
       worker = new Worker(options.workerUrl, { workerData: options.workerData });
       const startup = setTimeout(() => {
-        disable('storage_unavailable');
+        disable('storage_unavailable', {
+          operation: 'startup',
+          cause: 'timeout',
+          startedAt: workerStartedAt,
+          deadlineMs: 3000,
+        });
         void worker?.terminate();
       }, 3000);
       worker.once('message', () => clearTimeout(startup));
       worker.on('message', (reply: Reply) => {
-        if (health.state === 'closed') return;
+        if (health.state === 'closed' || health.state === 'disabled') return;
         if (reply.type === 'ready' && reply.stats) {
+          awaitingReady = false;
           // Local pre-ready losses are additional to counters from the previous process.
           health.dropped += reply.stats.dropped;
           update(reply.stats);
@@ -183,26 +278,51 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
           return;
         }
         if (reply.type === 'disabled') {
-          disable(reply.reason ?? 'storage_unavailable');
+          disable(reply.reason ?? 'storage_unavailable', {
+            operation: awaitingReady ? 'startup' : 'worker',
+            cause: 'worker_reply',
+            startedAt: workerStartedAt,
+            deadlineMs: null,
+          });
           return;
         }
         const call = reply.id === undefined ? undefined : calls.get(reply.id);
         if (!call) return;
         clearTimeout(call.timer);
         calls.delete(reply.id!);
-        if (reply.error) call.reject(new Error(reply.error));
-        else call.resolve(reply.result);
+        if (reply.error) {
+          const error = new Error(reply.error);
+          rpcFailures.set(error, call.failure);
+          call.reject(error);
+        } else call.resolve(reply.result);
       });
       worker.on('error', () => {
         clearTimeout(startup);
-        disable('storage_unavailable');
+        disable('storage_unavailable', {
+          operation: awaitingReady ? 'startup' : 'worker',
+          cause: 'worker_error',
+          startedAt: workerStartedAt,
+          deadlineMs: null,
+        });
       });
-      worker.on('exit', () => {
+      worker.on('exit', (exitCode: number) => {
         clearTimeout(startup);
-        if (accepting) disable('storage_unavailable');
+        if (accepting)
+          disable('storage_unavailable', {
+            operation: awaitingReady ? 'startup' : 'worker',
+            cause: 'worker_exit',
+            startedAt: workerStartedAt,
+            deadlineMs: null,
+            ...(Number.isSafeInteger(exitCode) ? { exitCode } : {}),
+          });
       });
     } catch {
-      disable('storage_unavailable');
+      disable('storage_unavailable', {
+        operation: 'startup',
+        cause: 'worker_construction',
+        startedAt: workerStartedAt,
+        deadlineMs: null,
+      });
     }
   }
   function record(input: unknown): boolean {
@@ -242,6 +362,7 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
   async function close(): Promise<void> {
     if (!accepting) return;
     accepting = false;
+    const closeStartedAt = performance.now();
     clearScheduledFlush();
     let timeout: ReturnType<typeof setTimeout> | undefined;
     let shutdownFailure: CaptureHealth['reason'] | undefined;
@@ -265,7 +386,15 @@ export function createCaptureStore<T, H extends CaptureHealth>(options: CaptureO
           ? 'shutdown_timeout'
           : 'storage_unavailable';
       // disable counts queued events; the in-flight append accounts for its own loss once.
-      disable(shutdownFailure);
+      disable(
+        shutdownFailure,
+        replyFailure(error, {
+          operation: 'close',
+          cause: shutdownFailure === 'shutdown_timeout' ? 'timeout' : 'unknown',
+          startedAt: closeStartedAt,
+          deadlineMs: options.closeDeadlineMs,
+        }),
+      );
     } finally {
       if (timeout) clearTimeout(timeout);
       // Thread termination can wait on native I/O; it must not extend the shutdown deadline.

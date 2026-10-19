@@ -693,3 +693,5 @@ export * from './gitDelivery.js';
 export * from './runControl.js';
 
 export * from './monitoring.js';
+
+export * from './captureFailure.js';

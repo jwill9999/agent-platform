@@ -100,7 +100,8 @@ direct Markdown API explicitly validates all six authored documents, including C
 diff and historical-suffix checks also apply. Full earlier f526 session history (511,129 bytes) remains
 verbatim exactly once; only the current checkpoint is replaced, leaving session at 511,963 bytes.
 The replaced 50f6 checkpoint remains in Git. Normal hooks, final independent review, pushed revision
-and hosted PR status are tracked in Beads; this documentation has not been promoted to staging.
+and hosted PR status were tracked in Beads; at that pre-merge checkpoint this documentation had
+not yet been promoted to staging.
 
 Local receipts live under `/Users/letuscode/.codex/workspace-cleanup-20261019/`: inventory,
 disposition plan, delivery proofs, recovery-tag readbacks, private ignored-data archive/manifest and
@@ -111,5 +112,15 @@ records; they are not external publications or a second task tracker.
 The [recurring closeout checklist](../development/post-merge-cleanup.md) is linked from shared
 instructions. The owner corrected the unnecessary two-merge route: existing PR379 targets protected
 staging directly from its task branch, with the normal protection/review gates retained. The earlier
-feature route is superseded; no second PR or feature merge is needed. This documentation is not yet
-merged into staging.
+feature route is superseded; no second PR or feature merge is needed. The preceding pending
+statements describe the pre-merge checkpoint.
+
+## Verified protected delivery
+
+PR379 subsequently merged directly to staging at `dee20500f9614c9645de50286262827e18d410d6` on
+19October. Its fetched tree `0c9c2263b37df5b4be8c9dd02fbd8f2036ef5d2a` exactly matches the reviewed
+`4adddc24` source. Independent current-head evidence verifies all13required contexts,21executed
+successes, zero unresolved review threads/findings, genuine full scans and the signed packaged VM.
+The recorded budget/optional skips and coverage limits remain disclosed. Cleanup task closeout is
+still separate: the queued managed archive/remnant refs and final preservation/sync need verification.
+The owner app remains on50f6; this documentation merge did not rebuild or restart it.

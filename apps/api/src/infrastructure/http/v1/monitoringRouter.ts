@@ -1,4 +1,5 @@
 import {
+  CaptureFailureArtifactsSchema,
   MonitoringPreferenceInputSchema,
   MonitoringPreferenceResultSchema,
   MonitoringReportSchema,
@@ -7,6 +8,7 @@ import {
   projectMonitoringReport,
   type DiagnosticStore,
   type MonitoringStore,
+  type CaptureFailureArtifacts,
 } from '@agent-platform/contracts';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -20,7 +22,11 @@ const maximumReportBytes = 5 * 1024 * 1024;
 /** Mounted only behind the existing local peer/Host/capability guard, never public settings. */
 export function createMonitoringRouter(
   diagnostics: DiagnosticStore,
-  monitoring: { store: MonitoringStore; runtime: MonitoringRuntime },
+  monitoring: {
+    store: MonitoringStore;
+    runtime: MonitoringRuntime;
+    failureArtifacts?: () => CaptureFailureArtifacts;
+  },
 ): Router {
   const router = Router();
   router.post('/status', (req, res) => {
@@ -29,6 +35,9 @@ export function createMonitoringRouter(
       MonitoringStatusSchema.parse({
         monitoring: monitoring.store.health(),
         diagnostics: diagnostics.health(),
+        ...(monitoring.failureArtifacts
+          ? { failureArtifacts: cachedFailureArtifacts(monitoring.failureArtifacts) }
+          : {}),
       }),
     );
   });
@@ -154,5 +163,17 @@ async function boundedWindow<T>(read: (assertActive: () => void) => Promise<T>):
   } finally {
     ended = true;
     if (timer) clearTimeout(timer);
+  }
+}
+
+function cachedFailureArtifacts(read: () => CaptureFailureArtifacts): CaptureFailureArtifacts {
+  try {
+    return CaptureFailureArtifactsSchema.parse(read());
+  } catch {
+    const unavailable = {
+      previousFailureState: 'unavailable' as const,
+      publication: 'unavailable' as const,
+    };
+    return { diagnostics: { ...unavailable }, monitoring: { ...unavailable } };
   }
 }

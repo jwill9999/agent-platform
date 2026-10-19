@@ -48,7 +48,7 @@ Keep readable titles alongside stable Beads IDs. For new feature plans propose a
 based on the agreed feature name; task specifications retain the required Beads-ID filename. Record
 an explicit mapping in the feature manifest: feature/task title, Beads ID, spec path, verification-plan
 links, repository/worktree, task branch, parent branch and integration destination. Reuse recorded
-branches; proposed names are not evidence that branches exist. Preserve repository chaining rules.
+branches; proposed names are not evidence that branches exist. Follow the current shared Git route: bounded MVP task batches go directly to protected staging; use a feature integration branch only when owner-agreed work needs it.
 Show this mapping to the owner with the plan so implementation does not have to infer task identity.
 
 ## Required planning outputs and locations

@@ -34,15 +34,17 @@ not regress adjacent flows.
 4. Implement or update Playwright tests alongside the feature fix.
 5. Run focused Playwright tests locally.
 6. Run broader local gates required by the repo.
-7. Follow the repository's segment rules. Intermediate tasks require exact-head local tests, review,
-   pushed-revision evidence and their declared integration gate; they do not open a separate PR.
-   The segment tip opens the integration PR and monitors hosted checks, traces, screenshots, videos,
-   review comments and security/quality scans.
-8. Fix failures until the task's required gates are green. Preserve the final connected feature-level
-   integration gate; intermediate completion does not establish that the whole feature passes.
-9. Close an intermediate task only after its declared gates pass. Close a segment-tip task only after
-   the approved feature-branch merge and required hosted checks pass. Native developer tasks use normal authorized Beads/Git tools; an explicitly selected prototype
-   uses its own broker only for operations it owns.
+7. Follow the repository's current batch rules. Intermediate task tips require their declared
+   local checks and independent review; publish them through the cumulative batch ancestry without
+   separate PRs or mandatory intermediate pushes. For bounded MVP work, the final tip opens one PR
+   directly to protected staging. Monitor its actual hosted checks, traces, screenshots, videos,
+   review comments and security/quality scans. Optional feature integration requires owner agreement.
+8. Fix failures until the required gates are green. Keep repairs in the same PR and requalify changed
+   heads. Local task completion does not establish that the cumulative protected delivery passes.
+9. Close each task only after its declared acceptance and delivery gates pass; when protected staging
+   is the declared delivery, wait for that actual merge and verification. Native developer tasks use
+   normal authorized Beads/Git tools; an explicitly selected prototype uses its own broker only for
+   operations it owns.
 
 ## Gherkin E2E Strategy Format
 
@@ -144,7 +146,7 @@ For user-facing work, append this to the task DoD:
 - [ ] Tests exercise the real UI flow using accessible locators.
 - [ ] Tests verify expected visible behaviour and relevant negative/regression states.
 - [ ] Focused Playwright tests pass locally.
-- [ ] Intermediate tasks pass their declared local and integration gates; segment tips also pass required hosted Playwright jobs on the integration PR.
+- [ ] Intermediate tasks pass their declared local gates; the cumulative batch passes required hosted Playwright jobs on its protected-staging PR and all declared delivery gates.
 - [ ] Failure artifacts are inspected and addressed when tests fail.
 
 ## Anti-Patterns

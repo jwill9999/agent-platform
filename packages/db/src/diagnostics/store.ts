@@ -12,6 +12,7 @@ import {
   type DiagnosticPage,
   type DiagnosticScope,
   type DiagnosticStoredEvent,
+  type CaptureFailureObserver,
 } from '@agent-platform/contracts';
 
 function diagnosticErrorCode(reason: string): 'invalid_cursor' | 'expired_history' | 'unavailable' {
@@ -37,6 +38,7 @@ export type DiagnosticStoreOptions = {
   retentionDays?: number;
   maxEvents?: number;
   processInstanceId?: string;
+  onFirstFailure?: CaptureFailureObserver;
 };
 type Stats = Pick<
   DiagnosticHealth,
@@ -79,6 +81,8 @@ export function createDiagnosticStore(options: DiagnosticStoreOptions): Diagnost
     DiagnosticHealth
   >({
     health,
+    storeKind: 'diagnostics',
+    onFirstFailure: options.onFirstFailure,
     configurationValid,
     unavailableError: 'diagnostics_unavailable',
     workerUrl: new URL(

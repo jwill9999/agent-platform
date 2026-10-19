@@ -1,3 +1,4 @@
+import { CaptureFailureSchema } from './captureFailure.js';
 import { z } from 'zod';
 import { RunControlStateSchema, RunControlReasonSchema } from './runControl.js';
 
@@ -166,6 +167,7 @@ export const DiagnosticHealthSchema = z
     lastAcknowledgedAtMs: count.nullable(),
     processInstanceId: id,
     previousShutdownUnclean: z.boolean(),
+    firstFailure: CaptureFailureSchema.optional(),
   })
   .strict();
 export type DiagnosticHealth = z.infer<typeof DiagnosticHealthSchema>;
