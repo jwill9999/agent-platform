@@ -670,3 +670,66 @@ PR363's prior a9e71+1flaky result remains unqualified despite successful job bad
 VM, SDK, API, browser and benchmark slices remain bound to their actual source. This change enforces
 the existing clean-run requirement rather than accepting retry success. No live-provider success,
 owner-profile upgrade, stress readiness, main promotion or paused orchestration delivery is claimed.
+
+## Protected95d1 performance failure and bounded evidence plan
+
+PR365 merged normally at95d1cdbf; its tree equals reviewed5c48. The new protected PR363 run
+39195037818 preserves a genuine verify failure: first-repetition locked request p9560.943431ms
+minus disabled37.960703ms equals22.982728ms, above the unchanged20ms limit. Healthy overhead is
+0.887964ms. The retained raw report is completed=false, three vectors/300 measurements/330 fixture
+calls only. API604/DB236/new63 controls and Git fixture33 passed before the separate benchmark.
+No benchmark pass, complete900/990 qualification or staging readiness is inferred from those results.
+
+Artifact12162027412 has verified API digest248dc0e54faf2e385de194b02931b98613975eac1e4fe7c1e687ef2c1e3608e9,
+CRC and every member. Raw SHA2563319a202bb6839f4441b368085f77ea72ebfbfa5b061c314479815634b31a91f is
+retained alongside the job log. The failing percentile window overlaps one observed19.437716ms GC
+pause; observed GC can be incomplete. CPU/ELU and MessagePort counts establish neither external
+contention nor an active prior worker. No durations are excluded, adjusted or subtracted.
+
+Source review confirms bounded logical capture-store close requests termination without awaiting
+native exit. Cooperative close acknowledges after DB closure; monitoring stop invalidates future
+records but does not join a pending filesystem probe. Neither behavior proves the historical timing
+cause. Product shutdown deadlines, initial probe placement and all assertions remain unchanged.
+Independent critique requires actual identity/timestamp evidence before choosing a repair.
+
+The approved next step is one predeclared hosted diagnostic on a frozen reviewed task head, with
+bounded in-memory Worker/close-ack/exit, filesystem-probe and GC observations plus external one-hertz
+Linux numeric resource sampling. Tiny owned controls validate observation and cleanup before the
+sampler-only baseline. No payloads, credentials, paths, argv or environment values may be retained.
+Raw partial measurements and explicit observation gaps/truncation must survive failure under distinct
+filenames. No automatic retry or continue-on-error is permitted. The existing fresh uninstrumented
+benchmark remains a separate required gate with all three orders,900/990 calls,20ms overhead,2ms
+enqueue, queue256 and original deadlines unchanged. A diagnostic pass is not a cause finding or a
+replacement qualification. The implemented four-file observer/workflow refinement passes14 tiny controls, including an actual
+pnpm-to-Vitest default fork, real owned Worker close/ACK/exit, filesystem probe and exact raw-writer
+identity. Promise/result/error identity, active SIGTERM/SIGINT outcomes, failure7, existing/later
+regular/once/prependOnce handlers, no resurrection after consumption/removal and fail-closed missing
+evidence are covered. Static lint passes. No local complete benchmark has been run for this refinement.
+Final source review and normal hooks precede the one predeclared hosted diagnostic.
+
+The controls first exposed two observer defects, retained in their original logs: exit-only hooks
+miss Vitest’s SIGTERM teardown, and synchronous removal inside Node’s newListener registration can
+close the native signal handle before a foreign listener is installed. The corrected observer is
+permanently disowned immediately, with only its own listener removed in a microtask after registration.
+Foreign handlers remain untouched. Active-command signal identity is verified; an arbitrary bare Node
+self-signal with no live handles is explicitly unsupported and cannot qualify missing diagnostics.
+There is no process.kill/native patch, GC setting change, measurement adjustment or phase fence.
+
+Records remain bounded in memory until the owning process exit/termination boundary; diagnostic
+Worker exit alone does not flush during a measured phase. Per-PID exclusive0600 exit ledgers use a
+wrapper-owned0700 directory and are collected after child close, avoiding Vitest IPC descriptors.
+Observed raw data, observer records and host samples have distinct diagnostics-benchmark.json\*
+filenames from the later original gate. The conditional step is limited to the repair PR opening
+on attempt1, with no continue-on-error/retry; protected promotion skips it by source condition.
+The unchanged fresh uninstrumented gate remains mandatory even if the diagnostic passes.
+
+Both fresh full scans39195037863/39195062021 completed genuine five-batch analysis without findings;
+new CodeQL Actions/JavaScript/Swift analyses have zero results, alert12 is fixed without dismissal,
+and direct current-head Sonar is OK with zero open issues. Dependency comparison45 changes has
+zero introduced advisories, separate from existing audit debt. The protected Sourcery skip is due
+to exceeding150,000 diff characters, not a completed review; independent source review is retained.
+Actual VM20 and browser42 plus known skip passed; the full Electron report confirms72 each passed
+once on retry0 with no flakes/skips. All API artifact digests and every member are verified;
+`pr363-95d1-hosted-connected-verification.json` remains explicitly blocked by the benchmark.
+No source-independent result substitutes for the failed current benchmark. No owner-app upgrade,
+live-provider success, stress readiness, main promotion or paused orchestration delivery is claimed.

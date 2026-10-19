@@ -1,3 +1,29 @@
+# Provider SDK — benchmark failure evidence, 19 October 2026
+
+PR365 merged at95d1cdbf with reviewed tree3f054d13. Protected PR363 still cannot merge: its fresh
+verify benchmark failed locked overhead22.982728ms against20ms. Raw output is incomplete: only
+300 measured requests/330 fixture calls, not900/990. Ordinary API604/DB236 and browser42 plus known
+skip pass; actual packaged VM20 passes. Both full scans completed five genuine batches without
+findings; actual CodeQL Actions/JavaScript/Swift and Sonar are clear. Full Electron72 passed each on retry0 with artifact/source evidence verified. The historical failure remains retained; a green retry cannot waive it.
+
+The slow percentile window overlaps an observed19.437716ms GC pause. This does not establish the
+full cause or justify subtracting time. Logical store shutdown does not await native worker exit;
+resource-type counts do not prove a prior-worker overlap. Critique approved a bounded, observational
+CI diagnostic on this frozen repair head, preserving all work and limits. It must retain distinct
+partial raw output and safe worker/probe/GC/resource evidence. A later unchanged fresh uninstrumented
+benchmark gate is still required; diagnostic success alone is neither a repair nor qualification.
+
+The evidence-only implementation passes14 tiny controls, including the actual pnpm/Vitest fork,
+owned Worker/probe and raw-writer identity, active signal outcomes and missing-evidence rejection.
+SIGTERM-aware bounded ledgers preserve foreign handlers; the unsupported bare no-handle self-signal
+edge remains explicit. Source review and normal hooks precede hosted execution. No local full
+benchmark, product/paused changes, owner key/profile operations or paid model calls are included. SDK tasks remain in_progress. Owner-app preflight awaits Mac unlock;
+no staging/live/stress readiness is claimed. Earlier handoffs below remain verbatim history; current
+checks and delivery state belong in Beads and PR363.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Previous handoff follows verbatim; its pending statements are historical. -->
+
 # Provider SDK — enforce clean Electron CI, 19 October 2026
 
 The Git startup-port repair is pushed at d3160c6e. Normal hooks passed all builds/types,
