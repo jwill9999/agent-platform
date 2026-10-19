@@ -444,15 +444,25 @@ function resolveDefaultModelConfig(db: DrizzleDb): ResolvedChatModel | undefined
 
 let processFallbackPurposeSecret: Buffer | undefined;
 
+function fallbackPurposeSecret(): Buffer {
+  const masterKey = process.env['SECRETS_MASTER_KEY'];
+  if (masterKey === undefined) {
+    if (processFallbackPurposeSecret === undefined) processFallbackPurposeSecret = randomBytes(32);
+    return processFallbackPurposeSecret;
+  }
+  if (!/^[A-Za-z\d+/]{43}=$/.test(masterKey))
+    throw new Error('Invalid fallback master key configuration');
+  const parsedMasterKey = parseMasterKeyFromBase64(masterKey);
+  if (parsedMasterKey.toString('base64') !== masterKey)
+    throw new Error('Invalid fallback master key configuration');
+  return createHmac('sha256', parsedMasterKey)
+    .update('agent-platform/fallback-revision-purpose/v1')
+    .digest();
+}
+
 /** Private signing identity, never a reusable unkeyed verifier of the API credential. */
 function fallbackCredentialRevision(config: ResolvedChatModel): string {
-  const masterKey = process.env['SECRETS_MASTER_KEY'];
-  const purposeSecret =
-    masterKey === undefined
-      ? (processFallbackPurposeSecret ??= randomBytes(32))
-      : createHmac('sha256', parseMasterKeyFromBase64(masterKey))
-          .update('agent-platform/fallback-revision-purpose/v1')
-          .digest();
+  const purposeSecret = fallbackPurposeSecret();
   const credential = config.apiKey;
   return createHmac('sha256', credential ?? purposeSecret)
     .update(

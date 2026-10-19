@@ -1,3 +1,46 @@
+# Provider SDK — final quality follow-up, 19 October 2026
+
+Owner authorization continues through PR362/feature/staging merges only after every actual check
+and comment clears, delivered-only recovery cleanup and preserved-profile app preparation. PR362
+merged normally at7b816c61. Protected PR363 remains blocked on CodeQL alert12 until the actual
+credential-binding repair is delivered through the feature branch and freshly qualified.
+
+Repair [PR364](https://github.com/jwill9999/agent-platform/pull/364) is open atb8cfddc1. Independent
+review approved the bounded HMAC/private identity design and source. Final normal hooks passed all
+593 API cases and a fresh900/990 benchmark, maximum added p95 2.534041ms under unchanged20ms.
+Its Sonar check reported SUCCESS/gateOK, but the actual API found nine open issues: one lazy-assignment
+expression and eight assertion-style findings. Do not treat the green check as clearance.
+
+The bounded follow-up extracts the lazy-purpose-secret expression without changing derived bytes,
+invalid-master or keyless semantics. Dedicated cardinality matchers use a null projection, so failed
+tests cannot dump private binding identities; private equality stays a boolean comparison. Original
+assertions, product deadlines and benchmark limits remain. Hosted review also identified permissive
+base64 decoding and incomplete privacy-test log capture; canonical fallback-master validation and
+all-used-channel/sink/output controls are being qualified. The restart warning is already fenced by
+shared persisted run control before approval claim; an actual fallback-specific process-restart409/
+no-effects regression passed. Final local63/63 passed16.48seconds with no retry/skip/unhandled
+failure, plus API build/types/lint/format. The real SDK/owned-loopback fallback case verifies approved
+encrypted history, new process interruption and409 with unchanged provider1/audit/approval/claim/file
+effects. Retain its initial zero-audit fixture mistake and transient same-origin ECONNRESET; final
+children use fresh owned API ports without changing provider identity or relaxing deadlines.
+Final digit-class shorthand is notation-only with exhaustive membership/corpus equivalence; the63-case
+receipt keeps its earlier regex bytes, and final normal hooks must compile/test the current source. Valid configured-master identity can survive restart; masterless
+identity is process-local. The single local owner app must shut down before upgrade; no rolling or
+multi-worker approval compatibility is promised in this MVP. Actual focused evidence/source review,
+normal hooks and fresh current-head hosted quality/security checks remain required. Later status
+belongs in Beads/PRs; the dated checkpoints below are retained verbatim.
+
+Owner-app preparation research safely verified the original primary Make key matches its stored
+credential once in memory on a private read-only snapshot. No key value, fingerprint or plaintext
+was logged; source DB/key were not changed. Pin that existing key/profile on rebuild after stagedelivery.
+The actual app command runner is disabled and has no VM resources configured; preserve that state
+for owner-led live model testing, with no host/Docker fallback or VM/shell readiness claim. No new
+paid model call, app restart/build, owner stress trial, Notion/global change, main promotion or paused
+orchestration/PR283 integration is claimed. Both SDK Beads tasks remain in_progress.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier checkpoint follows verbatim; its later-state limits remain historical. -->
+
 # Provider SDK — protected credential-binding repair, 19 October 2026
 
 Owner authorized PR362 merge, protected feature-to-staging delivery after every check/comment clears,

@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import {
   appendMessage,
   closeDatabase,
@@ -629,7 +630,7 @@ describe('context admission through API and SQLite', () => {
     const legacy = createHash('sha256')
       .update('{"provider":"openai","model":"gpt-4o","apiKey":"sk-fixture-only"}')
       .digest('hex');
-    expect(payload.continuation.binding.credentialRevision === legacy).toBe(false);
+    expect(isDeepStrictEqual(payload.continuation.binding.credentialRevision, legacy)).toBe(false);
     payload.continuation.binding.credentialRevision = legacy;
     const plaintext = JSON.stringify(payload);
     const envelope = encryptUtf8(plaintext, key, row.keyVersion);

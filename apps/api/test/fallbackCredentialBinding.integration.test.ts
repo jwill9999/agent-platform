@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import request from 'supertest';
+import { createLogger } from '@agent-platform/logger';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   closeDatabase,
@@ -25,7 +26,7 @@ afterAll(() => vi.resetModules());
 const cleanups: Array<() => Promise<void>> = [];
 const master = Buffer.alloc(32, 51).toString('base64');
 const fixtureCredential = 'fixture-credential-A';
-let log: ReturnType<typeof vi.spyOn>;
+let logs: Array<ReturnType<typeof vi.spyOn>>;
 beforeEach(() => {
   vi.stubEnv('SECRETS_MASTER_KEY', master);
   vi.stubEnv('DEFAULT_MODEL_PROVIDER', 'openai');
@@ -38,7 +39,10 @@ beforeEach(() => {
     'fetch',
     vi.fn(() => Promise.reject(new Error('No transport in binding fixture'))),
   );
-  log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  // The configured structured logger writes console.log; capture direct API/SDK channels too.
+  logs = (['log', 'info', 'warn', 'error', 'debug'] as const).map((channel) =>
+    vi.spyOn(console, channel).mockImplementation(() => {}),
+  );
 });
 afterEach(async () => {
   try {
@@ -104,22 +108,25 @@ async function fixture() {
   };
 }
 
-function assertPrivate(response: string, bindings: ProviderContinuationBinding[]) {
-  const publicAndLogs = response + JSON.stringify(log.mock.calls);
-  for (const credential of [
+function hasPrivateLeak(response: string, bindings: ProviderContinuationBinding[]): boolean {
+  const publicAndLogs = response + JSON.stringify(logs.flatMap((log) => log.mock.calls));
+  return [
     fixtureCredential,
     'fixture-credential-B',
     'unused-environment-credential',
-  ])
-    expect(publicAndLogs.includes(credential)).toBe(false);
-  for (const binding of bindings) {
-    // Compare booleans so a regression does not print a private credential identity.
-    expect(publicAndLogs.includes(binding.credentialRevision)).toBe(false);
+    ...bindings.map((binding) => binding.credentialRevision),
+  ].some((privateValue) => publicAndLogs.includes(privateValue));
+}
+
+function assertPrivate(response: string, bindings: ProviderContinuationBinding[]) {
+  // Only report a boolean: a failed privacy assertion must not print the private value.
+  expect(hasPrivateLeak(response, bindings)).toBe(false);
+  for (const binding of bindings)
     expect(/^[0-9a-f]{64}$/.test(binding.credentialRevision)).toBe(true);
-  }
   expect(globalThis.fetch).not.toHaveBeenCalled();
 }
 
+// Binding counts project to null so matcher failures cannot print private identities.
 describe('private fallback credential binding through the actual API resolver', () => {
   it('keeps header selection stable, ignores an unused env key and fences a changed header', async () => {
     const f = await fixture();
@@ -127,7 +134,7 @@ describe('private fallback credential binding through the actual API resolver', 
     vi.stubEnv('AGENT_OPENAI_API_KEY', 'unused-environment-credential');
     const same = await f.ask(fixtureCredential);
     const changed = await f.ask('fixture-credential-B');
-    expect(f.bindings.length).toBe(3);
+    expect(f.bindings.map(() => null)).toHaveLength(3);
     expect(isDeepStrictEqual(f.bindings[0], f.bindings[1])).toBe(true);
     expect(isDeepStrictEqual(f.bindings[0], f.bindings[2])).toBe(false);
     expect(first.text + same.text + changed.text).toContain('Local binding ready');
@@ -140,7 +147,7 @@ describe('private fallback credential binding through the actual API resolver', 
     await f.ask();
     vi.stubEnv('AGENT_OPENAI_API_KEY', 'fixture-credential-B');
     const changed = await f.ask();
-    expect(f.bindings.length).toBe(3);
+    expect(f.bindings.map(() => null)).toHaveLength(3);
     expect(isDeepStrictEqual(f.bindings[0], f.bindings[1])).toBe(true);
     expect(isDeepStrictEqual(f.bindings[0], f.bindings[2])).toBe(false);
     assertPrivate(changed.text, f.bindings);
@@ -158,7 +165,7 @@ describe('private fallback credential binding through the actual API resolver', 
       if (field === 'master')
         vi.stubEnv('SECRETS_MASTER_KEY', Buffer.alloc(32, 52).toString('base64'));
       const changed = await f.ask(fixtureCredential);
-      expect(f.bindings.length).toBe(2);
+      expect(f.bindings.map(() => null)).toHaveLength(2);
       expect(isDeepStrictEqual(f.bindings[0], f.bindings[1])).toBe(false);
       assertPrivate(changed.text, f.bindings);
     },
@@ -171,7 +178,7 @@ describe('private fallback credential binding through the actual API resolver', 
     const f = await fixture();
     const first = await f.ask();
     const second = await f.ask();
-    expect(f.bindings.length).toBe(2);
+    expect(f.bindings.map(() => null)).toHaveLength(2);
     expect(isDeepStrictEqual(f.bindings[0], f.bindings[1])).toBe(true);
     expect(first.text + second.text).toContain('Local binding ready');
     expect(f.sqlite.prepare('SELECT COUNT(*) AS count FROM provider_continuations').get()).toEqual({
@@ -180,15 +187,43 @@ describe('private fallback credential binding through the actual API resolver', 
     assertPrivate(first.text + second.text, f.bindings);
   });
 
-  it.each(['', 'invalid-master'])(
-    'fails closed for present invalid master %j before invoking a reasoning node',
-    async (value) => {
+  it.each([
+    ['empty', ''],
+    ['invalid text', 'invalid-master'],
+    ['ignored character', master.slice(0, 8) + '!' + master.slice(8)],
+    ['whitespace', master.slice(0, 8) + ' ' + master.slice(8)],
+    ['omitted padding', master.slice(0, -1)],
+    ['extra padding', master + '='],
+    ['noncanonical pad bits', master.slice(0, -2) + 'N='],
+  ])(
+    'fails closed for %s master encoding before invoking a reasoning node',
+    async (_label, value) => {
       vi.stubEnv('SECRETS_MASTER_KEY', value);
       const f = await fixture();
       const response = await f.ask(undefined, 500);
       expect(response.body.error.code).toBe('INTERNAL_ERROR');
-      expect(f.bindings.length).toBe(0);
+      expect(f.bindings.map(() => null)).toHaveLength(0);
       assertPrivate(response.text, []);
+    },
+  );
+
+  it.each(['warn', 'error', 'logger.info', 'logger.warn', 'logger.error'] as const)(
+    'detects private values emitted through %s without printing them in assertions',
+    async (channel) => {
+      const f = await fixture();
+      const response = await f.ask();
+      expect(f.bindings.map(() => null)).toHaveLength(1);
+      expect(hasPrivateLeak(response.text, f.bindings)).toBe(false);
+      const revision = f.bindings[0]!.credentialRevision;
+      if (channel === 'warn') console.warn(fixtureCredential, revision);
+      else if (channel === 'error') console.error(fixtureCredential, revision);
+      else {
+        const logger = createLogger('api:privacy-positive-control');
+        const level = channel.slice('logger.'.length) as 'info' | 'warn' | 'error';
+        logger[level]('Synthetic privacy control', { credential: fixtureCredential, revision });
+      }
+      expect(hasPrivateLeak(response.text, f.bindings)).toBe(true);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     },
   );
 });
@@ -255,8 +290,11 @@ async function captureChild(root: string, masterKey: string) {
   const child = spawn(process.execPath, ['--input-type=module', '--eval', childFixture], {
     cwd: dirname(fileURLToPath(import.meta.url)),
     env,
-    stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
+  const childLogs: string[] = [];
+  child.stdout?.on('data', (data: Buffer) => childLogs.push(data.toString()));
+  child.stderr?.on('data', (data: Buffer) => childLogs.push(data.toString()));
   const result = await new Promise<{
     pid: number;
     bindings: ProviderContinuationBinding[];
@@ -284,7 +322,8 @@ async function captureChild(root: string, masterKey: string) {
         );
     });
   });
-  expect(result.bindings.length).toBe(2);
+  expect(hasPrivateLeak(childLogs.join(''), result.bindings)).toBe(false);
+  expect(result.bindings.map(() => null)).toHaveLength(2);
   expect(result.foreign).toBe(0);
   expect(isDeepStrictEqual(result.bindings[0], result.bindings[1])).toBe(true);
   return result;
@@ -296,7 +335,7 @@ it('keeps configured-master fallback identity stable across separate clean API p
     const first = await captureChild(root, master);
     const reopened = await captureChild(root, master);
     const changed = await captureChild(root, randomBytes(32).toString('base64'));
-    expect(first.pid === reopened.pid).toBe(false);
+    expect(first.pid).not.toBe(reopened.pid);
     expect(isDeepStrictEqual(first.bindings[0], reopened.bindings[0])).toBe(true);
     expect(isDeepStrictEqual(first.bindings[0], changed.bindings[0])).toBe(false);
   } finally {

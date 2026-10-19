@@ -1,6 +1,6 @@
 # Provider SDK compatibility review and results
 
-Status: 19 October 2026. PR362 merged at7b816c61 after exacteca47820 passed all11 executed feature checks,3876 ordinary cases/77 existing optional skips,72 first-attempt Electron cases, browser42 plus its documented context-fixture skip and the900/990 benchmark with maximum overhead3.153359ms under20ms. Independent artifact/source review approved that revision. Protected PR363 has a new blocking high CodeQL credential-binding finding; its bounded repair is being prepared. No protected staging delivery, owner-app rebuild or stress readiness is claimed.
+Status: 19 October 2026. PR362 merged at7b816c61 after qualifiedeca47820; protected PR363 remains blocked by CodeQL12 pending actual repaired-source delivery. Repair PR364 atb8cfddc1 passed normal API593 and fresh900/990 benchmark (maximum overhead2.534041ms), but its green Sonar check concealed nine actual open API findings. A semantics-preserving lazy-secret extraction and privacy-safe dedicated matcher follow-up is being qualified. No protected staging delivery, owner-app rebuild or stress readiness is claimed.
 Earlier pending states below retain their named source/time bindings and do not override this checkpoint.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
@@ -9,6 +9,61 @@ Evidence root: `/Users/letuscode/.codex/provider-sdk-20261018`; source base stag
 Qualified provider protocol/generation checks below use researched owned HTTP fixtures and the actual pinned SDKs.
 It does not establish live model availability, account permissions or generation quality. The owner
 app/profile remains unchanged; paused orchestration, main and the disabled Docker gateway are preserved.
+
+## Hosted review boundaries and follow-up
+
+PR364 review found a real format-validation gap: Node's base64 decoder can ignore invalid characters
+and still yield32bytes. The new fallback path must require canonical base64 before decoding; focused
+adversarial controls include ignored characters, whitespace, padding aliases and invalid pad bits.
+Review also found incomplete test log capture. The privacy fixture must cover all used console
+channels, the configured structured-logger sink and owned-child output, with positive controls that
+prove simulated leaks are detected. No key/revision value may be printed when those assertions fail.
+Final local qualification passed63/63 across three files in16.48seconds, with no retries, skips or
+unhandled failures; API build/types/lint/format pass. This includes20 binding controls,42 prior/context
+cases and one actual fallback-approval process-restart case. The process case uses the real maintained
+SDK against an owned loopback provider, zero saved configurations and the same valid master/model/
+provider endpoint. It confirms an approved encrypted continuation, one pending/null-completion audit
+and no file effect before the crash; a new API process marks the run interrupted/process_interrupted.
+Resume returns409 RUN_NOT_RUNNING, with provider requests still exactly1 and encrypted history,
+approval/resumedAt/claim/execution/audit rows unchanged. No new generation runtime was needed.
+
+Retain initial fixture failures: expecting zero audit rows was incorrect because pending approval is
+itself audited; the corrected assertion requires exactly one pending row and unchanged postrestart
+state. A same-API-origin restart also hit ECONNRESET; each child now owns a fresh API port while the
+provider endpoint/master/model remain identical. Its historical socket cause is unproven; no retry,
+assertion or deadline was relaxed. Logs/compiled-source hashes bind the final63 case receipt
+pr364-review-repair-source-and-qualification.json. A final notation-only0-9 to\d character-class
+change retains that63-case receipt's original source binding;65,536 BMP memberships,262,144 pattern
+substitutions and1,285 canonical cases prove equivalence. No underscore or non-ASCII digit is added.
+Final normal hooks will compile and test the actual shorthand source. Actual hosted reviews/security
+and all protected gates remain future at this dated checkpoint; later status belongs in Beads/PRs.
+
+The restart warning is distinct from credential identity. The existing shared run-control service
+creates a process identity and marks older active executions interrupted/outcome_unknown on startup;
+resume checks that persisted authority before private-binding validation or approval claim. Stable
+credential identity cannot bypass that fence. The actual fallback-specific SDK/API child-process
+restart regression above proves409 with no new provider/audit/file or approval-claim effect.
+Same-process SQLite reopen tests are not represented as process-restart evidence. No new orchestration
+or execution-generation runtime is introduced unless a concrete regression requires it.
+
+This MVP has one local API instance. Shut down/drain the old owner app before opening the upgraded
+build. Prepatch weak fallback pending identities fail closed with new-request recovery; there is no
+rolling mixed-version approval compatibility promise. Cross-worker resumable continuation requires
+a valid configured master; masterless identity is process-local and supports the existing keyless
+plaintext route. Multi-worker/rolling deployment support belongs to later distribution architecture,
+not this repair. Existing Stop, secret/private persistence and tool-admission requirements still apply.
+
+## Actual Sonar follow-up
+
+Atb8cfddc1, Sonar reported gateOK/checkSUCCESS while its direct API returned nine open issues:
+S1121 on a lazy assignment expression and S5906 on eight assertions. These are not waived by green
+check status. The repair extracts purpose-secret selection into equivalent explicit statements,
+retaining the exact domain/HMAC bytes and strict undefined versus invalid-present master handling.
+Length matchers receive null projections of private bindings so failure output remains safe;
+private-revision comparison stays boolean, while nonsecret PID comparison uses a direct matcher.
+Focused tests, frozen source/document critique, normal hooks and new actual hosted zero-issue
+qualification remain required. No assertion, timeout, scan, product deadline or benchmark limit is
+weakened. Current outcomes belong in Beads/PRs rather than rewriting prior frozen evidence claims.
 
 ## Protected credential-binding correction
 
@@ -23,8 +78,9 @@ It never serializes the credential-containing configuration into a hash message.
 comes from a separately domain-separated existing validated master key, or a module-private random
 secret when no master key is configured. Keyless identity uses a distinct domain/presence marker.
 This is private credential identity, not password verification or a new credential store. A configured
-invalid master fails closed. Same patched source/configuration/master remains stable across restart;
-changing any binding material changes its identity. Existing prepatch pending fallback identities
+invalid master fails closed. With a valid configured master, the same patched source/configuration
+remains stable across restart; masterless identities are process-local and are not cross-process
+continuation credentials. Changing any binding material changes its identity. Existing prepatch pending fallback identities
 must fail closed with the normal new-request recovery; no weak backwards fallback is added.
 
 Focused resolver tests passed52/52 in18.58seconds:42 context-admission cases, including denial of
