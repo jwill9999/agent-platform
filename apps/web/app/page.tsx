@@ -168,6 +168,15 @@ function getWorkspaceSurface(selectedMode: WorkspaceMode | null) {
   return 'home';
 }
 
+function commitWorkspaceLocation(href: string): void {
+  if (globalThis.window === undefined) return;
+  const destination = new URL(href, globalThis.window.location.href);
+  if (destination.href !== globalThis.window.location.href) {
+    globalThis.window.history.pushState(null, '', href);
+  }
+  globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
+}
+
 function projectOnboardingDraft(
   project: ProjectDesktopRecord | null,
 ): ProjectOnboardingDraft | null {
@@ -675,6 +684,7 @@ export default function HomePage() {
   const personalChatRepairRef = useRef<string | null>(null);
   const selectionGenerationRef = useRef(0);
   const selectionPendingRef = useRef(false);
+  const pendingProjectNavigationRef = useRef<(() => boolean) | null>(null);
   const [deferredProjectBinding, setDeferredProjectBinding] = useState<{
     projectId: string;
     isCurrent: () => boolean;
@@ -682,6 +692,7 @@ export default function HomePage() {
   const beginSelection = useCallback((clearSession = true) => {
     const generation = ++selectionGenerationRef.current;
     selectionPendingRef.current = false;
+    pendingProjectNavigationRef.current = null;
     setDeferredProjectBinding(null);
     if (clearSession) {
       setSessionId(null);
@@ -694,6 +705,11 @@ export default function HomePage() {
     personalChatRepairRef.current = null;
     return () => selectionGenerationRef.current === generation;
   }, []);
+  const beginProjectNavigation = useCallback(() => {
+    const isCurrent = beginSelection(false);
+    pendingProjectNavigationRef.current = isCurrent;
+    return isCurrent;
+  }, [beginSelection]);
   const currentSelection = useCallback(() => {
     const generation = selectionGenerationRef.current;
     return () => selectionGenerationRef.current === generation;
@@ -705,6 +721,13 @@ export default function HomePage() {
     },
     [],
   );
+
+  useEffect(() => {
+    // A persistent Sidebar may have used normal Next navigation before Home's
+    // listeners mounted. Announce the committed URL without writing history or
+    // taking selection ownership, including query-only navigation at '/'.
+    globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
+  }, []);
 
   const {
     messages,
@@ -948,13 +971,13 @@ export default function HomePage() {
 
   const handleOpenChat = useCallback(
     (options?: { readonly updateUrl?: boolean }) => {
+      if (options?.updateUrl !== false) commitWorkspaceLocation(buildPersonalChatHref());
       // Workspace navigation preserves the current chat; New conversation owns replacement.
-      if (selectedMode === 'chat') return;
-      beginSelection();
-      if (options?.updateUrl !== false && globalThis.window !== undefined) {
-        globalThis.window.history.pushState(null, '', buildPersonalChatHref());
-        globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
+      if (selectedMode === 'chat') {
+        if (pendingProjectNavigationRef.current?.()) beginSelection(false);
+        return;
       }
+      beginSelection();
       setSelectedMode('chat');
       setActiveProject(null);
       setSessionId(null);
@@ -975,28 +998,30 @@ export default function HomePage() {
     [agents, beginSelection, clearAttachments, modelConfigs, selectedMode],
   );
 
-  const handleReturnHome = useCallback(() => {
-    beginSelection();
-    if (globalThis.window !== undefined) {
-      globalThis.window.history.pushState(null, '', '/');
-      globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
-    }
-    setSelectedMode(null);
-    setActiveProject(null);
-    setSessionId(null);
-    setSensorDashboard(null);
-    setSensorError(null);
-    setSensorLoading(false);
-    setCommandRunnerHealth(null);
-    setSessionError(null);
-    setIsResuming(false);
-    clearAttachments();
-  }, [beginSelection, clearAttachments]);
+  const handleReturnHome = useCallback(
+    (options?: { readonly updateUrl?: boolean }) => {
+      beginSelection();
+      if (options?.updateUrl !== false) commitWorkspaceLocation('/');
+      setSelectedMode(null);
+      setActiveProject(null);
+      setSessionId(null);
+      setSensorDashboard(null);
+      setSensorError(null);
+      setSensorLoading(false);
+      setCommandRunnerHealth(null);
+      setSessionError(null);
+      setIsResuming(false);
+      clearAttachments();
+    },
+    [beginSelection, clearAttachments],
+  );
 
   useEffect(() => {
     if (globalThis.window === undefined) return;
-    const returnHome = () => {
+    const returnHome = (event: Event) => {
+      if (globalThis.window.location.pathname !== '/') return;
       handleReturnHome();
+      event.preventDefault();
     };
     globalThis.window.addEventListener(workspaceHomeRequestedEvent, returnHome);
     return () => {
@@ -1006,8 +1031,10 @@ export default function HomePage() {
 
   useEffect(() => {
     if (globalThis.window === undefined) return;
-    const openPersonalChat = () => {
-      handleOpenChat({ updateUrl: false });
+    const openPersonalChat = (event: Event) => {
+      if (globalThis.window.location.pathname !== '/') return;
+      handleOpenChat();
+      event.preventDefault();
     };
     globalThis.window.addEventListener(workspacePersonalChatRequestedEvent, openPersonalChat);
     return () => {
@@ -1086,7 +1113,7 @@ export default function HomePage() {
   );
 
   const handleOpenProject = useCallback(async () => {
-    const isCurrent = beginSelection(false);
+    const isCurrent = beginProjectNavigation();
     selectionPendingRef.current = true;
     setIsOpeningProject(true);
     setSessionError(null);
@@ -1103,10 +1130,13 @@ export default function HomePage() {
       if (!isCurrent()) return;
       setSessionError(error instanceof ApiRequestError ? error.message : 'Failed to open Project');
     } finally {
-      if (isCurrent()) selectionPendingRef.current = false;
-      if (isCurrent()) setIsOpeningProject(false);
+      if (isCurrent()) {
+        selectionPendingRef.current = false;
+        setIsOpeningProject(false);
+        pendingProjectNavigationRef.current = null;
+      }
     }
-  }, [beginSelection, bindActiveProjectSession, openProjectChat]);
+  }, [beginProjectNavigation, bindActiveProjectSession, openProjectChat]);
 
   const handleCreateProject = useCallback(async () => {
     const name = newProjectName.trim();
@@ -1115,7 +1145,7 @@ export default function HomePage() {
       return;
     }
 
-    const isCurrent = beginSelection(false);
+    const isCurrent = beginProjectNavigation();
     selectionPendingRef.current = true;
     setIsCreatingProject(true);
     setNewProjectError(null);
@@ -1143,14 +1173,17 @@ export default function HomePage() {
       }
       setNewProjectError(message);
     } finally {
-      if (isCurrent()) selectionPendingRef.current = false;
-      if (isCurrent()) setIsCreatingProject(false);
+      if (isCurrent()) {
+        selectionPendingRef.current = false;
+        setIsCreatingProject(false);
+        pendingProjectNavigationRef.current = null;
+      }
     }
-  }, [beginSelection, bindActiveProjectSession, newProjectName, openProjectChat]);
+  }, [beginProjectNavigation, bindActiveProjectSession, newProjectName, openProjectChat]);
 
   const reopenRecentProject = useCallback(
     async (projectId: string, requestedSessionId: string | null) => {
-      const isCurrent = beginSelection();
+      const isCurrent = beginProjectNavigation();
       selectionPendingRef.current = true;
       try {
         const projects = await loadRecentDesktopProjects();
@@ -1197,12 +1230,15 @@ export default function HomePage() {
           error instanceof ApiRequestError ? error.message : 'Failed to reopen Project',
         );
       } finally {
-        if (isCurrent()) selectionPendingRef.current = false;
+        if (isCurrent()) {
+          selectionPendingRef.current = false;
+          pendingProjectNavigationRef.current = null;
+        }
       }
     },
     [
       agents,
-      beginSelection,
+      beginProjectNavigation,
       bindActiveProjectSession,
       modelConfigs,
       openProjectChat,
@@ -1436,9 +1472,12 @@ export default function HomePage() {
   useEffect(() => {
     if (globalThis.window === undefined) return;
     const handleProjectReopenRequest = (event: Event) => {
+      if (globalThis.window.location.pathname !== '/') return;
       const detail = (event as CustomEvent<{ projectId?: unknown }>).detail;
       if (typeof detail?.projectId !== 'string') return;
+      commitWorkspaceLocation(buildProjectChatHref(detail.projectId));
       reopenRecentProject(detail.projectId, null).catch(() => {});
+      event.preventDefault();
     };
 
     globalThis.window.addEventListener(projectReopenRequestedEvent, handleProjectReopenRequest);
@@ -1449,6 +1488,24 @@ export default function HomePage() {
       );
     };
   }, [reopenRecentProject]);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const restoreLocation = () => {
+      if (globalThis.window.location.pathname !== '/') return;
+      const params = new URLSearchParams(globalThis.window.location.search);
+      const projectId = params.get(projectReopenSearchParam);
+      if (projectId) {
+        reopenRecentProject(projectId, params.get(sessionReopenSearchParam)).catch(() => {});
+      } else if (params.get(workspaceModeSearchParam) === personalChatModeSearchValue) {
+        handleOpenChat({ updateUrl: false });
+      } else {
+        handleReturnHome({ updateUrl: false });
+      }
+    };
+    globalThis.window.addEventListener('popstate', restoreLocation);
+    return () => globalThis.window.removeEventListener('popstate', restoreLocation);
+  }, [handleOpenChat, handleReturnHome, reopenRecentProject]);
 
   const handleSelectSession = useCallback(
     (session: SessionRecord) => {

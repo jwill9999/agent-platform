@@ -4,11 +4,14 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { Agent, ProjectDesktopRecord, SessionRecord } from '@agent-platform/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HomePage from '../app/page';
+import { Sidebar } from '../components/layout/sidebar';
+import { SidebarProvider } from '../components/layout/sidebar-context';
 import type { Chat } from '../components/chat/chat';
 import type { SessionDropdown } from '../components/chat/session-dropdown';
 import {
   workspaceHomeRequestedEvent,
   workspacePersonalChatRequestedEvent,
+  projectReopenRequestedEvent,
 } from '../lib/project-navigation';
 
 const mocks = vi.hoisted(() => ({
@@ -20,8 +23,26 @@ const mocks = vi.hoisted(() => ({
   bind: vi.fn(),
   recent: vi.fn(),
   refresh: vi.fn(),
+  linkFallback: vi.fn(),
   sessions: [] as SessionRecord[],
 }));
+// The real Sidebar dispatches before Next Link commits its route. Keep that default
+// navigation deferred so the previous URL remains observable until the test commits it.
+vi.mock('next/link', () => ({
+  default: ({ href, onClick, ...props }: ComponentProps<'a'>) =>
+    createElement('a', {
+      ...props,
+      href,
+      onClick: (event: React.MouseEvent<HTMLAnchorElement>) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) {
+          mocks.linkFallback(href);
+          event.preventDefault();
+        }
+      },
+    }),
+}));
+vi.mock('next/navigation', () => ({ usePathname: () => window.location.pathname }));
 vi.mock('../lib/apiClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/apiClient')>()),
   apiGet: mocks.get,
@@ -46,7 +67,10 @@ vi.mock('../components/chat/chat', () => ({
   Chat: (props: ComponentProps<typeof Chat>) =>
     createElement(
       'div',
-      null,
+      {
+        'data-testid': 'chat-presentation',
+        'data-project': props.workspaceWebViewProjectId ?? 'none',
+      },
       createElement('output', { 'data-testid': 'conversation' }, props.diagnosticSessionId ?? ''),
       createElement('input', { 'data-testid': 'draft', defaultValue: '' }),
       props.sideAccessory,
@@ -58,11 +82,19 @@ vi.mock('../components/chat/agent-model-context', () => ({
     value,
   }: {
     children: ReactNode;
-    value: { onSelectAgent: (agentId: string) => void };
+    value: {
+      onSelectAgent: (agentId: string) => void;
+      selectedAgentId: string | null;
+      selectedModelConfigId: string | null;
+    };
   }) =>
     createElement(
       'div',
-      null,
+      {
+        'data-testid': 'agent-model-selection',
+        'data-agent': value.selectedAgentId,
+        'data-model': value.selectedModelConfigId,
+      },
       children,
       createElement(
         'button',
@@ -80,7 +112,7 @@ vi.mock('../components/chat/session-dropdown', () => ({
   SessionDropdown: (props: ComponentProps<typeof SessionDropdown>) =>
     createElement(
       'nav',
-      null,
+      { 'data-testid': 'session-scope', 'data-label': props.scopeLabel },
       ...props.sessions.map((session) =>
         createElement(
           'button',
@@ -190,6 +222,7 @@ beforeEach(async () => {
   mocks.get.mockImplementation(async (path: string) => {
     if (path === '/api/v1/agents') return agents;
     if (path === '/api/v1/model-configs' || path === '/api/v1/sessions') return [];
+    if (path === '/api/v1/projects/desktop/recent') return { projects: [project('alpha')] };
     if (path.endsWith('/sensors')) return null;
     throw new Error(`Unexpected fixture GET ${path}`);
   });
@@ -251,6 +284,81 @@ async function openProject(id = 'alpha') {
   expect(current()).toBe(`bound-${id}`);
 }
 
+async function mountNavigationShell() {
+  const get = mocks.get.getMockImplementation()!;
+  mocks.get.mockImplementation(async (path: string) => {
+    if (path === '/api/v1/agents')
+      return agents.map((agent) => ({ ...agent, modelConfigId: `${agent.id}-model` }));
+    if (path === '/api/v1/model-configs')
+      return ['personal', 'coding'].map((id) => ({
+        id: `${id}-model`,
+        name: id,
+        provider: 'openai',
+        model: `fixture-${id}`,
+        hasApiKey: true,
+        createdAtMs: 1,
+        updatedAtMs: 1,
+      }));
+    return get(path);
+  });
+  await act(async () =>
+    root.render(
+      createElement(SidebarProvider, null, createElement(Sidebar), createElement(HomePage)),
+    ),
+  );
+}
+
+async function clickSidebarLink(href: string, init: MouseEventInit = {}) {
+  const link = container.querySelector<HTMLAnchorElement>(`aside a[href="${href}"]`);
+  if (!link) throw new Error(`Missing Sidebar link ${href}`);
+  await act(async () =>
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...init })),
+  );
+}
+
+function expectPersonalScope(expectedSession = 'personal-current') {
+  expect(container.querySelector('[data-workspace-surface="chat"]')).not.toBeNull();
+  expect(container.querySelector('[data-workspace-scope="global-chat"]')).not.toBeNull();
+  expect(container.querySelector('[data-workspace-surface="project-chat"]')).toBeNull();
+  expect(container.querySelector('[data-testid="session-scope"]')?.getAttribute('data-label')).toBe(
+    'Personal chat sessions',
+  );
+  expect(container.querySelector('[data-testid="session-scope"]')?.textContent).toContain(
+    'Select A',
+  );
+  expect(container.querySelector('[data-testid="session-scope"]')?.textContent).not.toContain(
+    'Select project-alpha',
+  );
+  expect(
+    container.querySelector('[data-testid="agent-model-selection"]')?.getAttribute('data-agent'),
+  ).toBe('personal');
+  expect(
+    container.querySelector('[data-testid="agent-model-selection"]')?.getAttribute('data-model'),
+  ).toBe('personal-model');
+  expect(
+    container.querySelector('[data-testid="chat-presentation"]')?.getAttribute('data-project'),
+  ).toBe('none');
+  expect(current()).toBe(expectedSession);
+}
+
+async function requestProject(id: string) {
+  await act(async () =>
+    window.dispatchEvent(
+      new CustomEvent(projectReopenRequestedEvent, { detail: { projectId: id } }),
+    ),
+  );
+}
+
+async function traverseHistory(direction: 'back' | 'forward') {
+  await act(async () => {
+    const changed = new Promise<void>((resolve) =>
+      window.addEventListener('popstate', () => resolve(), { once: true }),
+    );
+    window.history[direction]();
+    await changed;
+  });
+}
+
 async function coldProjectReopen() {
   await act(async () => root.unmount());
   vi.clearAllMocks();
@@ -271,6 +379,242 @@ async function coldProjectReopen() {
 }
 
 describe('HomePage asynchronous selection ownership', () => {
+  it('keeps personal scope authoritative when a Sidebar click precedes the deferred Next URL commit', async () => {
+    mocks.sessions.push(session('project-alpha', 'coding', 'alpha'));
+    await mountNavigationShell();
+    await openProject('alpha');
+    expect(window.location.search).toBe('?projectId=alpha');
+    const staleProject = deferred<ProjectDesktopRecord[]>();
+    mocks.recent.mockReturnValueOnce(staleProject.promise);
+    const bindsBeforePersonal = mocks.bind.mock.calls.length;
+    const historyBeforePersonal = window.history.length;
+
+    await clickSidebarLink('/?mode=chat');
+    await settle(staleProject, [project('alpha')]);
+
+    expectPersonalScope();
+    expect(window.location.search).toBe('?mode=chat');
+    expect(window.history).toHaveLength(historyBeforePersonal + 1);
+    expect(mocks.bind).toHaveBeenCalledTimes(bindsBeforePersonal);
+    expect(mocks.linkFallback).not.toHaveBeenCalled();
+  });
+
+  it('aligns an already committed personal URL without adding another history entry', async () => {
+    mocks.sessions.push(session('project-alpha', 'coding', 'alpha'));
+    await mountNavigationShell();
+    await openProject();
+    window.history.pushState(null, '', '/?mode=chat');
+    const length = window.history.length;
+    await navigate(workspacePersonalChatRequestedEvent);
+    expectPersonalScope();
+    expect(window.history).toHaveLength(length);
+    expect(mocks.bind).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a resumed personal conversation when newer personal intent supersedes a pending Project lookup', async () => {
+    mocks.sessions.push(session('project-alpha', 'coding', 'alpha'));
+    await mountNavigationShell();
+    await openPersonal();
+    await click('Select B');
+    const pending = deferred<ProjectDesktopRecord[]>();
+    mocks.recent.mockReturnValueOnce(pending.promise);
+    await requestProject('alpha');
+    await clickSidebarLink('/?mode=chat');
+    await settle(pending, [project('alpha')]);
+    expectPersonalScope('B');
+    expect(mocks.post).toHaveBeenCalledOnce();
+    expect(mocks.bind).not.toHaveBeenCalled();
+  });
+
+  it('keeps the newest Project intent after personal navigation abandons an older Project lookup', async () => {
+    await mountNavigationShell();
+    await openPersonal();
+    const pending = deferred<ProjectDesktopRecord[]>();
+    mocks.recent.mockReturnValueOnce(pending.promise).mockResolvedValueOnce([project('beta')]);
+    await requestProject('alpha');
+    await clickSidebarLink('/?mode=chat');
+    await requestProject('beta');
+    await settle(pending, [project('alpha')]);
+    expect(current()).toBe('bound-beta');
+    expect(container.querySelector('[data-workspace-surface="project-chat"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="session-scope"]')?.getAttribute('data-label'),
+    ).toBe('Project beta sessions');
+    expect(
+      container.querySelector('[data-testid="chat-presentation"]')?.getAttribute('data-project'),
+    ).toBe('beta');
+    expect(mocks.bind).toHaveBeenCalledOnce();
+    expect(mocks.bind.mock.calls[0]?.[0].projectId).toBe('beta');
+  });
+
+  it.each([
+    { label: 'control', init: { ctrlKey: true } },
+    { label: 'meta', init: { metaKey: true } },
+    { label: 'shift', init: { shiftKey: true } },
+    { label: 'alt', init: { altKey: true } },
+    { label: 'middle button', init: { button: 1 } },
+    { label: 'new tab', attribute: 'target', value: '_blank', init: {} },
+    { label: 'download', attribute: 'download', value: 'fixture', init: {} },
+  ])(
+    'leaves $label links to normal navigation without changing this window scope',
+    async ({ init, attribute, value }) => {
+      await mountNavigationShell();
+      await openProject();
+      const link = container.querySelector<HTMLAnchorElement>('aside a[href="/?mode=chat"]')!;
+      if (attribute) link.setAttribute(attribute, value!);
+      const length = window.history.length;
+      const postsBeforeLink = mocks.post.mock.calls.length;
+      await clickSidebarLink('/?mode=chat', init);
+      expect(current()).toBe('bound-alpha');
+      expect(window.location.search).toBe('?projectId=alpha');
+      expect(window.history).toHaveLength(length);
+      expect(mocks.linkFallback).toHaveBeenCalledOnce();
+      expect(mocks.post).toHaveBeenCalledTimes(postsBeforeLink);
+    },
+  );
+
+  it('does not dispatch another scope request for an already prevented link', async () => {
+    await mountNavigationShell();
+    await openProject();
+    const link = container.querySelector<HTMLAnchorElement>('aside a[href="/?mode=chat"]')!;
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    const postsBeforeLink = mocks.post.mock.calls.length;
+    event.preventDefault();
+    await act(async () => link.dispatchEvent(event));
+    expect(current()).toBe('bound-alpha');
+    expect(window.location.search).toBe('?projectId=alpha');
+    expect(mocks.linkFallback).not.toHaveBeenCalled();
+    expect(mocks.post).toHaveBeenCalledTimes(postsBeforeLink);
+  });
+
+  it.each(['/', '/settings/models'])(
+    'uses Next Link fallback from %s when HomePage has no mounted listener',
+    async (pathname) => {
+      window.history.replaceState(null, '', pathname);
+      await act(async () =>
+        root.render(createElement(SidebarProvider, null, createElement(Sidebar))),
+      );
+      const length = window.history.length;
+      await clickSidebarLink('/?mode=chat');
+      expect(window.location.pathname).toBe(pathname);
+      expect(window.location.search).toBe('');
+      expect(window.history).toHaveLength(length);
+      expect(mocks.linkFallback).toHaveBeenCalledExactlyOnceWith('/?mode=chat');
+      expect(mocks.post).not.toHaveBeenCalled();
+    },
+  );
+
+  it('retains normal Settings-to-root navigation even before an old HomePage listener unmounts', async () => {
+    await mountNavigationShell();
+    window.history.replaceState(null, '', '/settings/models');
+    const length = window.history.length;
+    await clickSidebarLink('/?mode=chat');
+    expect(window.location.pathname).toBe('/settings/models');
+    expect(window.history).toHaveLength(length);
+    expect(current()).toBeUndefined();
+    expect(mocks.linkFallback).toHaveBeenCalledExactlyOnceWith('/?mode=chat');
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { pathname: '/settings/models', scope: 'personal' },
+    { pathname: '/settings/models', scope: 'Project' },
+    { pathname: '/', scope: 'personal' },
+    { pathname: '/', scope: 'Project' },
+  ])(
+    'synchronizes a persistent Sidebar after $pathname fallback commits the $scope URL and mounts HomePage',
+    async ({ pathname, scope }) => {
+      window.history.replaceState(null, '', pathname);
+      await act(async () =>
+        root.render(createElement(SidebarProvider, null, createElement(Sidebar))),
+      );
+      const sidebar = container.querySelector('aside');
+      const href = scope === 'personal' ? '/?mode=chat' : '/?projectId=alpha';
+      if (scope === 'personal') await clickSidebarLink(href);
+      else {
+        const projectLink = container.querySelector<HTMLAnchorElement>(
+          'aside a[href="/?projectId=alpha"]',
+        )!;
+        await act(async () =>
+          projectLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })),
+        );
+      }
+      expect(mocks.linkFallback).toHaveBeenCalledExactlyOnceWith(href);
+
+      // Complete the deferred normal Next navigation. AppShell retains its Sidebar;
+      // only the route child changes, and pushState does not emit popstate.
+      window.history.pushState(null, '', href);
+      mocks.recent.mockResolvedValue([project('alpha')]);
+      await mountNavigationShell();
+
+      expect(container.querySelector('aside')).toBe(sidebar);
+      if (scope === 'personal') {
+        expectPersonalScope();
+        expect(
+          container.querySelector('aside a[href="/?mode=chat"]')?.getAttribute('aria-current'),
+        ).toBe('page');
+        expect(container.querySelector('section[aria-label="Recent Projects"]')).toBeNull();
+      } else {
+        expect(current()).toBe('bound-alpha');
+        expect(container.querySelector('[data-workspace-surface="project-chat"]')).not.toBeNull();
+        expect(
+          container.querySelector('aside a[href="/?mode=chat"]')?.getAttribute('aria-current'),
+        ).toBeNull();
+        expect(container.querySelector('section[aria-label="Recent Projects"]')).not.toBeNull();
+      }
+      expect(container.querySelector('aside a[href="/"]')?.getAttribute('aria-current')).toBeNull();
+    },
+  );
+
+  it.each(['/settings/sessions', 'https://outside.example/?mode=chat'])(
+    'leaves a link targeting %s to normal navigation',
+    async (destination) => {
+      await mountNavigationShell();
+      await openProject();
+      const link = container.querySelector<HTMLAnchorElement>('aside a[href="/?mode=chat"]')!;
+      link.href = destination;
+      const length = window.history.length;
+      const postsBeforeLink = mocks.post.mock.calls.length;
+      await act(async () =>
+        link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })),
+      );
+      expect(window.location.search).toBe('?projectId=alpha');
+      expect(window.history).toHaveLength(length);
+      expect(current()).toBe('bound-alpha');
+      expect(mocks.linkFallback).toHaveBeenCalledOnce();
+      expect(mocks.post).toHaveBeenCalledTimes(postsBeforeLink);
+    },
+  );
+
+  it('replays browser Back and Forward through personal, Project and Home scopes without pushing history', async () => {
+    mocks.sessions.push(session('project-alpha', 'coding', 'alpha'));
+    await mountNavigationShell();
+    await clickSidebarLink('/?mode=chat');
+    await requestProject('alpha');
+    mocks.recent.mockResolvedValue([project('alpha')]);
+    await clickSidebarLink('/');
+    const length = window.history.length;
+    const pushes = vi.spyOn(window.history, 'pushState');
+    try {
+      await traverseHistory('back');
+      expect(window.location.search).toBe('?projectId=alpha');
+      expect(container.querySelector('[data-workspace-surface="project-chat"]')).not.toBeNull();
+      await traverseHistory('back');
+      expect(window.location.search).toBe('?mode=chat');
+      expectPersonalScope();
+      await traverseHistory('forward');
+      expect(window.location.search).toBe('?projectId=alpha');
+      expect(container.querySelector('[data-workspace-surface="project-chat"]')).not.toBeNull();
+      await traverseHistory('forward');
+      expect(window.location.search).toBe('');
+      expect(container.textContent).toContain('Choose a workspace');
+      expect(pushes).not.toHaveBeenCalled();
+      expect(window.history).toHaveLength(length);
+    } finally {
+      pushes.mockRestore();
+    }
+  });
+
   it('refreshes retained session visibility on Project reopen and revokes the old navigation guard', async () => {
     await openProject('alpha');
     expect(mocks.refresh).toHaveBeenCalledOnce();

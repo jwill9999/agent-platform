@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import type { Dirent } from 'node:fs';
+import type { Dirent, Stats } from 'node:fs';
 import { mkdir, readdir, stat } from 'node:fs/promises';
 import { basename, join, posix, relative, resolve, sep } from 'node:path';
 
@@ -7,6 +7,8 @@ import type { WorkspaceArea, WorkspaceAreaListing, WorkspaceFile } from '@agent-
 import { WorkspaceAreaSchema } from '@agent-platform/contracts';
 import { PathJail, WORKSPACE_CHILD_DIRECTORIES, WORKSPACE_ROOT } from '@agent-platform/harness';
 import { Router } from 'express';
+import { ZodError } from 'zod';
+import { createLogger } from '@agent-platform/logger';
 
 import { HttpError } from '../httpError.js';
 
@@ -18,6 +20,7 @@ const AREA_LABELS: Record<WorkspaceArea, string> = {
   exports: 'Exports',
   projects: 'Projects',
 };
+const log = createLogger('workspace-files');
 const MAX_DEPTH = 6;
 const MAX_FILES_PER_AREA = 500;
 
@@ -69,6 +72,24 @@ async function ensureWorkspaceAreas(root: string): Promise<void> {
   );
 }
 
+function toWorkspaceFile(
+  name: string,
+  area: WorkspaceArea,
+  root: string,
+  absolutePath: string,
+  entryStat: Stats,
+): WorkspaceFile {
+  const kind = entryStat.isDirectory() ? 'directory' : 'file';
+  return {
+    name,
+    path: toWorkspaceRelative(root, absolutePath),
+    area,
+    kind,
+    size: kind === 'file' ? entryStat.size : 0,
+    modifiedAt: entryStat.mtime.toISOString(),
+  };
+}
+
 async function listAreaFiles(options: {
   root: string;
   area: WorkspaceArea;
@@ -80,12 +101,7 @@ async function listAreaFiles(options: {
   async function walk(directory: string, depth: number): Promise<void> {
     if (depth > MAX_DEPTH || files.length >= MAX_FILES_PER_AREA) return;
 
-    let entries: Dirent[];
-    try {
-      entries = await readdir(directory, { withFileTypes: true });
-    } catch {
-      return;
-    }
+    const entries: Dirent[] = await readdir(directory, { withFileTypes: true });
 
     for (const entry of entries) {
       if (files.length >= MAX_FILES_PER_AREA) break;
@@ -93,27 +109,24 @@ async function listAreaFiles(options: {
       const validation = await options.jail.validate(absolutePath, 'read');
       if (!validation.allowed) continue;
 
-      let entryStat: Awaited<ReturnType<typeof stat>>;
+      let entryStat: Stats;
       try {
         entryStat = await stat(validation.resolvedPath);
-      } catch {
-        continue;
+      } catch (error) {
+        if (filesystemCategory(error) === 'ENOENT') continue;
+        throw error;
       }
 
-      const kind = entryStat.isDirectory() ? 'directory' : 'file';
-      files.push({
-        name: entry.name,
-        path: toWorkspaceRelative(
-          validation.mount?.hostPath ?? options.root,
-          validation.resolvedPath,
-        ),
-        area: options.area,
-        kind,
-        size: kind === 'file' ? entryStat.size : 0,
-        modifiedAt: entryStat.mtime.toISOString(),
-      });
+      const file = toWorkspaceFile(
+        entry.name,
+        options.area,
+        validation.mount?.hostPath ?? options.root,
+        validation.resolvedPath,
+        entryStat,
+      );
+      files.push(file);
 
-      if (kind === 'directory') {
+      if (file.kind === 'directory') {
         await walk(validation.resolvedPath, depth + 1);
       }
     }
@@ -121,6 +134,24 @@ async function listAreaFiles(options: {
 
   await walk(areaRoot, 1);
   return files.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function filesystemCategory(error: unknown): string {
+  const code = error instanceof Error && 'code' in error ? error.code : undefined;
+  return typeof code === 'string' &&
+    ['EACCES', 'EPERM', 'EROFS', 'ENOENT', 'ENOTDIR', 'EEXIST', 'EIO', 'EMFILE', 'ENFILE'].includes(
+      code,
+    )
+    ? code
+    : 'unknown';
+}
+
+function observeListingFailure(phase: 'initialize' | 'read', error: unknown): void {
+  try {
+    log.warn('Workspace file listing unavailable', { phase, category: filesystemCategory(error) });
+  } catch {
+    // Observation must never change the safe response or trigger another listing attempt.
+  }
 }
 
 export function createWorkspaceRouter(options: WorkspaceRouterOptions = {}): Router {
@@ -131,8 +162,10 @@ export function createWorkspaceRouter(options: WorkspaceRouterOptions = {}): Rou
   ]);
 
   router.get('/files', async (req, res, next) => {
+    let phase: 'initialize' | 'read' = 'initialize';
     try {
       await ensureWorkspaceAreas(workspaceRoot);
+      phase = 'read';
       const areaQuery = typeof req.query.area === 'string' ? req.query.area : undefined;
       const areaFilter = areaQuery ? WorkspaceAreaSchema.parse(areaQuery) : undefined;
       const areas = (areaFilter ? [areaFilter] : WORKSPACE_AREAS).map((area) => area);
@@ -157,7 +190,18 @@ export function createWorkspaceRouter(options: WorkspaceRouterOptions = {}): Rou
         },
       });
     } catch (err) {
-      next(err);
+      if (err instanceof HttpError || err instanceof ZodError) {
+        next(err);
+        return;
+      }
+      observeListingFailure(phase, err);
+      next(
+        new HttpError(
+          503,
+          'WORKSPACE_FILES_UNAVAILABLE',
+          'Workspace files are unavailable. Refresh to retry.',
+        ),
+      );
     }
   });
 
