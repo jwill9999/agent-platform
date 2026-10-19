@@ -91,12 +91,19 @@ jobs:
         run: pnpm -r --workspace-concurrency=1 run test --maxWorkers=1 --no-file-parallelism --exclude '**/diagnostics.performance.test.ts'
 
       - name: Observe one declared diagnostic benchmark run
-        if: github.event.action == 'opened' && github.head_ref == 'task/provider-sdk-benchmark-evidence' && github.run_attempt == 1
+        if: >-
+          github.head_ref == 'task/provider-sdk-benchmark-evidence' &&
+          github.event.number == 366 &&
+          github.run_attempt == 1 &&
+          (github.event.action == 'opened' ||
+          (github.event.action == 'synchronize' &&
+          github.event.before == 'bf374458a476a505637a24efe09a2c8d555f7c2d'))
         env:
           DIAGNOSTICS_BENCHMARK_RESULT: ${{ runner.temp }}/diagnostics-benchmark.json.observed-raw
           DIAGNOSTICS_BENCHMARK_OBSERVER_PREFIX: ${{ runner.temp }}/diagnostics-benchmark.json.observed
           DIAGNOSTICS_OBSERVER_CONTROL_RESULT: ${{ runner.temp }}/diagnostics-benchmark.json.observed-controls.json
         # This diagnostic run cannot replace the unchanged, uninstrumented gate below.
+        # One exact-prior-head continuation retains evidence lost by the opening control failure.
         run: |
           node --test scripts/diagnostics-benchmark-observer.test.mjs
           node scripts/run-diagnostics-benchmark-observed.mjs

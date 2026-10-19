@@ -33,43 +33,69 @@ const eventFields = {
 };
 const numeric = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
-function numericLines(path, allowed) {
+const counter = (value) => /^\d+$/u.test(value ?? '') && numeric(Number(value));
+export function parseNumericLines(text, allowed) {
   const values = {};
-  for (const line of readFileSync(path, 'utf8').trim().split('\n')) {
+  for (const line of text.trim().split('\n')) {
     const [key, value] = line.replace(':', '').trim().split(/\s+/u);
-    if (allowed.includes(key) && /^\d+$/u.test(value ?? '')) values[key] = Number(value);
+    if (allowed.includes(key) && counter(value)) values[key] = Number(value);
   }
+  if (!allowed.every((key) => Object.hasOwn(values, key)))
+    throw new Error('Unavailable resource counters');
   return values;
 }
-function pressure(path) {
+export function parseCpuTicks(text) {
+  const [name, ...fields] = text.split('\n')[0].trim().split(/\s+/u);
+  const values = fields.slice(0, 10);
+  if (name !== 'cpu' || values.length !== 10 || !values.every(counter))
+    throw new Error('Unavailable CPU counters');
+  return values.map(Number);
+}
+const pressureFields = ['avg10', 'avg60', 'avg300', 'total'];
+function parsePressureFields(fields) {
   const values = {};
-  for (const line of readFileSync(path, 'utf8').trim().split('\n')) {
+  for (const field of fields) {
+    const [name, value] = field.split('=');
+    if (
+      pressureFields.includes(name) &&
+      /^\d+(?:\.\d+)?$/u.test(value ?? '') &&
+      numeric(Number(value))
+    )
+      values[name] = Number(value);
+  }
+  if (!pressureFields.every((key) => Object.hasOwn(values, key)))
+    throw new Error('Unavailable pressure counters');
+  return values;
+}
+export function parsePressure(text) {
+  const values = {};
+  for (const line of text.trim().split('\n')) {
     const [kind, ...fields] = line.split(' ');
     if (kind !== 'some' && kind !== 'full') continue;
-    for (const field of fields) {
-      const [name, value] = field.split('=');
-      if (['avg10', 'avg60', 'avg300', 'total'].includes(name) && /^\d+(?:\.\d+)?$/u.test(value))
-        values[`${kind}_${name}`] = Number(value);
-    }
+    for (const [name, value] of Object.entries(parsePressureFields(fields)))
+      values[`${kind}_${name}`] = value;
   }
+  if (!Object.hasOwn(values, 'some_total')) throw new Error('Unavailable pressure counters');
   return values;
 }
+function numericLines(path, allowed) {
+  return parseNumericLines(readFileSync(path, 'utf8'), allowed);
+}
+function pressure(path) {
+  return parsePressure(readFileSync(path, 'utf8'));
+}
 function linuxSample() {
-  const sample = { available: process.platform === 'linux', errors: 0 };
+  const sample = { available: process.platform === 'linux', errors: 0, unavailable: [] };
   if (!sample.available) return sample;
   const capture = (name, operation) => {
     try {
       sample[name] = operation();
     } catch {
       sample.errors++;
+      sample.unavailable.push(name);
     }
   };
-  capture('cpuTicks', () => {
-    const line = readFileSync('/proc/stat', 'utf8').split('\n')[0];
-    const values = line.trim().split(/\s+/u).slice(1, 11);
-    if (!values.every((value) => /^\d+$/u.test(value))) throw new Error('Unavailable CPU counters');
-    return values.map(Number);
-  });
+  capture('cpuTicks', () => parseCpuTicks(readFileSync('/proc/stat', 'utf8')));
   capture('memoryKiB', () =>
     numericLines('/proc/meminfo', ['MemTotal', 'MemAvailable', 'Cached', 'SwapTotal', 'SwapFree']),
   );
@@ -91,11 +117,15 @@ function linuxSample() {
   return sample;
 }
 
+function hasExactKeys(input, expected) {
+  const actual = Object.keys(input);
+  return actual.length === expected.length && actual.every((key) => expected.includes(key));
+}
 function projectEvent(row) {
   const fields = eventFields[row.event];
   if (
     !Array.isArray(fields) ||
-    Object.keys(row).sort().join(',') !== ['event', 'atMs', ...fields].sort().join(',') ||
+    !hasExactKeys(row, ['event', 'atMs', ...fields]) ||
     !numeric(row.atMs)
   )
     throw new Error('Invalid observer event');
@@ -107,12 +137,12 @@ function projectEvent(row) {
 function checkCapabilities(capabilities) {
   if (
     !capabilities ||
-    Object.keys(capabilities).sort().join(',') !== 'gc,rawWrite,statfs,worker' ||
+    !hasExactKeys(capabilities, ['gc', 'rawWrite', 'statfs', 'worker']) ||
     !Object.values(capabilities).every((value) => typeof value === 'boolean')
   )
     throw new Error('Invalid observer capabilities');
 }
-function projectLedger(input) {
+export function projectLedger(input) {
   const keys = [
     'schemaVersion',
     'pid',
@@ -127,11 +157,7 @@ function projectLedger(input) {
     'truncated',
     'events',
   ];
-  if (
-    !input ||
-    Object.keys(input).sort().join(',') !== keys.sort().join(',') ||
-    input.schemaVersion !== 1
-  )
+  if (!input || !hasExactKeys(input, keys) || input.schemaVersion !== 1)
     throw new Error('Invalid observer receipt');
   for (const key of ['pid', 'threadId', 'timeOriginMs', 'startedAtMs', 'exitedAtMs', 'errors'])
     if (!numeric(input[key])) throw new Error('Invalid observer counter');
@@ -150,7 +176,7 @@ function projectLedger(input) {
   return input;
 }
 function collectLedgers(directory) {
-  const names = readdirSync(directory).sort();
+  const names = readdirSync(directory).toSorted((left, right) => left.localeCompare(right));
   const observation = {
     processes: [],
     errors: 0,

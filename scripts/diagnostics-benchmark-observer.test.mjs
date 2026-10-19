@@ -3,10 +3,24 @@ import assert from 'node:assert/strict';
 import test, { after } from 'node:test';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  lstatSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import {
+  projectLedger,
+  parseNumericLines,
+  parseCpuTicks,
+  parsePressure,
+} from './run-diagnostics-benchmark-observed.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const wrapper = join(root, 'scripts/run-diagnostics-benchmark-observed.mjs');
@@ -14,13 +28,173 @@ const preload = pathToFileURL(join(root, 'scripts/diagnostics-benchmark-observer
 const api = join(root, 'apps/api');
 const failures = [];
 const proofs = [];
-after(() => {
-  if (process.env.DIAGNOSTICS_OBSERVER_CONTROL_RESULT)
-    writeFileSync(
-      process.env.DIAGNOSTICS_OBSERVER_CONTROL_RESULT,
-      JSON.stringify({ proofs }, null, 2),
-    );
-});
+function persistProofs(
+  destination = process.env.DIAGNOSTICS_OBSERVER_CONTROL_RESULT,
+  entries = proofs,
+) {
+  if (destination) writeFileSync(destination, JSON.stringify({ proofs: entries }, null, 2));
+}
+after(() => persistProofs());
+
+const metricFields = {
+  memoryKiB: ['MemTotal', 'MemAvailable', 'Cached', 'SwapTotal', 'SwapFree'],
+  cgroupCpu: [
+    'usage_usec',
+    'user_usec',
+    'system_usec',
+    'nr_periods',
+    'nr_throttled',
+    'throttled_usec',
+  ],
+  cgroupMemoryEvents: ['low', 'high', 'max', 'oom', 'oom_kill'],
+};
+const pressureFields = ['some', 'full'].flatMap((kind) =>
+  ['avg10', 'avg60', 'avg300', 'total'].map((field) => `${kind}_${field}`),
+);
+const unavailableFields = [
+  'cpuTicks',
+  ...Object.keys(metricFields),
+  'cpuPressure',
+  'memoryPressure',
+  'ioPressure',
+];
+function numbers(input, fields) {
+  const result = {};
+  for (const field of fields) {
+    if (!Object.hasOwn(input, field)) continue;
+    if (typeof input[field] !== 'number' || !Number.isFinite(input[field]) || input[field] < 0)
+      throw new Error('Invalid numeric control proof');
+    result[field] = input[field];
+  }
+  return result;
+}
+function status(input) {
+  if (input.exitCode !== null && (!Number.isInteger(input.exitCode) || input.exitCode < 0))
+    throw new Error('Invalid control exit');
+  if (input.signal !== null && typeof input.signal !== 'string')
+    throw new Error('Invalid control signal');
+  const signal = [null, 'SIGTERM', 'SIGINT', 'SIGKILL'].includes(input.signal)
+    ? input.signal
+    : 'other';
+  return { exitCode: input.exitCode, signal };
+}
+function readProofFile(path, project) {
+  try {
+    const info = lstatSync(path);
+    if (!info.isFile() || info.size > 2 * 1024 * 1024) throw new Error('Invalid control file');
+    return { availability: 'available', value: project(JSON.parse(readFileSync(path, 'utf8'))) };
+  } catch (error) {
+    return { availability: error.code === 'ENOENT' ? 'missing' : 'invalid' };
+  }
+}
+function projectRaw(input) {
+  const value = numbers(input, ['pid', 'timeOriginMs', 'fixtureThreadId']);
+  if (Object.keys(value).length !== 3 || typeof input.receiptBeforeExit !== 'boolean')
+    throw new Error('Invalid raw control proof');
+  return { ...value, receiptBeforeExit: input.receiptBeforeExit };
+}
+function projectObservation(input) {
+  if (
+    !Array.isArray(input.processes) ||
+    input.processes.length > 32 ||
+    !Array.isArray(input.rawOwners) ||
+    input.rawOwners.length > 32
+  )
+    throw new Error('Invalid observer control proof');
+  const flags = {};
+  for (const field of ['complete', 'truncated', 'missing']) {
+    if (typeof input[field] !== 'boolean') throw new Error('Invalid observer control flag');
+    flags[field] = input[field];
+  }
+  return {
+    ...flags,
+    ...numbers(input, ['errors']),
+    child: { ...status(input.child), spawnFailed: input.child.spawnFailed === true },
+    processes: input.processes.map(projectLedger),
+    rawOwners: input.rawOwners.map((owner) => numbers(owner, ['pid', 'threadId', 'timeOriginMs'])),
+  };
+}
+function projectSample(input) {
+  if (!['baseline', 'measurement'].includes(input.phase) || typeof input.available !== 'boolean')
+    throw new Error('Invalid sample control proof');
+  const sample = {
+    ...numbers(input, ['atMs', 'errors']),
+    phase: input.phase,
+    available: input.available,
+  };
+  if (
+    !Array.isArray(input.unavailable) ||
+    input.unavailable.length > unavailableFields.length ||
+    !input.unavailable.every((field) => unavailableFields.includes(field))
+  )
+    throw new Error('Invalid unavailable control fields');
+  sample.unavailable = input.unavailable;
+  if (input.cpuTicks !== undefined) {
+    if (
+      !Array.isArray(input.cpuTicks) ||
+      input.cpuTicks.length !== 10 ||
+      !input.cpuTicks.every((value) => Number.isFinite(value) && value >= 0)
+    )
+      throw new Error('Invalid CPU control proof');
+    sample.cpuTicks = input.cpuTicks;
+  }
+  for (const [field, allowed] of Object.entries(metricFields))
+    if (input[field] !== undefined) sample[field] = numbers(input[field], allowed);
+  for (const field of ['cpuPressure', 'memoryPressure', 'ioPressure'])
+    if (input[field] !== undefined) sample[field] = numbers(input[field], pressureFields);
+  return sample;
+}
+function projectHost(input) {
+  if (
+    !['linux', 'darwin', 'win32'].includes(input.platform) ||
+    typeof input.complete !== 'boolean' ||
+    typeof input.truncated !== 'boolean' ||
+    !Array.isArray(input.samples) ||
+    input.samples.length > 180
+  )
+    throw new Error('Invalid host control proof');
+  return {
+    ...numbers(input, [
+      'schemaVersion',
+      'pid',
+      'timeOriginMs',
+      'cadenceMs',
+      'baselineMs',
+      'errors',
+    ]),
+    platform: input.platform,
+    complete: input.complete,
+    truncated: input.truncated,
+    samples: input.samples.map(projectSample),
+    overhead: {
+      ...numbers(input.overhead, [
+        'baselineWallMs',
+        'samplerWallMs',
+        'samplerCpuUserMicros',
+        'samplerCpuSystemMicros',
+      ]),
+      baselineCpu: numbers(input.overhead.baselineCpu, ['user', 'system']),
+    },
+  };
+}
+function retainForkProof(
+  result,
+  directory,
+  entries = proofs,
+  destination = process.env.DIAGNOSTICS_OBSERVER_CONTROL_RESULT,
+) {
+  const proof = {
+    kind: 'actual-pnpm-default-vitest-fork',
+    stage: 'before-success-assertions',
+    wrapper: status(result),
+    raw: readProofFile(join(directory, 'raw.json'), projectRaw),
+    observer: readProofFile(`${result.prefix}-observer.json`, projectObservation),
+    host: readProofFile(`${result.prefix}-host.json`, projectHost),
+  };
+  entries.push(proof);
+  persistProofs(destination, entries);
+  return proof;
+}
 
 async function execute(args, directory, extraEnv = {}) {
   const prefix = join(directory, 'result');
@@ -72,6 +246,7 @@ import { performance } from 'node:perf_hooks';
 it('keeps real worker and filesystem semantics', async () => {
   expect(isMainThread).toBe(true);
   const worker = new Worker(\`const {parentPort}=require('node:worker_threads');parentPort.on('message', value=>{parentPort.postMessage({id:value.id,result:null});parentPort.close();});\`, {eval:true});
+  const fixtureThreadId = worker.threadId;
   const exited = once(worker, 'exit');
   const reply = once(worker, 'message');
   worker.postMessage({id:7,type:'close'});
@@ -86,7 +261,7 @@ it('keeps real worker and filesystem semantics', async () => {
   expect((await stoppedExit)[0]).toBe(terminationCode);
   const currentReceipt=String(process.pid)+'.json';
   expect(readdirSync(process.env.DIAGNOSTICS_OBSERVER_DIRECTORY).includes(currentReceipt)).toBe(false);
-  writeFileSync(process.env.DIAGNOSTICS_BENCHMARK_RESULT, JSON.stringify({pid:process.pid,timeOriginMs:performance.timeOrigin,receiptBeforeExit:false}));
+  writeFileSync(process.env.DIAGNOSTICS_BENCHMARK_RESULT, JSON.stringify({pid:process.pid,timeOriginMs:performance.timeOrigin,receiptBeforeExit:false,fixtureThreadId}));
 });
 `,
       );
@@ -105,6 +280,7 @@ it('keeps real worker and filesystem semantics', async () => {
         ],
         directory,
       );
+      retainForkProof(result, directory);
       assert.equal(result.signal, null);
       assert.equal(result.exitCode, 0, 'Owned fork control must complete successfully');
       const raw = JSON.parse(readFileSync(join(directory, 'raw.json'), 'utf8'));
@@ -128,17 +304,22 @@ it('keeps real worker and filesystem semantics', async () => {
           owner.events.some((row) => row.event === event),
           `Missing fixed event: ${event}`,
         );
+      const created = owner.events.find(
+        (event) => event.event === 'worker-create' && event.actualThreadId === raw.fixtureThreadId,
+      );
+      assert.ok(created, 'The fixture worker must have its own create event');
+      for (const kind of ['worker-close-request', 'worker-close-ack', 'worker-exit']) {
+        const matching = owner.events.filter(
+          (event) =>
+            event.event === kind &&
+            event.ordinal === created.ordinal &&
+            event.actualThreadId === raw.fixtureThreadId,
+        );
+        assert.equal(matching.length, 1, `Expected one matching fixture event: ${kind}`);
+        if (kind === 'worker-close-ack') assert.equal(matching[0].success, true);
+        if (kind === 'worker-exit') assert.equal(matching[0].exitCode, 0);
+      }
       assert.equal(raw.receiptBeforeExit, false);
-      proofs.push({
-        kind: 'actual-pnpm-default-vitest-fork',
-        pid: raw.pid,
-        timeOriginMs: raw.timeOriginMs,
-        events: owner.events.map(({ event }) => event),
-        observer: observed,
-        flushReason: owner.flushReason,
-        noLedgerBeforeExit: true,
-        exitCode: result.exitCode,
-      });
       assert.ok(
         owner.events
           .filter(({ event }) => event === 'statfs-settle')
@@ -150,7 +331,6 @@ it('keeps real worker and filesystem semantics', async () => {
       assert.ok(host.samples.some(({ phase }) => phase === 'baseline'));
       assert.ok(!JSON.stringify(observed).includes(directory));
       assert.ok(!JSON.stringify(host).includes(directory));
-      proofs[0].host = host;
     } catch (error) {
       failures.push(directory);
       throw error;
@@ -360,3 +540,220 @@ test(
     }
   },
 );
+
+function validLedger() {
+  return {
+    schemaVersion: 1,
+    pid: 1,
+    threadId: 0,
+    timeOriginMs: 1,
+    startedAtMs: 0,
+    exitedAtMs: 1,
+    exitCode: 0,
+    flushReason: 'exit',
+    capabilities: { gc: true, rawWrite: true, statfs: true, worker: true },
+    errors: 0,
+    truncated: false,
+    events: [{ event: 'worker-create', atMs: 0, ordinal: 1, actualThreadId: 1 }],
+  };
+}
+
+test('exact ledger schemas accept reordered keys without replacing the receipt', () => {
+  const reordered = (value) => Object.fromEntries(Object.entries(value).reverse());
+  const ledger = reordered(validLedger());
+  ledger.capabilities = reordered(ledger.capabilities);
+  ledger.events = ledger.events.map(reordered);
+  assert.equal(projectLedger(ledger), ledger);
+});
+
+for (const scope of ['ledger', 'capabilities', 'event']) {
+  for (const mutation of ['joined', 'missing', 'extra']) {
+    test(`exact ${scope} schema rejects ${mutation} keys`, () => {
+      const ledger = validLedger();
+      let target = ledger;
+      if (scope === 'event') target = ledger.events[0];
+      else if (scope === 'capabilities') target = ledger.capabilities;
+      if (mutation === 'extra') target.unexpected = true;
+      else if (mutation === 'missing') delete target[Object.keys(target)[0]];
+      else {
+        const keys = Object.keys(target).toSorted((left, right) => left.localeCompare(right));
+        const value = scope === 'capabilities' ? true : 1;
+        for (const key of keys) delete target[key];
+        target[keys.join(',')] = value;
+      }
+      assert.throws(() => projectLedger(ledger), /Invalid observer/u);
+    });
+  }
+}
+
+test('resource parsers require complete finite counter sets', () => {
+  assert.deepEqual(
+    parseNumericLines('MemTotal: 12 kB\nMemAvailable: 3 kB\n', ['MemTotal', 'MemAvailable']),
+    { MemTotal: 12, MemAvailable: 3 },
+  );
+  for (const text of [
+    '',
+    'MemTotal: 12 kB',
+    'MemTotal: 12 kB\nMemAvailable: invalid',
+    `MemTotal: 12 kB\nMemAvailable: ${'9'.repeat(400)}`,
+  ])
+    assert.throws(
+      () => parseNumericLines(text, ['MemTotal', 'MemAvailable']),
+      /Unavailable resource counters/u,
+    );
+  assert.deepEqual(
+    parseCpuTicks('cpu 1 2 3 4 5 6 7 8 9 10\ncpu0 1 2'),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  );
+  for (const text of [
+    '',
+    'cpu 1 2 3',
+    'cpu0 1 2 3 4 5 6 7 8 9 10',
+    'cpu 1 2 3 4 5 6 7 8 9 invalid',
+  ])
+    assert.throws(() => parseCpuTicks(text), /Unavailable CPU counters/u);
+});
+
+test('pressure parser requires a complete some row and any present full row', () => {
+  const some = 'some avg10=0.00 avg60=0.50 avg300=1.00 total=17';
+  const full = 'full avg10=0.00 avg60=0.00 avg300=0.00 total=0';
+  assert.deepEqual(parsePressure(some), {
+    some_avg10: 0,
+    some_avg60: 0.5,
+    some_avg300: 1,
+    some_total: 17,
+  });
+  assert.equal(parsePressure(`${some}\n${full}`).full_total, 0);
+  for (const text of [
+    '',
+    full,
+    'some avg10=0 avg60=0 avg300=0',
+    `${some}\nfull avg10=0`,
+    'some avg10=invalid avg60=0 avg300=0 total=1',
+  ])
+    assert.throws(() => parsePressure(text), /Unavailable pressure counters/u);
+});
+
+test('failed first-control assertions retain bounded proof without publishing child output', () => {
+  const directory = fixture();
+  try {
+    const prefix = join(directory, 'result');
+    const destination = join(directory, 'proof.json');
+    const marker = 'private-control-marker';
+    writeFileSync(
+      join(directory, 'raw.json'),
+      JSON.stringify({
+        pid: 7,
+        timeOriginMs: 8,
+        fixtureThreadId: 9,
+        receiptBeforeExit: false,
+        secret: marker,
+      }),
+    );
+    writeFileSync(`${prefix}-host.json`, '{invalid');
+    const entries = [];
+    assert.throws(() => {
+      retainForkProof(
+        { exitCode: 1, signal: null, prefix, output: marker },
+        directory,
+        entries,
+        destination,
+      );
+      assert.equal(1, 0, 'Intentional owned control failure');
+    }, /Intentional owned control failure/u);
+    const saved = JSON.parse(readFileSync(destination, 'utf8'));
+    assert.equal(saved.proofs.length, 1);
+    assert.deepEqual(saved.proofs[0].wrapper, { exitCode: 1, signal: null });
+    assert.equal(saved.proofs[0].stage, 'before-success-assertions');
+    assert.equal(saved.proofs[0].raw.availability, 'available');
+    assert.equal(saved.proofs[0].observer.availability, 'missing');
+    assert.equal(saved.proofs[0].host.availability, 'invalid');
+    assert.equal(JSON.stringify(saved).includes(marker), false);
+    assert.equal(JSON.stringify(saved).includes(directory), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('failed wrapper proof retains safe child and host diagnostics while excluding untrusted fields', () => {
+  const directory = fixture();
+  try {
+    const prefix = join(directory, 'result');
+    const marker = 'private-proof-marker';
+    writeFileSync(
+      `${prefix}-observer.json`,
+      JSON.stringify({
+        complete: false,
+        truncated: false,
+        missing: false,
+        errors: 0,
+        child: { exitCode: 7, signal: null, spawnFailed: false, error: marker },
+        processes: [validLedger()],
+        rawOwners: [{ pid: 1, threadId: 0, timeOriginMs: 1 }],
+        secret: marker,
+      }),
+    );
+    writeFileSync(
+      `${prefix}-host.json`,
+      JSON.stringify({
+        schemaVersion: 1,
+        platform: 'linux',
+        pid: 2,
+        timeOriginMs: 3,
+        cadenceMs: 1000,
+        baselineMs: 5000,
+        complete: false,
+        truncated: false,
+        errors: 0,
+        samples: [
+          {
+            atMs: 4,
+            phase: 'measurement',
+            available: true,
+            errors: 1,
+            unavailable: ['cgroupCpu'],
+            secret: marker,
+          },
+        ],
+        overhead: { baselineWallMs: 5001, baselineCpu: { user: 1, system: 2 }, secret: marker },
+        secret: marker,
+      }),
+    );
+    const entries = [];
+    const proof = retainForkProof({ exitCode: 1, signal: null, prefix }, directory, entries, null);
+    assert.equal(proof.raw.availability, 'missing');
+    assert.equal(proof.observer.availability, 'available');
+    assert.deepEqual(proof.observer.value.child, { exitCode: 7, signal: null, spawnFailed: false });
+    assert.equal(proof.host.availability, 'available');
+    assert.deepEqual(proof.host.value.samples[0].unavailable, ['cgroupCpu']);
+    assert.equal(proof.host.value.samples[0].errors, 1);
+    assert.equal(JSON.stringify(proof).includes(marker), false);
+    assert.equal(JSON.stringify(proof).includes(directory), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('unexpected wrapper signals retain a fixed safe failure category before assertions', () => {
+  const directory = fixture();
+  try {
+    for (const signal of ['SIGABRT', 'private-untrusted-signal-marker']) {
+      const entries = [];
+      const proof = retainForkProof(
+        { exitCode: null, signal, prefix: join(directory, 'result') },
+        directory,
+        entries,
+        null,
+      );
+      assert.equal(entries.length, 1);
+      assert.deepEqual(proof.wrapper, { exitCode: null, signal: 'other' });
+      assert.equal(proof.raw.availability, 'missing');
+      assert.equal(proof.observer.availability, 'missing');
+      assert.equal(proof.host.availability, 'missing');
+      assert.equal(JSON.stringify(proof).includes(signal), false);
+      assert.equal(JSON.stringify(proof).includes(directory), false);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

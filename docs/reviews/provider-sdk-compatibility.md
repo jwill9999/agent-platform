@@ -1,6 +1,6 @@
 # Provider SDK compatibility review and results
 
-Status: 19 October 2026. PR362 and PR364 merged into feature a9e8ac61. Protected PR363 has actual CodeQL/alert12/Sonar clearance, both genuine full scans, API604/DB236/browser and benchmark pass, and real packaged macOS VM20 pass. Its green Electron job nevertheless has71 passes plus a new initial-screen flaky case, so staging remains blocked. The bounded three-launch distinct-port repair passes independent source review and all three actual native journeys once; final combined review, normal hooks and new hosted qualification remain required. No owner-app or live/stress readiness is claimed.
+Status: 19 October 2026. PR362, PR364 and PR365 merged into the feature at `95d1cdbf`. Protected PR363 remains blocked by its measured 22.982728 ms benchmark overhead against the 20 ms limit, despite clear security scans and 72 Electron cases passing without retries. PR366's opening CI passed the ordinary suite and browser checks, but its first Linux diagnostic-helper control failed before either benchmark command ran. The exact helper failure cause was not retained. Independent review approved bounded schema/counter/control-evidence corrections and one continuation anchored to that exact prior head; fresh checks and review remain required. No owner-app or live/stress readiness is claimed.
 Earlier pending states below retain their named source/time bindings and do not override this checkpoint.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
@@ -723,7 +723,44 @@ filenames from the later original gate. The conditional step is limited to the r
 on attempt1, with no continue-on-error/retry; protected promotion skips it by source condition.
 The unchanged fresh uninstrumented gate remains mandatory even if the diagnostic passes.
 
-Both fresh full scans39195037863/39195062021 completed genuine five-batch analysis without findings;
+### Opening helper failure and bounded evidence recovery
+
+PR366 opening head `bf374458` ran CI39197870734, attempt 1. Ordinary tests passed, but the diagnostic
+step's first real pnpm/Vitest-fork control received wrapper exit 1; 13 other tiny controls passed.
+The shell stopped before the full instrumented benchmark command. The separate original benchmark
+correctly skipped, so no new performance measurement or gate pass exists. Artifact 12163356483 is
+592 bytes, API SHA256 475b617915a4e7bb6ff98ae52bf4d470988b898d0d10e1f20cce96ba061a8c68;
+its only member contains 13 successful control proofs. The failed control appended its receipt
+after the success assertion, so its child/observer/host evidence was lost from the upload. This is
+an instrumentation evidence gap, not a diagnosed application or Linux resource failure.
+
+Independent critique identified delimiter-joined schema-key validation as insufficient. Hosted
+review also found that missing expected host counters could appear complete, and the fork control
+did not establish a successful close acknowledgement from the actual fixture worker. The bounded
+correction requires exact key counts/membership, complete finite declared counters and ten CPU
+fields, a complete pressure some row and any present full row, and correlated worker identity,
+successful acknowledgement and exit status. It preserves numeric-only observations, resource paths,
+sampling bounds and every benchmark workload/assertion/deadline. These independently justified
+corrections do not establish the opening control's missing cause.
+
+The failed-control evidence must be saved before success assertions, with fixed missing/invalid
+indicators and safe statuses rather than raw errors, output, paths or environment. Critique approved
+one continuation only for PR366's exact task branch, synchronize event from `bf374458` and attempt 1.
+Subsequent pushes, reruns and protected feature promotion cannot select it. Controls still block
+both benchmark commands on failure. No local full benchmark or unchanged failed-input rerun is
+included; fresh focused controls, final source review and normal hooks precede that continuation.
+
+The corrected local suite passes all 29 tiny controls in 26.502 seconds, with zero failures,
+skips or cancellations. The real pnpm/Vitest-fork proof is persisted before assertions and records
+the actual worker's successful close and exit. Missing/invalid receipt and failed-wrapper controls
+verify safe failure evidence without child output, raw errors or paths. Pure parser controls reject
+joined, missing and extra keys, incomplete/nonfinite counters and incomplete pressure rows. Syntax,
+ESLint, formatting and diff checks pass. These macOS controls do not establish Linux counter
+availability. The original benchmark file and every pre-existing workflow object remain unchanged;
+12 trigger cases verify that only the opening and exact-prior-head continuation select the helper.
+Final combined source/evidence review, normal hooks and new hosted checks remain required.
+
+At protected95d1, both full scans39195037863/39195062021 completed genuine five-batch analysis without findings;
 new CodeQL Actions/JavaScript/Swift analyses have zero results, alert12 is fixed without dismissal,
 and direct current-head Sonar is OK with zero open issues. Dependency comparison45 changes has
 zero introduced advisories, separate from existing audit debt. The protected Sourcery skip is due
