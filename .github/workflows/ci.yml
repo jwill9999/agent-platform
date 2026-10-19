@@ -97,13 +97,13 @@ jobs:
           github.run_attempt == 1 &&
           (github.event.action == 'opened' ||
           (github.event.action == 'synchronize' &&
-          github.event.before == 'bf374458a476a505637a24efe09a2c8d555f7c2d'))
+          github.event.before == 'ca2c319fe2889de9058a431ce0b03b87ea35fec0'))
         env:
           DIAGNOSTICS_BENCHMARK_RESULT: ${{ runner.temp }}/diagnostics-benchmark.json.observed-raw
           DIAGNOSTICS_BENCHMARK_OBSERVER_PREFIX: ${{ runner.temp }}/diagnostics-benchmark.json.observed
           DIAGNOSTICS_OBSERVER_CONTROL_RESULT: ${{ runner.temp }}/diagnostics-benchmark.json.observed-controls.json
         # This diagnostic run cannot replace the unchanged, uninstrumented gate below.
-        # One exact-prior-head continuation retains evidence lost by the opening control failure.
+        # One exact-prior-head continuation corrects the unsupported auxiliary counter assumption.
         run: |
           node --test scripts/diagnostics-benchmark-observer.test.mjs
           node scripts/run-diagnostics-benchmark-observed.mjs

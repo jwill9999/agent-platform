@@ -33,6 +33,14 @@ const eventFields = {
 };
 const numeric = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
+const invalidCounters = (message) =>
+  Object.assign(new Error(message), { code: 'INVALID_OBSERVER_COUNTERS' });
+export function resourceFailureReason(error) {
+  if (error?.code === 'ENOENT') return 'absent';
+  if (['EACCES', 'EPERM'].includes(error?.code)) return 'unreadable';
+  if (error?.code === 'INVALID_OBSERVER_COUNTERS') return 'invalid';
+  return 'other';
+}
 const counter = (value) => /^\d+$/u.test(value ?? '') && numeric(Number(value));
 export function parseNumericLines(text, allowed) {
   const values = {};
@@ -41,14 +49,14 @@ export function parseNumericLines(text, allowed) {
     if (allowed.includes(key) && counter(value)) values[key] = Number(value);
   }
   if (!allowed.every((key) => Object.hasOwn(values, key)))
-    throw new Error('Unavailable resource counters');
+    throw invalidCounters('Unavailable resource counters');
   return values;
 }
 export function parseCpuTicks(text) {
   const [name, ...fields] = text.split('\n')[0].trim().split(/\s+/u);
   const values = fields.slice(0, 10);
   if (name !== 'cpu' || values.length !== 10 || !values.every(counter))
-    throw new Error('Unavailable CPU counters');
+    throw invalidCounters('Unavailable CPU counters');
   return values.map(Number);
 }
 const pressureFields = ['avg10', 'avg60', 'avg300', 'total'];
@@ -64,7 +72,7 @@ function parsePressureFields(fields) {
       values[name] = Number(value);
   }
   if (!pressureFields.every((key) => Object.hasOwn(values, key)))
-    throw new Error('Unavailable pressure counters');
+    throw invalidCounters('Unavailable pressure counters');
   return values;
 }
 export function parsePressure(text) {
@@ -75,7 +83,7 @@ export function parsePressure(text) {
     for (const [name, value] of Object.entries(parsePressureFields(fields)))
       values[`${kind}_${name}`] = value;
   }
-  if (!Object.hasOwn(values, 'some_total')) throw new Error('Unavailable pressure counters');
+  if (!Object.hasOwn(values, 'some_total')) throw invalidCounters('Unavailable pressure counters');
   return values;
 }
 function numericLines(path, allowed) {
@@ -85,14 +93,20 @@ function pressure(path) {
   return parsePressure(readFileSync(path, 'utf8'));
 }
 function linuxSample() {
-  const sample = { available: process.platform === 'linux', errors: 0, unavailable: [] };
+  const sample = {
+    available: process.platform === 'linux',
+    errors: 0,
+    unavailable: [],
+    unavailableReasons: {},
+  };
   if (!sample.available) return sample;
   const capture = (name, operation) => {
     try {
       sample[name] = operation();
-    } catch {
+    } catch (error) {
       sample.errors++;
       sample.unavailable.push(name);
+      sample.unavailableReasons[name] = resourceFailureReason(error);
     }
   };
   capture('cpuTicks', () => parseCpuTicks(readFileSync('/proc/stat', 'utf8')));
@@ -199,6 +213,147 @@ function collectLedgers(directory) {
   return observation;
 }
 
+const resourceFields = {
+  memoryKiB: ['MemTotal', 'MemAvailable', 'Cached', 'SwapTotal', 'SwapFree'],
+  cgroupCpu: [
+    'usage_usec',
+    'user_usec',
+    'system_usec',
+    'nr_periods',
+    'nr_throttled',
+    'throttled_usec',
+  ],
+  cgroupMemoryEvents: ['low', 'high', 'max', 'oom', 'oom_kill'],
+};
+const coreFields = [
+  'cpuTicks',
+  'memoryKiB',
+  'cgroupCpu',
+  'cpuPressure',
+  'memoryPressure',
+  'ioPressure',
+];
+const failureReasons = ['absent', 'unreadable', 'invalid', 'other'];
+function counterSet(input, fields) {
+  return !!input && fields.every((field) => numeric(input[field]));
+}
+function pressureSet(input) {
+  if (
+    !counterSet(
+      input,
+      pressureFields.map((field) => `some_${field}`),
+    )
+  )
+    return false;
+  return (
+    !Object.keys(input).some((field) => field.startsWith('full_')) ||
+    counterSet(
+      input,
+      pressureFields.map((field) => `full_${field}`),
+    )
+  );
+}
+function coreCounters(sample) {
+  return (
+    Array.isArray(sample.cpuTicks) &&
+    sample.cpuTicks.length === 10 &&
+    sample.cpuTicks.every(numeric) &&
+    counterSet(sample.memoryKiB, resourceFields.memoryKiB) &&
+    counterSet(sample.cgroupCpu, resourceFields.cgroupCpu) &&
+    ['cpuPressure', 'memoryPressure', 'ioPressure'].every((field) => pressureSet(sample[field]))
+  );
+}
+function validGaps(sample) {
+  const fields = [...coreFields, 'cgroupMemoryEvents'];
+  return (
+    Array.isArray(sample.unavailable) &&
+    sample.errors === sample.unavailable.length &&
+    new Set(sample.unavailable).size === sample.unavailable.length &&
+    sample.unavailable.every((field) => fields.includes(field)) &&
+    !!sample.unavailableReasons &&
+    hasExactKeys(sample.unavailableReasons, sample.unavailable) &&
+    Object.values(sample.unavailableReasons).every((reason) => failureReasons.includes(reason))
+  );
+}
+function hostCoverage(host) {
+  const reliable =
+    host.errors === 0 &&
+    host.truncated === false &&
+    Array.isArray(host.samples) &&
+    host.samples.length > 0 &&
+    host.samples.every(validGaps);
+  const linuxAvailable =
+    host.platform === 'linux' &&
+    reliable &&
+    host.samples.every((sample) => sample.available === true);
+  const coreComplete =
+    linuxAvailable &&
+    host.samples.every(
+      (sample) =>
+        coreCounters(sample) &&
+        sample.unavailable.every((field) => field === 'cgroupMemoryEvents') &&
+        (counterSet(sample.cgroupMemoryEvents, resourceFields.cgroupMemoryEvents) ||
+          sample.unavailable.includes('cgroupMemoryEvents')),
+    );
+  const complete =
+    coreComplete &&
+    host.samples.every(
+      (sample) =>
+        sample.errors === 0 &&
+        counterSet(sample.cgroupMemoryEvents, resourceFields.cgroupMemoryEvents),
+    );
+  let coverage = 'unavailable';
+  if (linuxAvailable) coverage = complete ? 'full' : 'partial';
+  return { reliable, linuxAvailable, coreComplete, complete, coverage };
+}
+function processCoverage(observation) {
+  try {
+    if (!Array.isArray(observation.processes) || observation.processes.length > MAX_LEDGER_FILES)
+      throw new Error('Invalid observer processes');
+    const processes = observation.processes.map(projectLedger);
+    const owners = processes.filter((entry) =>
+      entry.events.some((row) => row.event === 'benchmark-raw-write' && row.success),
+    );
+    const owner = owners[0];
+    const complete =
+      observation.errors === 0 &&
+      observation.missing === false &&
+      observation.truncated === false &&
+      processes.every(
+        (entry) =>
+          entry.errors === 0 &&
+          !entry.truncated &&
+          Object.values(entry.capabilities).every(Boolean),
+      ) &&
+      owners.length === 1 &&
+      ['worker-create', 'statfs-start'].every((kind) =>
+        owner.events.some(({ event }) => event === kind),
+      );
+    return {
+      complete,
+      rawOwners: owners.map(({ pid, threadId, timeOriginMs }) => ({ pid, threadId, timeOriginMs })),
+    };
+  } catch {
+    return { complete: false, rawOwners: [] };
+  }
+}
+export function diagnosticCoverage(observation, host) {
+  const process = processCoverage(observation);
+  const resources = hostCoverage(host);
+  const localControl =
+    host.platform !== 'linux' &&
+    resources.reliable &&
+    host.samples.every((sample) => sample.available === false && sample.errors === 0);
+  return {
+    processComplete: process.complete,
+    rawOwners: process.rawOwners,
+    host: resources,
+    complete: process.complete && resources.complete,
+    diagnosticEligibility: process.complete && (resources.coreComplete || localControl),
+    diagnosticScope: host.platform === 'linux' ? 'linux-diagnostic' : 'non-linux-control-only',
+  };
+}
+
 export async function runObservedCommand({ command, args, cwd = root, prefix, env = process.env }) {
   mkdirSync(dirname(prefix), { recursive: true });
   const directory = mkdtempSync(join(dirname(prefix), 'diagnostic-observer-'));
@@ -284,33 +439,21 @@ export async function runObservedCommand({ command, args, cwd = root, prefix, en
   } catch {
     observation = { processes: [], errors: 1, missing: true, truncated: false };
   }
-  const events = observation.processes.flatMap((entry) => entry.events);
-  observation.complete =
-    !observation.errors &&
-    !observation.missing &&
-    !observation.truncated &&
-    observation.processes.every(
-      (entry) =>
-        !entry.errors && !entry.truncated && Object.values(entry.capabilities).every(Boolean),
-    ) &&
-    events.some((entry) => entry.event === 'worker-create') &&
-    events.some((entry) => entry.event === 'statfs-start');
-  observation.rawOwners = observation.processes
-    .filter((entry) =>
-      entry.events.some((row) => row.event === 'benchmark-raw-write' && row.success),
-    )
-    .map(({ pid, threadId, timeOriginMs }) => ({ pid, threadId, timeOriginMs }));
-  observation.complete &&= observation.rawOwners.length === 1;
-  const owner = observation.processes.find(({ pid }) => pid === observation.rawOwners[0]?.pid);
-  observation.complete &&= ['worker-create', 'statfs-start'].every((kind) =>
-    owner?.events.some(({ event }) => event === kind),
-  );
-  host.complete =
-    !host.errors && !host.truncated && host.samples.every((entry) => entry.errors === 0);
-  observation.complete &&= host.complete;
+  const coverage = diagnosticCoverage(observation, host);
+  observation.processComplete = coverage.processComplete;
+  observation.rawOwners = coverage.rawOwners;
+  observation.complete = coverage.complete;
+  observation.diagnosticEligibility = coverage.diagnosticEligibility;
+  observation.diagnosticScope = coverage.diagnosticScope;
+  host.linuxAvailable = coverage.host.linuxAvailable;
+  host.coreComplete = coverage.host.coreComplete;
+  host.complete = coverage.host.complete;
+  host.coverage = coverage.host.coverage;
   observation.limitations = [
     'Scoped to the fixed pnpm/Vitest command and active child processes; a bare self-signalling eval with no live handle can exit before a JavaScript signal callback.',
     'Foreign signal handlers permanently disable this observer for that signal; SIGKILL cannot flush. Missing raw-writer observations never qualify.',
+    'Root cgroup memory-event counters are auxiliary and may be unavailable; eligible partial host coverage is never complete coverage.',
+    'Non-Linux control-only eligibility does not qualify Linux resource coverage.',
     'GC delivery is asynchronous and can be incomplete; recorded sampling overhead is never subtracted from benchmark durations.',
   ];
   observation.child = result;
@@ -326,7 +469,11 @@ export async function runObservedCommand({ command, args, cwd = root, prefix, en
   } catch {
     publicationComplete = false;
   }
-  return { ...result, observationComplete: observation.complete && publicationComplete };
+  return {
+    ...result,
+    observationComplete: observation.complete && publicationComplete,
+    diagnosticEligibility: observation.diagnosticEligibility && publicationComplete,
+  };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -350,7 +497,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const result = await runObservedCommand({ command, args, prefix });
     if (result.signal) process.kill(process.pid, result.signal);
-    else process.exitCode = result.exitCode || (result.observationComplete ? 0 : 1);
+    else process.exitCode = result.exitCode || (result.diagnosticEligibility ? 0 : 1);
   } catch {
     process.stderr.write('Observed benchmark evidence unavailable.\n');
     process.exitCode = 1;

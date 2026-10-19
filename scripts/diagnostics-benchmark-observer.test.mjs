@@ -17,6 +17,8 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   projectLedger,
+  diagnosticCoverage,
+  resourceFailureReason,
   parseNumericLines,
   parseCpuTicks,
   parsePressure,
@@ -102,17 +104,46 @@ function projectObservation(input) {
   )
     throw new Error('Invalid observer control proof');
   const flags = {};
-  for (const field of ['complete', 'truncated', 'missing']) {
+  for (const field of [
+    'complete',
+    'processComplete',
+    'diagnosticEligibility',
+    'truncated',
+    'missing',
+  ]) {
     if (typeof input[field] !== 'boolean') throw new Error('Invalid observer control flag');
     flags[field] = input[field];
   }
+  if (!['linux-diagnostic', 'non-linux-control-only'].includes(input.diagnosticScope))
+    throw new Error('Invalid diagnostic control scope');
   return {
     ...flags,
+    diagnosticScope: input.diagnosticScope,
     ...numbers(input, ['errors']),
     child: { ...status(input.child), spawnFailed: input.child.spawnFailed === true },
     processes: input.processes.map(projectLedger),
     rawOwners: input.rawOwners.map((owner) => numbers(owner, ['pid', 'threadId', 'timeOriginMs'])),
   };
+}
+function projectGaps(input) {
+  if (
+    !Array.isArray(input.unavailable) ||
+    input.unavailable.length > unavailableFields.length ||
+    !input.unavailable.every((field) => unavailableFields.includes(field))
+  )
+    throw new Error('Invalid unavailable control fields');
+  const reasons = input.unavailableReasons;
+  if (
+    !reasons ||
+    Object.keys(reasons).length !== input.unavailable.length ||
+    !Object.entries(reasons).every(
+      ([field, reason]) =>
+        input.unavailable.includes(field) &&
+        ['absent', 'unreadable', 'invalid', 'other'].includes(reason),
+    )
+  )
+    throw new Error('Invalid unavailable control reasons');
+  return { unavailable: input.unavailable, unavailableReasons: reasons };
 }
 function projectSample(input) {
   if (!['baseline', 'measurement'].includes(input.phase) || typeof input.available !== 'boolean')
@@ -121,14 +152,8 @@ function projectSample(input) {
     ...numbers(input, ['atMs', 'errors']),
     phase: input.phase,
     available: input.available,
+    ...projectGaps(input),
   };
-  if (
-    !Array.isArray(input.unavailable) ||
-    input.unavailable.length > unavailableFields.length ||
-    !input.unavailable.every((field) => unavailableFields.includes(field))
-  )
-    throw new Error('Invalid unavailable control fields');
-  sample.unavailable = input.unavailable;
   if (input.cpuTicks !== undefined) {
     if (
       !Array.isArray(input.cpuTicks) ||
@@ -148,6 +173,9 @@ function projectHost(input) {
   if (
     !['linux', 'darwin', 'win32'].includes(input.platform) ||
     typeof input.complete !== 'boolean' ||
+    typeof input.coreComplete !== 'boolean' ||
+    typeof input.linuxAvailable !== 'boolean' ||
+    !['full', 'partial', 'unavailable'].includes(input.coverage) ||
     typeof input.truncated !== 'boolean' ||
     !Array.isArray(input.samples) ||
     input.samples.length > 180
@@ -164,6 +192,9 @@ function projectHost(input) {
     ]),
     platform: input.platform,
     complete: input.complete,
+    coreComplete: input.coreComplete,
+    linuxAvailable: input.linuxAvailable,
+    coverage: input.coverage,
     truncated: input.truncated,
     samples: input.samples.map(projectSample),
     overhead: {
@@ -285,7 +316,20 @@ it('keeps real worker and filesystem semantics', async () => {
       assert.equal(result.exitCode, 0, 'Owned fork control must complete successfully');
       const raw = JSON.parse(readFileSync(join(directory, 'raw.json'), 'utf8'));
       const observed = JSON.parse(readFileSync(`${result.prefix}-observer.json`, 'utf8'));
-      assert.equal(observed.complete, true);
+      const host = JSON.parse(readFileSync(`${result.prefix}-host.json`, 'utf8'));
+      assert.equal(observed.processComplete, true);
+      assert.equal(observed.diagnosticEligibility, true);
+      assert.equal(observed.complete, host.complete);
+      if (host.platform === 'linux') {
+        assert.equal(host.coreComplete, true);
+        assert.equal(observed.diagnosticScope, 'linux-diagnostic');
+      } else {
+        assert.equal(host.linuxAvailable, false);
+        assert.equal(host.coreComplete, false);
+        assert.equal(host.complete, false);
+        assert.equal(host.coverage, 'unavailable');
+        assert.equal(observed.diagnosticScope, 'non-linux-control-only');
+      }
       assert.deepEqual(observed.rawOwners, [
         { pid: raw.pid, threadId: 0, timeOriginMs: raw.timeOriginMs },
       ]);
@@ -325,7 +369,6 @@ it('keeps real worker and filesystem semantics', async () => {
           .filter(({ event }) => event === 'statfs-settle')
           .every(({ success }) => success),
       );
-      const host = JSON.parse(readFileSync(`${result.prefix}-host.json`, 'utf8'));
       assert.equal(host.baselineMs, 5000);
       assert.ok(host.overhead.baselineWallMs >= 5000);
       assert.ok(host.samples.some(({ phase }) => phase === 'baseline'));
@@ -684,6 +727,9 @@ test('failed wrapper proof retains safe child and host diagnostics while excludi
       `${prefix}-observer.json`,
       JSON.stringify({
         complete: false,
+        processComplete: true,
+        diagnosticEligibility: false,
+        diagnosticScope: 'linux-diagnostic',
         truncated: false,
         missing: false,
         errors: 0,
@@ -703,6 +749,9 @@ test('failed wrapper proof retains safe child and host diagnostics while excludi
         cadenceMs: 1000,
         baselineMs: 5000,
         complete: false,
+        coreComplete: false,
+        linuxAvailable: true,
+        coverage: 'partial',
         truncated: false,
         errors: 0,
         samples: [
@@ -712,6 +761,7 @@ test('failed wrapper proof retains safe child and host diagnostics while excludi
             available: true,
             errors: 1,
             unavailable: ['cgroupCpu'],
+            unavailableReasons: { cgroupCpu: 'unreadable' },
             secret: marker,
           },
         ],
@@ -756,4 +806,114 @@ test('unexpected wrapper signals retain a fixed safe failure category before ass
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+function coverageFixture() {
+  const ledger = validLedger();
+  ledger.events.push(
+    { event: 'statfs-start', atMs: 0, ordinal: 1 },
+    { event: 'benchmark-raw-write', atMs: 1, success: true },
+  );
+  const sample = {
+    available: true,
+    errors: 0,
+    unavailable: [],
+    unavailableReasons: {},
+    cpuTicks: Array(10).fill(1),
+  };
+  for (const [field, keys] of Object.entries(metricFields))
+    sample[field] = Object.fromEntries(keys.map((key) => [key, 1]));
+  for (const field of ['cpuPressure', 'memoryPressure', 'ioPressure'])
+    sample[field] = Object.fromEntries(pressureFields.map((key) => [key, 0]));
+  return {
+    observation: { processes: [ledger], errors: 0, missing: false, truncated: false },
+    host: { platform: 'linux', errors: 0, truncated: false, samples: [sample] },
+  };
+}
+function missingMetric(host, field, reason) {
+  const sample = host.samples[0];
+  delete sample[field];
+  sample.errors = 1;
+  sample.unavailable = [field];
+  sample.unavailableReasons = { [field]: reason };
+}
+test('an auxiliary-only host gap is eligible but explicitly partial and incomplete', () => {
+  const { observation, host } = coverageFixture();
+  missingMetric(host, 'cgroupMemoryEvents', 'absent');
+  const result = diagnosticCoverage(observation, host);
+  assert.equal(result.processComplete, true);
+  assert.equal(result.host.coreComplete, true);
+  assert.equal(result.host.complete, false);
+  assert.equal(result.host.coverage, 'partial');
+  assert.equal(result.complete, false);
+  assert.equal(result.diagnosticEligibility, true);
+  assert.equal(result.diagnosticScope, 'linux-diagnostic');
+  assert.equal(Object.hasOwn(host.samples[0], 'cgroupMemoryEvents'), false);
+  assert.deepEqual(host.samples[0].unavailableReasons, { cgroupMemoryEvents: 'absent' });
+});
+test('a core host gap cannot qualify the diagnostic', () => {
+  const { observation, host } = coverageFixture();
+  missingMetric(host, 'cgroupCpu', 'unreadable');
+  const result = diagnosticCoverage(observation, host);
+  assert.equal(result.processComplete, true);
+  assert.equal(result.host.coreComplete, false);
+  assert.equal(result.host.complete, false);
+  assert.equal(result.diagnosticEligibility, false);
+});
+test('a malformed process ledger cannot qualify even with full host coverage', () => {
+  const { observation, host } = coverageFixture();
+  observation.processes[0].capabilities = { 'gc,rawWrite,statfs,worker': true };
+  const result = diagnosticCoverage(observation, host);
+  assert.equal(result.host.complete, true);
+  assert.equal(result.processComplete, false);
+  assert.equal(result.complete, false);
+  assert.equal(result.diagnosticEligibility, false);
+});
+test('fully available valid observations are complete and eligible', () => {
+  const { observation, host } = coverageFixture();
+  const result = diagnosticCoverage(observation, host);
+  assert.equal(result.processComplete, true);
+  assert.equal(result.host.coreComplete, true);
+  assert.equal(result.host.complete, true);
+  assert.equal(result.host.coverage, 'full');
+  assert.equal(result.complete, true);
+  assert.equal(result.diagnosticEligibility, true);
+});
+test('resource failure reasons expose only fixed categories, never errors or paths', () => {
+  const marker = '/private/untrusted-error-marker';
+  for (const [code, reason] of [
+    ['ENOENT', 'absent'],
+    ['EACCES', 'unreadable'],
+    ['EPERM', 'unreadable'],
+    ['INVALID_OBSERVER_COUNTERS', 'invalid'],
+    ['private-code-marker', 'other'],
+  ]) {
+    const projected = resourceFailureReason(
+      Object.assign(new Error(marker), { code, path: marker }),
+    );
+    assert.equal(projected, reason);
+    assert.equal(projected.includes(marker), false);
+    assert.equal(projected.includes(code), false);
+  }
+  assert.equal(resourceFailureReason(new Error(marker)), 'other');
+});
+
+test('missing core counters cannot qualify through stale successful gap flags', () => {
+  const { observation, host } = coverageFixture();
+  delete host.samples[0].memoryKiB;
+  const result = diagnosticCoverage(observation, host);
+  assert.equal(host.samples[0].errors, 0);
+  assert.deepEqual(host.samples[0].unavailable, []);
+  assert.equal(result.host.coreComplete, false);
+  assert.equal(result.diagnosticEligibility, false);
+});
+test('empty host samples cannot qualify through stale complete flags', () => {
+  const { observation, host } = coverageFixture();
+  host.samples = [];
+  host.complete = true;
+  host.coreComplete = true;
+  const result = diagnosticCoverage(observation, host);
+  assert.equal(result.host.coreComplete, false);
+  assert.equal(result.host.complete, false);
+  assert.equal(result.diagnosticEligibility, false);
 });

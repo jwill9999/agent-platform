@@ -1,24 +1,27 @@
-# Provider SDK — diagnostic evidence recovery, 19 October 2026
+# Provider SDK — capability-aware diagnostic, 19 October 2026
 
-PR362, PR364 and PR365 are merged into the feature at95d1cdbf, with reviewed tree3f054d13.
-Protected PR363 remains blocked by its measured22.982728ms benchmark overhead against20ms.
-Its API604/DB236, browser, clean72 Electron, actual packaged VM20, full scans, CodeQL and Sonar
-slices do not waive that failure. Earlier handoffs below remain verbatim history.
+PR362, PR364 and PR365 merged into the feature at95d1cdbf. Protected PR363 remains blocked by
+measured22.982728ms benchmark overhead against20ms. Its API604/DB236, browser, clean72 Electron,
+packaged VM20 and security slices do not waive that failure. Earlier handoffs remain verbatim history.
 
-PR366 opening headbf374458 passed ordinary tests and browser checks. Its first Linux helper
-control failed on wrapper exit1;13 others passed. Neither benchmark command ran. The failed control
-saved its proof after assertions, so its child/observer/host cause was not uploaded and is unknown.
-Reviewed corrections now validate exact schema keys and complete numeric counters, correlate the
-actual worker's successful close/exit, and retain safe proof before assertions. All29 local tiny
-controls pass with no failures, skips or cancellations; Linux availability is not established by
-these macOS controls. No local full benchmark or product-deadline change is included.
+PR366 openingbf374458 failed its first Linux helper control before both benchmark commands; its
+cause was not uploaded. The ca2c319f follow-up retained evidence: actual child0 and valid process
+observations, but all seven host samples lacked only the auxiliary cgroupMemoryEvents counter.
+Again neither full benchmark ran. The fixed root metric is not universally available; its historical
+read-error reason remains unknown. Do not attribute these helper failures to application overhead.
 
-Critique approved one continuation restricted to PR366's task branch, synchronize frombf374458,
-attempt1. Controls still block both commands on failure; an observed pass cannot replace the
-unchanged fresh uninstrumented gate. Final combined review, normal hooks and fresh hosted
-qualification remain required. Current check and delivery state belongs in Beads and PR363.
-Owner-app preflight awaits Mac unlock; no staging/live/stress readiness, paid calls, profile/key
-changes, paused orchestration integration, main promotion or delivered-branch cleanup is claimed.
+Reviewed correction separates complete process/core evidence required for diagnostic eligibility
+from total host coverage. Any missing metric keeps host.complete=false and explicit partial or
+unavailable coverage; fixed failure reasons replace raw errors. No zero imputation or ignored core
+gap. All36 local tiny controls pass without failures/skips/cancellations, including stale flags,
+empty samples, optional-only gaps and actual worker identity. Mac controls explicitly do not qualify
+Linux coverage. No local full benchmark or product-deadline change is included.
+
+One continuation is restricted to PR366's task, synchronize fromca2c319f and attempt1. Controls
+still block both commands on failure; an eligible observed run cannot replace the unchanged fresh
+uninstrumented gate. Final combined review, normal hooks and new hosted checks remain required.
+Current delivery/checks belong in Beads and PR363. Owner-app preflight awaits Mac unlock; no staged,
+live-model/stress readiness, paid calls, profile/key changes, paused integration or cleanup claimed.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Previous handoff follows verbatim; its pending statements are historical. -->

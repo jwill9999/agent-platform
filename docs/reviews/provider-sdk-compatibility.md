@@ -1,6 +1,6 @@
 # Provider SDK compatibility review and results
 
-Status: 19 October 2026. PR362, PR364 and PR365 merged into the feature at `95d1cdbf`. Protected PR363 remains blocked by its measured 22.982728 ms benchmark overhead against the 20 ms limit, despite clear security scans and 72 Electron cases passing without retries. PR366's opening CI passed the ordinary suite and browser checks, but its first Linux diagnostic-helper control failed before either benchmark command ran. The exact helper failure cause was not retained. Independent review approved bounded schema/counter/control-evidence corrections and one continuation anchored to that exact prior head; fresh checks and review remain required. No owner-app or live/stress readiness is claimed.
+Status: 19 October 2026. PR362, PR364 and PR365 merged into the feature at `95d1cdbf`. Protected PR363 remains blocked by measured 22.982728 ms benchmark overhead against the 20 ms limit. PR366's ca2 follow-up passed ordinary and browser checks; its retained helper proof identifies an unavailable auxiliary Linux cgroup memory counter despite a successful child and complete core observations. Neither full benchmark has run. Independent critique approved explicit partial coverage with separate process/core eligibility and one narrowly guarded continuation. Fresh checks and review remain required; no staging, owner-app or live/stress readiness is claimed.
 Earlier pending states below retain their named source/time bindings and do not override this checkpoint.
 [Plan](../planning/provider-sdk-compatibility.md),
 [verification](../testing/provider-sdk-compatibility.md).
@@ -743,12 +743,10 @@ successful acknowledgement and exit status. It preserves numeric-only observatio
 sampling bounds and every benchmark workload/assertion/deadline. These independently justified
 corrections do not establish the opening control's missing cause.
 
-The failed-control evidence must be saved before success assertions, with fixed missing/invalid
-indicators and safe statuses rather than raw errors, output, paths or environment. Critique approved
-one continuation only for PR366's exact task branch, synchronize event from `bf374458` and attempt 1.
-Subsequent pushes, reruns and protected feature promotion cannot select it. Controls still block
-both benchmark commands on failure. No local full benchmark or unchanged failed-input rerun is
-included; fresh focused controls, final source review and normal hooks precede that continuation.
+The failed-control evidence is saved before success assertions, with fixed missing/invalid
+indicators and safe statuses rather than raw errors, output, paths or environment. The reviewed
+ca2 continuation selected only PR366's exact task branch, synchronize event from `bf374458` and
+attempt 1. Its records remain bound to that source; no full benchmark is inferred from the attempt.
 
 The corrected local suite passes all 29 tiny controls in 26.502 seconds, with zero failures,
 skips or cancellations. The real pnpm/Vitest-fork proof is persisted before assertions and records
@@ -758,7 +756,44 @@ joined, missing and extra keys, incomplete/nonfinite counters and incomplete pre
 ESLint, formatting and diff checks pass. These macOS controls do not establish Linux counter
 availability. The original benchmark file and every pre-existing workflow object remain unchanged;
 12 trigger cases verify that only the opening and exact-prior-head continuation select the helper.
-Final combined source/evidence review, normal hooks and new hosted checks remain required.
+Final combined source/evidence review, normal hooks and new hosted checks remained required at
+that local checkpoint.
+
+### Auxiliary cgroup capability correction
+
+The ca2 continuation CI39199762479 retained the missing evidence: 28 of 29 tiny controls passed,
+and the actual pnpm/Vitest child succeeded. Its wrapper exited1 solely because all seven Linux
+host samples lacked cgroupMemoryEvents. The three ledgers, matching raw owner/clock and successful
+worker close/exit are valid; CPU10, memory5, cgroupCPU6 and all three pressure counter sets are
+complete. Artifact12163534321 contains only the control report, so again no full observed benchmark
+ran and the original normal gate correctly skipped. The unavailable metric's precise read-error
+category was not retained; no historical ENOENT assertion is made.
+
+The sampler requests memory.events at the cgroup root, while the
+[Linux cgroup documentation](https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files)
+specifies that interface for non-root cgroups. Requiring this auxiliary counter universally is an
+incorrect capability assumption. Independent critique approved a bounded correction without a new
+cgroup-discovery collector: retain host.complete=false and explicit partial coverage for any gap,
+separately require complete process Worker/probe/raw and core-host observations for diagnostic
+eligibility, and preserve fixed absent/unreadable/invalid/other reasons. Missing or malformed core
+data cannot become eligible; no zeros or complete-coverage claims are substituted for unavailable
+data. Non-Linux local controls remain explicitly scoped rather than qualifying Linux coverage.
+
+One further continuation is restricted to PR366's task branch, synchronize from `ca2c319f` and
+attempt1. It follows this specific source-backed correction, not an unchanged rerun. Controls still
+block both benchmark commands on failure; the separate original fresh uninstrumented gate remains
+unchanged and mandatory. New focused controls, frozen independent review and normal hooks precede
+that continuation. No local full benchmark, product change or performance threshold/deadline waiver.
+
+The capability-aware implementation passes all 36 tiny controls in 26.504 seconds, with zero
+failures, skips or cancellations. Optional-only gaps remain eligible but partial/incomplete; missing
+or malformed core fields, stale error flags, empty samples and malformed ledgers cannot qualify.
+The actual Mac pnpm/Vitest fork succeeds with explicit non-linux-control-only scope and host/core/
+complete=false, so it makes no Linux coverage claim. Safe read-failure reason projections pass
+privacy controls. Syntax, lint, formatting, direct Markdown and diff checks pass. All original
+workflow objects and benchmark bytes remain unchanged; 13 trigger cases include rejection of the
+former bf37 continuation. Frozen combined review, normal hooks and actual hosted execution remain
+required before any merge qualification.
 
 At protected95d1, both full scans39195037863/39195062021 completed genuine five-batch analysis without findings;
 new CodeQL Actions/JavaScript/Swift analyses have zero results, alert12 is fixed without dismissal,
