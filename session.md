@@ -1,3 +1,17 @@
+# Husky secret-scan hook — 24 October 2026
+
+`.husky/pre-commit` now runs the owner's shared `~/.agents/git/hooks/secret-scan.sh` (gitleaks,
+staged changes) before lint-staged, and skips it cleanly when not installed. Husky's
+`core.hooksPath` had bypassed the global hook. PR381 delivers task/husky-secret-scan (from
+staging) directly into staging; Beads agent-platform-husky-secret-scan is in_progress pending
+review/merge. Developer hook only: it adds executable local hook behaviour but no CI,
+dependency or runtime change. The same batch (Beads agent-platform-user-skills-location) points
+reusable-skill guidance at `~/.agents/skills`, the user location in the current Codex skills guide,
+instead of `~/.codex/skills`; dated evidence and plans keep their original paths.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier handoff follows verbatim. -->
+
 # Monitoring preparation checkpoint
 
 Owner app50f6 is running. One authorized OpenAI chat returned Connection OK;1attempt/no tools/retries,

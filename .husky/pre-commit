@@ -1,3 +1,9 @@
+# Shared gitleaks secret scan from ~/.agents — blocking when installed, skipped otherwise.
+# Husky's core.hooksPath bypasses the global hook, so it is called here explicitly.
+if [ -x "$HOME/.agents/git/hooks/secret-scan.sh" ]; then
+  "$HOME/.agents/git/hooks/secret-scan.sh"
+fi
+
 pnpm exec lint-staged
 
 # Session handoff reminder — non-blocking, informational only
