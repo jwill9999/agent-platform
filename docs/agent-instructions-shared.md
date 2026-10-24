@@ -271,7 +271,8 @@ external publication requires an explicit owner request covering the destination
 Task approval, publication-tool access, home-installed skills and older plans do not grant that
 permission. Routine changes do not require Notion mirrors or generated publication payload/readback
 files; older mandatory-publication wording is historical and superseded for new work. Create new reusable skills under
-`$CODEX_HOME/skills` (default `~/.codex/skills`), not in this repository, unless the owner requests
+the shared user skills directory `~/.agents/skills`
+([Codex skills guide](https://learn.chatgpt.com/docs/build-skills)), not in this repository, unless the owner requests
 another destination. Existing project-specific skills remain in place.
 
 | Document                                                          | Contents                                                                                                     |
