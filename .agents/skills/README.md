@@ -36,8 +36,8 @@ Use [documentation](documentation/SKILL.md) for repository locations and authori
 External publication is performed only when explicitly requested. Routine changes do not require
 Notion mirrors or generated publication files.
 
-Keep the existing project-specific skills here. Create new reusable skills in the owner's Codex home
-skills directory (`$CODEX_HOME/skills`, default `~/.codex/skills`), not in this repository. Use supported
+Keep the existing project-specific skills here. Create new reusable skills in the owner's shared user
+skills directory (`~/.agents/skills`, which Codex reads alongside this folder), not in this repository. Use supported
 discovery links for other coding interfaces when requested; do not create another source copy here.
 
 ## Native development default

@@ -5,7 +5,9 @@ staged changes) before lint-staged, and skips it cleanly when not installed. Hus
 `core.hooksPath` had bypassed the global hook. PR381 delivers task/husky-secret-scan (from
 staging) directly into staging; Beads agent-platform-husky-secret-scan is in_progress pending
 review/merge. Developer hook only: it adds executable local hook behaviour but no CI,
-dependency or runtime change.
+dependency or runtime change. The same batch (Beads agent-platform-user-skills-location) points
+reusable-skill guidance at `~/.agents/skills`, the user location in the current Codex skills guide,
+instead of `~/.codex/skills`; dated evidence and plans keep their original paths.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Earlier handoff follows verbatim. -->
