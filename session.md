@@ -2,9 +2,10 @@
 
 `.husky/pre-commit` now runs the owner's shared `~/.agents/git/hooks/secret-scan.sh` (gitleaks,
 staged changes) before lint-staged, and skips it cleanly when not installed. Husky's
-`core.hooksPath` had bypassed the global hook. Delivered task/husky-secret-scan →
-feature/husky-secret-scan (cut from staging); Beads agent-platform-husky-secret-scan is
-in_progress pending PR review/merge. Local hook only; no CI, dependency or runtime change.
+`core.hooksPath` had bypassed the global hook. PR381 delivers task/husky-secret-scan (from
+staging) directly into staging; Beads agent-platform-husky-secret-scan is in_progress pending
+review/merge. Developer hook only: it adds executable local hook behaviour but no CI,
+dependency or runtime change.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Earlier handoff follows verbatim. -->
