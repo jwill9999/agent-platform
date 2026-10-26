@@ -2,6 +2,7 @@
 /* global console, process */
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { parseArgs as parseCliArgs } from 'node:util';
 
 const SECURITY_BINARY = '/usr/bin/security';
 // A service name that is never stored, so the probe only searches and never reads a secret.
@@ -16,37 +17,34 @@ const REMEDIATION =
   'with the login Keychain unlocked (for example after a reboot, log in on the runner Mac, then ' +
   're-run the job).';
 
-function usage(exitCode = 1) {
-  console.error(
-    [
-      'Usage: node scripts/check-macos-keychain.mjs [--json]',
-      '',
-      'Checks that the default macOS Keychain can be searched without user interaction',
-      'before the native secure-storage check runs. No Keychain item is read or created.',
-    ].join('\n'),
-  );
-  process.exit(exitCode);
-}
+const USAGE = [
+  'Usage: node scripts/check-macos-keychain.mjs [--json]',
+  '',
+  'Checks that the default macOS Keychain can be searched without user interaction',
+  'before the native secure-storage check runs. No Keychain item is read or created.',
+].join('\n');
 
 export function parseArgs(argv) {
-  const scriptArgs = [...argv];
-  if (scriptArgs[0] === '--') scriptArgs.shift();
-  const options = { json: false };
-  for (const arg of scriptArgs) {
-    switch (arg) {
-      case '--help':
-      case '-h':
-        usage(0);
-        break;
-      case '--json':
-        options.json = true;
-        break;
-      default:
-        console.error(`Unknown argument: ${arg}`);
-        usage();
-    }
+  const args = [...argv];
+  if (args[0] === '--') args.shift();
+  let values;
+  try {
+    ({ values } = parseCliArgs({
+      args,
+      options: {
+        json: { type: 'boolean', default: false },
+        help: { type: 'boolean', short: 'h', default: false },
+      },
+    }));
+  } catch (error) {
+    console.error(`${error.message}\n\n${USAGE}`);
+    process.exit(1);
   }
-  return options;
+  if (values.help) {
+    console.error(USAGE);
+    process.exit(0);
+  }
+  return { json: values.json };
 }
 
 /** Classifies a `security find-generic-password` probe result into a preflight report. */
