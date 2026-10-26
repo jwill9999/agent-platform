@@ -1,3 +1,16 @@
+# Dependency upgrade preview rework — 26 October 2026
+
+PR373 (Beads agent-platform-dependency-upgrade-preview, still in progress) was rebased from the unused
+feature/dependency-upgrade-preview base onto staging `d59e392c` and retargeted to staging. The plan
+now records exact action revisions (verified with `git ls-remote`), a PR369 setup-node slice and
+per-slice rollback boundaries; the task spec gains sign-off sections; the review record answers the
+five Sourcery findings (four accepted, the scope finding declined). Planning only: no package,
+workflow or runtime change. Not re-verified: Electron42 and Next15 support dates, which have passed.
+Next: owner discussion of Electron and Next targets; PR373 merge needs owner authority.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier handoff follows verbatim. -->
+
 # Dependency upgrade preview — 19 October 2026
 
 P1 agent-platform-dependency-upgrade-preview records the owner-requested major-upgrade impact
