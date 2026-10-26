@@ -89,6 +89,9 @@ jobs:
       - name: Test macOS VM build-output discovery
         run: node --test apps/desktop/scripts/resolve-macos-vm-helper.node-test.mjs
 
+      - name: Test macOS Keychain preflight classification
+        run: node --test apps/desktop/scripts/check-macos-keychain.node-test.mjs
+
       - name: Test historical archive trust boundaries
         run: >-
           node --test scripts/classify-historical-evidence.test.mjs
@@ -494,6 +497,11 @@ jobs:
 
       - name: Install Electron binary
         run: node scripts/install-electron-binary.mjs
+
+      - name: Check runner Keychain is unlocked
+        timeout-minutes: 1
+        # Separates a locked self-hosted runner Keychain from a secure-storage regression.
+        run: pnpm --filter @agent-platform/desktop native:keychain:check
 
       - name: Verify native macOS secure-storage startup
         timeout-minutes: 2
