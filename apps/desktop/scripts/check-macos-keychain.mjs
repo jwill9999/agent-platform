@@ -66,7 +66,8 @@ export function classifyProbe({ status, stderr = '', timedOut = false, spawnErro
   if (LOCKED_PATTERNS.some((pattern) => pattern.test(detail))) {
     return report(false, 'keychain_locked', detail);
   }
-  return report(false, 'probe_failed', `exit status ${status}${detail ? `: ${detail}` : ''}`);
+  const suffix = detail ? `: ${detail}` : '';
+  return report(false, 'probe_failed', `exit status ${status}${suffix}`);
 }
 
 function report(ok, state, detail) {
