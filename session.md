@@ -1,3 +1,19 @@
+# Runner Keychain preflight — 26 October 2026
+
+PR381's only failing check was `staging-packaged-macos-vm-e2e`: the native secure-storage step hit
+`errSecInteractionNotAllowed (-25308)` on the self-hosted runner at about 22:18 on 24 October,
+shortly after the runner service started, so the login Keychain was not usable. It is a runner
+environment fault, not a PR381 regression (the batch changes only the pre-commit hook and docs);
+the check passed locally once dependencies matched the lockfile, and the failed job was re-run.
+49888ed1 adds `apps/desktop/scripts/check-macos-keychain.mjs` (`native:keychain:check`) before
+that step: it searches for a never-stored service name with a 15s bound and reports a locked
+Keychain as a runner-environment problem with remediation. Five node tests run in the existing
+test job. Beads agent-platform-hev2 is closed. Not verified: a real locked-Keychain run, or
+actionlint (not installed). Next: confirm the re-run and new-head checks on PR381 pass.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier handoff follows verbatim. -->
+
 # Husky secret-scan hook — 24 October 2026
 
 `.husky/pre-commit` now runs the owner's shared `~/.agents/git/hooks/secret-scan.sh` (gitleaks,
