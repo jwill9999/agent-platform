@@ -1,3 +1,21 @@
+# Git transport fixture isolation — 27 October 2026
+
+Four `apps/api/test/gitDeliveryRemote.test.ts` cases failed on every local run and blocked the
+husky pre-push hook, while CI passed. The owned SSH transport fixture ran `git receive-pack` with
+the inherited environment, so the fake remote read the developer's `~/.gitconfig`; a global
+`core.hooksPath` (the shared `~/.agents/git/hooks`) replaced the bare repository's hooks, so the
+`post-receive` hooks that simulate concurrent remote effects never ran. 0ca8ae56 runs the remote
+side with `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1` and drops inherited
+`GIT_CONFIG*` overrides; product Git delivery code is unchanged. A new transport test pushes under
+a global `core.hooksPath` and fails without the fix. Verified locally with the real global config:
+transport node tests, and 72/72 across `gitDeliveryRemote` and `gitDeliveryChat.integration`.
+Beads agent-platform-3hga is in_progress on task/git-delivery-test-hook-isolation (from staging),
+committed locally and not pushed: owner approval is needed before push/PR. A single
+`fixtureLogIsolation` desktop failure under parallel pre-push load (passes alone) is not addressed.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier handoff follows verbatim. -->
+
 # Runner Keychain preflight — 26 October 2026
 
 PR381's only failing check was `staging-packaged-macos-vm-e2e`: the native secure-storage step hit
