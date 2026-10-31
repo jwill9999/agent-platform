@@ -20,6 +20,10 @@ the upstream (`desktop-e2e` lost-PR journey). It now accepts a tracking ref equa
 head and still refuses any other change; a regression test fails without the fix (73/73 locally on
 Git 2.54). `diagnostic-performance` (timing threshold) and `staging-packaged-macos-vm-e2e` (runner
 Keychain `-25308`) failures were environmental and need a re-run on the new head.
+On 31 October `ubuntu-latest` resolved to Ubuntu 26.04, where Playwright 1.59 cannot install
+Chromium, so the `e2e` and `desktop-e2e` jobs are pinned to `ubuntu-24.04` until a Playwright
+upgrade supports 26.04. The macOS VM Keychain failure recurred and needs the runner Keychain
+unlocked; it is not a code fault.
 
 <!-- markdownlint-disable MD025 -->
 <!-- Earlier handoff follows verbatim. -->
