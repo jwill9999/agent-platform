@@ -1,3 +1,29 @@
+# Git transport fixture isolation — 27 October 2026
+
+Four `apps/api/test/gitDeliveryRemote.test.ts` cases failed on every local run and blocked the
+husky pre-push hook, while CI passed. The owned SSH transport fixture ran `git receive-pack` with
+the inherited environment, so the fake remote read the developer's `~/.gitconfig`; a global
+`core.hooksPath` (the shared `~/.agents/git/hooks`) replaced the bare repository's hooks, so the
+`post-receive` hooks that simulate concurrent remote effects never ran. 0ca8ae56 runs the remote
+side with `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1` and drops inherited
+`GIT_CONFIG*` overrides; product Git delivery code is unchanged. A new transport test pushes under
+a global `core.hooksPath` and fails without the fix. Verified locally with the real global config:
+transport node tests, and 72/72 across `gitDeliveryRemote` and `gitDeliveryChat.integration`.
+Beads agent-platform-3hga is in_progress on task/git-delivery-test-hook-isolation (from staging),
+committed locally and not pushed: owner approval is needed before push/PR. A single
+`fixtureLogIsolation` desktop failure under parallel pre-push load (passes alone) is not addressed.
+
+PR386 CI (30 October) then exposed a product bug: the GitHub runner image moved to Git 2.56.0, which
+advances `refs/remotes/<remote>/<branch>` itself when the pushed URL matches one configured remote.
+`synchroniseTracking` treated that as an independent change, so publish succeeded without setting
+the upstream (`desktop-e2e` lost-PR journey). It now accepts a tracking ref equal to the exact pushed
+head and still refuses any other change; a regression test fails without the fix (73/73 locally on
+Git 2.54). `diagnostic-performance` (timing threshold) and `staging-packaged-macos-vm-e2e` (runner
+Keychain `-25308`) failures were environmental and need a re-run on the new head.
+
+<!-- markdownlint-disable MD025 -->
+<!-- Earlier handoff follows verbatim. -->
+
 # Runner Keychain preflight — 26 October 2026
 
 PR381's only failing check was `staging-packaged-macos-vm-e2e`: the native secure-storage step hit
