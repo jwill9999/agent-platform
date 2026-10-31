@@ -26,7 +26,13 @@ try {
     join(directory, 'transport.jsonl'),
     JSON.stringify({ operation, repository: config.repository }) + '\n',
   );
+  // A real remote never reads the developer's Git configuration: a global core.hooksPath would
+  // otherwise replace the bare repository's own hooks and silently skip fixture remote effects.
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_CONFIG')),
+  );
   const result = spawnSync('/usr/bin/git', [operation, config.bareRoot], {
+    env: { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
     stdio: 'inherit',
     shell: false,
   });

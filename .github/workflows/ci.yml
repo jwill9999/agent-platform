@@ -177,7 +177,8 @@ jobs:
 
   e2e:
     needs: docker
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which Playwright 1.59 cannot install Chromium on.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       # Existing browser projects retain their qualified GitHub-read boundary.
@@ -371,7 +372,8 @@ jobs:
         run: docker compose --profile services down -v
 
   desktop-e2e:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which Playwright 1.59 cannot install Chromium on.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - name: Checkout

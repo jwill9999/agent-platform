@@ -212,14 +212,18 @@ export async function synchroniseTracking(
   try {
     await recheckRemoteConfiguration(material, action, signal);
     const remote = material.remote!;
-    if ((await readTracking(material.root, remote.trackingRef, signal)) !== remote.trackingTip)
+    // Git 2.56+ advances the tracking ref itself when the pushed URL matches one configured
+    // remote; that exact pushed head is the intended result, any other change is independent.
+    const tracking = await readTracking(material.root, remote.trackingRef, signal);
+    if (tracking !== remote.trackingTip && tracking !== material.head)
       throw new Error('tracking changed');
     await authorise();
-    await git(
-      material.root,
-      ['update-ref', '--no-deref', remote.trackingRef, material.head, remote.trackingTip],
-      signal,
-    );
+    if (tracking !== material.head)
+      await git(
+        material.root,
+        ['update-ref', '--no-deref', remote.trackingRef, material.head, remote.trackingTip],
+        signal,
+      );
     if (action.kind === 'push' && action.mode === 'publish') {
       await authorise();
       await git(material.root, ['config', `branch.${material.branch}.remote`, remote.name], signal);
