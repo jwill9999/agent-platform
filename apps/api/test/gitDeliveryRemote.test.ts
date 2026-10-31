@@ -341,6 +341,22 @@ describe('remote Git delivery with real bare Git and inert GitHub boundary', () 
     );
     expect(git(repo, 'rev-parse', material.remote.trackingRef)).toBe(other);
   });
+  it('accepts a tracking ref the push already advanced to the exact pushed head', async () => {
+    const material = await inspectGitDeliveryRepository(
+      repo,
+      repo,
+      publish,
+      AbortSignal.timeout(5000),
+    );
+    material.remote = await inspectRemote(material, publish, AbortSignal.timeout(5000));
+    // Git 2.56+ updates the tracking ref itself when pushing to a URL a configured remote uses.
+    git(repo, 'update-ref', material.remote.trackingRef, material.head);
+    expect(await synchroniseTracking(material, publish, AbortSignal.timeout(5000))).toBeUndefined();
+    expect(git(repo, 'rev-parse', material.remote.trackingRef)).toBe(material.head);
+    expect(git(repo, 'rev-parse', '--abbrev-ref', '@{upstream}')).toBe(
+      material.remote.trackingRef.slice('refs/remotes/'.length),
+    );
+  });
   it('push reconciliation uses the stored exact destination and fresh network permission', async () => {
     await execute(publish);
     writeFileSync(join(repo, 'file.txt'), 'next');
