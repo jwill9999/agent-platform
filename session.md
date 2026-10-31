@@ -13,6 +13,14 @@ Beads agent-platform-3hga is in_progress on task/git-delivery-test-hook-isolatio
 committed locally and not pushed: owner approval is needed before push/PR. A single
 `fixtureLogIsolation` desktop failure under parallel pre-push load (passes alone) is not addressed.
 
+PR386 CI (30 October) then exposed a product bug: the GitHub runner image moved to Git 2.56.0, which
+advances `refs/remotes/<remote>/<branch>` itself when the pushed URL matches one configured remote.
+`synchroniseTracking` treated that as an independent change, so publish succeeded without setting
+the upstream (`desktop-e2e` lost-PR journey). It now accepts a tracking ref equal to the exact pushed
+head and still refuses any other change; a regression test fails without the fix (73/73 locally on
+Git 2.54). `diagnostic-performance` (timing threshold) and `staging-packaged-macos-vm-e2e` (runner
+Keychain `-25308`) failures were environmental and need a re-run on the new head.
+
 <!-- markdownlint-disable MD025 -->
 <!-- Earlier handoff follows verbatim. -->
 
